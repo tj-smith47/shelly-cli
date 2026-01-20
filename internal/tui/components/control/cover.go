@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 )
 
 // CoverState holds the current state of a cover/roller.
@@ -155,9 +156,9 @@ func (m CoverModel) handleKeyPress(msg tea.KeyPressMsg) (CoverModel, tea.Cmd) {
 		return m, nil
 	case key.Matches(msg, key.NewBinding(key.WithKeys("C"))):
 		return m.executeCalibrate()
-	case key.Matches(msg, key.NewBinding(key.WithKeys("tab"))):
+	case key.Matches(msg, key.NewBinding(key.WithKeys(keyconst.KeyTab))):
 		return m.cycleFocus(), nil
-	case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
+	case key.Matches(msg, key.NewBinding(key.WithKeys(keyconst.KeyEnter))):
 		if m.focus == coverFocusActions {
 			return m.executeSelectedAction()
 		}

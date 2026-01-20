@@ -5,9 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 const testDevice = "192.168.1.100"
@@ -211,7 +210,7 @@ func TestModel_Update_InputsLoadedError(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_Navigation(t *testing.T) {
+func TestModel_HandleAction_Navigation(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
@@ -223,48 +222,48 @@ func TestModel_HandleKey_Navigation(t *testing.T) {
 	m.Scroller.SetItemCount(len(m.inputs))
 
 	// Move down
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.Cursor() != 1 {
-		t.Errorf("cursor after j = %d, want 1", updated.Cursor())
+		t.Errorf("cursor after NavDown = %d, want 1", updated.Cursor())
 	}
 
 	// Move down again
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.Cursor() != 2 {
-		t.Errorf("cursor after second j = %d, want 2", updated.Cursor())
+		t.Errorf("cursor after second NavDown = %d, want 2", updated.Cursor())
 	}
 
 	// Move up
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'k'})
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
 	if updated.Cursor() != 1 {
-		t.Errorf("cursor after k = %d, want 1", updated.Cursor())
+		t.Errorf("cursor after NavUp = %d, want 1", updated.Cursor())
 	}
 }
 
-func TestModel_HandleKey_Refresh(t *testing.T) {
+func TestModel_HandleAction_Refresh(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 	m.device = testDevice
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'r'})
+	updated, cmd := m.Update(messages.RefreshRequestMsg{})
 
 	if !updated.loading {
-		t.Error("should be loading after 'r' key")
+		t.Error("should be loading after RefreshRequestMsg")
 	}
 	if cmd == nil {
 		t.Error("should return refresh command")
 	}
 }
 
-func TestModel_HandleKey_NotFocused(t *testing.T) {
+func TestModel_HandleAction_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = false
 	m.inputs = []shelly.InputInfo{{ID: 0}}
 	m.Scroller.SetItemCount(len(m.inputs))
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavDown})
 
 	if updated.Cursor() != 0 {
 		t.Error("cursor should not change when not focused")

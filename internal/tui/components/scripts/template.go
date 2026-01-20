@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -148,7 +149,7 @@ func (m TemplateModel) handleKey(msg tea.KeyPressMsg) (TemplateModel, tea.Cmd) {
 			m = m.adjustScroll()
 		}
 
-	case "enter":
+	case keyconst.KeyEnter:
 		if m.cursor >= 0 && m.cursor < len(m.templates) {
 			tpl := m.templates[m.cursor]
 			m = m.Hide()
@@ -163,7 +164,7 @@ func (m TemplateModel) handleKey(msg tea.KeyPressMsg) (TemplateModel, tea.Cmd) {
 			}
 		}
 
-	case "tab":
+	case keyconst.KeyTab:
 		// Toggle append/replace mode
 		m.append = !m.append
 

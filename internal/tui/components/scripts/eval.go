@@ -131,6 +131,10 @@ func (m EvalModel) Update(msg tea.Msg) (EvalModel, tea.Cmd) {
 		return m, nil
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m EvalModel) handleMessage(msg tea.Msg) (EvalModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case EvalResultMsg:
 		m.running = false
@@ -143,6 +147,16 @@ func (m EvalModel) Update(msg tea.Msg) (EvalModel, tea.Cmd) {
 		m.err = nil
 		return m, nil
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		// Single field component - navigation not applicable
+		return m, nil
+	case messages.ClearRequestMsg:
+		// Clear input
+		m.input = m.input.SetValue("")
+		m.result = ""
+		m.err = nil
+		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -154,6 +168,7 @@ func (m EvalModel) Update(msg tea.Msg) (EvalModel, tea.Cmd) {
 }
 
 func (m EvalModel) handleKey(msg tea.KeyPressMsg) (EvalModel, tea.Cmd) {
+	// Modal-specific keys not covered by action messages
 	switch msg.String() {
 	case keyconst.KeyEsc, "q":
 		m = m.Hide()
@@ -168,12 +183,6 @@ func (m EvalModel) handleKey(msg tea.KeyPressMsg) (EvalModel, tea.Cmd) {
 		m.result = ""
 		m.err = nil
 		return m, m.evalCmd(code)
-
-	case "ctrl+c":
-		// Clear input
-		m.input = m.input.SetValue("")
-		m.result = ""
-		m.err = nil
 	}
 
 	// Forward to input

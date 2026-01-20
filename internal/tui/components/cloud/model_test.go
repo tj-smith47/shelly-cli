@@ -5,9 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 const testDevice = "192.168.1.100"
@@ -251,61 +250,45 @@ func TestModel_Update_ToggleResultError(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_Toggle(t *testing.T) {
+func TestModel_HandleAction_Toggle(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 	m.device = testDevice
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+	updated, cmd := m.Update(messages.ToggleEnableRequestMsg{})
 
 	if !updated.toggling {
-		t.Error("should be toggling after 't' key")
+		t.Error("should be toggling after toggle request")
 	}
 	if cmd == nil {
 		t.Error("should return toggle command")
 	}
 }
 
-func TestModel_HandleKey_ToggleEnter(t *testing.T) {
+func TestModel_HandleAction_Refresh(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 	m.device = testDevice
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-
-	if !updated.toggling {
-		t.Error("should be toggling after enter key")
-	}
-	if cmd == nil {
-		t.Error("should return toggle command")
-	}
-}
-
-func TestModel_HandleKey_Refresh(t *testing.T) {
-	t.Parallel()
-	m := newTestModel()
-	m.focused = true
-	m.device = testDevice
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'r'})
+	updated, cmd := m.Update(messages.RefreshRequestMsg{})
 
 	if !updated.loading {
-		t.Error("should be loading after 'r' key")
+		t.Error("should be loading after refresh request")
 	}
 	if cmd == nil {
 		t.Error("should return refresh command")
 	}
 }
 
-func TestModel_HandleKey_NotFocused(t *testing.T) {
+func TestModel_HandleAction_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = false
 	m.device = testDevice
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+	updated, cmd := m.Update(messages.ToggleEnableRequestMsg{})
 
 	if updated.toggling {
 		t.Error("should not toggle when not focused")
@@ -315,12 +298,12 @@ func TestModel_HandleKey_NotFocused(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_NoDevice(t *testing.T) {
+func TestModel_HandleAction_NoDevice(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+	updated, cmd := m.Update(messages.ToggleEnableRequestMsg{})
 
 	if updated.toggling {
 		t.Error("should not toggle without device")
@@ -330,14 +313,14 @@ func TestModel_HandleKey_NoDevice(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_AlreadyToggling(t *testing.T) {
+func TestModel_HandleAction_AlreadyToggling(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 	m.device = testDevice
 	m.toggling = true
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+	updated, cmd := m.Update(messages.ToggleEnableRequestMsg{})
 
 	if cmd != nil {
 		t.Error("should not return command while toggling")

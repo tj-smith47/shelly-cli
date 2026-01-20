@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -235,58 +236,51 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m.handleExport(msg)
 	case ImportTemplateMsg:
 		return m.handleImport(msg)
-
-	// Action messages from context-based keybindings
 	case messages.NavigationMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleNavigation(msg)
-	case messages.NewRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		return m, func() tea.Msg { return CreateTemplateMsg{} }
-	case messages.EditRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		return m.editTemplate()
-	case messages.DeleteRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleDeleteKey()
-	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		m.loading = true
-		return m, tea.Batch(m.Loader.Tick(), m.loadTemplates())
-	case messages.ExportRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		return m.exportTemplate()
-	case messages.ImportRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		return m.importTemplate()
-
+		return m.handleNavigationMsg(msg)
+	case messages.NewRequestMsg, messages.EditRequestMsg,
+		messages.RefreshRequestMsg, messages.ExportRequestMsg, messages.ImportRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
+	}
+	return m, nil
+}
+
+func (m ListModel) handleNavigationMsg(msg messages.NavigationMsg) (ListModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m ListModel) handleActionMsg(msg tea.Msg) (ListModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
+	case messages.NewRequestMsg:
+		m.pendingDelete = ""
+		return m, func() tea.Msg { return CreateTemplateMsg{} }
+	case messages.EditRequestMsg:
+		m.pendingDelete = ""
+		return m.editTemplate()
+	case messages.RefreshRequestMsg:
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		m.loading = true
+		return m, tea.Batch(m.Loader.Tick(), m.loadTemplates())
+	case messages.ExportRequestMsg:
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		return m.exportTemplate()
+	case messages.ImportRequestMsg:
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		return m.importTemplate()
 	}
 	return m, nil
 }
@@ -334,7 +328,7 @@ func (m ListModel) handleImport(msg ImportTemplateMsg) (ListModel, tea.Cmd) {
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	// Component-specific keys not in context system
 	switch msg.String() {
-	case "enter", "a":
+	case keyconst.KeyEnter, "a":
 		// Apply template to device
 		m.pendingDelete = ""
 		return m.applyTemplate()
@@ -342,7 +336,10 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		// Diff template vs device
 		m.pendingDelete = ""
 		return m.diffTemplate()
-	case "esc":
+	case "D":
+		// Delete template (Shift+D)
+		return m.handleDeleteKey()
+	case keyconst.KeyEsc:
 		// Cancel pending delete
 		if m.pendingDelete != "" {
 			m.pendingDelete = ""

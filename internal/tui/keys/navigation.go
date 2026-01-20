@@ -1,6 +1,9 @@
 package keys
 
-import "github.com/tj-smith47/shelly-cli/internal/tui/panel"
+import (
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+)
 
 // ScrollNavigator defines the interface for scrollable components.
 // This matches the *panel.Scroller methods used for list navigation.
@@ -42,9 +45,9 @@ func HandleScrollNavigation(key string, nav ScrollNavigator) bool {
 		nav.CursorToStart()
 	case "G":
 		nav.CursorToEnd()
-	case "ctrl+d", "pgdown":
+	case keyconst.KeyCtrlD, keyconst.KeyPgDown:
 		nav.PageDown()
-	case "ctrl+u", "pgup":
+	case keyconst.KeyCtrlU, keyconst.KeyPgUp:
 		nav.PageUp()
 	default:
 		return false

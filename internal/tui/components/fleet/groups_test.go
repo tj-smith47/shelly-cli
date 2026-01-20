@@ -172,7 +172,7 @@ func TestGroupsModel_handleGroupToggle_NoFleet(t *testing.T) {
 	m.focused = true
 
 	// Without fleet manager, toggle should be a no-op
-	m, cmd := m.handleKey(tea.KeyPressMsg{Code: 't'})
+	_, cmd := m.handleKey(tea.KeyPressMsg{Code: 't'})
 	if cmd != nil {
 		t.Error("toggle without fleet should return nil cmd")
 	}

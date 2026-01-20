@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 // mockCache creates a mock cache for testing.
@@ -114,35 +115,41 @@ func TestCursorNavigation(t *testing.T) {
 		t.Errorf("expected cursor=0, got %d", m.Cursor())
 	}
 
-	// Move down
-	m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
+	// Move down via NavigationMsg (how app.go dispatches j/k)
+	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if m.Cursor() != 1 {
-		t.Errorf("expected cursor=1 after j, got %d", m.Cursor())
+		t.Errorf("expected cursor=1 after NavDown, got %d", m.Cursor())
 	}
 
 	// Move down again
-	m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
+	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if m.Cursor() != 2 {
-		t.Errorf("expected cursor=2 after j, got %d", m.Cursor())
+		t.Errorf("expected cursor=2 after NavDown, got %d", m.Cursor())
 	}
 
 	// Move up
-	m, _ = m.Update(tea.KeyPressMsg{Code: 'k'})
+	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavUp})
 	if m.Cursor() != 1 {
-		t.Errorf("expected cursor=1 after k, got %d", m.Cursor())
+		t.Errorf("expected cursor=1 after NavUp, got %d", m.Cursor())
 	}
 
-	// Go to start (gg pattern)
+	// Go to start via NavHome
+	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavHome})
+	if m.Cursor() != 0 {
+		t.Errorf("expected cursor=0 after NavHome, got %d", m.Cursor())
+	}
+
+	// Go to end via NavEnd
+	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavEnd})
+	if m.Cursor() != 2 {
+		t.Errorf("expected cursor=2 after NavEnd, got %d", m.Cursor())
+	}
+
+	// Test gg pattern via raw key (component-specific behavior retained)
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'g'})
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'g'})
 	if m.Cursor() != 0 {
 		t.Errorf("expected cursor=0 after gg, got %d", m.Cursor())
-	}
-
-	// Go to end
-	m, _ = m.Update(tea.KeyPressMsg{Code: 'G'})
-	if m.Cursor() != 2 {
-		t.Errorf("expected cursor=2 after G, got %d", m.Cursor())
 	}
 }
 

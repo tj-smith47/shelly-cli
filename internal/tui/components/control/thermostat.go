@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 )
 
 // ThermostatState holds the current state of a thermostat.
@@ -155,9 +156,9 @@ func (m ThermostatModel) handleKeyPress(msg tea.KeyPressMsg) (ThermostatModel, t
 		return m.executeBoost()
 	case key.Matches(msg, key.NewBinding(key.WithKeys("B"))):
 		return m.executeCancelBoost()
-	case key.Matches(msg, key.NewBinding(key.WithKeys("tab"))):
+	case key.Matches(msg, key.NewBinding(key.WithKeys(keyconst.KeyTab))):
 		return m.cycleFocus(), nil
-	case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
+	case key.Matches(msg, key.NewBinding(key.WithKeys(keyconst.KeyEnter))):
 		return m.handleEnter()
 	}
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
@@ -161,6 +162,10 @@ func (m OperationsModel) SetPanelIndex(index int) OperationsModel {
 
 // Update handles messages.
 func (m OperationsModel) Update(msg tea.Msg) (OperationsModel, tea.Cmd) {
+	return m.handleMessage(msg)
+}
+
+func (m OperationsModel) handleMessage(msg tea.Msg) (OperationsModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case OperationResultMsg:
 		m.executing = false
@@ -172,6 +177,27 @@ func (m OperationsModel) Update(msg tea.Msg) (OperationsModel, tea.Cmd) {
 		m.lastErr = nil
 		return m, nil
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.ModeSelectMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleModeSelect(msg)
+	case messages.ActivateRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleExecute()
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRetry()
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -182,37 +208,57 @@ func (m OperationsModel) Update(msg tea.Msg) (OperationsModel, tea.Cmd) {
 	return m, nil
 }
 
-func (m OperationsModel) handleKey(msg tea.KeyPressMsg) (OperationsModel, tea.Cmd) {
-	switch msg.String() {
-	case "1":
-		m.operation = OpAllOn
-	case "2":
-		m.operation = OpAllOff
-	case "enter":
-		if !m.executing && m.fleet != nil {
-			m.executing = true
-			m.lastErr = nil
-			m.lastResults = nil
-			return m, m.executeOperation()
-		}
-	case "r":
-		// Retry: clear error and re-execute
-		if m.lastErr != nil && !m.executing && m.fleet != nil {
-			m.executing = true
-			m.lastErr = nil
-			m.lastResults = nil
-			return m, m.executeOperation()
-		}
-	case "h", "left":
+func (m OperationsModel) handleNavigation(msg messages.NavigationMsg) (OperationsModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavLeft:
 		if m.operation > OpAllOn {
 			m.operation--
 		}
-	case "l", "right":
+	case messages.NavRight:
 		if m.operation < OpAllOff {
 			m.operation++
 		}
+	case messages.NavUp, messages.NavDown, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this component - only horizontal selection
 	}
+	return m, nil
+}
 
+func (m OperationsModel) handleModeSelect(msg messages.ModeSelectMsg) (OperationsModel, tea.Cmd) {
+	switch msg.Mode {
+	case 1:
+		m.operation = OpAllOn
+	case 2:
+		m.operation = OpAllOff
+	}
+	return m, nil
+}
+
+func (m OperationsModel) handleExecute() (OperationsModel, tea.Cmd) {
+	if !m.executing && m.fleet != nil {
+		m.executing = true
+		m.lastErr = nil
+		m.lastResults = nil
+		return m, m.executeOperation()
+	}
+	return m, nil
+}
+
+func (m OperationsModel) handleRetry() (OperationsModel, tea.Cmd) {
+	// Retry: clear error and re-execute
+	if m.lastErr != nil && !m.executing && m.fleet != nil {
+		m.executing = true
+		m.lastErr = nil
+		m.lastResults = nil
+		return m, m.executeOperation()
+	}
+	return m, nil
+}
+
+func (m OperationsModel) handleKey(msg tea.KeyPressMsg) (OperationsModel, tea.Cmd) {
+	// Component-specific keys not covered by action messages
+	// (none currently - all keys migrated to action messages)
+	_ = msg
 	return m, nil
 }
 

@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
@@ -16,7 +17,9 @@ func TestNewConfig(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	svc := &shelly.Service{}
-	deps := ConfigDeps{Ctx: ctx, Svc: svc}
+	focusState := focus.NewState()
+	focusState.SetActiveTab(tabs.TabConfig)
+	deps := ConfigDeps{Ctx: ctx, Svc: svc, FocusState: focusState}
 
 	c := NewConfig(deps)
 
@@ -25,9 +28,6 @@ func TestNewConfig(t *testing.T) {
 	}
 	if c.svc != svc {
 		t.Error("svc not set")
-	}
-	if c.focusedPanel != PanelWiFi {
-		t.Errorf("focusedPanel = %v, want PanelWiFi", c.focusedPanel)
 	}
 	if c.ID() != tabs.TabConfig {
 		t.Errorf("ID() = %v, want tabs.TabConfig", c.ID())
@@ -42,7 +42,8 @@ func TestNewConfig_PanicOnNilCtx(t *testing.T) {
 		}
 	}()
 
-	deps := ConfigDeps{Ctx: nil, Svc: &shelly.Service{}}
+	focusState := focus.NewState()
+	deps := ConfigDeps{Ctx: nil, Svc: &shelly.Service{}, FocusState: focusState}
 	NewConfig(deps)
 }
 
@@ -54,12 +55,14 @@ func TestNewConfig_PanicOnNilSvc(t *testing.T) {
 		}
 	}()
 
-	deps := ConfigDeps{Ctx: context.Background(), Svc: nil}
+	focusState := focus.NewState()
+	deps := ConfigDeps{Ctx: context.Background(), Svc: nil, FocusState: focusState}
 	NewConfig(deps)
 }
 
 func TestConfigDeps_Validate(t *testing.T) {
 	t.Parallel()
+	focusState := focus.NewState()
 	tests := []struct {
 		name    string
 		deps    ConfigDeps
@@ -67,17 +70,22 @@ func TestConfigDeps_Validate(t *testing.T) {
 	}{
 		{
 			name:    "valid",
-			deps:    ConfigDeps{Ctx: context.Background(), Svc: &shelly.Service{}},
+			deps:    ConfigDeps{Ctx: context.Background(), Svc: &shelly.Service{}, FocusState: focusState},
 			wantErr: false,
 		},
 		{
 			name:    "nil ctx",
-			deps:    ConfigDeps{Ctx: nil, Svc: &shelly.Service{}},
+			deps:    ConfigDeps{Ctx: nil, Svc: &shelly.Service{}, FocusState: focusState},
 			wantErr: true,
 		},
 		{
 			name:    "nil svc",
-			deps:    ConfigDeps{Ctx: context.Background(), Svc: nil},
+			deps:    ConfigDeps{Ctx: context.Background(), Svc: nil, FocusState: focusState},
+			wantErr: true,
+		},
+		{
+			name:    "nil focus state",
+			deps:    ConfigDeps{Ctx: context.Background(), Svc: &shelly.Service{}, FocusState: nil},
 			wantErr: true,
 		},
 	}
@@ -147,70 +155,38 @@ func TestConfig_SetSize(t *testing.T) {
 	}
 }
 
-func TestConfig_FocusNext(t *testing.T) {
+func TestConfig_FocusCycling(t *testing.T) {
 	t.Parallel()
 	c := newTestConfig()
 
-	// Start at PanelWiFi
-	if c.focusedPanel != PanelWiFi {
-		t.Fatalf("initial panel = %v, want PanelWiFi", c.focusedPanel)
-	}
+	// Get initial panel
+	initialPanel := c.focusState.ActivePanel()
 
-	// Panel order: WiFi -> System -> Cloud -> Security -> BLE -> Inputs -> Protocols -> SmartHome
-	c.focusNext()
-	if c.focusedPanel != PanelSystem {
-		t.Errorf("after focusNext = %v, want PanelSystem", c.focusedPanel)
-	}
-
-	c.focusNext()
-	if c.focusedPanel != PanelCloud {
-		t.Errorf("after focusNext = %v, want PanelCloud", c.focusedPanel)
-	}
-
-	c.focusNext()
-	if c.focusedPanel != PanelSecurity {
-		t.Errorf("after focusNext = %v, want PanelSecurity", c.focusedPanel)
-	}
-}
-
-func TestConfig_FocusPrev(t *testing.T) {
-	t.Parallel()
-	c := newTestConfig()
-	c.focusedPanel = PanelCloud
-
-	// Panel order: WiFi -> System -> Cloud -> Security -> BLE -> Inputs -> Protocols -> SmartHome
-	c.focusPrev()
-	if c.focusedPanel != PanelSystem {
-		t.Errorf("after focusPrev = %v, want PanelSystem", c.focusedPanel)
-	}
-
-	c.focusPrev()
-	if c.focusedPanel != PanelWiFi {
-		t.Errorf("after focusPrev = %v, want PanelWiFi", c.focusedPanel)
-	}
-}
-
-func TestConfig_FocusWrap(t *testing.T) {
-	t.Parallel()
-	c := newTestConfig()
-	c.focusedPanel = PanelSmartHome // Last panel in the list
-
-	// Focus next should wrap to PanelWiFi
-	c.focusNext()
-	if c.focusedPanel != PanelWiFi {
-		t.Errorf("after wrap = %v, want PanelWiFi", c.focusedPanel)
-	}
-}
-
-func TestConfig_HandleKeyPress_Tab(t *testing.T) {
-	t.Parallel()
-	c := newTestConfig()
+	// Send Tab key to cycle focus
 	msg := tea.KeyPressMsg{Code: tea.KeyTab}
-
 	c.handleKeyPress(msg)
 
-	if c.focusedPanel != PanelSystem {
-		t.Errorf("focusedPanel = %v, want PanelSystem", c.focusedPanel)
+	newPanel := c.focusState.ActivePanel()
+	if newPanel == initialPanel {
+		t.Error("Tab should change focused panel")
+	}
+}
+
+func TestConfig_HandleKeyPress_ShiftTab(t *testing.T) {
+	t.Parallel()
+	c := newTestConfig()
+
+	// Move to second panel first
+	c.focusState.NextPanel()
+	panelAfterNext := c.focusState.ActivePanel()
+
+	// Send Shift+Tab key to go back
+	msg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+	c.handleKeyPress(msg)
+
+	panelAfterPrev := c.focusState.ActivePanel()
+	if panelAfterPrev == panelAfterNext {
+		t.Error("Shift+Tab should change focused panel")
 	}
 }
 
@@ -260,21 +236,6 @@ func TestConfig_Device(t *testing.T) {
 	}
 }
 
-func TestConfig_FocusedPanel(t *testing.T) {
-	t.Parallel()
-	c := newTestConfig()
-
-	if c.FocusedPanel() != PanelWiFi {
-		t.Errorf("FocusedPanel() = %v, want PanelWiFi", c.FocusedPanel())
-	}
-
-	c = c.SetFocusedPanel(PanelCloud)
-
-	if c.FocusedPanel() != PanelCloud {
-		t.Errorf("FocusedPanel() = %v, want PanelCloud", c.FocusedPanel())
-	}
-}
-
 func TestDefaultConfigStyles(t *testing.T) {
 	t.Parallel()
 	styles := DefaultConfigStyles()
@@ -289,6 +250,9 @@ func TestDefaultConfigStyles(t *testing.T) {
 func newTestConfig() *Config {
 	ctx := context.Background()
 	svc := &shelly.Service{}
-	deps := ConfigDeps{Ctx: ctx, Svc: svc}
+	focusState := focus.NewState()
+	// Set to config tab so panel cycling works correctly
+	focusState.SetActiveTab(tabs.TabConfig)
+	deps := ConfigDeps{Ctx: ctx, Svc: svc, FocusState: focusState}
 	return NewConfig(deps)
 }

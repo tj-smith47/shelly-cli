@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
@@ -168,6 +169,10 @@ func (m HealthModel) Update(msg tea.Msg) (HealthModel, tea.Cmd) {
 		}
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m HealthModel) handleMessage(msg tea.Msg) (HealthModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case HealthLoadedMsg:
 		m.loading = false
@@ -180,6 +185,12 @@ func (m HealthModel) Update(msg tea.Msg) (HealthModel, tea.Cmd) {
 		m.err = nil
 		return m, nil
 
+	// Action messages from context system
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRefresh()
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -190,12 +201,18 @@ func (m HealthModel) Update(msg tea.Msg) (HealthModel, tea.Cmd) {
 	return m, nil
 }
 
-func (m HealthModel) handleKey(msg tea.KeyPressMsg) (HealthModel, tea.Cmd) {
-	if msg.String() == "r" && !m.loading && m.fleet != nil {
-		m.loading = true
-		return m, tea.Batch(m.Loader.Tick(), m.loadHealth())
+func (m HealthModel) handleRefresh() (HealthModel, tea.Cmd) {
+	if m.loading || m.fleet == nil {
+		return m, nil
 	}
+	m.loading = true
+	return m, tea.Batch(m.Loader.Tick(), m.loadHealth())
+}
 
+func (m HealthModel) handleKey(msg tea.KeyPressMsg) (HealthModel, tea.Cmd) {
+	// Component-specific keys not covered by action messages
+	// (none currently - all keys migrated to action messages)
+	_ = msg
 	return m, nil
 }
 

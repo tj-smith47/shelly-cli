@@ -19,10 +19,11 @@ const (
 
 // Common key constants.
 const (
-	KeyEnter = "enter"
-	KeySpace = "space"
-	KeyTab   = "tab"
-	KeyEsc   = "esc"
+	KeyEnter    = "enter"
+	KeySpace    = "space"
+	KeyTab      = "tab"
+	KeyShiftTab = "shift+tab"
+	KeyEsc      = "esc"
 )
 
 // Navigation key constants.
@@ -33,4 +34,10 @@ const (
 	KeyPgUp   = "pgup"
 	KeyCtrlD  = "ctrl+d"
 	KeyCtrlU  = "ctrl+u"
+)
+
+// Action key constants.
+const (
+	KeyCtrlS = "ctrl+s"
+	KeyCtrlF = "ctrl+f"
 )

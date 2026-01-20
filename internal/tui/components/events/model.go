@@ -22,6 +22,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -530,6 +531,10 @@ func isSwitchStateChange(status json.RawMessage) bool {
 
 // Update handles messages for events.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	return m.handleMessage(msg)
+}
+
+func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case EventMsg:
 		for _, e := range msg.Events {
@@ -551,11 +556,46 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case SubscriptionStatusMsg:
 		return m.handleSubscriptionStatus(msg), nil
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		return m.handleNavigation(msg), nil
+	case messages.PauseRequestMsg:
+		m.paused = !m.paused
+		return m, nil
+	case messages.ClearRequestMsg:
+		return m.clearEvents(), nil
+	case messages.FilterToggleRequestMsg:
+		m.filterByDevice = !m.filterByDevice
+		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg), nil
 	}
 
 	return m, nil
+}
+
+func (m Model) handleNavigation(msg messages.NavigationMsg) Model {
+	switch msg.Direction {
+	case messages.NavLeft:
+		m.focusedColumn = ColumnUser
+		m.autoScroll = false
+	case messages.NavRight:
+		m.focusedColumn = ColumnSystem
+		m.autoScroll = false
+	case messages.NavUp:
+		m = m.moveCursorUp()
+	case messages.NavDown:
+		m = m.moveCursorDown()
+	case messages.NavPageUp:
+		m = m.pageUp()
+	case messages.NavPageDown:
+		m = m.pageDown()
+	case messages.NavHome:
+		m = m.jumpToStart()
+	case messages.NavEnd:
+		m = m.jumpToEnd()
+	}
+	return m
 }
 
 // handleSubscriptionStatus handles WebSocket subscription status updates.
@@ -575,34 +615,11 @@ func (m Model) handleSubscriptionStatus(msg SubscriptionStatusMsg) Model {
 	return m
 }
 
-// handleKeyPress handles keyboard input for scrolling, pagination, and clearing.
+// handleKeyPress handles keyboard input for component-specific keys.
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
-	switch msg.String() {
-	case "h", "left":
-		m.focusedColumn = ColumnUser
-		m.autoScroll = false
-	case "l", "right":
-		m.focusedColumn = ColumnSystem
-		m.autoScroll = false
-	case "j", "down":
-		m = m.moveCursorDown()
-	case "k", "up":
-		m = m.moveCursorUp()
-	case "n", "pgdown", "ctrl+d":
-		m = m.pageDown()
-	case "N", "pgup", "ctrl+u":
-		m = m.pageUp()
-	case "g":
-		m = m.jumpToStart()
-	case "G":
-		m = m.jumpToEnd()
-	case "c":
-		m = m.clearEvents()
-	case "p", "space":
-		m.paused = !m.paused
-	case "f":
-		m.filterByDevice = !m.filterByDevice
-	}
+	// Component-specific keys not covered by action messages
+	// (none currently - all keys migrated to action messages)
+	_ = msg
 	return m
 }
 
@@ -834,9 +851,10 @@ func (m Model) renderEventRow(e Event, isSelected bool, colTime, colDevice, colC
 	compVal := m.formatComponent(e)
 	compStr := m.styles.Component.Render(output.PadRight(compVal, colComp))
 
-	// Level column with color
+	// Level column with color - sanitize to prevent rendering issues
+	levelVal := sanitizeLevel(e.Type, colLevel)
 	levelStyle := m.getTypeStyle(e.Type)
-	levelStr := levelStyle.Render(output.PadRight(e.Type, colLevel))
+	levelStr := levelStyle.Render(output.PadRight(levelVal, colLevel))
 
 	// Description gets all remaining width
 	fixedWidth := colTime + colDevice + colComp + colLevel
@@ -900,6 +918,23 @@ func (m Model) getTypeStyle(eventType string) lipgloss.Style {
 	default:
 		return lipgloss.NewStyle().Foreground(colors.Text)
 	}
+}
+
+// sanitizeLevel sanitizes an event type string for display in the LEVEL column.
+// Removes newlines and other control characters, truncates to fit maxWidth.
+func sanitizeLevel(level string, maxWidth int) string {
+	// Remove newlines and carriage returns
+	level = strings.ReplaceAll(level, "\n", "")
+	level = strings.ReplaceAll(level, "\r", "")
+
+	// Truncate with ellipsis if too long
+	if len(level) > maxWidth {
+		if maxWidth > 1 {
+			return level[:maxWidth-1] + "…"
+		}
+		return level[:maxWidth]
+	}
+	return level
 }
 
 // EventCount returns the number of events.
@@ -1098,7 +1133,7 @@ func computeColumnLayout(totalWidth int, userEvents, systemEvents []Event) colum
 	const timeW = 8
 	const levelW = 12
 	const minDeviceW, minDescW = 10, 20
-	const maxDescW = 80 // Cap DESC to prevent excessive padding
+	const maxDescW = 80 // Initial cap for DESC (may expand further to fill space)
 	const headerCompW = 6
 	const spacesUser = 4
 	const separatorW = 3
@@ -1143,13 +1178,14 @@ func computeColumnLayout(totalWidth int, userEvents, systemEvents []Event) colum
 	userColWidth := timeW + userDeviceW + userCompW + levelW + userDescW + spacesUser
 	sysColWidth := timeW + 1 + sysDeviceW
 
-	// If we have more space than needed, expand DESC up to maxDescW
+	// If we have more space than needed, expand DESC to fill available space.
+	// Remove maxDescW cap - the User column should absorb all extra space so the
+	// Cache Updates column stays at its minimal required width.
 	neededWidth := userColWidth + separatorW + sysColWidth
 	if neededWidth < totalWidth {
 		extra := totalWidth - neededWidth
-		expandDesc := min(extra, maxDescW-userDescW)
-		userDescW += expandDesc
-		userColWidth += expandDesc
+		userDescW += extra
+		userColWidth += extra
 	}
 
 	return columnLayout{
@@ -1368,8 +1404,9 @@ func (m Model) renderUserEventWrapped(e Event, timeW, deviceW, compW, levelW, de
 	}
 	compStr := compStyle.Width(compW).Render(comp)
 
-	// Level column
-	levelStr := levelStyle.Width(levelW).Render(e.Type)
+	// Level column - sanitize to prevent rendering issues
+	levelVal := sanitizeLevel(e.Type, levelW)
+	levelStr := levelStyle.Width(levelW).Render(levelVal)
 
 	// Build prefix for first line and continuation indent
 	prefix := timeStr + " " + deviceStr + " " + compStr + " " + levelStr + " "

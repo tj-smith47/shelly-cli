@@ -5,9 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 const testDevice = "192.168.1.100"
@@ -228,47 +227,47 @@ func TestModel_Update_StatusLoadedError(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_Navigation(t *testing.T) {
+func TestModel_HandleAction_Navigation(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 
 	// Move down
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.cursor != FieldTimezone {
-		t.Errorf("cursor after j = %v, want FieldTimezone", updated.cursor)
+		t.Errorf("cursor after NavDown = %v, want FieldTimezone", updated.cursor)
 	}
 
 	// Move down again
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.cursor != FieldEcoMode {
-		t.Errorf("cursor after second j = %v, want FieldEcoMode", updated.cursor)
+		t.Errorf("cursor after second NavDown = %v, want FieldEcoMode", updated.cursor)
 	}
 
 	// Move up
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'k'})
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
 	if updated.cursor != FieldTimezone {
-		t.Errorf("cursor after k = %v, want FieldTimezone", updated.cursor)
+		t.Errorf("cursor after NavUp = %v, want FieldTimezone", updated.cursor)
 	}
 }
 
-func TestModel_HandleKey_Refresh(t *testing.T) {
+func TestModel_HandleAction_Refresh(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 	m.device = testDevice
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'r'})
+	updated, cmd := m.Update(messages.RefreshRequestMsg{})
 
 	if !updated.loading {
-		t.Error("should be loading after 'r' key")
+		t.Error("should be loading after RefreshRequestMsg")
 	}
 	if cmd == nil {
 		t.Error("should return refresh command")
 	}
 }
 
-func TestModel_HandleKey_Toggle(t *testing.T) {
+func TestModel_HandleAction_Toggle(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
@@ -279,19 +278,19 @@ func TestModel_HandleKey_Toggle(t *testing.T) {
 	}
 	m.cursor = FieldEcoMode
 
-	_, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+	_, cmd := m.Update(messages.ToggleEnableRequestMsg{})
 
 	if cmd == nil {
 		t.Error("toggle should return a command")
 	}
 }
 
-func TestModel_HandleKey_NotFocused(t *testing.T) {
+func TestModel_HandleAction_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = false
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavDown})
 
 	if updated.cursor != FieldName {
 		t.Error("cursor should not change when not focused")

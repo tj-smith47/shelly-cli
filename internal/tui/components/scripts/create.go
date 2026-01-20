@@ -137,6 +137,10 @@ func (m CreateModel) Update(msg tea.Msg) (CreateModel, tea.Cmd) {
 		return m, nil
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m CreateModel) handleMessage(msg tea.Msg) (CreateModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case CreatedMsg:
 		m.saving = false
@@ -148,6 +152,18 @@ func (m CreateModel) Update(msg tea.Msg) (CreateModel, tea.Cmd) {
 		m = m.Hide()
 		return m, func() tea.Msg { return messages.EditClosedMsg{Saved: true} }
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		return m.handleNavigation(msg)
+	case messages.ToggleEnableRequestMsg:
+		if m.cursor == CreateFieldTemplate {
+			if m.templateDropdown.IsExpanded() {
+				m.templateDropdown = m.templateDropdown.Collapse()
+			} else {
+				m.templateDropdown = m.templateDropdown.Expand()
+			}
+			return m, nil
+		}
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -156,10 +172,21 @@ func (m CreateModel) Update(msg tea.Msg) (CreateModel, tea.Cmd) {
 	return m.updateFocusedInput(msg)
 }
 
-func (m CreateModel) handleKey(msg tea.KeyPressMsg) (CreateModel, tea.Cmd) {
-	key := msg.String()
+func (m CreateModel) handleNavigation(msg messages.NavigationMsg) (CreateModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		return m.prevField(), nil
+	case messages.NavDown:
+		return m.nextField(), nil
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this form
+	}
+	return m, nil
+}
 
-	switch key {
+func (m CreateModel) handleKey(msg tea.KeyPressMsg) (CreateModel, tea.Cmd) {
+	// Modal-specific keys not covered by action messages
+	switch msg.String() {
 	case "esc", "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return messages.EditClosedMsg{Saved: false} }
@@ -171,21 +198,11 @@ func (m CreateModel) handleKey(msg tea.KeyPressMsg) (CreateModel, tea.Cmd) {
 		}
 		return m.save()
 
-	case "tab":
+	case keyconst.KeyTab:
 		return m.nextField(), nil
 
-	case "shift+tab":
+	case keyconst.KeyShiftTab:
 		return m.prevField(), nil
-
-	case " ":
-		if m.cursor == CreateFieldTemplate {
-			if m.templateDropdown.IsExpanded() {
-				m.templateDropdown = m.templateDropdown.Collapse()
-			} else {
-				m.templateDropdown = m.templateDropdown.Expand()
-			}
-			return m, nil
-		}
 	}
 
 	// Forward to focused input

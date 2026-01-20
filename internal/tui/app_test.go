@@ -80,6 +80,24 @@ func applyWindowSize(m Model, width, height int) Model {
 	return model
 }
 
+// testPanelTransition tests a single panel transition and returns the updated model.
+// It fails the test if the transition fails or the expected panel is not reached.
+func testPanelTransition(t *testing.T, m Model, msg tea.KeyPressMsg, expected focus.GlobalPanelID, desc string) Model {
+	t.Helper()
+	result, _, handled := m.handleKeyPress(msg)
+	if !handled {
+		t.Errorf("%s should be handled", desc)
+	}
+	newM, ok := result.(Model)
+	if !ok {
+		t.Fatalf("expected Model type after %s", desc)
+	}
+	if newM.focusState.ActivePanel() != expected {
+		t.Errorf("after %s = %v, want %v", desc, newM.focusState.ActivePanel(), expected)
+	}
+	return newM
+}
+
 //nolint:paralleltest // modifies global config state
 func TestNew(t *testing.T) {
 	m := newTestModel(t)
@@ -216,53 +234,27 @@ func TestModel_PanelFocusCycling(t *testing.T) {
 	m = applyWindowSize(m, 100, 40)
 
 	// Initial focus should be DeviceList
-	if m.focusManager.Current() != focus.PanelDeviceList {
-		t.Errorf("initial focus = %v, want %v", m.focusManager.Current(), focus.PanelDeviceList)
+	if m.focusState.ActivePanel() != focus.PanelDeviceList {
+		t.Errorf("initial focus = %v, want %v", m.focusState.ActivePanel(), focus.PanelDeviceList)
 	}
 
-	// Tab to next panel (DeviceList -> Detail)
-	newM, _, handled := m.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
-	if !handled {
-		t.Error("tab should be handled")
-	}
-	if newM.focusManager.Current() != focus.PanelDeviceInfo {
-		t.Errorf("after tab = %v, want %v", newM.focusManager.Current(), focus.PanelDeviceInfo)
+	tabMsg := tea.KeyPressMsg{Code: tea.KeyTab}
+
+	// Test panel cycling: DeviceList -> DashboardInfo -> Events -> EnergyBars -> EnergyHistory -> DeviceList
+	transitions := []struct {
+		expected focus.GlobalPanelID
+		desc     string
+	}{
+		{focus.PanelDashboardInfo, "first tab"},
+		{focus.PanelDashboardEvents, "second tab"},
+		{focus.PanelDashboardEnergyBars, "third tab"},
+		{focus.PanelDashboardEnergyHistory, "fourth tab"},
+		{focus.PanelDeviceList, "wrap tab"},
 	}
 
-	// Tab to Events (3-panel cycle: Detail -> Events)
-	newM, _, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
-	if !handled {
-		t.Error("tab should be handled")
-	}
-	if newM.focusManager.Current() != focus.PanelEvents {
-		t.Errorf("after second tab = %v, want %v", newM.focusManager.Current(), focus.PanelEvents)
-	}
-
-	// Tab to EnergyBars (5-panel cycle: Events -> EnergyBars)
-	newM, _, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
-	if !handled {
-		t.Error("tab should be handled")
-	}
-	if newM.focusManager.Current() != focus.PanelEnergyBars {
-		t.Errorf("after third tab = %v, want %v", newM.focusManager.Current(), focus.PanelEnergyBars)
-	}
-
-	// Tab to EnergyHistory (5-panel cycle: EnergyBars -> EnergyHistory)
-	newM, _, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
-	if !handled {
-		t.Error("tab should be handled")
-	}
-	if newM.focusManager.Current() != focus.PanelEnergyHistory {
-		t.Errorf("after fourth tab = %v, want %v", newM.focusManager.Current(), focus.PanelEnergyHistory)
-	}
-
-	// Tab should wrap back to DeviceList (EnergyHistory -> DeviceList)
-	newM, _, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
-	if !handled {
-		t.Error("tab should be handled")
-	}
-	if newM.focusManager.Current() != focus.PanelDeviceList {
-		t.Errorf("after wrap = %v, want %v", newM.focusManager.Current(), focus.PanelDeviceList)
+	current := m
+	for _, tt := range transitions {
+		current = testPanelTransition(t, current, tabMsg, tt.expected, tt.desc)
 	}
 }
 
@@ -271,50 +263,23 @@ func TestModel_ShiftTabReversesFocus(t *testing.T) {
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
-	// Shift+Tab from DeviceList should go to EnergyHistory (reverse cycle in 5-panel mode)
-	msg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
-	newM, _, handled := m.handlePanelSwitch(msg)
-	if !handled {
-		t.Error("shift+tab should be handled")
-	}
-	if newM.focusManager.Current() != focus.PanelEnergyHistory {
-		t.Errorf("after shift+tab = %v, want %v", newM.focusManager.Current(), focus.PanelEnergyHistory)
+	shiftTabMsg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+
+	// Test reverse panel cycling: DeviceList -> EnergyHistory -> EnergyBars -> Events -> DashboardInfo -> DeviceList
+	transitions := []struct {
+		expected focus.GlobalPanelID
+		desc     string
+	}{
+		{focus.PanelDashboardEnergyHistory, "first shift+tab"},
+		{focus.PanelDashboardEnergyBars, "second shift+tab"},
+		{focus.PanelDashboardEvents, "third shift+tab"},
+		{focus.PanelDashboardInfo, "fourth shift+tab"},
+		{focus.PanelDeviceList, "fifth shift+tab"},
 	}
 
-	// Shift+Tab from EnergyHistory should go to EnergyBars
-	newM, _, handled = newM.handlePanelSwitch(msg)
-	if !handled {
-		t.Error("shift+tab should be handled")
-	}
-	if newM.focusManager.Current() != focus.PanelEnergyBars {
-		t.Errorf("after second shift+tab = %v, want %v", newM.focusManager.Current(), focus.PanelEnergyBars)
-	}
-
-	// Shift+Tab from EnergyBars should go to Events
-	newM, _, handled = newM.handlePanelSwitch(msg)
-	if !handled {
-		t.Error("shift+tab should be handled")
-	}
-	if newM.focusManager.Current() != focus.PanelEvents {
-		t.Errorf("after third shift+tab = %v, want %v", newM.focusManager.Current(), focus.PanelEvents)
-	}
-
-	// Shift+Tab from Events should go to DeviceInfo
-	newM, _, handled = newM.handlePanelSwitch(msg)
-	if !handled {
-		t.Error("shift+tab should be handled")
-	}
-	if newM.focusManager.Current() != focus.PanelDeviceInfo {
-		t.Errorf("after fourth shift+tab = %v, want %v", newM.focusManager.Current(), focus.PanelDeviceInfo)
-	}
-
-	// Shift+Tab from DeviceInfo should go to DeviceList
-	newM, _, handled = newM.handlePanelSwitch(msg)
-	if !handled {
-		t.Error("shift+tab should be handled")
-	}
-	if newM.focusManager.Current() != focus.PanelDeviceList {
-		t.Errorf("after fifth shift+tab = %v, want %v", newM.focusManager.Current(), focus.PanelDeviceList)
+	current := m
+	for _, tt := range transitions {
+		current = testPanelTransition(t, current, shiftTabMsg, tt.expected, tt.desc)
 	}
 }
 

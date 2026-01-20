@@ -361,15 +361,23 @@ func (es *EventStream) Stop() {
 		}
 	}
 
+	// Collect all WebSockets to close BEFORE acquiring the lock for cleanup.
+	// This avoids deadlock: ws.Close() waits for readLoop to exit, and readLoop
+	// calls handleWebSocketStateChange() which needs es.mu.Lock().
 	es.mu.Lock()
-	defer es.mu.Unlock()
-
+	websockets := make([]*transport.WebSocket, 0, len(es.connections))
 	for name, conn := range es.connections {
 		conn.cancel()
 		if conn.ws != nil {
-			closeWS(conn.ws)
+			websockets = append(websockets, conn.ws)
 		}
 		delete(es.connections, name)
+	}
+	es.mu.Unlock()
+
+	// Close WebSockets outside the lock to avoid deadlock
+	for _, ws := range websockets {
+		closeWS(ws)
 	}
 
 	es.bus.Close()
@@ -391,14 +399,19 @@ func (es *EventStream) AddDevice(name, address string) {
 // RemoveDevice removes a device from the event stream.
 func (es *EventStream) RemoveDevice(name string) {
 	es.mu.Lock()
-	defer es.mu.Unlock()
+	conn, ok := es.connections[name]
+	if !ok {
+		es.mu.Unlock()
+		return
+	}
+	conn.cancel()
+	ws := conn.ws
+	delete(es.connections, name)
+	es.mu.Unlock()
 
-	if conn, ok := es.connections[name]; ok {
-		conn.cancel()
-		if conn.ws != nil {
-			closeWS(conn.ws)
-		}
-		delete(es.connections, name)
+	// Close WebSocket outside the lock to avoid deadlock (same as Stop)
+	if ws != nil {
+		closeWS(ws)
 	}
 }
 

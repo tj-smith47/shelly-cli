@@ -22,6 +22,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/provisioning"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/scenes"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/templates"
+	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
@@ -29,26 +30,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
-// ManagePanel identifies which panel is focused in the Manage view.
-type ManagePanel int
-
-// Manage panel constants.
-const (
-	ManagePanelDiscovery ManagePanel = iota
-	ManagePanelBatch
-	ManagePanelFirmware
-	ManagePanelBackup
-	ManagePanelScenes
-	ManagePanelTemplates
-	ManagePanelProvisioning
-	ManagePanelMigration
-)
-
 // ManageDeps holds dependencies for the manage view.
 type ManageDeps struct {
-	Ctx       context.Context
-	Svc       *shelly.Service
-	FileCache *cache.FileCache
+	Ctx        context.Context
+	Svc        *shelly.Service
+	FileCache  *cache.FileCache
+	FocusState *focus.State
 }
 
 // Validate ensures all required dependencies are set.
@@ -58,6 +45,9 @@ func (d ManageDeps) Validate() error {
 	}
 	if d.Svc == nil {
 		return errNilService
+	}
+	if d.FocusState == nil {
+		return errNilFocusState
 	}
 	return nil
 }
@@ -80,9 +70,9 @@ type Manage struct {
 	migration    migration.Wizard
 
 	// State
-	focusedPanel     ManagePanel
-	showProvisioning bool // Whether provisioning wizard is visible
-	showMigration    bool // Whether migration wizard is visible
+	focusState       *focus.State // Unified focus state (single source of truth)
+	showProvisioning bool         // Whether provisioning wizard is visible
+	showMigration    bool         // Whether migration wizard is visible
 	width            int
 	height           int
 	styles           ManageStyles
@@ -134,16 +124,16 @@ func NewManage(deps ManageDeps) *Manage {
 
 	// Configure left column panels (Discovery, Firmware, Backup, Scenes, Templates) with expansion on focus
 	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
-		{ID: layout.PanelID(ManagePanelDiscovery), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(ManagePanelFirmware), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(ManagePanelBackup), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(ManagePanelScenes), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(ManagePanelTemplates), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelManageDiscovery), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelManageFirmware), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelManageBackup), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelManageScenes), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelManageTemplates), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	// Configure right column (Batch takes full height)
 	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
-		{ID: layout.PanelID(ManagePanelBatch), MinHeight: 10, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelManageBatch), MinHeight: 10, ExpandOnFocus: true},
 	}
 
 	m := &Manage{
@@ -158,7 +148,7 @@ func NewManage(deps ManageDeps) *Manage {
 		templates:    templates.NewList(templatesDeps),
 		provisioning: provisioning.New(provisioningDeps),
 		migration:    migration.New(migrationDeps),
-		focusedPanel: ManagePanelDiscovery,
+		focusState:   deps.FocusState,
 		styles:       DefaultManageStyles(),
 		layoutCalc:   layoutCalc,
 	}
@@ -218,31 +208,36 @@ func (m *Manage) SetSize(width, height int) View {
 
 	// Update layout with new dimensions and focus
 	m.layoutCalc.SetSize(width, height)
-	m.layoutCalc.SetFocus(layout.PanelID(m.focusedPanel))
+	activePanel := m.focusState.ActivePanel()
+	if activePanel.TabFor() == tabs.TabManage {
+		m.layoutCalc.SetFocus(layout.PanelID(activePanel))
+	} else {
+		m.layoutCalc.SetFocus(-1)
+	}
 
 	// Calculate panel dimensions using flexible layout
 	dims := m.layoutCalc.Calculate()
 
 	// Apply sizes to left column components
 	// Pass full panel dimensions - components handle their own borders via rendering.New()
-	if d, ok := dims[layout.PanelID(ManagePanelDiscovery)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelManageDiscovery)]; ok {
 		m.discovery = m.discovery.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(ManagePanelFirmware)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelManageFirmware)]; ok {
 		m.firmware = m.firmware.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(ManagePanelBackup)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelManageBackup)]; ok {
 		m.backup = m.backup.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(ManagePanelScenes)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelManageScenes)]; ok {
 		m.scenes = m.scenes.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(ManagePanelTemplates)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelManageTemplates)]; ok {
 		m.templates = m.templates.SetSize(d.Width, d.Height)
 	}
 
 	// Apply size to right column (Batch)
-	if d, ok := dims[layout.PanelID(ManagePanelBatch)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelManageBatch)]; ok {
 		m.batch = m.batch.SetSize(d.Width, d.Height)
 	}
 
@@ -252,6 +247,12 @@ func (m *Manage) SetSize(width, height int) View {
 // Update handles messages.
 func (m *Manage) Update(msg tea.Msg) (View, tea.Cmd) {
 	var cmds []tea.Cmd
+
+	// Handle focus changes from the unified focus state
+	if _, ok := msg.(focus.ChangedMsg); ok {
+		m.updateFocusStates()
+		return m, nil
+	}
 
 	// Handle keyboard input
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
@@ -275,10 +276,10 @@ func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
 
 	// Handle tab navigation
 	switch key {
-	case keyTab:
+	case keyconst.KeyTab:
 		m.focusNext()
 		return
-	case keyShiftTab:
+	case keyconst.KeyShiftTab:
 		m.focusPrev()
 		return
 	}
@@ -294,31 +295,31 @@ func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
 		m.handleProvisioningToggle()
 	case "m":
 		m.handleMigrationToggle()
-	case "esc":
+	case keyconst.KeyEsc:
 		m.handleEscapeKey()
 	}
 }
 
 // handleShiftHotkey handles Shift+1-7 panel switching.
 func (m *Manage) handleShiftHotkey(key string) bool {
-	shiftPanelMap := map[string]ManagePanel{
-		keyconst.Shift1: ManagePanelDiscovery,
-		keyconst.Shift2: ManagePanelBatch,
-		keyconst.Shift3: ManagePanelFirmware,
-		keyconst.Shift4: ManagePanelBackup,
-		keyconst.Shift5: ManagePanelScenes,
-		keyconst.Shift6: ManagePanelTemplates,
+	shiftPanelMap := map[string]focus.GlobalPanelID{
+		keyconst.Shift1: focus.PanelManageDiscovery,
+		keyconst.Shift2: focus.PanelManageBatch,
+		keyconst.Shift3: focus.PanelManageFirmware,
+		keyconst.Shift4: focus.PanelManageBackup,
+		keyconst.Shift5: focus.PanelManageScenes,
+		keyconst.Shift6: focus.PanelManageTemplates,
 	}
 
 	if panel, ok := shiftPanelMap[key]; ok {
-		m.focusedPanel = panel
+		m.focusState.SetActivePanel(panel)
 		m.updateFocusStates()
 		return true
 	}
 
 	// Shift+7 opens provisioning overlay
 	if key == keyconst.Shift7 {
-		m.focusedPanel = ManagePanelProvisioning
+		m.focusState.SetActivePanel(focus.PanelManageProvisioning)
 		m.showProvisioning = true
 		m.updateFocusStates()
 		return true
@@ -328,30 +329,30 @@ func (m *Manage) handleShiftHotkey(key string) bool {
 }
 
 func (m *Manage) handleProvisioningToggle() {
-	if m.focusedPanel != ManagePanelDiscovery {
+	if m.focusState.ActivePanel() != focus.PanelManageDiscovery {
 		return
 	}
 	m.showProvisioning = !m.showProvisioning
 	if m.showProvisioning {
-		m.focusedPanel = ManagePanelProvisioning
+		m.focusState.SetActivePanel(focus.PanelManageProvisioning)
 		m.provisioning = m.provisioning.SetFocused(true)
 	} else {
-		m.focusedPanel = ManagePanelDiscovery
+		m.focusState.SetActivePanel(focus.PanelManageDiscovery)
 		m.provisioning = m.provisioning.Reset()
 	}
 	m.updateFocusStates()
 }
 
 func (m *Manage) handleMigrationToggle() {
-	if m.focusedPanel != ManagePanelTemplates {
+	if m.focusState.ActivePanel() != focus.PanelManageTemplates {
 		return
 	}
 	m.showMigration = !m.showMigration
 	if m.showMigration {
-		m.focusedPanel = ManagePanelMigration
+		m.focusState.SetActivePanel(focus.PanelManageMigration)
 		m.migration = m.migration.SetFocused(true)
 	} else {
-		m.focusedPanel = ManagePanelTemplates
+		m.focusState.SetActivePanel(focus.PanelManageTemplates)
 	}
 	m.updateFocusStates()
 }
@@ -359,38 +360,23 @@ func (m *Manage) handleMigrationToggle() {
 func (m *Manage) handleEscapeKey() {
 	if m.showProvisioning {
 		m.showProvisioning = false
-		m.focusedPanel = ManagePanelDiscovery
+		m.focusState.SetActivePanel(focus.PanelManageDiscovery)
 		m.provisioning = m.provisioning.Reset()
 		m.updateFocusStates()
 	} else if m.showMigration {
 		m.showMigration = false
-		m.focusedPanel = ManagePanelTemplates
+		m.focusState.SetActivePanel(focus.PanelManageTemplates)
 		m.updateFocusStates()
 	}
 }
 
 func (m *Manage) focusNext() {
-	// Column-by-column: left column (Discovery, Firmware, Backup, Scenes, Templates), then right (Batch)
-	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelScenes, ManagePanelTemplates, ManagePanelBatch}
-	for i, p := range panels {
-		if p == m.focusedPanel {
-			m.focusedPanel = panels[(i+1)%len(panels)]
-			break
-		}
-	}
+	m.focusState.NextPanel()
 	m.updateFocusStates()
 }
 
 func (m *Manage) focusPrev() {
-	// Column-by-column: left column (Discovery, Firmware, Backup, Scenes, Templates), then right (Batch)
-	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelScenes, ManagePanelTemplates, ManagePanelBatch}
-	for i, p := range panels {
-		if p == m.focusedPanel {
-			prevIdx := (i - 1 + len(panels)) % len(panels)
-			m.focusedPanel = panels[prevIdx]
-			break
-		}
-	}
+	m.focusState.PrevPanel()
 	m.updateFocusStates()
 }
 
@@ -398,12 +384,12 @@ func (m *Manage) updateFocusStates() {
 	// Panel indices match column-by-column cycling order: left (1-5), right (6)
 	// Overlay wizards disable focus on all panels when visible
 	overlayOpen := m.showProvisioning || m.showMigration
-	m.discovery = m.discovery.SetFocused(m.focusedPanel == ManagePanelDiscovery && !overlayOpen).SetPanelIndex(1)
-	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware && !overlayOpen).SetPanelIndex(2)
-	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup && !overlayOpen).SetPanelIndex(3)
-	m.scenes = m.scenes.SetFocused(m.focusedPanel == ManagePanelScenes && !overlayOpen).SetPanelIndex(4)
-	m.templates = m.templates.SetFocused(m.focusedPanel == ManagePanelTemplates && !overlayOpen).SetPanelIndex(5)
-	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !overlayOpen).SetPanelIndex(6)
+	m.discovery = m.discovery.SetFocused(m.focusState.IsPanelFocused(focus.PanelManageDiscovery) && !overlayOpen).SetPanelIndex(1)
+	m.firmware = m.firmware.SetFocused(m.focusState.IsPanelFocused(focus.PanelManageFirmware) && !overlayOpen).SetPanelIndex(2)
+	m.backup = m.backup.SetFocused(m.focusState.IsPanelFocused(focus.PanelManageBackup) && !overlayOpen).SetPanelIndex(3)
+	m.scenes = m.scenes.SetFocused(m.focusState.IsPanelFocused(focus.PanelManageScenes) && !overlayOpen).SetPanelIndex(4)
+	m.templates = m.templates.SetFocused(m.focusState.IsPanelFocused(focus.PanelManageTemplates) && !overlayOpen).SetPanelIndex(5)
+	m.batch = m.batch.SetFocused(m.focusState.IsPanelFocused(focus.PanelManageBatch) && !overlayOpen).SetPanelIndex(6)
 	m.provisioning = m.provisioning.SetFocused(m.showProvisioning).SetPanelIndex(7)
 	m.migration = m.migration.SetFocused(m.showMigration).SetPanelIndex(8)
 
@@ -431,23 +417,25 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 			cmds = append(cmds, cmd)
 			return tea.Batch(cmds...)
 		}
-		switch m.focusedPanel {
-		case ManagePanelDiscovery:
+		switch m.focusState.ActivePanel() {
+		case focus.PanelManageDiscovery:
 			m.discovery, cmd = m.discovery.Update(msg)
-		case ManagePanelBatch:
+		case focus.PanelManageBatch:
 			m.batch, cmd = m.batch.Update(msg)
-		case ManagePanelFirmware:
+		case focus.PanelManageFirmware:
 			m.firmware, cmd = m.firmware.Update(msg)
-		case ManagePanelBackup:
+		case focus.PanelManageBackup:
 			m.backup, cmd = m.backup.Update(msg)
-		case ManagePanelScenes:
+		case focus.PanelManageScenes:
 			m.scenes, cmd = m.scenes.Update(msg)
-		case ManagePanelTemplates:
+		case focus.PanelManageTemplates:
 			m.templates, cmd = m.templates.Update(msg)
-		case ManagePanelProvisioning:
+		case focus.PanelManageProvisioning:
 			m.provisioning, cmd = m.provisioning.Update(msg)
-		case ManagePanelMigration:
+		case focus.PanelManageMigration:
 			m.migration, cmd = m.migration.Update(msg)
+		default:
+			// Panels from other tabs - no action needed
 		}
 		cmds = append(cmds, cmd)
 	} else {
@@ -502,22 +490,22 @@ func (m *Manage) View() string {
 func (m *Manage) renderNarrowLayout() string {
 	// In narrow mode, show only the focused panel at full width
 	// Components already have embedded titles from rendering.New()
-	switch m.focusedPanel {
-	case ManagePanelDiscovery:
+	switch m.focusState.ActivePanel() {
+	case focus.PanelManageDiscovery:
 		return m.discovery.View()
-	case ManagePanelBatch:
+	case focus.PanelManageBatch:
 		return m.batch.View()
-	case ManagePanelFirmware:
+	case focus.PanelManageFirmware:
 		return m.firmware.View()
-	case ManagePanelBackup:
+	case focus.PanelManageBackup:
 		return m.backup.View()
-	case ManagePanelScenes:
+	case focus.PanelManageScenes:
 		return m.scenes.View()
-	case ManagePanelTemplates:
+	case focus.PanelManageTemplates:
 		return m.templates.View()
-	case ManagePanelProvisioning:
+	case focus.PanelManageProvisioning:
 		return m.provisioning.View()
-	case ManagePanelMigration:
+	case focus.PanelManageMigration:
 		return m.migration.View()
 	default:
 		return m.discovery.View()
@@ -562,11 +550,6 @@ func (m *Manage) Refresh() tea.Cmd {
 	cmds = append(cmds, cmd)
 
 	return tea.Batch(cmds...)
-}
-
-// FocusedPanel returns the currently focused panel.
-func (m *Manage) FocusedPanel() ManagePanel {
-	return m.focusedPanel
 }
 
 // Discovery returns the discovery component.

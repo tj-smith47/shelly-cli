@@ -342,22 +342,34 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 	case TriggerResultMsg:
 		// Re-emit so parent view can show toast
 		return m, func() tea.Msg { return msg }
-
-	// Action messages from context-based keybindings
 	case messages.NavigationMsg:
+		return m.handleNavigationMsg(msg)
+	case messages.EditRequestMsg, messages.RefreshRequestMsg:
+		return m.handleActionMsg(msg)
+	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
-		return m.handleNavigation(msg)
+		return m.handleKey(msg)
+	}
+	return m, nil
+}
+
+func (m Model) handleNavigationMsg(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
 	case messages.EditRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		return m.handleEditOpenKey()
 	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		if !m.loading && m.device != "" {
 			m.loading = true
 			return m, tea.Batch(
@@ -366,13 +378,6 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 				m.fetchAndCacheInputs(),
 			)
 		}
-		return m, nil
-
-	case tea.KeyPressMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleKey(msg)
 	}
 	return m, nil
 }

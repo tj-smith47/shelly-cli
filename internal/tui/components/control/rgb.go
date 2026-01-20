@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 )
 
 // RGBState holds the current state of an RGB component.
@@ -197,9 +198,9 @@ func (m RGBModel) handleKeyPress(msg tea.KeyPressMsg) (RGBModel, tea.Cmd) {
 			m.focus = rgbFocusPresets
 		}
 		return m, nil
-	case key.Matches(msg, key.NewBinding(key.WithKeys("tab"))):
+	case key.Matches(msg, key.NewBinding(key.WithKeys(keyconst.KeyTab))):
 		return m.cycleFocus(), nil
-	case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
+	case key.Matches(msg, key.NewBinding(key.WithKeys(keyconst.KeyEnter))):
 		if m.focus == rgbFocusPresets && m.showPresets {
 			return m.applyPreset()
 		}

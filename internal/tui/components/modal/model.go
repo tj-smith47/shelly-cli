@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
@@ -185,12 +186,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "ctrl+[":
+	case keyconst.KeyEsc, "ctrl+[":
 		if m.closeOnEsc {
 			m.visible = false
 			return m, func() tea.Msg { return CloseMsg{Confirmed: false} }
 		}
-	case "enter":
+	case keyconst.KeyEnter:
 		if m.confirmOnEnter {
 			m.visible = false
 			return m, func() tea.Msg { return CloseMsg{Confirmed: true} }
@@ -203,9 +204,9 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.scrollOffset = 0
 	case "G":
 		m = m.scrollToEnd()
-	case "pgdown", "ctrl+d":
+	case keyconst.KeyPgDown, keyconst.KeyCtrlD:
 		m = m.pageDown()
-	case "pgup", "ctrl+u":
+	case keyconst.KeyPgUp, keyconst.KeyCtrlU:
 		m = m.pageUp()
 	}
 	return m, nil

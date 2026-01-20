@@ -53,6 +53,7 @@ func TestModel_addDataPoint_MaxItems(t *testing.T) {
 	m.maxItems = 5 // Set small limit for testing
 
 	key := SwitchKey{DeviceName: "device1", SwitchID: 0, SwitchName: "", SwitchCount: 1}
+	id := key.toID()
 
 	// Add more than max items
 	for i := range 10 {
@@ -62,16 +63,16 @@ func TestModel_addDataPoint_MaxItems(t *testing.T) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if len(m.history[key]) != 5 {
-		t.Errorf("history length = %d, want 5", len(m.history[key]))
+	if len(m.history[id]) != 5 {
+		t.Errorf("history length = %d, want 5", len(m.history[id]))
 	}
 
 	// Should keep the last 5 values (50, 60, 70, 80, 90)
-	if m.history[key][0].Value != 50 {
-		t.Errorf("first value = %f, want 50", m.history[key][0].Value)
+	if m.history[id][0].Value != 50 {
+		t.Errorf("first value = %f, want 50", m.history[id][0].Value)
 	}
-	if m.history[key][4].Value != 90 {
-		t.Errorf("last value = %f, want 90", m.history[key][4].Value)
+	if m.history[id][4].Value != 90 {
+		t.Errorf("last value = %f, want 90", m.history[id][4].Value)
 	}
 }
 

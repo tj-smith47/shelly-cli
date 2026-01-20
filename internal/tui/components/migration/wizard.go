@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -381,9 +382,9 @@ func (w Wizard) applyNavToScroller(msg messages.NavigationMsg, scroller *panel.S
 
 func (w Wizard) handleActionKey(key string) (Wizard, tea.Cmd) {
 	switch key {
-	case "enter":
+	case keyconst.KeyEnter:
 		return w.handleEnter()
-	case "esc":
+	case keyconst.KeyEsc:
 		return w.handleEscape()
 	case "w":
 		if w.step == StepSourceSelect {

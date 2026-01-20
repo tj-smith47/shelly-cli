@@ -276,43 +276,16 @@ func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case CodeLoadedMsg:
-		if msg.Err != nil {
-			m.err = msg.Err
-			m.loading = false
-			return m, nil
-		}
-		m.code = msg.Code
-		m.codeLines = strings.Split(msg.Code, "\n")
-		// Generate syntax-highlighted lines using theme colors
-		highlighted := theme.HighlightJavaScript(msg.Code)
-		m.highlightedLines = strings.Split(highlighted, "\n")
-		m.loading = false
-		return m, nil
-
+		return m.handleCodeLoaded(msg)
 	case StatusLoadedMsg:
 		if msg.Err == nil {
 			m.status = msg.Status
 		}
 		return m, nil
-
-	// Action messages from context system
 	case messages.NavigationMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleNavigation(msg)
-	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.loading = true
-		return m, tea.Batch(m.Loader.Tick(), m.fetchCode(), m.fetchStatus())
-	case messages.DownloadRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m, m.Download()
-
+		return m.handleNavigationMsg(msg)
+	case messages.RefreshRequestMsg, messages.DownloadRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -320,6 +293,42 @@ func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
+	return m, nil
+}
+
+func (m EditorModel) handleCodeLoaded(msg CodeLoadedMsg) (EditorModel, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		m.loading = false
+		return m, nil
+	}
+	m.code = msg.Code
+	m.codeLines = strings.Split(msg.Code, "\n")
+	// Generate syntax-highlighted lines using theme colors
+	highlighted := theme.HighlightJavaScript(msg.Code)
+	m.highlightedLines = strings.Split(highlighted, "\n")
+	m.loading = false
+	return m, nil
+}
+
+func (m EditorModel) handleNavigationMsg(msg messages.NavigationMsg) (EditorModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m EditorModel) handleActionMsg(msg tea.Msg) (EditorModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
+	case messages.RefreshRequestMsg:
+		m.loading = true
+		return m, tea.Batch(m.Loader.Tick(), m.fetchCode(), m.fetchStatus())
+	case messages.DownloadRequestMsg:
+		return m, m.Download()
+	}
 	return m, nil
 }
 

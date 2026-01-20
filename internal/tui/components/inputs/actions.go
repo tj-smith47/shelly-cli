@@ -13,11 +13,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
-// Key constant for reuse.
-const keyEnter = "enter"
+// Keep only compound/special keys that don't have keyconst entries.
+// Single-char keys and keys in keyconst should use those directly.
 
 // Input event types available for actions.
 var inputEventTypes = []string{
@@ -204,6 +206,10 @@ func (m ActionModal) Update(msg tea.Msg) (ActionModal, tea.Cmd) {
 		return m, nil
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m ActionModal) handleMessage(msg tea.Msg) (ActionModal, tea.Cmd) {
 	switch msg := msg.(type) {
 	case ActionSavedMsg:
 		m.saving = false
@@ -227,12 +233,30 @@ func (m ActionModal) Update(msg tea.Msg) (ActionModal, tea.Cmd) {
 		m = m.removeLocalAction(msg.EventType)
 		return m, nil
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if m.saving {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 
 	// Forward to focused input
 	return m.updateFocusedInput(msg)
+}
+
+func (m ActionModal) handleNavigation(msg messages.NavigationMsg) (ActionModal, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		return m.prevField(), nil
+	case messages.NavDown:
+		return m.nextField(), nil
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this form
+	}
+	return m, nil
 }
 
 func (m ActionModal) populateURLForSelectedEvent() ActionModal {
@@ -287,24 +311,23 @@ func (m ActionModal) removeLocalAction(eventType string) ActionModal {
 }
 
 func (m ActionModal) handleKey(msg tea.KeyPressMsg) (ActionModal, tea.Cmd) {
-	key := msg.String()
-
 	// Block all input while saving
 	if m.saving {
 		return m, nil
 	}
 
-	switch key {
-	case "esc", "ctrl+[":
+	// Modal-specific keys not covered by action messages
+	switch msg.String() {
+	case keyconst.KeyEsc, "ctrl+[":
 		m.visible = false
 		return m, func() tea.Msg { return ActionModalClosedMsg{Changed: m.changed} }
-	case "tab", "down":
+	case keyconst.KeyTab:
 		return m.nextField(), nil
-	case "shift+tab", "up":
+	case keyconst.KeyShiftTab:
 		return m.prevField(), nil
-	case keyEnter:
+	case keyconst.KeyEnter:
 		return m.handleEnter()
-	case "ctrl+s":
+	case keyconst.KeyCtrlS:
 		return m.save()
 	case "d", "ctrl+d":
 		return m.deleteAction()

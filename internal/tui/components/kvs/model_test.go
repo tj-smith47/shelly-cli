@@ -5,9 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 const testDevice = "192.168.1.100"
@@ -247,14 +246,14 @@ func TestModel_Update_ActionMsg_Error(t *testing.T) {
 	}
 }
 
-func TestModel_Update_KeyPressMsg_NotFocused(t *testing.T) {
+func TestModel_HandleAction_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.focused = false
 	m.items = []Item{{Key: "key1"}, {Key: "key2"}}
 	m.Scroller.SetItemCount(len(m.items))
 
-	msg := tea.KeyPressMsg{Code: 106} // 'j'
+	msg := messages.NavigationMsg{Direction: messages.NavDown}
 
 	m, _ = m.Update(msg)
 
@@ -263,7 +262,7 @@ func TestModel_Update_KeyPressMsg_NotFocused(t *testing.T) {
 	}
 }
 
-func TestModel_Update_KeyPressMsg_Navigation(t *testing.T) {
+func TestModel_HandleAction_Navigation(t *testing.T) {
 	t.Parallel()
 	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.focused = true
@@ -271,32 +270,32 @@ func TestModel_Update_KeyPressMsg_Navigation(t *testing.T) {
 	m.Scroller.SetItemCount(len(m.items))
 	m = m.SetSize(80, 20)
 
-	// Test j/down
-	msg := tea.KeyPressMsg{Code: 106} // 'j'
+	// Test NavDown
+	msg := messages.NavigationMsg{Direction: messages.NavDown}
 	m, _ = m.Update(msg)
 	if m.Cursor() != 1 {
-		t.Errorf("cursor after j = %d, want 1", m.Cursor())
+		t.Errorf("cursor after NavDown = %d, want 1", m.Cursor())
 	}
 
-	// Test k/up
-	msg = tea.KeyPressMsg{Code: 107} // 'k'
+	// Test NavUp
+	msg = messages.NavigationMsg{Direction: messages.NavUp}
 	m, _ = m.Update(msg)
 	if m.Cursor() != 0 {
-		t.Errorf("cursor after k = %d, want 0", m.Cursor())
+		t.Errorf("cursor after NavUp = %d, want 0", m.Cursor())
 	}
 
-	// Test G (go to end)
-	msg = tea.KeyPressMsg{Code: 71} // 'G'
+	// Test NavEnd (go to end)
+	msg = messages.NavigationMsg{Direction: messages.NavEnd}
 	m, _ = m.Update(msg)
 	if m.Cursor() != 2 {
-		t.Errorf("cursor after G = %d, want 2", m.Cursor())
+		t.Errorf("cursor after NavEnd = %d, want 2", m.Cursor())
 	}
 
-	// Test g (go to start)
-	msg = tea.KeyPressMsg{Code: 103} // 'g'
+	// Test NavHome (go to start)
+	msg = messages.NavigationMsg{Direction: messages.NavHome}
 	m, _ = m.Update(msg)
 	if m.Cursor() != 0 {
-		t.Errorf("cursor after g = %d, want 0", m.Cursor())
+		t.Errorf("cursor after NavHome = %d, want 0", m.Cursor())
 	}
 }
 

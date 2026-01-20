@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -106,6 +107,10 @@ func (m Model) Init() tea.Cmd {
 
 // Update handles messages for the energy bars.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	if navMsg, ok := msg.(messages.NavigationMsg); ok {
+		return m.handleNavigation(navMsg), nil
+	}
+
 	if !m.loading {
 		return m, nil
 	}
@@ -120,6 +125,27 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+// handleNavigation handles NavigationMsg for scrolling.
+func (m Model) handleNavigation(msg messages.NavigationMsg) Model {
+	switch msg.Direction {
+	case messages.NavDown:
+		m.scroller.CursorDown()
+	case messages.NavUp:
+		m.scroller.CursorUp()
+	case messages.NavPageDown:
+		m.scroller.PageDown()
+	case messages.NavPageUp:
+		m.scroller.PageUp()
+	case messages.NavHome:
+		m.scroller.CursorToStart()
+	case messages.NavEnd:
+		m.scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Horizontal navigation not applicable for energy bars
+	}
+	return m
 }
 
 // hasPMDevicesInCache checks if the cache has any PM-capable devices.

@@ -233,74 +233,55 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m.handleExport(msg)
 	case ImportSceneMsg:
 		return m.handleImport(msg)
-	// Action messages from context system
 	case messages.NavigationMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleNavigation(msg)
-	case messages.ActivateRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		return m.activateScene()
-	case messages.ViewRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		return m.viewScene()
-	case messages.EditRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		return m.editScene()
-	case messages.DeleteRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleDelete()
-	case messages.NewRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		return m, func() tea.Msg { return CreateSceneMsg{} }
-	case messages.CaptureRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		return m, func() tea.Msg { return CaptureSceneMsg{} }
-	case messages.ExportRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		return m.exportScene()
-	case messages.ImportRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		return m.importScene()
-	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		m.loading = true
-		return m, tea.Batch(m.Loader.Tick(), m.loadScenes())
+		return m.handleNavigationMsg(msg)
+	case messages.ActivateRequestMsg, messages.ViewRequestMsg, messages.EditRequestMsg,
+		messages.DeleteRequestMsg, messages.NewRequestMsg, messages.CaptureRequestMsg,
+		messages.ExportRequestMsg, messages.ImportRequestMsg, messages.RefreshRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
+	}
+	return m, nil
+}
+
+func (m ListModel) handleNavigationMsg(msg messages.NavigationMsg) (ListModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m ListModel) handleActionMsg(msg tea.Msg) (ListModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	m.pendingDelete = ""
+	m.statusMsg = ""
+
+	switch msg.(type) {
+	case messages.ActivateRequestMsg:
+		return m.activateScene()
+	case messages.ViewRequestMsg:
+		return m.viewScene()
+	case messages.EditRequestMsg:
+		return m.editScene()
+	case messages.DeleteRequestMsg:
+		return m.handleDelete()
+	case messages.NewRequestMsg:
+		return m, func() tea.Msg { return CreateSceneMsg{} }
+	case messages.CaptureRequestMsg:
+		return m, func() tea.Msg { return CaptureSceneMsg{} }
+	case messages.ExportRequestMsg:
+		return m.exportScene()
+	case messages.ImportRequestMsg:
+		return m.importScene()
+	case messages.RefreshRequestMsg:
+		m.loading = true
+		return m, tea.Batch(m.Loader.Tick(), m.loadScenes())
 	}
 	return m, nil
 }

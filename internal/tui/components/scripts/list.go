@@ -316,57 +316,49 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m.handleLoaded(msg)
 	case ActionMsg:
 		return m.handleAction(msg)
-	// Action messages from context system
 	case messages.NavigationMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleNavigation(msg)
-	case messages.ViewRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m, m.selectScript()
-	case messages.EditRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m, m.editScript()
-	case messages.NewRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m, m.createScript()
-	case messages.DeleteRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleDelete()
-	case messages.RunRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m, m.startScript()
-	case messages.StopRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m, m.stopScript()
-	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleRefresh()
-	case messages.EvalRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m, m.openEval()
+		return m.handleNavigationMsg(msg)
+	case messages.ViewRequestMsg, messages.EditRequestMsg, messages.NewRequestMsg,
+		messages.DeleteRequestMsg, messages.RunRequestMsg, messages.StopRequestMsg,
+		messages.RefreshRequestMsg, messages.EvalRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
+	}
+	return m, nil
+}
+
+func (m ListModel) handleNavigationMsg(msg messages.NavigationMsg) (ListModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m ListModel) handleActionMsg(msg tea.Msg) (ListModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
+	case messages.ViewRequestMsg:
+		return m, m.selectScript()
+	case messages.EditRequestMsg:
+		return m, m.editScript()
+	case messages.NewRequestMsg:
+		return m, m.createScript()
+	case messages.DeleteRequestMsg:
+		return m.handleDelete()
+	case messages.RunRequestMsg:
+		return m, m.startScript()
+	case messages.StopRequestMsg:
+		return m, m.stopScript()
+	case messages.RefreshRequestMsg:
+		return m.handleRefresh()
+	case messages.EvalRequestMsg:
+		return m, m.openEval()
 	}
 	return m, nil
 }

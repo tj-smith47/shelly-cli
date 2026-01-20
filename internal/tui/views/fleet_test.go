@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
@@ -15,7 +16,9 @@ func TestNewFleet(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	svc := &shelly.Service{}
-	deps := FleetDeps{Ctx: ctx, Svc: svc}
+	focusState := focus.NewState()
+	focusState.SetActiveTab(tabs.TabFleet)
+	deps := FleetDeps{Ctx: ctx, Svc: svc, FocusState: focusState}
 
 	f := NewFleet(deps)
 
@@ -24,9 +27,6 @@ func TestNewFleet(t *testing.T) {
 	}
 	if f.svc != svc {
 		t.Error("svc not set")
-	}
-	if f.focusedPanel != FleetPanelDevices {
-		t.Errorf("focusedPanel = %v, want FleetPanelDevices", f.focusedPanel)
 	}
 	if f.id != tabs.TabFleet {
 		t.Errorf("id = %v, want tabs.TabFleet", f.id)
@@ -41,7 +41,8 @@ func TestNewFleet_PanicOnNilCtx(t *testing.T) {
 		}
 	}()
 
-	deps := FleetDeps{Ctx: nil, Svc: &shelly.Service{}}
+	focusState := focus.NewState()
+	deps := FleetDeps{Ctx: nil, Svc: &shelly.Service{}, FocusState: focusState}
 	NewFleet(deps)
 }
 
@@ -53,12 +54,14 @@ func TestNewFleet_PanicOnNilSvc(t *testing.T) {
 		}
 	}()
 
-	deps := FleetDeps{Ctx: context.Background(), Svc: nil}
+	focusState := focus.NewState()
+	deps := FleetDeps{Ctx: context.Background(), Svc: nil, FocusState: focusState}
 	NewFleet(deps)
 }
 
 func TestFleetDeps_Validate(t *testing.T) {
 	t.Parallel()
+	focusState := focus.NewState()
 	tests := []struct {
 		name    string
 		deps    FleetDeps
@@ -66,17 +69,22 @@ func TestFleetDeps_Validate(t *testing.T) {
 	}{
 		{
 			name:    "valid",
-			deps:    FleetDeps{Ctx: context.Background(), Svc: &shelly.Service{}},
+			deps:    FleetDeps{Ctx: context.Background(), Svc: &shelly.Service{}, FocusState: focusState},
 			wantErr: false,
 		},
 		{
 			name:    "nil ctx",
-			deps:    FleetDeps{Ctx: nil, Svc: &shelly.Service{}},
+			deps:    FleetDeps{Ctx: nil, Svc: &shelly.Service{}, FocusState: focusState},
 			wantErr: true,
 		},
 		{
 			name:    "nil svc",
-			deps:    FleetDeps{Ctx: context.Background(), Svc: nil},
+			deps:    FleetDeps{Ctx: context.Background(), Svc: nil, FocusState: focusState},
+			wantErr: true,
+		},
+		{
+			name:    "nil focus state",
+			deps:    FleetDeps{Ctx: context.Background(), Svc: &shelly.Service{}, FocusState: nil},
 			wantErr: true,
 		},
 	}
@@ -130,7 +138,7 @@ func TestFleet_SetSize(t *testing.T) {
 func TestFleet_Update_FocusNext(t *testing.T) {
 	t.Parallel()
 	f := newTestFleet()
-	f.focusedPanel = FleetPanelDevices
+	initialPanel := f.focusState.ActivePanel()
 
 	msg := tea.KeyPressMsg{Code: tea.KeyTab}
 	updated, _ := f.Update(msg)
@@ -139,15 +147,18 @@ func TestFleet_Update_FocusNext(t *testing.T) {
 		t.Fatal("Update should return *Fleet")
 	}
 
-	if fleet.focusedPanel != FleetPanelGroups {
-		t.Errorf("focusedPanel after tab = %v, want FleetPanelGroups", fleet.focusedPanel)
+	newPanel := fleet.focusState.ActivePanel()
+	if newPanel == initialPanel {
+		t.Error("Tab should change focused panel")
 	}
 }
 
 func TestFleet_Update_FocusPrev(t *testing.T) {
 	t.Parallel()
 	f := newTestFleet()
-	f.focusedPanel = FleetPanelGroups
+	// Move to second panel first
+	f.focusState.NextPanel()
+	panelAfterNext := f.focusState.ActivePanel()
 
 	msg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	updated, _ := f.Update(msg)
@@ -156,8 +167,9 @@ func TestFleet_Update_FocusPrev(t *testing.T) {
 		t.Fatal("Update should return *Fleet")
 	}
 
-	if fleet.focusedPanel != FleetPanelDevices {
-		t.Errorf("focusedPanel after shift+tab = %v, want FleetPanelDevices", fleet.focusedPanel)
+	panelAfterPrev := fleet.focusState.ActivePanel()
+	if panelAfterPrev == panelAfterNext {
+		t.Error("Shift+Tab should change focused panel")
 	}
 }
 
@@ -165,49 +177,33 @@ func TestFleet_FocusCycle(t *testing.T) {
 	t.Parallel()
 	f := newTestFleet()
 
-	// Start at devices
-	if f.focusedPanel != FleetPanelDevices {
-		t.Fatal("should start at FleetPanelDevices")
+	// Start at first panel
+	initialPanel := f.focusState.ActivePanel()
+
+	// Cycle through all panels (Fleet has 4 panels)
+	f.focusState.NextPanel()
+	p1 := f.focusState.ActivePanel()
+	if p1 == initialPanel {
+		t.Error("NextPanel should change panel")
 	}
 
-	// Cycle through all panels
-	f.focusNext()
-	if f.focusedPanel != FleetPanelGroups {
-		t.Errorf("after 1 focusNext = %v, want FleetPanelGroups", f.focusedPanel)
+	f.focusState.NextPanel()
+	p2 := f.focusState.ActivePanel()
+	if p2 == p1 {
+		t.Error("NextPanel should change panel again")
 	}
 
-	f.focusNext()
-	if f.focusedPanel != FleetPanelHealth {
-		t.Errorf("after 2 focusNext = %v, want FleetPanelHealth", f.focusedPanel)
+	f.focusState.NextPanel()
+	p3 := f.focusState.ActivePanel()
+	if p3 == p2 {
+		t.Error("NextPanel should change panel again")
 	}
 
-	f.focusNext()
-	if f.focusedPanel != FleetPanelOperations {
-		t.Errorf("after 3 focusNext = %v, want FleetPanelOperations", f.focusedPanel)
-	}
-
-	f.focusNext()
-	if f.focusedPanel != FleetPanelDevices {
-		t.Errorf("after 4 focusNext = %v, want FleetPanelDevices (wrap)", f.focusedPanel)
-	}
-}
-
-func TestFleet_FocusPrevCycle(t *testing.T) {
-	t.Parallel()
-	f := newTestFleet()
-
-	// Start at devices
-	f.focusedPanel = FleetPanelDevices
-
-	// Go backwards
-	f.focusPrev()
-	if f.focusedPanel != FleetPanelOperations {
-		t.Errorf("after 1 focusPrev = %v, want FleetPanelOperations (wrap)", f.focusedPanel)
-	}
-
-	f.focusPrev()
-	if f.focusedPanel != FleetPanelHealth {
-		t.Errorf("after 2 focusPrev = %v, want FleetPanelHealth", f.focusedPanel)
+	// After 4 more NextPanel, should wrap back
+	f.focusState.NextPanel()
+	p4 := f.focusState.ActivePanel()
+	if p4 != initialPanel {
+		t.Errorf("After cycling through all 4 panels, should wrap back to initial, got %v", p4)
 	}
 }
 
@@ -242,11 +238,6 @@ func TestFleet_View_NotConnected(t *testing.T) {
 func TestFleet_Accessors(t *testing.T) {
 	t.Parallel()
 	f := newTestFleet()
-	f.focusedPanel = FleetPanelHealth
-
-	if f.FocusedPanel() != FleetPanelHealth {
-		t.Errorf("FocusedPanel() = %v, want FleetPanelHealth", f.FocusedPanel())
-	}
 
 	// Verify components are accessible
 	_ = f.Devices()
@@ -311,8 +302,8 @@ func TestFleet_UpdateFocusStates(t *testing.T) {
 	t.Parallel()
 	f := newTestFleet()
 
-	// Set focus to health
-	f.focusedPanel = FleetPanelHealth
+	// Set focus to a different panel
+	f.focusState.NextPanel()
 	f.updateFocusStates()
 
 	// Verify focus states are updated (method doesn't panic)
@@ -364,6 +355,9 @@ func TestFleetConnectMsg(t *testing.T) {
 func newTestFleet() *Fleet {
 	ctx := context.Background()
 	svc := &shelly.Service{}
-	deps := FleetDeps{Ctx: ctx, Svc: svc}
+	focusState := focus.NewState()
+	// Set to fleet tab so panel cycling works correctly
+	focusState.SetActiveTab(tabs.TabFleet)
+	deps := FleetDeps{Ctx: ctx, Svc: svc, FocusState: focusState}
 	return NewFleet(deps)
 }

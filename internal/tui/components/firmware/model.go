@@ -481,30 +481,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleBatchComplete(msg), nil
 	case StagedUpdateCompleteMsg:
 		return m.handleStagedUpdateComplete(msg)
-
-	// Action messages from context-based keybindings
 	case messages.NavigationMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleNavigation(msg)
-	case messages.ToggleEnableRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m = m.toggleSelection()
-		return m, nil
-	case messages.ScanRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.CheckAll()
-	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.CheckAll()
-
+		return m.handleNavigationMsg(msg)
+	case messages.ToggleEnableRequestMsg, messages.ScanRequestMsg, messages.RefreshRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -512,6 +492,27 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
+	return m, nil
+}
+
+func (m Model) handleNavigationMsg(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
+	case messages.ToggleEnableRequestMsg:
+		m = m.toggleSelection()
+		return m, nil
+	case messages.ScanRequestMsg, messages.RefreshRequestMsg:
+		return m.CheckAll()
+	}
 	return m, nil
 }
 

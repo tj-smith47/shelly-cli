@@ -13,6 +13,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -149,12 +151,33 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	keyMsg, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		return m, nil
+	switch msg := msg.(type) {
+	case messages.NavigationMsg:
+		return m.handleNavigation(msg), nil
+	case tea.KeyPressMsg:
+		return m.handleKeyPress(msg)
 	}
+	return m, nil
+}
 
-	return m.handleKeyPress(keyMsg)
+// handleNavigation handles NavigationMsg for cursor movement.
+func (m Model) handleNavigation(msg messages.NavigationMsg) Model {
+	components := m.getComponents()
+	maxIdx := len(components) - 1
+
+	switch msg.Direction {
+	case messages.NavDown:
+		return m.handleDown(maxIdx)
+	case messages.NavUp:
+		return m.handleUp()
+	case messages.NavLeft:
+		return m.handleLeft()
+	case messages.NavRight:
+		return m.handleRight(maxIdx)
+	case messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Page navigation not applicable for device info panel
+	}
+	return m
 }
 
 func (m Model) handleKeyPress(keyMsg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -173,7 +196,7 @@ func (m Model) handleKeyPress(keyMsg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if key.Matches(keyMsg, key.NewBinding(key.WithKeys("k", "up"))) {
 		return m.handleUp(), nil
 	}
-	if key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter"))) {
+	if key.Matches(keyMsg, key.NewBinding(key.WithKeys(keyconst.KeyEnter))) {
 		return m.handleEnter(components, maxIdx)
 	}
 	if key.Matches(keyMsg, key.NewBinding(key.WithKeys("a"))) {

@@ -5,9 +5,8 @@ import (
 	"testing"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -189,26 +188,26 @@ func TestScrollerPageUp(t *testing.T) {
 func TestTogglePause(t *testing.T) {
 	t.Parallel()
 
-	t.Run("toggles from false to true via key", func(t *testing.T) {
+	t.Run("toggles from false to true via action", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(0)
 		m.paused = false
 
-		m = m.handleKeyPress(tea.KeyPressMsg{Code: 'p'})
+		updated, _ := m.Update(messages.PauseRequestMsg{})
 
-		if !m.paused {
+		if !updated.paused {
 			t.Error("expected paused to be true")
 		}
 	})
 
-	t.Run("toggles from true to false via key", func(t *testing.T) {
+	t.Run("toggles from true to false via action", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(0)
 		m.paused = true
 
-		m = m.handleKeyPress(tea.KeyPressMsg{Code: 'p'})
+		updated, _ := m.Update(messages.PauseRequestMsg{})
 
-		if m.paused {
+		if updated.paused {
 			t.Error("expected paused to be false")
 		}
 	})

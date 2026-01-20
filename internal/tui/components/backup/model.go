@@ -532,59 +532,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case ExportCompleteMsg:
-		m.exporting = false
-		for _, result := range msg.Results {
-			for i := range m.devices {
-				if m.devices[i].Name != result.Name {
-					continue
-				}
-				m.devices[i].Exporting = false
-				m.devices[i].Exported = result.Success
-				m.devices[i].FilePath = result.FilePath
-				m.devices[i].Err = result.Err
-				break
-			}
-		}
-		// Reload backup files after export
-		m = m.LoadBackupFiles()
-		return m, nil
-
+		return m.handleExportComplete(msg)
 	case ImportCompleteMsg:
-		m.importing = false
-		if !msg.Success {
-			m.err = msg.Err
-		}
-		return m, nil
-
-	// Action messages from context-based keybindings
+		return m.handleImportComplete(msg)
 	case messages.NavigationMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleNavigation(msg)
-	case messages.ToggleEnableRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		m = m.toggleSelection()
-		return m, nil
-	case messages.RunRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		if m.mode == ModeExport {
-			return m.ExportSelected()
-		}
-		return m.ImportSelected()
-	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		if m.mode == ModeImport {
-			m = m.LoadBackupFiles()
-		}
-		return m, nil
-
+		return m.handleNavigationMsg(msg)
+	case messages.ToggleEnableRequestMsg, messages.RunRequestMsg, messages.RefreshRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -612,6 +566,62 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.Scroller.CursorToStart()
 	}
 
+	return m, nil
+}
+
+func (m Model) handleExportComplete(msg ExportCompleteMsg) (Model, tea.Cmd) {
+	m.exporting = false
+	for _, result := range msg.Results {
+		for i := range m.devices {
+			if m.devices[i].Name != result.Name {
+				continue
+			}
+			m.devices[i].Exporting = false
+			m.devices[i].Exported = result.Success
+			m.devices[i].FilePath = result.FilePath
+			m.devices[i].Err = result.Err
+			break
+		}
+	}
+	// Reload backup files after export
+	m = m.LoadBackupFiles()
+	return m, nil
+}
+
+func (m Model) handleImportComplete(msg ImportCompleteMsg) (Model, tea.Cmd) {
+	m.importing = false
+	if !msg.Success {
+		m.err = msg.Err
+	}
+	return m, nil
+}
+
+func (m Model) handleNavigationMsg(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
+	case messages.ToggleEnableRequestMsg:
+		m = m.toggleSelection()
+		return m, nil
+	case messages.RunRequestMsg:
+		if m.mode == ModeExport {
+			return m.ExportSelected()
+		}
+		return m.ImportSelected()
+	case messages.RefreshRequestMsg:
+		if m.mode == ModeImport {
+			m = m.LoadBackupFiles()
+		}
+		return m, nil
+	}
 	return m, nil
 }
 

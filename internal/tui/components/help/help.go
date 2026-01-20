@@ -10,7 +10,9 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -92,25 +94,53 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	keyMsg, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		return m, nil
+	switch msg := msg.(type) {
+	case messages.NavigationMsg:
+		return m.handleNavigation(msg), nil
+	case tea.KeyPressMsg:
+		return m.handleKeyPress(msg)
 	}
+	return m, nil
+}
 
-	switch {
-	case key.Matches(keyMsg, key.NewBinding(key.WithKeys("?", "escape", "q"))):
-		m.visible = false
-		return m, func() tea.Msg { return CloseMsg{} }
-	case key.Matches(keyMsg, key.NewBinding(key.WithKeys("j", "down"))):
+func (m Model) handleNavigation(msg messages.NavigationMsg) Model {
+	switch msg.Direction {
+	case messages.NavDown:
 		m.scrollOffset++
-	case key.Matches(keyMsg, key.NewBinding(key.WithKeys("k", "up"))):
+	case messages.NavUp:
 		if m.scrollOffset > 0 {
 			m.scrollOffset--
 		}
-	case key.Matches(keyMsg, key.NewBinding(key.WithKeys("g"))):
+	case messages.NavHome:
+		m.scrollOffset = 0
+	case messages.NavPageDown:
+		m.scrollOffset += 10
+	case messages.NavPageUp:
+		if m.scrollOffset >= 10 {
+			m.scrollOffset -= 10
+		} else {
+			m.scrollOffset = 0
+		}
+	case messages.NavLeft, messages.NavRight, messages.NavEnd:
+		// Not applicable for help overlay
+	}
+	return m
+}
+
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, key.NewBinding(key.WithKeys("?", "escape", "q"))):
+		m.visible = false
+		return m, func() tea.Msg { return CloseMsg{} }
+	case key.Matches(msg, key.NewBinding(key.WithKeys("j", "down"))):
+		m.scrollOffset++
+	case key.Matches(msg, key.NewBinding(key.WithKeys("k", "up"))):
+		if m.scrollOffset > 0 {
+			m.scrollOffset--
+		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("g"))):
 		m.scrollOffset = 0
 	}
-
 	return m, nil
 }
 
@@ -419,7 +449,7 @@ func (m Model) FullHelp() [][]key.Binding {
 		{
 			key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("j/down", "move down")),
 			key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("k/up", "move up")),
-			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next view")),
+			key.NewBinding(key.WithKeys(keyconst.KeyTab), key.WithHelp("tab", "next view")),
 		},
 		{
 			key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),

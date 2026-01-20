@@ -10,6 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -169,8 +171,18 @@ func (f AlertForm) Init() tea.Cmd {
 
 // Update handles messages.
 func (f AlertForm) Update(msg tea.Msg) (AlertForm, tea.Cmd) {
-	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
-		return f.handleKeyPress(keyMsg)
+	return f.handleMessage(msg)
+}
+
+func (f AlertForm) handleMessage(msg tea.Msg) (AlertForm, tea.Cmd) {
+	switch msg := msg.(type) {
+	// Action messages from context system
+	case messages.NavigationMsg:
+		return f.handleNavigation(msg)
+	case messages.ToggleEnableRequestMsg:
+		return f.handleSpace()
+	case tea.KeyPressMsg:
+		return f.handleKeyPress(msg)
 	}
 
 	// Forward to focused field
@@ -191,20 +203,31 @@ func (f AlertForm) Update(msg tea.Msg) (AlertForm, tea.Cmd) {
 	return f, cmd
 }
 
-func (f AlertForm) handleKeyPress(msg tea.KeyPressMsg) (AlertForm, tea.Cmd) {
-	switch msg.String() {
-	case "tab", "down":
-		return f.nextField()
-	case "shift+tab", "up":
+func (f AlertForm) handleNavigation(msg messages.NavigationMsg) (AlertForm, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
 		return f.prevField()
-	case "enter":
+	case messages.NavDown:
+		return f.nextField()
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this form
+	}
+	return f, nil
+}
+
+func (f AlertForm) handleKeyPress(msg tea.KeyPressMsg) (AlertForm, tea.Cmd) {
+	// Modal-specific keys not covered by action messages
+	switch msg.String() {
+	case keyconst.KeyTab:
+		return f.nextField()
+	case keyconst.KeyShiftTab:
+		return f.prevField()
+	case keyconst.KeyEnter:
 		return f.handleEnter()
-	case "ctrl+s":
+	case keyconst.KeyCtrlS:
 		return f.trySubmit()
-	case "esc":
+	case keyconst.KeyEsc:
 		return f, func() tea.Msg { return AlertFormCancelMsg{} }
-	case " ":
-		return f.handleSpace()
 	}
 
 	return f.forwardToFocusedInput(msg)

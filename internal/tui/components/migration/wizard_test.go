@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 func TestNew(t *testing.T) {
@@ -223,7 +224,7 @@ func TestWizard_Update_ApplyComplete(t *testing.T) {
 	}
 }
 
-func TestWizard_HandleKey_Navigation(t *testing.T) {
+func TestWizard_HandleAction_Navigation(t *testing.T) {
 	t.Parallel()
 	w := newTestWizard()
 	w.focused = true
@@ -235,15 +236,15 @@ func TestWizard_HandleKey_Navigation(t *testing.T) {
 	w.Scroller.SetItemCount(len(w.devices))
 
 	// Move down
-	updated, _ := w.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ := w.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.Scroller.Cursor() != 1 {
-		t.Errorf("cursor after j = %d, want 1", updated.Scroller.Cursor())
+		t.Errorf("cursor after NavDown = %d, want 1", updated.Scroller.Cursor())
 	}
 
 	// Move up
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'k'})
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
 	if updated.Scroller.Cursor() != 0 {
-		t.Errorf("cursor after k = %d, want 0", updated.Scroller.Cursor())
+		t.Errorf("cursor after NavUp = %d, want 0", updated.Scroller.Cursor())
 	}
 }
 
@@ -298,14 +299,14 @@ func TestWizard_HandleKey_Escape_FromPreview(t *testing.T) {
 	}
 }
 
-func TestWizard_HandleKey_NotFocused(t *testing.T) {
+func TestWizard_HandleAction_NotFocused(t *testing.T) {
 	t.Parallel()
 	w := newTestWizard()
 	w.focused = false
 	w.devices = []DeviceInfo{{Name: "device1"}}
 	w.Scroller.SetItemCount(1)
 
-	updated, _ := w.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ := w.Update(messages.NavigationMsg{Direction: messages.NavDown})
 
 	if updated.Scroller.Cursor() != 0 {
 		t.Error("cursor should not change when not focused")

@@ -5,6 +5,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 )
 
 // Context represents the current keybinding context.
@@ -24,6 +25,8 @@ const (
 	ContextMonitor
 	ContextFleet
 	ContextHelp
+	ContextModal // Modal dialogs (edit forms, etc.)
+	ContextInput // Text input capture (search, command mode)
 )
 
 // Action represents a user action.
@@ -82,6 +85,10 @@ const (
 	ActionPanel9
 	ActionControl
 	ActionDetail
+	ActionNextField // Tab in modal: move to next field
+	ActionPrevField // Shift+Tab in modal: move to previous field
+	ActionConfirm   // Enter in modal: confirm selection/submit
+	ActionSave      // Ctrl+S: save changes
 )
 
 // KeyBinding represents a key and its description.
@@ -108,282 +115,309 @@ func NewContextMap() *ContextMap {
 func (m *ContextMap) initDefaults() {
 	// Global bindings
 	m.bindings[ContextGlobal] = map[string]Action{
-		"q":         ActionQuit,
-		"?":         ActionHelp,
-		"/":         ActionFilter,
-		":":         ActionCommand,
-		"esc":       ActionEscape,
-		"ctrl+[":    ActionEscape,
-		"tab":       ActionNextPanel,
-		"shift+tab": ActionPrevPanel,
-		"alt+]":     ActionNextPanel,
-		"alt+[":     ActionPrevPanel,
-		"1":         ActionTab1,
-		"2":         ActionTab2,
-		"3":         ActionTab3,
-		"4":         ActionTab4,
-		"5":         ActionTab5,
-		"6":         ActionTab6,
-		"!":         ActionPanel1, // Shift+1
-		"@":         ActionPanel2, // Shift+2
-		"#":         ActionPanel3, // Shift+3
-		"$":         ActionPanel4, // Shift+4
-		"%":         ActionPanel5, // Shift+5
-		"^":         ActionPanel6, // Shift+6
-		"&":         ActionPanel7, // Shift+7
-		"*":         ActionPanel8, // Shift+8
-		"(":         ActionPanel9, // Shift+9
-		"D":         ActionDebug,
-		"ctrl+c":    ActionQuit,
+		"q":                  ActionQuit,
+		"?":                  ActionHelp,
+		"/":                  ActionFilter,
+		":":                  ActionCommand,
+		keyconst.KeyEsc:      ActionEscape,
+		"ctrl+[":             ActionEscape,
+		keyconst.KeyTab:      ActionNextPanel,
+		keyconst.KeyShiftTab: ActionPrevPanel,
+		"alt+]":              ActionNextPanel,
+		"alt+[":              ActionPrevPanel,
+		"1":                  ActionTab1,
+		"2":                  ActionTab2,
+		"3":                  ActionTab3,
+		"4":                  ActionTab4,
+		"5":                  ActionTab5,
+		"6":                  ActionTab6,
+		"!":                  ActionPanel1, // Shift+1
+		"@":                  ActionPanel2, // Shift+2
+		"#":                  ActionPanel3, // Shift+3
+		"$":                  ActionPanel4, // Shift+4
+		"%":                  ActionPanel5, // Shift+5
+		"^":                  ActionPanel6, // Shift+6
+		"&":                  ActionPanel7, // Shift+7
+		"*":                  ActionPanel8, // Shift+8
+		"(":                  ActionPanel9, // Shift+9
+		"D":                  ActionDebug,
+		"ctrl+c":             ActionQuit,
 	}
 
 	// Events context - dual column layout with h/l for column switching
 	m.bindings[ContextEvents] = map[string]Action{
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"h":      ActionLeft,  // Switch to user (left) column
-		"l":      ActionRight, // Switch to system (right) column
-		"left":   ActionLeft,
-		"right":  ActionRight,
-		"space":  ActionPause,
-		"c":      ActionClear,
-		"f":      ActionFilterToggle,
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown,
-		"ctrl+u": ActionPageUp,
-		"g":      ActionHome,
-		"G":      ActionEnd,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		"h":                ActionLeft,  // Switch to user (left) column
+		"l":                ActionRight, // Switch to system (right) column
+		"left":             ActionLeft,
+		"right":            ActionRight,
+		keyconst.KeySpace:  ActionPause,
+		"c":                ActionClear,
+		"f":                ActionFilterToggle,
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown,
+		keyconst.KeyCtrlU:  ActionPageUp,
+		"g":                ActionHome,
+		"G":                ActionEnd,
 	}
 
 	// Devices context
 	m.bindings[ContextDevices] = map[string]Action{
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"h":      ActionLeft,
-		"l":      ActionRight,
-		"left":   ActionLeft,
-		"right":  ActionRight,
-		"t":      ActionToggle,
-		"o":      ActionOn,
-		"O":      ActionOff,
-		"R":      ActionReboot,
-		"c":      ActionControl, // Open control panel
-		"d":      ActionDetail,  // Device detail overlay
-		"enter":  ActionEnter,
-		"r":      ActionRefresh,
-		"ctrl+r": ActionRefreshAll,
-		"b":      ActionBrowser, // Open in browser
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown, // Half-page down
-		"ctrl+u": ActionPageUp,   // Half-page up
-		"g":      ActionHome,
-		"G":      ActionEnd,
-		"home":   ActionHome,
-		"end":    ActionEnd,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		"h":                ActionLeft,
+		"l":                ActionRight,
+		"left":             ActionLeft,
+		"right":            ActionRight,
+		"t":                ActionToggle,
+		"o":                ActionOn,
+		"O":                ActionOff,
+		"R":                ActionReboot,
+		"c":                ActionControl, // Open control panel
+		"d":                ActionDetail,  // Device detail overlay
+		keyconst.KeyEnter:  ActionEnter,
+		"r":                ActionRefresh,
+		"ctrl+r":           ActionRefreshAll,
+		"b":                ActionBrowser, // Open in browser
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown, // Half-page down
+		keyconst.KeyCtrlU:  ActionPageUp,   // Half-page up
+		"g":                ActionHome,
+		"G":                ActionEnd,
+		"home":             ActionHome,
+		"end":              ActionEnd,
 	}
 
 	// Info context
 	m.bindings[ContextInfo] = map[string]Action{
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"h":      ActionLeft,
-		"l":      ActionRight,
-		"left":   ActionLeft,
-		"right":  ActionRight,
-		"enter":  ActionEnter,
-		"a":      ActionExpand, // Toggle all/single view
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown,
-		"ctrl+u": ActionPageUp,
-		"g":      ActionHome,
-		"G":      ActionEnd,
-		"home":   ActionHome,
-		"end":    ActionEnd,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		"h":                ActionLeft,
+		"l":                ActionRight,
+		"left":             ActionLeft,
+		"right":            ActionRight,
+		keyconst.KeyEnter:  ActionEnter,
+		"a":                ActionExpand, // Toggle all/single view
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown,
+		keyconst.KeyCtrlU:  ActionPageUp,
+		"g":                ActionHome,
+		"G":                ActionEnd,
+		"home":             ActionHome,
+		"end":              ActionEnd,
 	}
 
 	// Energy context
 	m.bindings[ContextEnergy] = map[string]Action{
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"h":      ActionLeft,
-		"l":      ActionRight,
-		"left":   ActionLeft,
-		"right":  ActionRight,
-		"s":      ActionSort,
-		"e":      ActionExpand,
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown,
-		"ctrl+u": ActionPageUp,
-		"g":      ActionHome,
-		"G":      ActionEnd,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		"h":                ActionLeft,
+		"l":                ActionRight,
+		"left":             ActionLeft,
+		"right":            ActionRight,
+		"s":                ActionSort,
+		"e":                ActionExpand,
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown,
+		keyconst.KeyCtrlU:  ActionPageUp,
+		"g":                ActionHome,
+		"G":                ActionEnd,
 	}
 
 	// JSON context
 	m.bindings[ContextJSON] = map[string]Action{
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"h":      ActionLeft,
-		"l":      ActionRight,
-		"left":   ActionLeft,
-		"right":  ActionRight,
-		"q":      ActionEscape,
-		"esc":    ActionEscape,
-		"ctrl+[": ActionEscape,
-		"y":      ActionCopy,
-		"r":      ActionRefresh,
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown,
-		"ctrl+u": ActionPageUp,
-		"g":      ActionHome,
-		"G":      ActionEnd,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		"h":                ActionLeft,
+		"l":                ActionRight,
+		"left":             ActionLeft,
+		"right":            ActionRight,
+		"q":                ActionEscape,
+		keyconst.KeyEsc:    ActionEscape,
+		"ctrl+[":           ActionEscape,
+		"y":                ActionCopy,
+		"r":                ActionRefresh,
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown,
+		keyconst.KeyCtrlU:  ActionPageUp,
+		"g":                ActionHome,
+		"G":                ActionEnd,
 	}
 
 	// Automation context - scripts, schedules, webhooks, KVS
 	m.bindings[ContextAutomation] = map[string]Action{
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"h":      ActionLeft,
-		"l":      ActionRight,
-		"left":   ActionLeft,
-		"right":  ActionRight,
-		"enter":  ActionEnter,
-		"e":      ActionEdit,   // Edit script/schedule/webhook
-		"n":      ActionNew,    // Create new
-		"d":      ActionDelete, // Delete
-		"r":      ActionRefresh,
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown,
-		"ctrl+u": ActionPageUp,
-		"g":      ActionHome,
-		"G":      ActionEnd,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		"h":                ActionLeft,
+		"l":                ActionRight,
+		"left":             ActionLeft,
+		"right":            ActionRight,
+		keyconst.KeyEnter:  ActionEnter,
+		"e":                ActionEdit,   // Edit script/schedule/webhook
+		"n":                ActionNew,    // Create new
+		"d":                ActionDelete, // Delete
+		"r":                ActionRefresh,
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown,
+		keyconst.KeyCtrlU:  ActionPageUp,
+		"g":                ActionHome,
+		"G":                ActionEnd,
 	}
 
 	// Config context - device configuration panels
 	m.bindings[ContextConfig] = map[string]Action{
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"h":      ActionLeft,
-		"l":      ActionRight,
-		"left":   ActionLeft,
-		"right":  ActionRight,
-		"enter":  ActionEnter,
-		"e":      ActionEdit, // Edit configuration
-		"r":      ActionRefresh,
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown,
-		"ctrl+u": ActionPageUp,
-		"g":      ActionHome,
-		"G":      ActionEnd,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		"h":                ActionLeft,
+		"l":                ActionRight,
+		"left":             ActionLeft,
+		"right":            ActionRight,
+		keyconst.KeyEnter:  ActionEnter,
+		"e":                ActionEdit, // Edit configuration
+		"r":                ActionRefresh,
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown,
+		keyconst.KeyCtrlU:  ActionPageUp,
+		"g":                ActionHome,
+		"G":                ActionEnd,
 	}
 
 	// Manage context - discovery, firmware, backup, batch operations
 	m.bindings[ContextManage] = map[string]Action{
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"h":      ActionLeft,
-		"l":      ActionRight,
-		"left":   ActionLeft,
-		"right":  ActionRight,
-		"enter":  ActionEnter,
-		"r":      ActionRefresh, // Refresh device list
-		"space":  ActionToggle,  // Select device
-		"a":      ActionExpand,  // Select all
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown,
-		"ctrl+u": ActionPageUp,
-		"g":      ActionHome,
-		"G":      ActionEnd,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		"h":                ActionLeft,
+		"l":                ActionRight,
+		"left":             ActionLeft,
+		"right":            ActionRight,
+		keyconst.KeyEnter:  ActionEnter,
+		"r":                ActionRefresh, // Refresh device list
+		keyconst.KeySpace:  ActionToggle,  // Select device
+		"a":                ActionExpand,  // Select all
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown,
+		keyconst.KeyCtrlU:  ActionPageUp,
+		"g":                ActionHome,
+		"G":                ActionEnd,
 	}
 
 	// Monitor context - real-time monitoring with device actions
 	m.bindings[ContextMonitor] = map[string]Action{
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"h":      ActionLeft,
-		"l":      ActionRight,
-		"left":   ActionLeft,
-		"right":  ActionRight,
-		"t":      ActionToggle,
-		"o":      ActionOn,
-		"O":      ActionOff,
-		"R":      ActionReboot,
-		"c":      ActionControl, // Open control panel
-		"d":      ActionDetail,  // Device detail overlay
-		"enter":  ActionEnter,
-		"r":      ActionRefresh,
-		"ctrl+r": ActionRefreshAll,
-		"b":      ActionBrowser, // Open in browser
-		"space":  ActionPause,   // Pause/resume monitoring
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown, // Half-page down
-		"ctrl+u": ActionPageUp,   // Half-page up
-		"g":      ActionHome,
-		"G":      ActionEnd,
-		"home":   ActionHome,
-		"end":    ActionEnd,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		"h":                ActionLeft,
+		"l":                ActionRight,
+		"left":             ActionLeft,
+		"right":            ActionRight,
+		"t":                ActionToggle,
+		"o":                ActionOn,
+		"O":                ActionOff,
+		"R":                ActionReboot,
+		"c":                ActionControl, // Open control panel
+		"d":                ActionDetail,  // Device detail overlay
+		keyconst.KeyEnter:  ActionEnter,
+		"r":                ActionRefresh,
+		"ctrl+r":           ActionRefreshAll,
+		"b":                ActionBrowser, // Open in browser
+		keyconst.KeySpace:  ActionPause,   // Pause/resume monitoring
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown, // Half-page down
+		keyconst.KeyCtrlU:  ActionPageUp,   // Half-page up
+		"g":                ActionHome,
+		"G":                ActionEnd,
+		"home":             ActionHome,
+		"end":              ActionEnd,
 	}
 
 	// Fleet context - cloud fleet management
 	m.bindings[ContextFleet] = map[string]Action{
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"enter":  ActionEnter,
-		"r":      ActionRefresh,
-		"space":  ActionToggle, // Select device
-		"a":      ActionExpand, // Select all
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown,
-		"ctrl+u": ActionPageUp,
-		"g":      ActionHome,
-		"G":      ActionEnd,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		keyconst.KeyEnter:  ActionEnter,
+		"r":                ActionRefresh,
+		keyconst.KeySpace:  ActionToggle, // Select device
+		"a":                ActionExpand, // Select all
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown,
+		keyconst.KeyCtrlU:  ActionPageUp,
+		"g":                ActionHome,
+		"G":                ActionEnd,
 	}
 
 	// Help context
 	m.bindings[ContextHelp] = map[string]Action{
-		"?":      ActionEscape,
-		"q":      ActionEscape,
-		"esc":    ActionEscape,
-		"ctrl+[": ActionEscape,
-		"j":      ActionDown,
-		"k":      ActionUp,
-		"down":   ActionDown,
-		"up":     ActionUp,
-		"pgdown": ActionPageDown,
-		"pgup":   ActionPageUp,
-		"ctrl+d": ActionPageDown,
-		"ctrl+u": ActionPageUp,
-		"g":      ActionHome,
-		"G":      ActionEnd,
+		"?":                ActionEscape,
+		"q":                ActionEscape,
+		keyconst.KeyEsc:    ActionEscape,
+		"ctrl+[":           ActionEscape,
+		"j":                ActionDown,
+		"k":                ActionUp,
+		keyconst.KeyDown:   ActionDown,
+		keyconst.KeyUp:     ActionUp,
+		keyconst.KeyPgDown: ActionPageDown,
+		keyconst.KeyPgUp:   ActionPageUp,
+		keyconst.KeyCtrlD:  ActionPageDown,
+		keyconst.KeyCtrlU:  ActionPageUp,
+		"g":                ActionHome,
+		"G":                ActionEnd,
+	}
+
+	// Modal context - for edit modals and dialog forms
+	m.bindings[ContextModal] = map[string]Action{
+		"j":                  ActionDown,
+		"k":                  ActionUp,
+		keyconst.KeyDown:     ActionDown,
+		keyconst.KeyUp:       ActionUp,
+		keyconst.KeyTab:      ActionNextField,
+		keyconst.KeyShiftTab: ActionPrevField,
+		keyconst.KeyEsc:      ActionEscape,
+		"ctrl+[":             ActionEscape,
+		keyconst.KeyEnter:    ActionConfirm,
+		"ctrl+s":             ActionSave,
+		"h":                  ActionLeft,
+		"l":                  ActionRight,
+		"left":               ActionLeft,
+		"right":              ActionRight,
+		keyconst.KeySpace:    ActionToggle,
+	}
+
+	// Input context - minimal bindings for text input capture
+	// Most keys should pass through to the text input
+	m.bindings[ContextInput] = map[string]Action{
+		keyconst.KeyEsc:   ActionEscape,
+		"ctrl+[":          ActionEscape,
+		keyconst.KeyEnter: ActionConfirm,
 	}
 }
 
@@ -432,19 +466,19 @@ func (m *ContextMap) GetGlobalBindings() []KeyBinding {
 }
 
 // ContextFromPanel converts a focus Panel to a keys Context.
-func ContextFromPanel(p focus.PanelID) Context {
+func ContextFromPanel(p focus.GlobalPanelID) Context {
 	switch p {
-	case focus.PanelEvents:
+	case focus.PanelDashboardEvents:
 		return ContextEvents
 	case focus.PanelDeviceList:
 		return ContextDevices
-	case focus.PanelDeviceInfo:
+	case focus.PanelDashboardInfo:
 		return ContextInfo
-	case focus.PanelJSON:
+	case focus.PanelDashboardJSON:
 		return ContextJSON
-	case focus.PanelEnergyBars, focus.PanelEnergyHistory:
+	case focus.PanelDashboardEnergyBars, focus.PanelDashboardEnergyHistory:
 		return ContextEnergy
-	case focus.PanelMonitor:
+	case focus.PanelMonitorMain:
 		return ContextMonitor
 	default:
 		return ContextGlobal
@@ -508,6 +542,10 @@ var actionDescriptions = map[Action]string{
 	ActionPanel9:       "Jump to panel 9",
 	ActionControl:      "Control panel",
 	ActionDetail:       "Device detail",
+	ActionNextField:    "Next field",
+	ActionPrevField:    "Previous field",
+	ActionConfirm:      "Confirm",
+	ActionSave:         "Save",
 }
 
 // contextActionDescriptions overrides action descriptions for specific contexts.
@@ -605,6 +643,10 @@ func ContextName(ctx Context) string {
 		return "Fleet"
 	case ContextHelp:
 		return "Help"
+	case ContextModal:
+		return "Modal"
+	case ContextInput:
+		return "Input"
 	default:
 		return "Unknown"
 	}

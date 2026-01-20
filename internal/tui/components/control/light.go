@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 )
 
 // LightState holds the current state of a light.
@@ -138,7 +139,7 @@ func (m LightModel) handleKeyPress(msg tea.KeyPressMsg) (LightModel, tea.Cmd) {
 		return m.adjustBrightness(5)
 	case key.Matches(msg, key.NewBinding(key.WithKeys("-", "_"))):
 		return m.adjustBrightness(-5)
-	case key.Matches(msg, key.NewBinding(key.WithKeys("tab"))):
+	case key.Matches(msg, key.NewBinding(key.WithKeys(keyconst.KeyTab))):
 		return m.cycleFocus(), nil
 	}
 

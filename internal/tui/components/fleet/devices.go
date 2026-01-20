@@ -16,7 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -175,6 +175,10 @@ func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 		}
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m DevicesModel) handleMessage(msg tea.Msg) (DevicesModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case DevicesLoadedMsg:
 		m.loading = false
@@ -188,6 +192,17 @@ func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 		m.Scroller.SetItemCount(len(m.devices))
 		return m, nil
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRefresh()
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -198,27 +213,38 @@ func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 	return m, nil
 }
 
-func (m DevicesModel) handleKey(msg tea.KeyPressMsg) (DevicesModel, tea.Cmd) {
-	switch msg.String() {
-	case "j", keyconst.KeyDown:
-		m.Scroller.CursorDown()
-	case "k", keyconst.KeyUp:
+func (m DevicesModel) handleNavigation(msg messages.NavigationMsg) (DevicesModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
 		m.Scroller.CursorUp()
-	case "g":
-		m.Scroller.CursorToStart()
-	case "G":
-		m.Scroller.CursorToEnd()
-	case "ctrl+d", keyconst.KeyPgDown:
-		m.Scroller.PageDown()
-	case "ctrl+u", keyconst.KeyPgUp:
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
 		m.Scroller.PageUp()
-	case "r":
-		if !m.loading {
-			m.loading = true
-			return m, tea.Batch(m.Loader.Tick(), m.loadDevices())
-		}
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
 	}
+	return m, nil
+}
 
+func (m DevicesModel) handleRefresh() (DevicesModel, tea.Cmd) {
+	if m.loading {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.Loader.Tick(), m.loadDevices())
+}
+
+func (m DevicesModel) handleKey(msg tea.KeyPressMsg) (DevicesModel, tea.Cmd) {
+	// Component-specific keys not covered by action messages
+	// (none currently - all keys migrated to action messages)
+	_ = msg
 	return m, nil
 }
 

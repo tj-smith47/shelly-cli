@@ -195,51 +195,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case ScanCompleteMsg:
-		m.scanning = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.devices = msg.Devices
-		m.Scroller.SetItemCount(len(m.devices))
-		return m, nil
-
+		return m.handleScanComplete(msg)
 	case DeviceAddedMsg:
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		// Mark device as added
-		for i := range m.devices {
-			if m.devices[i].Address == msg.Address {
-				m.devices[i].Added = true
-				break
-			}
-		}
-		return m, nil
-
-	// Action messages from context-based keybindings
+		return m.handleDeviceAdded(msg)
 	case messages.NavigationMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleNavigation(msg)
-	case messages.ScanRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.StartScan()
-	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.StartScan()
-	case messages.NewRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.addSelectedDevice()
-
+		return m.handleNavigationMsg(msg)
+	case messages.ScanRequestMsg, messages.RefreshRequestMsg, messages.NewRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -247,6 +209,52 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
+	return m, nil
+}
+
+func (m Model) handleScanComplete(msg ScanCompleteMsg) (Model, tea.Cmd) {
+	m.scanning = false
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.devices = msg.Devices
+	m.Scroller.SetItemCount(len(m.devices))
+	return m, nil
+}
+
+func (m Model) handleDeviceAdded(msg DeviceAddedMsg) (Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	// Mark device as added
+	for i := range m.devices {
+		if m.devices[i].Address == msg.Address {
+			m.devices[i].Added = true
+			break
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleNavigationMsg(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
+	case messages.ScanRequestMsg, messages.RefreshRequestMsg:
+		return m.StartScan()
+	case messages.NewRequestMsg:
+		return m.addSelectedDevice()
+	}
 	return m, nil
 }
 

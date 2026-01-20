@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -31,7 +32,15 @@ type DataPoint struct {
 	Timestamp time.Time
 }
 
-// SwitchKey uniquely identifies a switch across devices.
+// switchID uniquely identifies a switch for map indexing.
+// This is the actual map key - only includes fields needed for uniqueness.
+type switchID struct {
+	DeviceName string
+	SwitchIdx  int
+}
+
+// SwitchKey holds display information for a switch.
+// This is NOT used as a map key - only for display purposes.
 type SwitchKey struct {
 	DeviceName  string
 	SwitchID    int
@@ -56,16 +65,22 @@ func (k SwitchKey) String() string {
 	return k.DeviceName + " " + k.SwitchName
 }
 
+// toID returns the map key for this switch.
+func (k SwitchKey) toID() switchID {
+	return switchID{DeviceName: k.DeviceName, SwitchIdx: k.SwitchID}
+}
+
 // Model represents the energy history state.
 type Model struct {
 	helpers.Sizable
 	cache          *cache.Cache
 	mu             *sync.RWMutex
-	history        map[SwitchKey][]DataPoint // Per-switch history (not per-device)
-	hasInitialData map[SwitchKey]bool        // Tracks switches that have initial data point
-	maxItems       int                       // Max data points per switch
-	lastCollection time.Time                 // Throttle data collection
-	scroller       *panel.Scroller           // For scrolling when many switches
+	history        map[switchID][]DataPoint // Per-switch history keyed by stable ID
+	displayInfo    map[switchID]SwitchKey   // Display info for each switch (updated on each collection)
+	hasInitialData map[switchID]bool        // Tracks switches that have initial data point
+	maxItems       int                      // Max data points per switch
+	lastCollection time.Time                // Throttle data collection
+	scroller       *panel.Scroller          // For scrolling when many switches
 	styles         Styles
 	focused        bool
 	panelIndex     int // For Shift+N hint
@@ -125,8 +140,9 @@ func New(c *cache.Cache) Model {
 		Sizable:        helpers.NewSizableLoaderOnly(),
 		cache:          c,
 		mu:             &sync.RWMutex{},
-		history:        make(map[SwitchKey][]DataPoint),
-		hasInitialData: make(map[SwitchKey]bool),
+		history:        make(map[switchID][]DataPoint),
+		displayInfo:    make(map[switchID]SwitchKey),
+		hasInitialData: make(map[switchID]bool),
 		maxItems:       60,                       // 5 minutes at 5-second intervals
 		scroller:       panel.NewScroller(0, 10), // Will be updated with actual counts
 		styles:         DefaultStyles(),
@@ -147,6 +163,12 @@ func (m *Model) Init() tea.Cmd {
 // Update handles messages for the energy history.
 // Collects data from cache on DeviceUpdateMsg to ensure history is populated.
 func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Handle navigation messages
+	if navMsg, ok := msg.(messages.NavigationMsg); ok {
+		m.handleNavigation(navMsg)
+		return *m, nil
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
 		result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
@@ -171,7 +193,26 @@ func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return *m, nil
 }
 
-// handleDeviceUpdate collects power data when device updates arrive.
+// handleNavigation handles NavigationMsg for scrolling.
+func (m *Model) handleNavigation(msg messages.NavigationMsg) {
+	switch msg.Direction {
+	case messages.NavDown:
+		m.scroller.CursorDown()
+	case messages.NavUp:
+		m.scroller.CursorUp()
+	case messages.NavPageDown:
+		m.scroller.PageDown()
+	case messages.NavPageUp:
+		m.scroller.PageUp()
+	case messages.NavHome:
+		m.scroller.CursorToStart()
+	case messages.NavEnd:
+		m.scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for single-column scrolling
+	}
+}
+
 func (m *Model) handleDeviceUpdate() {
 	if m.cache == nil {
 		return
@@ -272,6 +313,7 @@ func modelHasPM(model string) bool {
 }
 
 func (m *Model) addDataPoint(key SwitchKey, power float64) {
+	id := key.toID()
 	debug.TraceLock("energyhistory", "Lock", "addDataPoint:"+key.String())
 	m.mu.Lock()
 	defer func() {
@@ -284,7 +326,7 @@ func (m *Model) addDataPoint(key SwitchKey, power float64) {
 		Timestamp: time.Now(),
 	}
 
-	history := m.history[key]
+	history := m.history[id]
 	history = append(history, point)
 
 	// Trim to max items
@@ -292,7 +334,9 @@ func (m *Model) addDataPoint(key SwitchKey, power float64) {
 		history = history[len(history)-m.maxItems:]
 	}
 
-	m.history[key] = history
+	m.history[id] = history
+	// Update display info (may change as switch names/counts are discovered)
+	m.displayInfo[id] = key
 }
 
 // historyEntry holds a switch key and its history for sorting/rendering.
@@ -346,10 +390,12 @@ func (m *Model) getSortedEntries() []historyEntry {
 	debug.TraceLock("energyhistory", "RLock", "View")
 	m.mu.RLock()
 	var entries []historyEntry
-	for key, history := range m.history {
+	for id, history := range m.history {
 		if len(history) > 0 {
+			// Get display info for this switch ID
+			displayKey := m.displayInfo[id]
 			entries = append(entries, historyEntry{
-				key:     key,
+				key:     displayKey,
 				history: history,
 				power:   history[len(history)-1].Value,
 			})
@@ -503,8 +549,9 @@ func (m *Model) collectCurrentPower(devices []*cache.DeviceData) {
 
 // collectDataForKey adds a data point for a switch key, respecting throttle and initial capture.
 func (m *Model) collectDataForKey(key SwitchKey, power float64, throttleActive bool) {
+	id := key.toID()
 	m.mu.RLock()
-	hasInitial := m.hasInitialData[key]
+	hasInitial := m.hasInitialData[id]
 	m.mu.RUnlock()
 
 	if !hasInitial {
@@ -513,7 +560,7 @@ func (m *Model) collectDataForKey(key SwitchKey, power float64, throttleActive b
 		debug.TraceEvent("energy: %s initial capture: %.1fW (bypassing throttle)", key.String(), power)
 		m.addDataPoint(key, power)
 		m.mu.Lock()
-		m.hasInitialData[key] = true
+		m.hasInitialData[id] = true
 		m.mu.Unlock()
 	} else if !throttleActive {
 		// Subsequent data points respect the throttle
@@ -735,6 +782,7 @@ func (m *Model) Clear() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	clear(m.history)
+	clear(m.displayInfo)
 	clear(m.hasInitialData)
 }
 

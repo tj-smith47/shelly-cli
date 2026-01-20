@@ -363,49 +363,47 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleLoaded(msg)
 	case ActionMsg:
 		return m.handleAction(msg)
-
-	// Action messages from context-based keybindings
 	case messages.NavigationMsg:
+		return m.handleNavigationMsg(msg)
+	case messages.ToggleEnableRequestMsg, messages.EditRequestMsg, messages.NewRequestMsg,
+		messages.DeleteRequestMsg, messages.RefreshRequestMsg:
+		return m.handleActionMsg(msg)
+	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
-		return m.handleNavigation(msg)
+		return m.handleKey(msg)
+	}
+	return m, nil
+}
+
+func (m Model) handleNavigationMsg(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
 	case messages.ToggleEnableRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		return m, m.toggleOrTrigger()
 	case messages.EditRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		return m.handleEditKey()
 	case messages.NewRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		return m.handleNewKey()
 	case messages.DeleteRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		return m.handleDeleteKey()
 	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		m.loading = true
 		return m, tea.Batch(
 			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
 			m.fetchAndCacheVirtuals(),
 		)
-
-	case tea.KeyPressMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleKey(msg)
 	}
 	return m, nil
 }

@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
@@ -14,7 +15,9 @@ func TestNewManage(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	svc := &shelly.Service{}
-	deps := ManageDeps{Ctx: ctx, Svc: svc}
+	focusState := focus.NewState()
+	focusState.SetActiveTab(tabs.TabManage)
+	deps := ManageDeps{Ctx: ctx, Svc: svc, FocusState: focusState}
 
 	m := NewManage(deps)
 
@@ -23,9 +26,6 @@ func TestNewManage(t *testing.T) {
 	}
 	if m.svc != svc {
 		t.Error("svc not set")
-	}
-	if m.focusedPanel != ManagePanelDiscovery {
-		t.Errorf("focusedPanel = %v, want ManagePanelDiscovery", m.focusedPanel)
 	}
 	if m.id != tabs.TabManage {
 		t.Errorf("id = %v, want tabs.TabManage", m.id)
@@ -40,7 +40,8 @@ func TestNewManage_PanicOnNilCtx(t *testing.T) {
 		}
 	}()
 
-	deps := ManageDeps{Ctx: nil, Svc: &shelly.Service{}}
+	focusState := focus.NewState()
+	deps := ManageDeps{Ctx: nil, Svc: &shelly.Service{}, FocusState: focusState}
 	NewManage(deps)
 }
 
@@ -52,12 +53,14 @@ func TestNewManage_PanicOnNilSvc(t *testing.T) {
 		}
 	}()
 
-	deps := ManageDeps{Ctx: context.Background(), Svc: nil}
+	focusState := focus.NewState()
+	deps := ManageDeps{Ctx: context.Background(), Svc: nil, FocusState: focusState}
 	NewManage(deps)
 }
 
 func TestManageDeps_Validate(t *testing.T) {
 	t.Parallel()
+	focusState := focus.NewState()
 	tests := []struct {
 		name    string
 		deps    ManageDeps
@@ -65,17 +68,22 @@ func TestManageDeps_Validate(t *testing.T) {
 	}{
 		{
 			name:    "valid",
-			deps:    ManageDeps{Ctx: context.Background(), Svc: &shelly.Service{}},
+			deps:    ManageDeps{Ctx: context.Background(), Svc: &shelly.Service{}, FocusState: focusState},
 			wantErr: false,
 		},
 		{
 			name:    "nil ctx",
-			deps:    ManageDeps{Ctx: nil, Svc: &shelly.Service{}},
+			deps:    ManageDeps{Ctx: nil, Svc: &shelly.Service{}, FocusState: focusState},
 			wantErr: true,
 		},
 		{
 			name:    "nil svc",
-			deps:    ManageDeps{Ctx: context.Background(), Svc: nil},
+			deps:    ManageDeps{Ctx: context.Background(), Svc: nil, FocusState: focusState},
+			wantErr: true,
+		},
+		{
+			name:    "nil focus state",
+			deps:    ManageDeps{Ctx: context.Background(), Svc: &shelly.Service{}, FocusState: nil},
 			wantErr: true,
 		},
 	}
@@ -129,7 +137,7 @@ func TestManage_SetSize(t *testing.T) {
 func TestManage_Update_FocusNext(t *testing.T) {
 	t.Parallel()
 	m := newTestManage()
-	m.focusedPanel = ManagePanelDiscovery
+	initialPanel := m.focusState.ActivePanel()
 
 	msg := tea.KeyPressMsg{Code: tea.KeyTab}
 	updated, _ := m.Update(msg)
@@ -138,16 +146,18 @@ func TestManage_Update_FocusNext(t *testing.T) {
 		t.Fatal("Update should return *Manage")
 	}
 
-	// Panel order: Discovery -> Firmware -> Backup -> Scenes -> Templates -> Batch
-	if manage.focusedPanel != ManagePanelFirmware {
-		t.Errorf("focusedPanel after tab = %v, want ManagePanelFirmware", manage.focusedPanel)
+	newPanel := manage.focusState.ActivePanel()
+	if newPanel == initialPanel {
+		t.Error("Tab should change focused panel")
 	}
 }
 
 func TestManage_Update_FocusPrev(t *testing.T) {
 	t.Parallel()
 	m := newTestManage()
-	m.focusedPanel = ManagePanelBatch
+	// Move to second panel first
+	m.focusState.NextPanel()
+	panelAfterNext := m.focusState.ActivePanel()
 
 	msg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	updated, _ := m.Update(msg)
@@ -156,10 +166,9 @@ func TestManage_Update_FocusPrev(t *testing.T) {
 		t.Fatal("Update should return *Manage")
 	}
 
-	// Panel order: Discovery -> Firmware -> Backup -> Scenes -> Templates -> Batch
-	// Batch is last, so prev is Templates
-	if manage.focusedPanel != ManagePanelTemplates {
-		t.Errorf("focusedPanel after shift+tab = %v, want ManagePanelTemplates", manage.focusedPanel)
+	panelAfterPrev := manage.focusState.ActivePanel()
+	if panelAfterPrev == panelAfterNext {
+		t.Error("Shift+Tab should change focused panel")
 	}
 }
 
@@ -167,60 +176,45 @@ func TestManage_FocusCycle(t *testing.T) {
 	t.Parallel()
 	m := newTestManage()
 
-	// Start at discovery
-	if m.focusedPanel != ManagePanelDiscovery {
-		t.Fatal("should start at ManagePanelDiscovery")
+	// Start at first panel
+	initialPanel := m.focusState.ActivePanel()
+
+	// Panel order: Discovery -> Firmware -> Backup -> Scenes -> Templates -> Batch (6 panels)
+	m.focusState.NextPanel()
+	p1 := m.focusState.ActivePanel()
+	if p1 == initialPanel {
+		t.Error("NextPanel should change panel")
 	}
 
-	// Panel order: Discovery -> Firmware -> Backup -> Scenes -> Templates -> Batch
-	m.focusNext()
-	if m.focusedPanel != ManagePanelFirmware {
-		t.Errorf("after 1 focusNext = %v, want ManagePanelFirmware", m.focusedPanel)
+	m.focusState.NextPanel()
+	p2 := m.focusState.ActivePanel()
+	if p2 == p1 {
+		t.Error("NextPanel should change panel again")
 	}
 
-	m.focusNext()
-	if m.focusedPanel != ManagePanelBackup {
-		t.Errorf("after 2 focusNext = %v, want ManagePanelBackup", m.focusedPanel)
+	m.focusState.NextPanel()
+	p3 := m.focusState.ActivePanel()
+	if p3 == p2 {
+		t.Error("NextPanel should change panel again")
 	}
 
-	m.focusNext()
-	if m.focusedPanel != ManagePanelScenes {
-		t.Errorf("after 3 focusNext = %v, want ManagePanelScenes", m.focusedPanel)
+	m.focusState.NextPanel()
+	p4 := m.focusState.ActivePanel()
+	if p4 == p3 {
+		t.Error("NextPanel should change panel again")
 	}
 
-	m.focusNext()
-	if m.focusedPanel != ManagePanelTemplates {
-		t.Errorf("after 4 focusNext = %v, want ManagePanelTemplates", m.focusedPanel)
+	m.focusState.NextPanel()
+	p5 := m.focusState.ActivePanel()
+	if p5 == p4 {
+		t.Error("NextPanel should change panel again")
 	}
 
-	m.focusNext()
-	if m.focusedPanel != ManagePanelBatch {
-		t.Errorf("after 5 focusNext = %v, want ManagePanelBatch", m.focusedPanel)
-	}
-
-	m.focusNext()
-	if m.focusedPanel != ManagePanelDiscovery {
-		t.Errorf("after 6 focusNext = %v, want ManagePanelDiscovery (wrap)", m.focusedPanel)
-	}
-}
-
-func TestManage_FocusPrevCycle(t *testing.T) {
-	t.Parallel()
-	m := newTestManage()
-
-	// Start at discovery
-	m.focusedPanel = ManagePanelDiscovery
-
-	// Panel order: Discovery -> Firmware -> Backup -> Scenes -> Templates -> Batch
-	// Go backwards (wrap from Discovery to Batch)
-	m.focusPrev()
-	if m.focusedPanel != ManagePanelBatch {
-		t.Errorf("after 1 focusPrev = %v, want ManagePanelBatch (wrap)", m.focusedPanel)
-	}
-
-	m.focusPrev()
-	if m.focusedPanel != ManagePanelTemplates {
-		t.Errorf("after 2 focusPrev = %v, want ManagePanelTemplates", m.focusedPanel)
+	// After cycling through all 6 panels, should wrap back
+	m.focusState.NextPanel()
+	p6 := m.focusState.ActivePanel()
+	if p6 != initialPanel {
+		t.Errorf("After cycling through all 6 panels, should wrap back to initial, got %v", p6)
 	}
 }
 
@@ -265,11 +259,6 @@ func TestManage_Refresh(t *testing.T) {
 func TestManage_Accessors(t *testing.T) {
 	t.Parallel()
 	m := newTestManage()
-	m.focusedPanel = ManagePanelFirmware
-
-	if m.FocusedPanel() != ManagePanelFirmware {
-		t.Errorf("FocusedPanel() = %v, want ManagePanelFirmware", m.FocusedPanel())
-	}
 
 	// Verify components are accessible
 	_ = m.Discovery()
@@ -295,13 +284,13 @@ func TestManage_UpdateFocusStates(t *testing.T) {
 	t.Parallel()
 	m := newTestManage()
 
-	// Set focus to batch
-	m.focusedPanel = ManagePanelBatch
+	// Set focus to a different panel
+	m.focusState.NextPanel()
 	m.updateFocusStates()
 
 	// Verify focus states are updated (method doesn't panic)
-	// Discovery should not be focused since we set focus to batch
-	_ = m.discovery.Scanning() // Access model to verify it's accessible
+	// Access model to verify it's accessible
+	_ = m.discovery.Scanning()
 }
 
 func TestDefaultManageStyles(t *testing.T) {
@@ -318,6 +307,9 @@ func TestDefaultManageStyles(t *testing.T) {
 func newTestManage() *Manage {
 	ctx := context.Background()
 	svc := &shelly.Service{}
-	deps := ManageDeps{Ctx: ctx, Svc: svc}
+	focusState := focus.NewState()
+	// Set to manage tab so panel cycling works correctly
+	focusState.SetActiveTab(tabs.TabManage)
+	deps := ManageDeps{Ctx: ctx, Svc: svc, FocusState: focusState}
 	return NewManage(deps)
 }

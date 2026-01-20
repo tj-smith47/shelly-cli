@@ -23,6 +23,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/virtuals"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/webhooks"
+	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
@@ -36,26 +37,7 @@ var (
 	errNilService     = errors.New("service is required")
 	errNilIOStreams   = errors.New("iostreams is required")
 	errNilEventStream = errors.New("event stream is required")
-)
-
-// AutomationPanel identifies which panel is focused.
-// Layout is 3x3: Left(Scripts, Schedules, Webhooks) Right(Virtuals, KVS, Alerts)
-// ScriptEditor and ScheduleEditor are modal overlays, not panels.
-type AutomationPanel int
-
-const (
-	// PanelScripts is the scripts list panel.
-	PanelScripts AutomationPanel = iota
-	// PanelSchedules is the schedules list panel.
-	PanelSchedules
-	// PanelWebhooks is the webhooks panel.
-	PanelWebhooks
-	// PanelVirtuals is the virtual components panel.
-	PanelVirtuals
-	// PanelKVS is the KVS browser panel.
-	PanelKVS
-	// PanelAlerts is the alerts panel.
-	PanelAlerts
+	errNilFocusState  = errors.New("focus state is required")
 )
 
 // automationLoadPhase tracks which component is being loaded.
@@ -75,12 +57,6 @@ type automationLoadNextMsg struct {
 	phase automationLoadPhase
 }
 
-// Key string constants for key handling.
-const (
-	keyTab      = "tab"
-	keyShiftTab = "shift+tab"
-)
-
 // Action string constants for component messages.
 const (
 	actionDelete = "delete"
@@ -93,6 +69,7 @@ type AutomationDeps struct {
 	AutoSvc     *automation.Service
 	KVSSvc      *shellykvs.Service
 	EventStream *automation.EventStream
+	FocusState  *focus.State
 }
 
 // Validate ensures all required dependencies are set.
@@ -108,6 +85,9 @@ func (d AutomationDeps) Validate() error {
 	}
 	if d.KVSSvc == nil {
 		return errors.New("kvs service is required")
+	}
+	if d.FocusState == nil {
+		return errNilFocusState
 	}
 	// EventStream is optional - console won't work without it but other features will
 	return nil
@@ -141,14 +121,13 @@ type Automation struct {
 	evalOpen       bool
 
 	// State
-	device       string
-	focusedPanel AutomationPanel
-	viewFocused  bool // Whether the view content has focus (vs device list)
-	width        int
-	height       int
-	styles       AutomationStyles
-	loadPhase    automationLoadPhase // Tracks sequential loading progress
-	pendingEdit  bool                // Flag to launch editor after code loads
+	device      string
+	focusState  *focus.State // Unified focus state (single source of truth)
+	width       int
+	height      int
+	styles      AutomationStyles
+	loadPhase   automationLoadPhase // Tracks sequential loading progress
+	pendingEdit bool                // Flag to launch editor after code loads
 
 	// Modal state (script and schedule editors are modals, not panels)
 	scriptEditorOpen   bool
@@ -159,10 +138,10 @@ type Automation struct {
 	layout *layout.TwoColumnLayout
 }
 
-// automationCols holds the left/right column assignments.
+// automationCols holds the left/right column assignments for panel cycle order.
 type automationCols struct {
-	left  []AutomationPanel
-	right []AutomationPanel
+	left  []focus.GlobalPanelID
+	right []focus.GlobalPanelID
 }
 
 // AutomationStyles holds styles for the automation view.
@@ -208,16 +187,16 @@ func NewAutomation(deps AutomationDeps) *Automation {
 	// ScriptEditor and ScheduleEditor are modal overlays, not panels
 	// MinHeight includes borders (2) + top padding (1) + content (1) + bottom padding (1) = 5 minimum
 	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
-		{ID: layout.PanelID(PanelScripts), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelSchedules), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelWebhooks), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelAutoScripts), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelAutoSchedules), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelAutoWebhooks), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	// Configure right column panels with expansion on focus
 	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
-		{ID: layout.PanelID(PanelVirtuals), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelKVS), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelAlerts), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelAutoVirtuals), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelAutoKVS), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelAutoAlerts), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	alertsDeps := alerts.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
@@ -243,12 +222,12 @@ func NewAutomation(deps AutomationDeps) *Automation {
 		virtuals:       virtuals.New(virtualsDeps),
 		kvs:            kvs.New(kvsDeps),
 		alerts:         alerts.New(alertsDeps),
-		focusedPanel:   PanelScripts,
+		focusState:     deps.FocusState,
 		styles:         DefaultAutomationStyles(),
 		layout:         layoutCalc,
 		cols: automationCols{
-			left:  []AutomationPanel{PanelScripts, PanelSchedules, PanelWebhooks},
-			right: []AutomationPanel{PanelVirtuals, PanelKVS, PanelAlerts},
+			left:  []focus.GlobalPanelID{focus.PanelAutoScripts, focus.PanelAutoSchedules, focus.PanelAutoWebhooks},
+			right: []focus.GlobalPanelID{focus.PanelAutoVirtuals, focus.PanelAutoKVS, focus.PanelAutoAlerts},
 		},
 	}
 
@@ -362,13 +341,8 @@ func (a *Automation) advanceLoadPhase() tea.Cmd {
 
 // Update handles messages.
 func (a *Automation) Update(msg tea.Msg) (View, tea.Cmd) {
-	// Handle view focus changes from app.go
-	if focusMsg, ok := msg.(ViewFocusChangedMsg); ok {
-		// When regaining focus, reset to first panel so Tab cycling starts fresh
-		if focusMsg.Focused && !a.viewFocused {
-			a.focusedPanel = PanelScripts
-		}
-		a.viewFocused = focusMsg.Focused
+	// Handle focus changes from the unified focus state
+	if _, ok := msg.(focus.ChangedMsg); ok {
 		a.updateFocusStates()
 		return a, nil
 	}
@@ -388,6 +362,18 @@ func (a *Automation) Update(msg tea.Msg) (View, tea.Cmd) {
 	}
 
 	var cmds []tea.Cmd
+
+	// Handle edit modal coordination messages - notify app.go of modal state changes
+	if _, ok := msg.(messages.EditOpenedMsg); ok {
+		cmds = append(cmds, func() tea.Msg {
+			return messages.ModalOpenedMsg{ID: focus.OverlayEditModal, Mode: focus.ModeModal}
+		})
+	}
+	if _, ok := msg.(messages.EditClosedMsg); ok {
+		cmds = append(cmds, func() tea.Msg {
+			return messages.ModalClosedMsg{ID: focus.OverlayEditModal}
+		})
+	}
 
 	// Check for component completion to advance sequential loading
 	if cmd := a.handleComponentLoaded(msg); cmd != nil {
@@ -506,100 +492,78 @@ func (a *Automation) routeToActiveModal(msg tea.Msg) (tea.Cmd, bool) {
 }
 
 func (a *Automation) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
+	prevPanel := a.focusState.ActivePanel()
+
 	switch msg.String() {
-	case keyTab:
-		// If on last panel, return focus to device list
-		if a.focusedPanel == PanelAlerts {
-			a.viewFocused = false
-			a.updateFocusStates()
-			return func() tea.Msg { return ReturnFocusMsg{} }
-		}
-		a.viewFocused = true // View has focus when cycling panels
-		a.focusNext()
-	case keyShiftTab:
-		// If on first panel, return focus to device list
-		if a.focusedPanel == PanelScripts {
-			a.viewFocused = false
-			a.updateFocusStates()
-			return func() tea.Msg { return ReturnFocusMsg{} }
-		}
-		a.viewFocused = true // View has focus when cycling panels
-		a.focusPrev()
+	case keyconst.KeyTab:
+		a.focusState.NextPanel()
+		a.updateFocusStates()
+		return a.emitFocusChanged(prevPanel)
+	case keyconst.KeyShiftTab:
+		a.focusState.PrevPanel()
+		a.updateFocusStates()
+		return a.emitFocusChanged(prevPanel)
 	// Shift+N hotkeys: 3x3 layout - left(2-4) right(5-7)
 	case keyconst.Shift2:
-		a.viewFocused = true
-		a.focusedPanel = PanelScripts
+		a.focusState.JumpToPanel(2) // Scripts
 		a.updateFocusStates()
+		return a.emitFocusChanged(prevPanel)
 	case keyconst.Shift3:
-		a.viewFocused = true
-		a.focusedPanel = PanelSchedules
+		a.focusState.JumpToPanel(3) // Schedules
 		a.updateFocusStates()
+		return a.emitFocusChanged(prevPanel)
 	case keyconst.Shift4:
-		a.viewFocused = true
-		a.focusedPanel = PanelWebhooks
+		a.focusState.JumpToPanel(4) // Webhooks
 		a.updateFocusStates()
+		return a.emitFocusChanged(prevPanel)
 	case keyconst.Shift5:
-		a.viewFocused = true
-		a.focusedPanel = PanelVirtuals
+		a.focusState.JumpToPanel(5) // Virtuals
 		a.updateFocusStates()
+		return a.emitFocusChanged(prevPanel)
 	case keyconst.Shift6:
-		a.viewFocused = true
-		a.focusedPanel = PanelKVS
+		a.focusState.JumpToPanel(6) // KVS
 		a.updateFocusStates()
+		return a.emitFocusChanged(prevPanel)
 	case keyconst.Shift7:
-		a.viewFocused = true
-		a.focusedPanel = PanelAlerts
+		a.focusState.JumpToPanel(7) // Alerts
 		a.updateFocusStates()
+		return a.emitFocusChanged(prevPanel)
 	case "c":
 		// Open console modal (only from Scripts panel)
-		if a.focusedPanel == PanelScripts && a.viewFocused {
+		if a.focusState.IsPanelFocused(focus.PanelAutoScripts) {
 			return a.openConsoleModal()
 		}
 	}
 	return nil
 }
 
-func (a *Automation) focusNext() {
-	// 3x3 layout: left column then right column
-	panels := []AutomationPanel{
-		PanelScripts, PanelSchedules, PanelWebhooks, // Left column
-		PanelVirtuals, PanelKVS, PanelAlerts, // Right column
+// emitFocusChanged returns a command that emits a FocusChangedMsg if panel actually changed.
+func (a *Automation) emitFocusChanged(prevPanel focus.GlobalPanelID) tea.Cmd {
+	newPanel := a.focusState.ActivePanel()
+	if newPanel == prevPanel {
+		return nil
 	}
-	for i, p := range panels {
-		if p == a.focusedPanel {
-			a.focusedPanel = panels[(i+1)%len(panels)]
-			break
-		}
+	return func() tea.Msg {
+		return a.focusState.NewChangedMsg(
+			a.focusState.ActiveTab(),
+			prevPanel,
+			false, // tab didn't change
+			true,  // panel changed
+			false, // overlay didn't change
+		)
 	}
-	a.updateFocusStates()
-}
-
-func (a *Automation) focusPrev() {
-	// 3x3 layout: left column then right column
-	panels := []AutomationPanel{
-		PanelScripts, PanelSchedules, PanelWebhooks, // Left column
-		PanelVirtuals, PanelKVS, PanelAlerts, // Right column
-	}
-	for i, p := range panels {
-		if p == a.focusedPanel {
-			prevIdx := (i - 1 + len(panels)) % len(panels)
-			a.focusedPanel = panels[prevIdx]
-			break
-		}
-	}
-	a.updateFocusStates()
 }
 
 func (a *Automation) updateFocusStates() {
-	// Panels only show focused when the view has overall focus AND it's the active panel
+	// Query focusState for panel focus (single source of truth)
 	// 3x3 layout: left column (2-4), right column (5-7)
-	a.scripts = a.scripts.SetFocused(a.viewFocused && a.focusedPanel == PanelScripts).SetPanelIndex(2)
-	a.schedules = a.schedules.SetFocused(a.viewFocused && a.focusedPanel == PanelSchedules).SetPanelIndex(3)
-	a.webhooks = a.webhooks.SetFocused(a.viewFocused && a.focusedPanel == PanelWebhooks).SetPanelIndex(4)
-	a.virtuals = a.virtuals.SetFocused(a.viewFocused && a.focusedPanel == PanelVirtuals).SetPanelIndex(5)
-	a.kvs = a.kvs.SetFocused(a.viewFocused && a.focusedPanel == PanelKVS).SetPanelIndex(6)
+	a.scripts = a.scripts.SetFocused(a.focusState.IsPanelFocused(focus.PanelAutoScripts)).SetPanelIndex(2)
+	a.schedules = a.schedules.SetFocused(a.focusState.IsPanelFocused(focus.PanelAutoSchedules)).SetPanelIndex(3)
+	a.webhooks = a.webhooks.SetFocused(a.focusState.IsPanelFocused(focus.PanelAutoWebhooks)).SetPanelIndex(4)
+	a.virtuals = a.virtuals.SetFocused(a.focusState.IsPanelFocused(focus.PanelAutoVirtuals)).SetPanelIndex(5)
+	a.kvs = a.kvs.SetFocused(a.focusState.IsPanelFocused(focus.PanelAutoKVS)).SetPanelIndex(6)
 	// alerts uses pointer receivers, so we need to split the chain
-	a.alerts = a.alerts.SetFocused(a.viewFocused && a.focusedPanel == PanelAlerts)
+	a.alerts = a.alerts.SetFocused(a.focusState.IsPanelFocused(focus.PanelAutoAlerts))
 	a.alerts = a.alerts.SetPanelIndex(7)
 
 	// Recalculate layout with new focus (panels resize on focus change)
@@ -610,19 +574,21 @@ func (a *Automation) updateFocusStates() {
 
 func (a *Automation) updateFocusedComponent(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
-	switch a.focusedPanel {
-	case PanelScripts:
+	switch a.focusState.ActivePanel() {
+	case focus.PanelAutoScripts:
 		a.scripts, cmd = a.scripts.Update(msg)
-	case PanelSchedules:
+	case focus.PanelAutoSchedules:
 		a.schedules, cmd = a.schedules.Update(msg)
-	case PanelWebhooks:
+	case focus.PanelAutoWebhooks:
 		a.webhooks, cmd = a.webhooks.Update(msg)
-	case PanelVirtuals:
+	case focus.PanelAutoVirtuals:
 		a.virtuals, cmd = a.virtuals.Update(msg)
-	case PanelKVS:
+	case focus.PanelAutoKVS:
 		a.kvs, cmd = a.kvs.Update(msg)
-	case PanelAlerts:
+	case focus.PanelAutoAlerts:
 		a.alerts, cmd = a.alerts.Update(msg)
+	default:
+		// Panels from other tabs - no action needed
 	}
 	return cmd
 }
@@ -1185,18 +1151,18 @@ func (a *Automation) renderNarrowLayout() string {
 	// In narrow mode, show only the focused panel at full width
 	// 3x3 layout: Scripts, Schedules, Webhooks, Virtuals, KVS, Alerts
 	// Components already have embedded titles from rendering.New()
-	switch a.focusedPanel {
-	case PanelScripts:
+	switch a.focusState.ActivePanel() {
+	case focus.PanelAutoScripts:
 		return a.scripts.View()
-	case PanelSchedules:
+	case focus.PanelAutoSchedules:
 		return a.schedules.View()
-	case PanelWebhooks:
+	case focus.PanelAutoWebhooks:
 		return a.webhooks.View()
-	case PanelVirtuals:
+	case focus.PanelAutoVirtuals:
 		return a.virtuals.View()
-	case PanelKVS:
+	case focus.PanelAutoKVS:
 		return a.kvs.View()
-	case PanelAlerts:
+	case focus.PanelAutoAlerts:
 		return a.alerts.View()
 	default:
 		return a.scripts.View()
@@ -1246,9 +1212,10 @@ func (a *Automation) SetSize(width, height int) View {
 
 	// Update layout with new dimensions and focus
 	a.layout.SetSize(width, height)
-	// Only expand panels when view has focus, otherwise distribute evenly
-	if a.viewFocused {
-		a.layout.SetFocus(layout.PanelID(a.focusedPanel))
+	// Only expand panels when an automation panel has focus, otherwise distribute evenly
+	activePanel := a.focusState.ActivePanel()
+	if activePanel.TabFor() == tabs.TabAutomation && activePanel != focus.PanelDeviceList {
+		a.layout.SetFocus(layout.PanelID(activePanel))
 	} else {
 		a.layout.SetFocus(-1) // No expansion when device list is focused
 	}
@@ -1258,24 +1225,24 @@ func (a *Automation) SetSize(width, height int) View {
 
 	// Apply sizes to left column components
 	// Pass full panel dimensions - components handle their own borders via rendering.New()
-	if d, ok := dims[layout.PanelID(PanelScripts)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelAutoScripts)]; ok {
 		a.scripts = a.scripts.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelSchedules)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelAutoSchedules)]; ok {
 		a.schedules = a.schedules.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelWebhooks)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelAutoWebhooks)]; ok {
 		a.webhooks = a.webhooks.SetSize(d.Width, d.Height)
 	}
 
 	// Apply sizes to right column components (3x3 layout)
-	if d, ok := dims[layout.PanelID(PanelVirtuals)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelAutoVirtuals)]; ok {
 		a.virtuals = a.virtuals.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelKVS)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelAutoKVS)]; ok {
 		a.kvs = a.kvs.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelAlerts)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelAutoAlerts)]; ok {
 		a.alerts = a.alerts.SetSize(d.Width, d.Height)
 	}
 
@@ -1285,26 +1252,6 @@ func (a *Automation) SetSize(width, height int) View {
 // Device returns the current device.
 func (a *Automation) Device() string {
 	return a.device
-}
-
-// FocusedPanel returns the currently focused panel.
-func (a *Automation) FocusedPanel() AutomationPanel {
-	return a.focusedPanel
-}
-
-// SetFocusedPanel sets the focused panel.
-func (a *Automation) SetFocusedPanel(panel AutomationPanel) *Automation {
-	a.focusedPanel = panel
-	a.updateFocusStates()
-	return a
-}
-
-// SetViewFocused sets whether the view has overall focus (vs device list).
-// When false, all panels show as unfocused.
-func (a *Automation) SetViewFocused(focused bool) *Automation {
-	a.viewFocused = focused
-	a.updateFocusStates()
-	return a
 }
 
 // HasActiveModal returns true if any component has a modal overlay visible.

@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 const testDevice = "192.168.1.100"
@@ -236,7 +237,7 @@ func TestModel_Update_StatusLoadedError(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_Navigation(t *testing.T) {
+func TestModel_HandleAction_Navigation(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
@@ -250,27 +251,27 @@ func TestModel_HandleKey_Navigation(t *testing.T) {
 	}
 
 	// Move down to Modbus
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.activeProtocol != ProtocolModbus {
-		t.Errorf("activeProtocol after j = %d, want Modbus", updated.activeProtocol)
+		t.Errorf("activeProtocol after NavDown = %d, want Modbus", updated.activeProtocol)
 	}
 
 	// Move down to Ethernet
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.activeProtocol != ProtocolEthernet {
-		t.Errorf("activeProtocol after second j = %d, want Ethernet", updated.activeProtocol)
+		t.Errorf("activeProtocol after second NavDown = %d, want Ethernet", updated.activeProtocol)
 	}
 
 	// Move down wraps to MQTT
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.activeProtocol != ProtocolMQTT {
-		t.Errorf("activeProtocol after third j = %d, want MQTT (wrap)", updated.activeProtocol)
+		t.Errorf("activeProtocol after third NavDown = %d, want MQTT (wrap)", updated.activeProtocol)
 	}
 
 	// Move up wraps to Ethernet
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'k'})
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
 	if updated.activeProtocol != ProtocolEthernet {
-		t.Errorf("activeProtocol after k = %d, want Ethernet (wrap)", updated.activeProtocol)
+		t.Errorf("activeProtocol after NavUp = %d, want Ethernet (wrap)", updated.activeProtocol)
 	}
 }
 
@@ -298,29 +299,29 @@ func TestModel_HandleKey_NumberSelection(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_Refresh(t *testing.T) {
+func TestModel_HandleAction_Refresh(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 	m.device = testDevice
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'r'})
+	updated, cmd := m.Update(messages.RefreshRequestMsg{})
 
 	if !updated.loading {
-		t.Error("should be loading after 'r' key")
+		t.Error("should be loading after RefreshRequestMsg")
 	}
 	if cmd == nil {
 		t.Error("should return refresh command")
 	}
 }
 
-func TestModel_HandleKey_NotFocused(t *testing.T) {
+func TestModel_HandleAction_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = false
 	m.device = testDevice
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavDown})
 
 	if updated.activeProtocol != ProtocolMQTT {
 		t.Error("activeProtocol should not change when not focused")

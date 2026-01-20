@@ -21,6 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -131,6 +132,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleFetchedMsg(fetchedMsg)
 	}
 
+	// Handle NavigationMsg for consistent navigation
+	if navMsg, ok := msg.(messages.NavigationMsg); ok && !m.loading {
+		return m.handleNavigation(navMsg)
+	}
+
 	// Update loader for spinner animation when loading
 	if m.loading {
 		var cmd tea.Cmd
@@ -143,6 +149,29 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleKeyPress(keyMsg)
 	}
 
+	return m, nil
+}
+
+// handleNavigation processes NavigationMsg for viewport scrolling.
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavDown:
+		m.viewport.ScrollDown(1)
+	case messages.NavUp:
+		m.viewport.ScrollUp(1)
+	case messages.NavPageDown:
+		m.viewport.PageDown()
+	case messages.NavPageUp:
+		m.viewport.PageUp()
+	case messages.NavHome:
+		m.viewport.GotoTop()
+	case messages.NavEnd:
+		m.viewport.GotoBottom()
+	case messages.NavLeft:
+		return m.prevEndpoint()
+	case messages.NavRight:
+		return m.nextEndpoint()
+	}
 	return m, nil
 }
 

@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -295,11 +296,48 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleRefreshComplete(msg)
 	case StatusLoadedMsg:
 		return m.handleStatusLoaded(msg)
+
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRefresh()
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
+	}
+	return m, nil
+}
+
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		m = m.prevProtocol()
+	case messages.NavDown:
+		m = m.nextProtocol()
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this component
+	}
+	return m, nil
+}
+
+func (m Model) handleRefresh() (Model, tea.Cmd) {
+	if !m.loading && m.device != "" {
+		m.loading = true
+		// Invalidate cache and fetch fresh data
+		return m, tea.Batch(
+			m.Loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+			m.fetchAndCacheStatus(),
+		)
 	}
 	return m, nil
 }
@@ -381,21 +419,8 @@ func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	// Component-specific keys not covered by action messages
 	switch msg.String() {
-	case "j", "down":
-		m = m.nextProtocol()
-	case "k", "up":
-		m = m.prevProtocol()
-	case "r":
-		if !m.loading && m.device != "" {
-			m.loading = true
-			// Invalidate cache and fetch fresh data
-			return m, tea.Batch(
-				m.Loader.Tick(),
-				panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
-				m.fetchAndCacheStatus(),
-			)
-		}
 	case "1":
 		m.activeProtocol = ProtocolMatter
 	case "2":

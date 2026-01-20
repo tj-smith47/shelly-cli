@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 func TestNewOperations(t *testing.T) {
@@ -97,38 +97,38 @@ func TestOperationsModel_SetFocused(t *testing.T) {
 	}
 }
 
-func TestOperationsModel_KeyHandler_SelectOperation(t *testing.T) {
+func TestOperationsModel_HandleAction_SelectOperation(t *testing.T) {
 	t.Parallel()
 	m := newTestOperations()
 	m.focused = true
 
-	// Select All On
-	m, _ = m.handleKey(tea.KeyPressMsg{Code: '1'})
+	// Select All On (mode 1)
+	m, _ = m.Update(messages.ModeSelectMsg{Mode: 1})
 	if m.operation != OpAllOn {
 		t.Errorf("operation = %v, want OpAllOn", m.operation)
 	}
 
-	// Select All Off
-	m, _ = m.handleKey(tea.KeyPressMsg{Code: '2'})
+	// Select All Off (mode 2)
+	m, _ = m.Update(messages.ModeSelectMsg{Mode: 2})
 	if m.operation != OpAllOff {
 		t.Errorf("operation = %v, want OpAllOff", m.operation)
 	}
 }
 
-func TestOperationsModel_KeyHandler_Navigate(t *testing.T) {
+func TestOperationsModel_HandleAction_Navigate(t *testing.T) {
 	t.Parallel()
 	m := newTestOperations()
 	m.focused = true
 	m.operation = OpAllOn
 
 	// Navigate right
-	m, _ = m.handleKey(tea.KeyPressMsg{Code: 'l'})
+	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavRight})
 	if m.operation != OpAllOff {
 		t.Errorf("operation = %v, want OpAllOff", m.operation)
 	}
 
 	// Navigate left
-	m, _ = m.handleKey(tea.KeyPressMsg{Code: 'h'})
+	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavLeft})
 	if m.operation != OpAllOn {
 		t.Errorf("operation = %v, want OpAllOn", m.operation)
 	}

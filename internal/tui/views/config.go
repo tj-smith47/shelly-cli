@@ -19,26 +19,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/system"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/wifi"
+	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
-)
-
-// ConfigPanel identifies which panel is focused in the Config view.
-type ConfigPanel int
-
-// Config panel constants.
-const (
-	PanelWiFi ConfigPanel = iota
-	PanelSystem
-	PanelCloud
-	PanelInputs
-	PanelBLE
-	PanelProtocols
-	PanelSecurity
-	PanelSmartHome
 )
 
 // configLoadPhase tracks which component is being loaded.
@@ -64,8 +50,9 @@ type configLoadNextMsg struct {
 
 // ConfigDeps holds dependencies for the config view.
 type ConfigDeps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx        context.Context
+	Svc        *shelly.Service
+	FocusState *focus.State
 }
 
 // Validate ensures all required dependencies are set.
@@ -75,6 +62,9 @@ func (d ConfigDeps) Validate() error {
 	}
 	if d.Svc == nil {
 		return errNilService
+	}
+	if d.FocusState == nil {
+		return errNilFocusState
 	}
 	return nil
 }
@@ -96,13 +86,12 @@ type Config struct {
 	smarthome smarthome.Model
 
 	// State
-	device       string
-	focusedPanel ConfigPanel
-	viewFocused  bool // Whether the view content has focus (vs device list)
-	width        int
-	height       int
-	styles       ConfigStyles
-	loadPhase    configLoadPhase // Tracks sequential loading progress
+	device     string
+	focusState *focus.State // Unified focus state (single source of truth)
+	width      int
+	height     int
+	styles     ConfigStyles
+	loadPhase  configLoadPhase // Tracks sequential loading progress
 
 	// Layout calculator for flexible panel sizing
 	layoutCalc *layout.TwoColumnLayout
@@ -152,35 +141,35 @@ func NewConfig(deps ConfigDeps) *Config {
 	// Configure left column panels (WiFi, System, Cloud, Security) with expansion on focus
 	// MinHeight = borders (2) + padding (2) + content (1) = 5 minimum
 	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
-		{ID: layout.PanelID(PanelWiFi), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelSystem), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelCloud), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelSecurity), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelConfigWiFi), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelConfigSystem), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelConfigCloud), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelConfigSecurity), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	// Configure right column panels (BLE, Inputs, Protocols, SmartHome)
 	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
-		{ID: layout.PanelID(PanelBLE), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelInputs), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelProtocols), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelSmartHome), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelConfigBLE), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelConfigInputs), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelConfigProtocols), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(focus.PanelConfigSmartHome), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	c := &Config{
-		ctx:          deps.Ctx,
-		svc:          deps.Svc,
-		id:           tabs.TabConfig,
-		wifi:         wifi.New(wifiDeps),
-		system:       system.New(systemDeps),
-		cloud:        cloud.New(cloudDeps),
-		inputs:       inputs.New(inputsDeps),
-		ble:          ble.New(bleDeps),
-		protocols:    protocols.New(protocolsDeps),
-		security:     security.New(securityDeps),
-		smarthome:    smarthome.New(smarthomeDeps),
-		focusedPanel: PanelWiFi,
-		styles:       DefaultConfigStyles(),
-		layoutCalc:   layoutCalc,
+		ctx:        deps.Ctx,
+		svc:        deps.Svc,
+		id:         tabs.TabConfig,
+		wifi:       wifi.New(wifiDeps),
+		system:     system.New(systemDeps),
+		cloud:      cloud.New(cloudDeps),
+		inputs:     inputs.New(inputsDeps),
+		ble:        ble.New(bleDeps),
+		protocols:  protocols.New(protocolsDeps),
+		security:   security.New(securityDeps),
+		smarthome:  smarthome.New(smarthomeDeps),
+		focusState: deps.FocusState,
+		styles:     DefaultConfigStyles(),
+		layoutCalc: layoutCalc,
 	}
 
 	// Initialize focus states so the default focused panel (WiFi) receives key events
@@ -310,15 +299,17 @@ func (c *Config) advanceLoadPhase() tea.Cmd {
 func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	// Handle view focus changes from app.go
-	if focusMsg, ok := msg.(ViewFocusChangedMsg); ok {
-		// When regaining focus, reset to first panel so Tab cycling starts fresh
-		if focusMsg.Focused && !c.viewFocused {
-			c.focusedPanel = PanelWiFi
-		}
-		c.viewFocused = focusMsg.Focused
+	// Handle focus changes from the unified focus state
+	if _, ok := msg.(focus.ChangedMsg); ok {
 		c.updateFocusStates()
 		return c, nil
+	}
+
+	// Handle edit modal opened messages - notify app.go of modal state change
+	if _, ok := msg.(messages.EditOpenedMsg); ok {
+		cmds = append(cmds, func() tea.Msg {
+			return messages.ModalOpenedMsg{ID: focus.OverlayEditModal, Mode: focus.ModeModal}
+		})
 	}
 
 	// Handle edit completion messages with toast feedback
@@ -366,12 +357,17 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 	return c, tea.Batch(cmds...)
 }
 
-// handleEditClosedMsg processes edit completion messages and returns toast commands.
+// handleEditClosedMsg processes edit completion messages and returns toast and coordination commands.
 func (c *Config) handleEditClosedMsg(msg tea.Msg) tea.Cmd {
 	if editMsg, ok := msg.(messages.EditClosedMsg); ok {
-		if editMsg.Saved {
-			return toast.Success("Settings saved")
+		cmds := []tea.Cmd{
+			// Notify app.go that modal is closed
+			func() tea.Msg { return messages.ModalClosedMsg{ID: focus.OverlayEditModal} },
 		}
+		if editMsg.Saved {
+			cmds = append(cmds, toast.Success("Settings saved"))
+		}
+		return tea.Batch(cmds...)
 	}
 	return nil
 }
@@ -454,104 +450,82 @@ func (c *Config) phaseForMessage(msg tea.Msg) configLoadPhase {
 }
 
 func (c *Config) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
+	prevPanel := c.focusState.ActivePanel()
+
 	switch msg.String() {
-	case keyTab:
-		// If on last panel, return focus to device list
-		if c.focusedPanel == PanelSmartHome {
-			c.viewFocused = false
-			c.updateFocusStates()
-			return func() tea.Msg { return ReturnFocusMsg{} }
-		}
-		c.viewFocused = true // View has focus when cycling panels
-		c.focusNext()
-	case keyShiftTab:
-		// If on first panel, return focus to device list
-		if c.focusedPanel == PanelWiFi {
-			c.viewFocused = false
-			c.updateFocusStates()
-			return func() tea.Msg { return ReturnFocusMsg{} }
-		}
-		c.viewFocused = true // View has focus when cycling panels
-		c.focusPrev()
+	case keyconst.KeyTab:
+		c.focusState.NextPanel()
+		c.updateFocusStates()
+		return c.emitFocusChanged(prevPanel)
+	case keyconst.KeyShiftTab:
+		c.focusState.PrevPanel()
+		c.updateFocusStates()
+		return c.emitFocusChanged(prevPanel)
 	// Shift+N hotkeys match column-by-column order: left column (2-5), right column (6-9)
 	case keyconst.Shift2:
-		c.viewFocused = true
-		c.focusedPanel = PanelWiFi
+		c.focusState.JumpToPanel(2) // WiFi
 		c.updateFocusStates()
+		return c.emitFocusChanged(prevPanel)
 	case keyconst.Shift3:
-		c.viewFocused = true
-		c.focusedPanel = PanelSystem
+		c.focusState.JumpToPanel(3) // System
 		c.updateFocusStates()
+		return c.emitFocusChanged(prevPanel)
 	case keyconst.Shift4:
-		c.viewFocused = true
-		c.focusedPanel = PanelCloud
+		c.focusState.JumpToPanel(4) // Cloud
 		c.updateFocusStates()
+		return c.emitFocusChanged(prevPanel)
 	case keyconst.Shift5:
-		c.viewFocused = true
-		c.focusedPanel = PanelSecurity
+		c.focusState.JumpToPanel(5) // Security
 		c.updateFocusStates()
+		return c.emitFocusChanged(prevPanel)
 	case keyconst.Shift6:
-		c.viewFocused = true
-		c.focusedPanel = PanelBLE
+		c.focusState.JumpToPanel(6) // BLE
 		c.updateFocusStates()
+		return c.emitFocusChanged(prevPanel)
 	case keyconst.Shift7:
-		c.viewFocused = true
-		c.focusedPanel = PanelInputs
+		c.focusState.JumpToPanel(7) // Inputs
 		c.updateFocusStates()
+		return c.emitFocusChanged(prevPanel)
 	case keyconst.Shift8:
-		c.viewFocused = true
-		c.focusedPanel = PanelProtocols
+		c.focusState.JumpToPanel(8) // Protocols
 		c.updateFocusStates()
+		return c.emitFocusChanged(prevPanel)
 	case keyconst.Shift9:
-		c.viewFocused = true
-		c.focusedPanel = PanelSmartHome
+		c.focusState.JumpToPanel(9) // SmartHome
 		c.updateFocusStates()
+		return c.emitFocusChanged(prevPanel)
 	}
 	return nil
 }
 
-func (c *Config) focusNext() {
-	// Column-by-column: left column top-to-bottom, then right column top-to-bottom
-	panels := []ConfigPanel{
-		PanelWiFi, PanelSystem, PanelCloud, PanelSecurity, // Left column
-		PanelBLE, PanelInputs, PanelProtocols, PanelSmartHome, // Right column
+// emitFocusChanged returns a command that emits a FocusChangedMsg if panel actually changed.
+func (c *Config) emitFocusChanged(prevPanel focus.GlobalPanelID) tea.Cmd {
+	newPanel := c.focusState.ActivePanel()
+	if newPanel == prevPanel {
+		return nil
 	}
-	for i, p := range panels {
-		if p == c.focusedPanel {
-			c.focusedPanel = panels[(i+1)%len(panels)]
-			break
-		}
+	return func() tea.Msg {
+		return c.focusState.NewChangedMsg(
+			c.focusState.ActiveTab(),
+			prevPanel,
+			false, // tab didn't change
+			true,  // panel changed
+			false, // overlay didn't change
+		)
 	}
-	c.updateFocusStates()
-}
-
-func (c *Config) focusPrev() {
-	// Column-by-column: left column top-to-bottom, then right column top-to-bottom
-	panels := []ConfigPanel{
-		PanelWiFi, PanelSystem, PanelCloud, PanelSecurity, // Left column
-		PanelBLE, PanelInputs, PanelProtocols, PanelSmartHome, // Right column
-	}
-	for i, p := range panels {
-		if p == c.focusedPanel {
-			prevIdx := (i - 1 + len(panels)) % len(panels)
-			c.focusedPanel = panels[prevIdx]
-			break
-		}
-	}
-	c.updateFocusStates()
 }
 
 func (c *Config) updateFocusStates() {
-	// Panels only show focused when the view has overall focus AND it's the active panel
+	// Query focusState for panel focus (single source of truth)
 	// Panel indices match column-by-column order: left column (2-5), right column (6-9)
-	c.wifi = c.wifi.SetFocused(c.viewFocused && c.focusedPanel == PanelWiFi).SetPanelIndex(2)
-	c.system = c.system.SetFocused(c.viewFocused && c.focusedPanel == PanelSystem).SetPanelIndex(3)
-	c.cloud = c.cloud.SetFocused(c.viewFocused && c.focusedPanel == PanelCloud).SetPanelIndex(4)
-	c.security = c.security.SetFocused(c.viewFocused && c.focusedPanel == PanelSecurity).SetPanelIndex(5)
-	c.ble = c.ble.SetFocused(c.viewFocused && c.focusedPanel == PanelBLE).SetPanelIndex(6)
-	c.inputs = c.inputs.SetFocused(c.viewFocused && c.focusedPanel == PanelInputs).SetPanelIndex(7)
-	c.protocols = c.protocols.SetFocused(c.viewFocused && c.focusedPanel == PanelProtocols).SetPanelIndex(8)
-	c.smarthome = c.smarthome.SetFocused(c.viewFocused && c.focusedPanel == PanelSmartHome).SetPanelIndex(9)
+	c.wifi = c.wifi.SetFocused(c.focusState.IsPanelFocused(focus.PanelConfigWiFi)).SetPanelIndex(2)
+	c.system = c.system.SetFocused(c.focusState.IsPanelFocused(focus.PanelConfigSystem)).SetPanelIndex(3)
+	c.cloud = c.cloud.SetFocused(c.focusState.IsPanelFocused(focus.PanelConfigCloud)).SetPanelIndex(4)
+	c.security = c.security.SetFocused(c.focusState.IsPanelFocused(focus.PanelConfigSecurity)).SetPanelIndex(5)
+	c.ble = c.ble.SetFocused(c.focusState.IsPanelFocused(focus.PanelConfigBLE)).SetPanelIndex(6)
+	c.inputs = c.inputs.SetFocused(c.focusState.IsPanelFocused(focus.PanelConfigInputs)).SetPanelIndex(7)
+	c.protocols = c.protocols.SetFocused(c.focusState.IsPanelFocused(focus.PanelConfigProtocols)).SetPanelIndex(8)
+	c.smarthome = c.smarthome.SetFocused(c.focusState.IsPanelFocused(focus.PanelConfigSmartHome)).SetPanelIndex(9)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if c.layoutCalc != nil && c.width > 0 && c.height > 0 {
@@ -561,23 +535,25 @@ func (c *Config) updateFocusStates() {
 
 func (c *Config) updateFocusedComponent(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
-	switch c.focusedPanel {
-	case PanelWiFi:
+	switch c.focusState.ActivePanel() {
+	case focus.PanelConfigWiFi:
 		c.wifi, cmd = c.wifi.Update(msg)
-	case PanelSystem:
+	case focus.PanelConfigSystem:
 		c.system, cmd = c.system.Update(msg)
-	case PanelCloud:
+	case focus.PanelConfigCloud:
 		c.cloud, cmd = c.cloud.Update(msg)
-	case PanelInputs:
+	case focus.PanelConfigInputs:
 		c.inputs, cmd = c.inputs.Update(msg)
-	case PanelBLE:
+	case focus.PanelConfigBLE:
 		c.ble, cmd = c.ble.Update(msg)
-	case PanelProtocols:
+	case focus.PanelConfigProtocols:
 		c.protocols, cmd = c.protocols.Update(msg)
-	case PanelSecurity:
+	case focus.PanelConfigSecurity:
 		c.security, cmd = c.security.Update(msg)
-	case PanelSmartHome:
+	case focus.PanelConfigSmartHome:
 		c.smarthome, cmd = c.smarthome.Update(msg)
+	default:
+		// Panels from other tabs - no action needed
 	}
 	return cmd
 }
@@ -620,22 +596,22 @@ func (c *Config) View() string {
 func (c *Config) renderNarrowLayout() string {
 	// In narrow mode, show only the focused panel at full width
 	// Components already have embedded titles from rendering.New()
-	switch c.focusedPanel {
-	case PanelWiFi:
+	switch c.focusState.ActivePanel() {
+	case focus.PanelConfigWiFi:
 		return c.wifi.View()
-	case PanelSystem:
+	case focus.PanelConfigSystem:
 		return c.system.View()
-	case PanelCloud:
+	case focus.PanelConfigCloud:
 		return c.cloud.View()
-	case PanelInputs:
+	case focus.PanelConfigInputs:
 		return c.inputs.View()
-	case PanelBLE:
+	case focus.PanelConfigBLE:
 		return c.ble.View()
-	case PanelProtocols:
+	case focus.PanelConfigProtocols:
 		return c.protocols.View()
-	case PanelSecurity:
+	case focus.PanelConfigSecurity:
 		return c.security.View()
-	case PanelSmartHome:
+	case focus.PanelConfigSmartHome:
 		return c.smarthome.View()
 	default:
 		return c.wifi.View()
@@ -689,9 +665,10 @@ func (c *Config) SetSize(width, height int) View {
 
 	// Update layout with new dimensions and focus
 	c.layoutCalc.SetSize(width, height)
-	// Only expand panels when view has focus, otherwise distribute evenly
-	if c.viewFocused {
-		c.layoutCalc.SetFocus(layout.PanelID(c.focusedPanel))
+	// Only expand panels when a config panel has focus, otherwise distribute evenly
+	activePanel := c.focusState.ActivePanel()
+	if activePanel.TabFor() == tabs.TabConfig && activePanel != focus.PanelDeviceList {
+		c.layoutCalc.SetFocus(layout.PanelID(activePanel))
 	} else {
 		c.layoutCalc.SetFocus(-1) // No expansion when device list is focused
 	}
@@ -701,30 +678,30 @@ func (c *Config) SetSize(width, height int) View {
 
 	// Apply sizes to left column components (WiFi, System, Cloud, Security)
 	// Pass full panel dimensions - components handle their own borders via rendering.New()
-	if d, ok := dims[layout.PanelID(PanelWiFi)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelConfigWiFi)]; ok {
 		c.wifi = c.wifi.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelSystem)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelConfigSystem)]; ok {
 		c.system = c.system.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelCloud)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelConfigCloud)]; ok {
 		c.cloud = c.cloud.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelSecurity)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelConfigSecurity)]; ok {
 		c.security = c.security.SetSize(d.Width, d.Height)
 	}
 
 	// Apply sizes to right column components (BLE, Inputs, Protocols, SmartHome)
-	if d, ok := dims[layout.PanelID(PanelBLE)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelConfigBLE)]; ok {
 		c.ble = c.ble.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelInputs)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelConfigInputs)]; ok {
 		c.inputs = c.inputs.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelProtocols)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelConfigProtocols)]; ok {
 		c.protocols = c.protocols.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelSmartHome)]; ok {
+	if d, ok := dims[layout.PanelID(focus.PanelConfigSmartHome)]; ok {
 		c.smarthome = c.smarthome.SetSize(d.Width, d.Height)
 	}
 
@@ -734,26 +711,6 @@ func (c *Config) SetSize(width, height int) View {
 // Device returns the current device.
 func (c *Config) Device() string {
 	return c.device
-}
-
-// FocusedPanel returns the currently focused panel.
-func (c *Config) FocusedPanel() ConfigPanel {
-	return c.focusedPanel
-}
-
-// SetFocusedPanel sets the focused panel.
-func (c *Config) SetFocusedPanel(panel ConfigPanel) *Config {
-	c.focusedPanel = panel
-	c.updateFocusStates()
-	return c
-}
-
-// SetViewFocused sets whether the view has overall focus (vs device list).
-// When false, all panels show as unfocused.
-func (c *Config) SetViewFocused(focused bool) *Config {
-	c.viewFocused = focused
-	c.updateFocusStates()
-	return c
 }
 
 // HasActiveModal returns true if any component has an edit modal visible.

@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 func TestNew(t *testing.T) {
@@ -245,15 +246,15 @@ func TestModel_HandleKey_Navigation(t *testing.T) {
 	m.Scroller.SetItemCount(3)
 
 	// Move down
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.Scroller.Cursor() != 1 {
-		t.Errorf("cursor after j = %d, want 1", updated.Scroller.Cursor())
+		t.Errorf("cursor after nav down = %d, want 1", updated.Scroller.Cursor())
 	}
 
 	// Move up
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'k'})
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
 	if updated.Scroller.Cursor() != 0 {
-		t.Errorf("cursor after k = %d, want 0", updated.Scroller.Cursor())
+		t.Errorf("cursor after nav up = %d, want 0", updated.Scroller.Cursor())
 	}
 }
 
@@ -268,16 +269,16 @@ func TestModel_HandleKey_Selection(t *testing.T) {
 	}
 	m.Scroller.SetItemCount(2)
 
-	// Toggle selection with space
-	updated, _ := m.Update(tea.KeyPressMsg{Code: ' '})
+	// Toggle selection
+	updated, _ := m.Update(messages.ToggleEnableRequestMsg{})
 	if !updated.devices[0].Selected {
-		t.Error("device0 should be selected after space")
+		t.Error("device0 should be selected after toggle")
 	}
 
 	// Toggle again
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: ' '})
+	updated, _ = updated.Update(messages.ToggleEnableRequestMsg{})
 	if updated.devices[0].Selected {
-		t.Error("device0 should be unselected after second space")
+		t.Error("device0 should be unselected after second toggle")
 	}
 }
 
@@ -334,7 +335,7 @@ func TestModel_HandleKey_ModeSwitch(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_Export_NoSelection(t *testing.T) {
+func TestModel_HandleAction_Export_NoSelection(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
@@ -343,7 +344,7 @@ func TestModel_HandleKey_Export_NoSelection(t *testing.T) {
 		{Name: "device0", Selected: false},
 	}
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'x'})
+	updated, cmd := m.Update(messages.RunRequestMsg{})
 
 	if cmd != nil {
 		t.Error("should not return command when no devices selected")
@@ -353,7 +354,7 @@ func TestModel_HandleKey_Export_NoSelection(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_Export_WithSelection(t *testing.T) {
+func TestModel_HandleAction_Export_WithSelection(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
@@ -362,10 +363,10 @@ func TestModel_HandleKey_Export_WithSelection(t *testing.T) {
 		{Name: "device0", Selected: true},
 	}
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'x'})
+	updated, cmd := m.Update(messages.RunRequestMsg{})
 
 	if !updated.exporting {
-		t.Error("should be exporting after 'x'")
+		t.Error("should be exporting after run request")
 	}
 	if cmd == nil {
 		t.Error("should return command when devices selected")
@@ -375,14 +376,14 @@ func TestModel_HandleKey_Export_WithSelection(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_NotFocused(t *testing.T) {
+func TestModel_HandleAction_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = false
 	m.devices = []DeviceBackup{{Name: "device0"}}
 	m.Scroller.SetItemCount(1)
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
+	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavDown})
 
 	if updated.Scroller.Cursor() != 0 {
 		t.Error("cursor should not change when not focused")

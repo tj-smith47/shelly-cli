@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
@@ -195,11 +196,11 @@ func (s Select) handleKey(msg tea.KeyPressMsg) (Select, tea.Cmd) {
 
 	// Normal mode keys
 	switch key {
-	case "enter", "space":
+	case keyconst.KeyEnter, keyconst.KeySpace:
 		return s.handleConfirm(), nil
 	case "/":
 		return s.handleSlash()
-	case "esc", "ctrl+[":
+	case keyconst.KeyEsc, "ctrl+[":
 		return s.handleEscape(), nil
 	case "j", "down":
 		return s.handleDown(), nil
@@ -209,7 +210,7 @@ func (s Select) handleKey(msg tea.KeyPressMsg) (Select, tea.Cmd) {
 		return s.handleHome(), nil
 	case "shift+G", "G", "end":
 		return s.handleEnd(), nil
-	case "tab":
+	case keyconst.KeyTab:
 		return s.handleTab(), nil
 	}
 
@@ -290,7 +291,7 @@ func (s Select) handleTab() Select {
 
 func (s Select) handleFilterKey(key string, msg tea.KeyPressMsg) (Select, tea.Cmd) {
 	switch key {
-	case "enter":
+	case keyconst.KeyEnter:
 		// Select current and exit filter mode
 		s = s.selectCurrent()
 		s.expanded = false
@@ -300,7 +301,7 @@ func (s Select) handleFilterKey(key string, msg tea.KeyPressMsg) (Select, tea.Cm
 		s = s.applyFilter()
 		return s, nil
 
-	case "esc", "ctrl+[":
+	case keyconst.KeyEsc, "ctrl+[":
 		// Exit filter mode but stay expanded
 		s.filtering = false
 		s.filterInput.Blur()

@@ -283,32 +283,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleStatusLoaded(msg)
 	case EditClosedMsg:
 		return m.handleEditClosed(msg)
-	// Action messages from context system
 	case messages.NavigationMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleNavigation(msg)
-	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleRefreshKey()
-	case messages.ToggleEnableRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.toggleCurrentField()
-	case messages.EditRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleEditKey()
-	case messages.TimezoneRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleTimezoneKey()
+		return m.handleNavigationMsg(msg)
+	case messages.RefreshRequestMsg, messages.ToggleEnableRequestMsg,
+		messages.EditRequestMsg, messages.TimezoneRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -316,6 +295,30 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
+	return m, nil
+}
+
+func (m Model) handleNavigationMsg(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
+	case messages.RefreshRequestMsg:
+		return m.handleRefreshKey()
+	case messages.ToggleEnableRequestMsg:
+		return m.toggleCurrentField()
+	case messages.EditRequestMsg:
+		return m.handleEditKey()
+	case messages.TimezoneRequestMsg:
+		return m.handleTimezoneKey()
+	}
 	return m, nil
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -236,6 +237,10 @@ func (m MQTTEditModel) Update(msg tea.Msg) (MQTTEditModel, tea.Cmd) {
 		return m, nil
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m MQTTEditModel) handleMessage(msg tea.Msg) (MQTTEditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
 		m.saving = false
@@ -247,6 +252,9 @@ func (m MQTTEditModel) Update(msg tea.Msg) (MQTTEditModel, tea.Cmd) {
 		m = m.Hide()
 		return m, func() tea.Msg { return MQTTEditClosedMsg{Saved: true} }
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		return m.handleNavigation(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -255,9 +263,19 @@ func (m MQTTEditModel) Update(msg tea.Msg) (MQTTEditModel, tea.Cmd) {
 	return m.updateFocusedInput(msg)
 }
 
-func (m MQTTEditModel) handleKey(msg tea.KeyPressMsg) (MQTTEditModel, tea.Cmd) {
-	key := msg.String()
+func (m MQTTEditModel) handleNavigation(msg messages.NavigationMsg) (MQTTEditModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		return m.prevField(), nil
+	case messages.NavDown:
+		return m.nextField(), nil
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this form
+	}
+	return m, nil
+}
 
+func (m MQTTEditModel) handleKey(msg tea.KeyPressMsg) (MQTTEditModel, tea.Cmd) {
 	// Handle dropdown expansion separately
 	if m.cursor == MQTTFieldTLS && m.tlsDropdown.IsExpanded() {
 		var cmd tea.Cmd
@@ -265,12 +283,13 @@ func (m MQTTEditModel) handleKey(msg tea.KeyPressMsg) (MQTTEditModel, tea.Cmd) {
 		return m, cmd
 	}
 
-	switch key {
-	case "esc", "ctrl+[":
+	// Modal-specific keys not covered by action messages
+	switch msg.String() {
+	case keyconst.KeyEsc, "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return MQTTEditClosedMsg{Saved: false} }
 
-	case "enter":
+	case keyconst.KeyEnter:
 		// If on TLS dropdown and not expanded, expand it
 		if m.cursor == MQTTFieldTLS && !m.tlsDropdown.IsExpanded() {
 			m.tlsDropdown = m.tlsDropdown.Expand()
@@ -278,10 +297,10 @@ func (m MQTTEditModel) handleKey(msg tea.KeyPressMsg) (MQTTEditModel, tea.Cmd) {
 		}
 		return m.save()
 
-	case "tab":
+	case keyconst.KeyTab:
 		return m.nextField(), nil
 
-	case "shift+tab":
+	case keyconst.KeyShiftTab:
 		return m.prevField(), nil
 	}
 

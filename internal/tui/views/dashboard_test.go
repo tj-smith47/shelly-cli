@@ -20,9 +20,6 @@ func TestNewDashboard(t *testing.T) {
 	if d.ID() != ViewDashboard {
 		t.Errorf("ID() = %v, want %v", d.ID(), ViewDashboard)
 	}
-	if d.FocusedPanel() != DashboardPanelDevices {
-		t.Errorf("FocusedPanel() = %v, want %v", d.FocusedPanel(), DashboardPanelDevices)
-	}
 }
 
 func TestNewDashboard_NilCtx(t *testing.T) {
@@ -115,22 +112,6 @@ func TestDashboard_SetSize(t *testing.T) {
 	}
 }
 
-func TestDashboard_SetFocusedPanel(t *testing.T) {
-	t.Parallel()
-
-	d := NewDashboard(DashboardDeps{Ctx: context.Background()})
-
-	d = d.SetFocusedPanel(DashboardPanelInfo)
-	if d.FocusedPanel() != DashboardPanelInfo {
-		t.Errorf("FocusedPanel() = %v, want %v", d.FocusedPanel(), DashboardPanelInfo)
-	}
-
-	d = d.SetFocusedPanel(DashboardPanelJSON)
-	if d.FocusedPanel() != DashboardPanelJSON {
-		t.Errorf("FocusedPanel() = %v, want %v", d.FocusedPanel(), DashboardPanelJSON)
-	}
-}
-
 func TestDashboard_Update_DeviceSelected(t *testing.T) {
 	t.Parallel()
 
@@ -177,24 +158,6 @@ func TestDashboard_Update_SameDevice(t *testing.T) {
 	_, cmd := d.Update(msg)
 	if cmd != nil {
 		t.Error("Update() should return nil when device hasn't changed")
-	}
-}
-
-func TestDashboard_Update_PanelFocus(t *testing.T) {
-	t.Parallel()
-
-	d := NewDashboard(DashboardDeps{Ctx: context.Background()})
-
-	msg := DashboardPanelFocusMsg{Panel: DashboardPanelJSON}
-
-	newView, _ := d.Update(msg)
-	dashboard, ok := newView.(*Dashboard)
-	if !ok {
-		t.Fatalf("expected *Dashboard, got %T", newView)
-	}
-
-	if dashboard.FocusedPanel() != DashboardPanelJSON {
-		t.Errorf("FocusedPanel() = %v, want %v", dashboard.FocusedPanel(), DashboardPanelJSON)
 	}
 }
 

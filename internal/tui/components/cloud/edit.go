@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -98,6 +99,10 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 		return m, nil
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
 		m.saving = false
@@ -110,6 +115,15 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		// Single toggle component - navigation not applicable
+		return m, nil
+	case messages.ToggleEnableRequestMsg:
+		if !m.saving {
+			m.pendingEnabled = !m.pendingEnabled
+		}
+		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -118,18 +132,17 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 }
 
 func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
-	key := msg.String()
-
-	switch key {
-	case "esc", "ctrl+[":
+	// Modal-specific keys not covered by action messages
+	switch msg.String() {
+	case keyconst.KeyEsc, "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 
-	case "enter":
+	case keyconst.KeyEnter:
 		return m.save()
 
-	case "t", " ":
-		// Toggle cloud enabled state
+	case "t":
+		// Toggle cloud enabled state (t key for "toggle")
 		if !m.saving {
 			m.pendingEnabled = !m.pendingEnabled
 			return m, nil

@@ -17,6 +17,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -36,13 +38,8 @@ const (
 // DefaultAPAddress is the default IP address for Shelly devices in AP mode.
 const DefaultAPAddress = "192.168.33.1"
 
-// Key constants for input handling.
+// Key constants for input handling (single-char keys only, others use keyconst).
 const (
-	keyEnter     = "enter"
-	keyEsc       = "esc"
-	keyTab       = "tab"
-	keyUp        = "up"
-	keyDown      = "down"
 	keyBackspace = "backspace"
 	keyQ         = "q"
 	keyR         = "r"
@@ -204,15 +201,23 @@ func (m Model) SetPanelIndex(index int) Model {
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward tick messages to loaders when active
+	if m, cmd, handled := m.updateLoaders(msg); handled {
+		return m, cmd
+	}
+
+	return m.handleMessage(msg)
+}
+
+func (m Model) updateLoaders(msg tea.Msg) (Model, tea.Cmd, bool) {
 	if m.step == StepWaiting {
 		var cmd tea.Cmd
 		m.Loader, cmd = m.Loader.Update(msg)
 		switch msg.(type) {
 		case DeviceFoundMsg, PollMsg:
-			// Pass through to main switch below
+			return m, nil, false // Pass through
 		default:
 			if cmd != nil {
-				return m, cmd
+				return m, cmd, true
 			}
 		}
 	}
@@ -221,47 +226,73 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.configLoader, cmd = m.configLoader.Update(msg)
 		switch msg.(type) {
 		case ConfiguredMsg:
-			// Pass through to main switch below
+			return m, nil, false // Pass through
 		default:
 			if cmd != nil {
-				return m, cmd
+				return m, cmd, true
 			}
 		}
 	}
+	return m, nil, false
+}
 
+func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case DeviceFoundMsg:
-		m.polling = false
-		if msg.Err != nil {
-			// Keep polling on error
-			return m, tea.Batch(m.Loader.Tick(), m.pollAfterDelay())
-		}
-		m.deviceInfo = msg.DeviceInfo
-		m.step = StepCredentials
-		return m, nil
-
+		return m.handleDeviceFound(msg)
 	case ConfiguredMsg:
-		if msg.Err != nil {
-			m.err = msg.Err
-			m.step = StepError
-			return m, nil
-		}
-		m.step = StepSuccess
-		return m, nil
-
+		return m.handleConfigured(msg)
 	case PollMsg:
 		if m.step == StepWaiting {
 			return m, tea.Batch(m.Loader.Tick(), m.checkDevice())
 		}
-		return m, nil
-
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
+	return m, nil
+}
 
+func (m Model) handleDeviceFound(msg DeviceFoundMsg) (Model, tea.Cmd) {
+	m.polling = false
+	if msg.Err != nil {
+		// Keep polling on error
+		return m, tea.Batch(m.Loader.Tick(), m.pollAfterDelay())
+	}
+	m.deviceInfo = msg.DeviceInfo
+	m.step = StepCredentials
+	return m, nil
+}
+
+func (m Model) handleConfigured(msg ConfiguredMsg) (Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		m.step = StepError
+		return m, nil
+	}
+	m.step = StepSuccess
+	return m, nil
+}
+
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	// Navigation only applicable during credential entry
+	if m.step != StepCredentials {
+		return m, nil
+	}
+	switch msg.Direction {
+	case messages.NavUp, messages.NavDown:
+		// Cycle between SSID (0) and Password (1) fields
+		m.inputField = (m.inputField + 1) % 2
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for 2-field form
+	}
 	return m, nil
 }
 
@@ -285,11 +316,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 func (m Model) handleInstructionsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
-	case keyEnter:
+	case keyconst.KeyEnter:
 		m.step = StepWaiting
 		m.polling = true
 		return m, tea.Batch(m.Loader.Tick(), m.checkDevice())
-	case keyEsc, keyQ:
+	case keyconst.KeyEsc, keyQ:
 		m = m.Reset()
 	}
 	return m, nil
@@ -297,14 +328,15 @@ func (m Model) handleInstructionsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 func (m Model) handleCredentialsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
-	case keyTab, keyDown, keyUp:
+	case keyconst.KeyTab:
+		// Tab cycles through fields (NavigationMsg handles j/k/arrows)
 		m.inputField = (m.inputField + 1) % 2
-	case keyEnter:
+	case keyconst.KeyEnter:
 		if m.ssid != "" {
 			m.step = StepConfiguring
 			return m, tea.Batch(m.configLoader.Tick(), m.configureDevice())
 		}
-	case keyEsc:
+	case keyconst.KeyEsc:
 		m = m.Reset()
 	case keyBackspace:
 		m = m.handleBackspace()
@@ -337,7 +369,7 @@ func (m Model) handleCharInput(char string) Model {
 
 func (m Model) handleFinalKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
-	case keyEnter, keyEsc, keyQ, keyR:
+	case keyconst.KeyEnter, keyconst.KeyEsc, keyQ, keyR:
 		m = m.Reset()
 	}
 	return m, nil

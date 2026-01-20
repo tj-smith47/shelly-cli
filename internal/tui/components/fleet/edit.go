@@ -200,6 +200,10 @@ func (m GroupEditModel) Update(msg tea.Msg) (GroupEditModel, tea.Cmd) {
 		return m, nil
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m GroupEditModel) handleMessage(msg tea.Msg) (GroupEditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
 		m.saving = false
@@ -211,6 +215,14 @@ func (m GroupEditModel) Update(msg tea.Msg) (GroupEditModel, tea.Cmd) {
 		m = m.Hide()
 		return m, func() tea.Msg { return GroupEditClosedMsg{Saved: true} }
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		return m.handleNavigation(msg)
+	case messages.ToggleEnableRequestMsg:
+		// Toggle device selection if in devices field
+		if m.cursor == GroupEditFieldDevices && len(m.allDevices) > 0 {
+			return m.toggleCurrentDevice(), nil
+		}
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -225,6 +237,26 @@ func (m GroupEditModel) Update(msg tea.Msg) (GroupEditModel, tea.Cmd) {
 	return m, nil
 }
 
+func (m GroupEditModel) handleNavigation(msg messages.NavigationMsg) (GroupEditModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		if m.cursor == GroupEditFieldDevices {
+			m.deviceScroller.CursorUp()
+			return m, nil
+		}
+		return m.prevField(), nil
+	case messages.NavDown:
+		if m.cursor == GroupEditFieldDevices {
+			m.deviceScroller.CursorDown()
+			return m, nil
+		}
+		return m.nextField(), nil
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this component
+	}
+	return m, nil
+}
+
 func (m GroupEditModel) handleKey(msg tea.KeyPressMsg) (GroupEditModel, tea.Cmd) {
 	key := msg.String()
 
@@ -233,46 +265,24 @@ func (m GroupEditModel) handleKey(msg tea.KeyPressMsg) (GroupEditModel, tea.Cmd)
 		return m.handleDeleteKey(key)
 	}
 
+	// Modal-specific keys not covered by action messages
 	switch key {
-	case "esc", "ctrl+[":
+	case keyconst.KeyEsc, "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return GroupEditClosedMsg{Saved: false} }
-
-	case "ctrl+s", keyconst.KeyEnter:
+	case keyconst.KeyCtrlS:
 		if m.cursor == GroupEditFieldName {
 			// Move to devices instead of saving
 			return m.nextField(), nil
 		}
 		return m.save()
-
-	case "tab", "down":
+	case keyconst.KeyTab:
 		return m.nextField(), nil
-
-	case "shift+tab", "up":
+	case keyconst.KeyShiftTab:
 		return m.prevField(), nil
-
-	case " ":
-		// Toggle device selection if in devices field
-		if m.cursor == GroupEditFieldDevices && len(m.allDevices) > 0 {
-			return m.toggleCurrentDevice(), nil
-		}
-
-	case "j":
-		// Scroll down in device list
-		if m.cursor == GroupEditFieldDevices {
-			m.deviceScroller.CursorDown()
-			return m, nil
-		}
-
-	case "k":
-		// Scroll up in device list
-		if m.cursor == GroupEditFieldDevices {
-			m.deviceScroller.CursorUp()
-			return m, nil
-		}
 	}
 
-	// Forward to name input
+	// Forward to name input when focused
 	if m.cursor == GroupEditFieldName {
 		var cmd tea.Cmd
 		m.nameInput, cmd = m.nameInput.Update(msg)
@@ -287,11 +297,9 @@ func (m GroupEditModel) handleDeleteKey(key string) (GroupEditModel, tea.Cmd) {
 	case "esc", "n", "N":
 		m = m.Hide()
 		return m, func() tea.Msg { return GroupEditClosedMsg{Saved: false} }
-
-	case "y", "Y", keyconst.KeyEnter:
+	case "y", "Y", "enter":
 		return m.doDelete()
 	}
-
 	return m, nil
 }
 

@@ -1,7 +1,11 @@
 // Package messages provides shared message types for TUI components.
 package messages
 
-import tea "charm.land/bubbletea/v2"
+import (
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
+)
 
 // IsActionRequest returns true if the message is an action request that should
 // be forwarded only to the focused component, not all components.
@@ -175,4 +179,20 @@ type SnoozeRequestMsg struct {
 // ModeSelectMsg requests selecting a mode (e.g., operation mode 1 or 2).
 type ModeSelectMsg struct {
 	Mode int
+}
+
+// Overlay/Modal coordination messages - used to synchronize focus state between
+// app.go and views/components when modals are opened or closed.
+
+// ModalOpenedMsg notifies the app that a modal/overlay was opened.
+// Views/components emit this when they open edit modals, dialogs, etc.
+type ModalOpenedMsg struct {
+	ID   focus.OverlayID
+	Mode focus.Mode
+}
+
+// ModalClosedMsg notifies the app that a modal/overlay was closed.
+// Views/components emit this when their modals are dismissed.
+type ModalClosedMsg struct {
+	ID focus.OverlayID
 }

@@ -147,16 +147,15 @@ func TestContextMap_GetGlobalBindings(t *testing.T) {
 func TestContextFromPanel(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		panel focus.PanelID
+		panel focus.GlobalPanelID
 		want  Context
 	}{
-		{focus.PanelEvents, ContextEvents},
+		{focus.PanelDashboardEvents, ContextEvents},
 		{focus.PanelDeviceList, ContextDevices},
-		{focus.PanelDeviceInfo, ContextInfo},
-		{focus.PanelJSON, ContextJSON},
-		{focus.PanelEnergyBars, ContextEnergy},
-		{focus.PanelEnergyHistory, ContextEnergy},
-		{focus.PanelMonitor, ContextMonitor},
+		{focus.PanelDashboardInfo, ContextInfo},
+		{focus.PanelDashboardEnergyBars, ContextEnergy},
+		{focus.PanelDashboardEnergyHistory, ContextEnergy},
+		{focus.PanelMonitorMain, ContextMonitor},
 		{focus.PanelNone, ContextGlobal},
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -189,6 +190,10 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 		return m, nil
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
 		m.saving = false
@@ -199,6 +204,24 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 		}
 		return m, nil
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if m.saving {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.ToggleEnableRequestMsg:
+		if m.saving {
+			return m, nil
+		}
+		if m.field == FieldEnabled {
+			if m.mode == EditModeStation {
+				m.staEnabled = !m.staEnabled
+			} else {
+				m.apEnabled = !m.apEnabled
+			}
+		}
+		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 	}
@@ -206,6 +229,18 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 	// Update focused text input
 	m, cmd := m.updateFocusedInput(msg)
 	return m, cmd
+}
+
+func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		return m.prevField(), nil
+	case messages.NavDown:
+		return m.nextField(), nil
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this form
+	}
+	return m, nil
 }
 
 func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
@@ -228,11 +263,12 @@ func (m EditModel) handleKeyPress(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 		return m, nil
 	}
 
+	// Modal-specific keys not covered by action messages
 	switch msg.String() {
 	case "esc", "ctrl+[":
 		return m.Hide(), nil
 
-	case "tab", "shift+tab":
+	case keyconst.KeyTab, keyconst.KeyShiftTab:
 		// Switch between Station and AP modes
 		if m.mode == EditModeStation {
 			m.mode = EditModeAP
@@ -246,13 +282,7 @@ func (m EditModel) handleKeyPress(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 		m.field = FieldSSID
 		return m, nil
 
-	case "down", "j":
-		return m.nextField(), nil
-
-	case "up", "k":
-		return m.prevField(), nil
-
-	case "enter":
+	case keyconst.KeyEnter:
 		if m.field == FieldEnabled {
 			// Toggle enabled state
 			if m.mode == EditModeStation {
@@ -265,18 +295,7 @@ func (m EditModel) handleKeyPress(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 		// Move to next field
 		return m.nextField(), nil
 
-	case " ":
-		if m.field == FieldEnabled {
-			// Toggle enabled state
-			if m.mode == EditModeStation {
-				m.staEnabled = !m.staEnabled
-			} else {
-				m.apEnabled = !m.apEnabled
-			}
-			return m, nil
-		}
-
-	case "ctrl+s":
+	case keyconst.KeyCtrlS:
 		// Save
 		return m, m.save()
 	}

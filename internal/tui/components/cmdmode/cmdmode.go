@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
@@ -112,20 +113,20 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
-		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("esc", "ctrl+["))):
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys(keyconst.KeyEsc, "ctrl+["))):
 			m.active = false
 			m.textInput.Blur()
 			m.textInput.SetValue("")
 			m.histIdx = -1
 			return m, func() tea.Msg { return ClosedMsg{} }
 
-		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter"))):
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys(keyconst.KeyEnter))):
 			return m.executeCommand()
 
-		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("up"))):
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys(keyconst.KeyUp))):
 			return m.historyUp(), nil
 
-		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("down"))):
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys(keyconst.KeyDown))):
 			return m.historyDown(), nil
 		}
 	}

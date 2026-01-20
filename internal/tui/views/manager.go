@@ -58,17 +58,6 @@ type ViewChangedMsg struct {
 	Current  ViewID
 }
 
-// ViewFocusChangedMsg is sent when the view's overall focus changes.
-// When Focused is false, the device list sidebar has focus.
-// When Focused is true, the view content has focus.
-type ViewFocusChangedMsg struct {
-	Focused bool
-}
-
-// ReturnFocusMsg is sent by views when Tab/Shift+Tab should return focus
-// to the device list (i.e., when cycling past the first or last panel).
-type ReturnFocusMsg struct{}
-
 // Manager manages multiple views and their transitions.
 type Manager struct {
 	views   map[ViewID]View

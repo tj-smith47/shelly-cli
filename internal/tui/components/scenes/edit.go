@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 // EditMode indicates what mode the edit modal is in.
@@ -228,9 +229,11 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 		return m, nil
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		return m.handleKey(msg)
 	case EditSavedMsg:
 		if msg.Err != nil {
 			m.err = msg.Err
@@ -238,6 +241,16 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 		}
 		m.visible = false
 		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+
+	// Action messages from context system
+	case messages.NavigationMsg:
+		// Only handle navigation for actions field
+		if m.focusedField == EditFieldActions {
+			return m.handleActionsNavigation(msg)
+		}
+		return m, nil
+	case tea.KeyPressMsg:
+		return m.handleKey(msg)
 	}
 
 	// Update text inputs
@@ -252,6 +265,22 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 		return m, cmd
 	}
 
+	return m, nil
+}
+
+func (m EditModel) handleActionsNavigation(msg messages.NavigationMsg) (EditModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		if m.actionCursor > 0 {
+			m.actionCursor--
+		}
+	case messages.NavDown:
+		if m.actionCursor < len(m.actions)-1 {
+			m.actionCursor++
+		}
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable
+	}
 	return m, nil
 }
 
@@ -270,7 +299,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 	case keyconst.KeyTab:
 		return m.focusNext(), nil
-	case "shift+tab":
+	case keyconst.KeyShiftTab:
 		return m.focusPrev(), nil
 	case keyconst.KeyEnter:
 		return m.handleEnter()
@@ -308,18 +337,8 @@ func (m EditModel) handleDeleteKey(key string) (EditModel, tea.Cmd) {
 }
 
 func (m EditModel) handleActionsKey(key string) (EditModel, tea.Cmd) {
-	switch key {
-	case "j", keyconst.KeyDown:
-		if m.actionCursor < len(m.actions)-1 {
-			m.actionCursor++
-		}
-		return m, nil
-	case "k", keyconst.KeyUp:
-		if m.actionCursor > 0 {
-			m.actionCursor--
-		}
-		return m, nil
-	case "d":
+	// Modal-specific keys not covered by NavigationMsg
+	if key == "d" {
 		// Delete selected action
 		if len(m.actions) > 0 && m.actionCursor < len(m.actions) {
 			m.actions = append(m.actions[:m.actionCursor], m.actions[m.actionCursor+1:]...)
@@ -327,7 +346,6 @@ func (m EditModel) handleActionsKey(key string) (EditModel, tea.Cmd) {
 				m.actionCursor--
 			}
 		}
-		return m, nil
 	}
 	return m, nil
 }

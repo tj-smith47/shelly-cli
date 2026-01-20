@@ -16,7 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -172,6 +172,10 @@ func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
 		}
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m GroupsModel) handleMessage(msg tea.Msg) (GroupsModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case GroupsLoadedMsg:
 		m.loading = false
@@ -184,6 +188,32 @@ func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
 		m.Scroller.SetItemCount(len(m.groups))
 		return m, nil
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRefresh()
+	case messages.NewRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleCreate()
+	case messages.EditRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleEdit()
+	case messages.DeleteRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleDelete()
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -191,6 +221,26 @@ func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
+	return m, nil
+}
+
+func (m GroupsModel) handleNavigation(msg messages.NavigationMsg) (GroupsModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
+	}
 	return m, nil
 }
 
@@ -233,36 +283,9 @@ func (m GroupsModel) canActOnSelected() bool {
 }
 
 func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
-	key := msg.String()
-
-	// Navigation keys
-	switch key {
-	case "j", keyconst.KeyDown:
-		m.Scroller.CursorDown()
-		return m, nil
-	case "k", keyconst.KeyUp:
-		m.Scroller.CursorUp()
-		return m, nil
-	case "g":
-		m.Scroller.CursorToStart()
-		return m, nil
-	case "G":
-		m.Scroller.CursorToEnd()
-		return m, nil
-	case "ctrl+d", keyconst.KeyPgDown:
-		m.Scroller.PageDown()
-		return m, nil
-	case "ctrl+u", keyconst.KeyPgUp:
-		m.Scroller.PageUp()
-		return m, nil
-	case "r":
-		return m.handleRefresh()
-	case "n":
-		return m.handleCreate()
-	case "e", "enter":
-		return m.handleEdit()
-	case "d":
-		return m.handleDelete()
+	// Component-specific keys not covered by action messages
+	// Group batch operations (on/off/toggle) are specific to this component
+	switch msg.String() {
 	case "o":
 		return m.handleGroupOn()
 	case "f":
@@ -270,7 +293,6 @@ func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
 	case "t":
 		return m.handleGroupToggle()
 	}
-
 	return m, nil
 }
 

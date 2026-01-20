@@ -299,39 +299,44 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m.handleLoaded(msg)
 	case ActionMsg:
 		return m.handleAction(msg)
-	// Action messages from context system
 	case messages.NavigationMsg:
+		return m.handleNavigationMsg(msg)
+	case messages.ViewRequestMsg, messages.EditRequestMsg, messages.ToggleEnableRequestMsg,
+		messages.DeleteRequestMsg, messages.NewRequestMsg, messages.RefreshRequestMsg:
+		return m.handleActionMsg(msg)
+	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
-		return m.handleNavigation(msg)
+		return m.handleKey(msg)
+	}
+	return m, nil
+}
+
+func (m ListModel) handleNavigationMsg(msg messages.NavigationMsg) (ListModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m ListModel) handleActionMsg(msg tea.Msg) (ListModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
 	case messages.ViewRequestMsg, messages.EditRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		m.pendingDelete = 0
 		return m, m.selectSchedule()
 	case messages.ToggleEnableRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		m.pendingDelete = 0
 		return m, m.toggleSchedule()
 	case messages.DeleteRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		return m.handleDelete()
 	case messages.NewRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		m.pendingDelete = 0
 		return m, m.createSchedule()
 	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		m.pendingDelete = 0
 		m.loading = true
 		return m, tea.Batch(
@@ -339,11 +344,6 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeSchedules),
 			m.fetchAndCacheSchedules(),
 		)
-	case tea.KeyPressMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleKey(msg)
 	}
 	return m, nil
 }

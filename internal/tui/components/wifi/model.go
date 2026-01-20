@@ -324,32 +324,38 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleStatusLoaded(msg)
 	case ScanResultMsg:
 		return m.handleScanResult(msg)
-	// Action messages from context system
+	// Action messages from context system - consolidated for complexity
 	case messages.NavigationMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleNavigation(msg)
-	case messages.ScanRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleScanKey()
-	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleRefreshKey()
-	case messages.EditRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleEditKey()
+		return m.handleNavigationMsg(msg)
+	case messages.ScanRequestMsg, messages.RefreshRequestMsg, messages.EditRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
+	}
+	return m, nil
+}
+
+func (m Model) handleNavigationMsg(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
+	case messages.ScanRequestMsg:
+		return m.handleScanKey()
+	case messages.RefreshRequestMsg:
+		return m.handleRefreshKey()
+	case messages.EditRequestMsg:
+		return m.handleEditKey()
 	}
 	return m, nil
 }

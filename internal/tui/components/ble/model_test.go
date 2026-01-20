@@ -5,9 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
 const testDevice = "192.168.1.100"
@@ -256,47 +255,47 @@ func TestModel_Update_DiscoveryStartedError(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_Refresh(t *testing.T) {
+func TestModel_HandleAction_Refresh(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 	m.device = testDevice
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'r'})
+	updated, cmd := m.Update(messages.RefreshRequestMsg{})
 
 	if !updated.loading {
-		t.Error("should be loading after 'r' key")
+		t.Error("should be loading after refresh request")
 	}
 	if cmd == nil {
 		t.Error("should return refresh command")
 	}
 }
 
-func TestModel_HandleKey_Discovery(t *testing.T) {
+func TestModel_HandleAction_Discovery(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 	m.device = testDevice
 	m.ble = &shelly.BLEConfig{Enable: true}
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'd'})
+	updated, cmd := m.Update(messages.ScanRequestMsg{})
 
 	if !updated.starting {
-		t.Error("should be starting after 'd' key")
+		t.Error("should be starting after scan request")
 	}
 	if cmd == nil {
 		t.Error("should return discovery command")
 	}
 }
 
-func TestModel_HandleKey_Discovery_BLEDisabled(t *testing.T) {
+func TestModel_HandleAction_Discovery_BLEDisabled(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
 	m.device = testDevice
 	m.ble = &shelly.BLEConfig{Enable: false}
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'd'})
+	updated, cmd := m.Update(messages.ScanRequestMsg{})
 
 	if updated.starting {
 		t.Error("should not start discovery when BLE disabled")
@@ -306,16 +305,16 @@ func TestModel_HandleKey_Discovery_BLEDisabled(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_NotFocused(t *testing.T) {
+func TestModel_HandleAction_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = false
 	m.device = testDevice
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'r'})
+	updated, _ := m.Update(messages.RefreshRequestMsg{})
 
 	if updated.loading {
-		t.Error("should not respond to keys when not focused")
+		t.Error("should not respond to actions when not focused")
 	}
 }
 

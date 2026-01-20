@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -163,6 +164,10 @@ func (m *Model) Init() tea.Cmd {
 
 // Update handles messages for the alerts component.
 func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	return m.handleMessage(msg)
+}
+
+func (m *Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case LoadedMsg:
 		m.loading = false
@@ -180,6 +185,12 @@ func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return *m, nil
 
+	case messages.NavigationMsg:
+		return m.handleNavigationMsg(msg)
+	case messages.ToggleEnableRequestMsg, messages.NewRequestMsg, messages.EditRequestMsg,
+		messages.DeleteRequestMsg, messages.SnoozeRequestMsg, messages.TestRequestMsg,
+		messages.RefreshRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 	}
@@ -194,35 +205,69 @@ func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return *m, nil
 }
 
-func (m *Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+func (m *Model) handleNavigationMsg(msg messages.NavigationMsg) (Model, tea.Cmd) {
 	if !m.focused {
 		return *m, nil
 	}
+	return m.handleNavigation(msg)
+}
 
-	switch msg.String() {
-	case "j", "down":
-		m.cursorDown()
-	case "k", "up":
-		m.cursorUp()
-	case "e", "enter":
+func (m *Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
+	if !m.focused {
+		return *m, nil
+	}
+	switch msg := msg.(type) {
+	case messages.ToggleEnableRequestMsg:
 		return *m, m.handleToggle()
-	case "n":
+	case messages.NewRequestMsg:
 		return *m, func() tea.Msg { return AlertCreateMsg{} }
-	case "E":
+	case messages.EditRequestMsg:
 		return *m, m.handleEdit()
-	case "d", "delete", "backspace":
+	case messages.DeleteRequestMsg:
 		return *m, m.handleDelete()
-	case "s":
-		return *m, m.handleSnooze(1 * time.Hour)
-	case "S":
-		return *m, m.handleSnooze(24 * time.Hour)
-	case "t":
+	case messages.SnoozeRequestMsg:
+		return m.handleSnoozeMsg(msg)
+	case messages.TestRequestMsg:
 		return *m, m.handleTest()
-	case "r":
+	case messages.RefreshRequestMsg:
 		m.loading = true
 		return *m, tea.Batch(m.Loader.Tick(), m.loadAlerts())
 	}
+	return *m, nil
+}
 
+func (m *Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		m.cursorUp()
+	case messages.NavDown:
+		m.cursorDown()
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this component
+	}
+	return *m, nil
+}
+
+func (m *Model) handleSnoozeMsg(msg messages.SnoozeRequestMsg) (Model, tea.Cmd) {
+	var duration time.Duration
+	switch msg.Duration {
+	case "1h":
+		duration = 1 * time.Hour
+	case "24h":
+		duration = 24 * time.Hour
+	default:
+		return *m, nil
+	}
+	return *m, m.handleSnooze(duration)
+}
+
+func (m *Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	// Component-specific keys not covered by action messages
+	// (none currently - all keys migrated to action messages)
+	_ = msg
+	if !m.focused {
+		return *m, nil
+	}
 	return *m, nil
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -160,14 +161,28 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 	}
 
-	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+	switch msg := msg.(type) {
+	case messages.NavigationMsg:
+		// Sync item count from cache before handling navigation
+		devices := m.getFilteredDevices()
+		m.Scroller.SetItemCount(len(devices))
+
+		oldCursor := m.Scroller.Cursor()
+		m = m.handleNavigation(msg)
+		// Emit selection change if cursor moved
+		if m.Scroller.Cursor() != oldCursor {
+			return m, m.emitSelection()
+		}
+		return m, nil
+
+	case tea.KeyPressMsg:
 		// Sync item count from cache before handling key
 		devices := m.getFilteredDevices()
 		m.Scroller.SetItemCount(len(devices))
 
 		oldCursor := m.Scroller.Cursor()
 		var cmd tea.Cmd
-		m, cmd = m.handleKeyPress(keyMsg)
+		m, cmd = m.handleKeyPress(msg)
 		// Emit selection change if cursor moved (unless a command is already being returned)
 		if m.Scroller.Cursor() != oldCursor && cmd == nil {
 			return m, m.emitSelection()
@@ -177,10 +192,32 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleNavigation handles NavigationMsg for cursor movement.
+func (m Model) handleNavigation(msg messages.NavigationMsg) Model {
+	switch msg.Direction {
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Horizontal navigation not applicable for device list
+	}
+	return m
+}
+
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	key := msg.String()
 
 	// Handle g-prefix commands (gx for browser, gg for top)
+	// This is a vim-style compound command pattern not covered by NavigationMsg
 	if m.gPressed {
 		m.gPressed = false
 		switch key {
@@ -193,29 +230,21 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			}
 			return m, nil
 		case "g":
-			// gg: go to top
+			// gg: go to top (vim-style)
 			m.Scroller.CursorToStart()
 			return m, nil
 		}
-		// Other keys after g: just process normally
+		// Other keys after g: cancel prefix mode
+		return m, nil
 	}
 
-	switch key {
-	case "j", "down":
-		m.Scroller.CursorDown()
-	case "k", "up":
-		m.Scroller.CursorUp()
-	case "g":
-		// Start g-prefix mode (for gg, gx commands)
+	// Start g-prefix mode for compound commands (gg, gx)
+	if key == "g" {
 		m.gPressed = true
 		return m, nil
-	case "G":
-		m.Scroller.CursorToEnd()
-	case "pgdown", "ctrl+d":
-		m.Scroller.PageDown()
-	case "pgup", "ctrl+u":
-		m.Scroller.PageUp()
 	}
+
+	// All other navigation (j/k/G/pgdown/pgup/ctrl+d/ctrl+u) is handled by NavigationMsg
 	return m, nil
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/modal"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
@@ -169,13 +170,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "ctrl+[":
+	case keyconst.KeyEsc, "ctrl+[":
 		m.visible = false
 		m.input = ""
 		return m, func() tea.Msg {
 			return CancelledMsg{Operation: m.operation}
 		}
-	case "enter":
+	case keyconst.KeyEnter:
 		if m.inputMatches() {
 			m.visible = false
 			m.input = ""

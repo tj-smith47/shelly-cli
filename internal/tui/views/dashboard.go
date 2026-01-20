@@ -10,20 +10,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
-// DashboardPanel identifies which panel is focused in the Dashboard view.
-type DashboardPanel int
-
-const (
-	// DashboardPanelEvents is the events stream panel.
-	DashboardPanelEvents DashboardPanel = iota
-	// DashboardPanelDevices is the device list panel.
-	DashboardPanelDevices
-	// DashboardPanelInfo is the device info panel.
-	DashboardPanelInfo
-	// DashboardPanelJSON is the JSON overlay panel.
-	DashboardPanelJSON
-)
-
 // DashboardDeps holds dependencies for the Dashboard view.
 type DashboardDeps struct {
 	Ctx context.Context
@@ -46,12 +32,12 @@ func (d DashboardDeps) Validate() error {
 // The Dashboard is implemented as a thin wrapper that signals app.go
 // to render the multi-panel layout. The actual rendering logic remains
 // in app.go to minimize refactoring while enabling the tabbed interface.
+// Panel focus is managed by focusState (single source of truth in app.go).
 type Dashboard struct {
-	ctx          context.Context
-	id           ViewID
-	focusedPanel DashboardPanel
-	width        int
-	height       int
+	ctx    context.Context
+	id     ViewID
+	width  int
+	height int
 
 	// selectedDevice tracks the currently selected device for propagation
 	selectedDevice string
@@ -65,9 +51,8 @@ func NewDashboard(deps DashboardDeps) *Dashboard {
 	}
 
 	return &Dashboard{
-		ctx:          deps.Ctx,
-		id:           tabs.TabDashboard,
-		focusedPanel: DashboardPanelDevices,
+		ctx: deps.Ctx,
+		id:  tabs.TabDashboard,
 	}
 }
 
@@ -84,17 +69,14 @@ func (d *Dashboard) Init() tea.Cmd {
 // Update handles messages for the Dashboard view.
 // Most updates are handled by app.go; this just tracks state for the View interface.
 func (d *Dashboard) Update(msg tea.Msg) (View, tea.Cmd) {
-	switch msg := msg.(type) {
-	case DashboardDeviceSelectedMsg:
-		if d.selectedDevice != msg.Device {
-			d.selectedDevice = msg.Device
+	if dsMsg, ok := msg.(DashboardDeviceSelectedMsg); ok {
+		if d.selectedDevice != dsMsg.Device {
+			d.selectedDevice = dsMsg.Device
 			// Emit message for other views
 			return d, func() tea.Msg {
-				return DeviceSelectedMsg(msg)
+				return DeviceSelectedMsg(dsMsg)
 			}
 		}
-	case DashboardPanelFocusMsg:
-		d.focusedPanel = msg.Panel
 	}
 
 	return d, nil
@@ -116,17 +98,6 @@ func (d *Dashboard) SetSize(width, height int) View {
 	return d
 }
 
-// FocusedPanel returns the currently focused panel.
-func (d *Dashboard) FocusedPanel() DashboardPanel {
-	return d.focusedPanel
-}
-
-// SetFocusedPanel sets the focused panel.
-func (d *Dashboard) SetFocusedPanel(panel DashboardPanel) *Dashboard {
-	d.focusedPanel = panel
-	return d
-}
-
 // SelectedDevice returns the currently selected device.
 func (d *Dashboard) SelectedDevice() string {
 	return d.selectedDevice
@@ -137,11 +108,6 @@ func (d *Dashboard) SelectedDevice() string {
 type DashboardDeviceSelectedMsg struct {
 	Device  string
 	Address string
-}
-
-// DashboardPanelFocusMsg is sent when the focused panel changes.
-type DashboardPanelFocusMsg struct {
-	Panel DashboardPanel
 }
 
 // IsDashboardView returns true if this is the Dashboard view.

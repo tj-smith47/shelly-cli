@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -216,6 +217,10 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 		return m, nil
 	}
 
+	return m.handleMessage(msg)
+}
+
+func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
 		m.saving = false
@@ -227,6 +232,9 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		return m.handleNavigation(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -235,21 +243,32 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 	return m.updateFocusedInput(msg)
 }
 
-func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
-	key := msg.String()
+func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		return m.prevField(), nil
+	case messages.NavDown:
+		return m.nextField(), nil
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this form
+	}
+	return m, nil
+}
 
-	switch key {
-	case "esc", "ctrl+[":
+func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
+	// Modal-specific keys not covered by action messages
+	switch msg.String() {
+	case keyconst.KeyEsc, "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 
-	case "ctrl+s":
+	case keyconst.KeyCtrlS:
 		return m.save()
 
-	case "tab":
+	case keyconst.KeyTab:
 		return m.nextField(), nil
 
-	case "shift+tab":
+	case keyconst.KeyShiftTab:
 		return m.prevField(), nil
 	}
 
