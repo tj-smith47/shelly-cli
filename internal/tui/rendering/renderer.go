@@ -305,32 +305,31 @@ func (r *Renderer) buildPanelHint() string {
 }
 
 // NewModal creates a modal-style renderer optimized for full-screen overlays.
-// Uses 80% of screen dimensions with minimum sizes, focused border, and highlight color.
+// Uses the provided dimensions directly with minimum sizes, focused border, and highlight color.
+// Callers should pass properly computed modal dimensions (typically 90% of screen).
 // This is the standard pattern for all edit modals.
-func NewModal(screenWidth, screenHeight int, title, footer string) *Renderer {
-	// Calculate overlay dimensions (80% of screen, like help modal)
-	overlayWidth := screenWidth * 80 / 100
-	overlayHeight := screenHeight * 80 / 100
-	if overlayWidth < 60 {
-		overlayWidth = 60
+func NewModal(width, height int, title, footer string) *Renderer {
+	// Apply minimum sizes
+	if width < 60 {
+		width = 60
 	}
-	if overlayHeight < 20 {
-		overlayHeight = 20
+	if height < 20 {
+		height = 20
 	}
 
 	colors := theme.GetSemanticColors()
-	return New(overlayWidth, overlayHeight).
+	return New(width, height).
 		SetTitle(title).
 		SetFocused(true).
 		SetFocusColor(colors.Highlight).
 		SetFooter(footer)
 }
 
-// ModalInputWidth returns the recommended input width for modals given screen dimensions.
+// ModalInputWidth returns the recommended input width for modals given modal dimensions.
 // This ensures inputs are appropriately sized without arbitrary limits.
-func ModalInputWidth(screenWidth int) int {
-	overlayWidth := screenWidth * 90 / 100
-	inputWidth := overlayWidth - 20 // Account for borders, padding, labels
+// The modalWidth parameter should be the actual modal width (not screen width).
+func ModalInputWidth(modalWidth int) int {
+	inputWidth := modalWidth - 20 // Account for borders, padding, labels
 	if inputWidth < 40 {
 		inputWidth = 40
 	}

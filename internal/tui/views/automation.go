@@ -382,6 +382,7 @@ func (a *Automation) Update(msg tea.Msg) (View, tea.Cmd) {
 
 	// Handle edit modal coordination messages - notify app.go of modal state changes
 	if _, ok := msg.(messages.EditOpenedMsg); ok {
+		a.setEditModalDimensions()
 		cmds = append(cmds, func() tea.Msg {
 			return messages.ModalOpenedMsg{ID: focus.OverlayEditModal, Mode: focus.ModeModal}
 		})
@@ -1034,7 +1035,7 @@ func (a *Automation) handleScriptEdit(msg scripts.EditScriptMsg) tea.Cmd {
 
 	// If script is running, stop it first (Shelly API doesn't allow editing running scripts)
 	if msg.Script.Running {
-		// Store script for later use in handler
+		// Capture script in closure scope
 		script := msg.Script
 		return func() tea.Msg {
 			ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
@@ -1396,6 +1397,30 @@ func (a *Automation) HasActiveModal() bool {
 		a.webhooks.IsEditing() || a.virtuals.IsEditing() || a.kvs.IsEditing() ||
 		a.alertFormOpen || a.scriptEditorOpen || a.scheduleEditorOpen || a.scheduleEditOpen ||
 		a.consoleOpen || a.templateOpen || a.evalOpen
+}
+
+// setEditModalDimensions sets proper modal dimensions using screen dimensions.
+// This is called when an edit modal opens to ensure it gets screen-based sizing
+// rather than panel-based sizing.
+func (a *Automation) setEditModalDimensions() {
+	modalWidth := a.width * 90 / 100
+	modalHeight := a.height * 90 / 100
+	if modalWidth < 60 {
+		modalWidth = 60
+	}
+	if modalHeight < 20 {
+		modalHeight = 20
+	}
+	// Set dimensions for whichever component has an edit modal open
+	if a.kvs.IsEditing() {
+		a.kvs = a.kvs.SetEditModalSize(modalWidth, modalHeight)
+	}
+	if a.webhooks.IsEditing() {
+		a.webhooks = a.webhooks.SetEditModalSize(modalWidth, modalHeight)
+	}
+	if a.virtuals.IsEditing() {
+		a.virtuals = a.virtuals.SetEditModalSize(modalWidth, modalHeight)
+	}
 }
 
 // RenderModal returns the active modal content for full-screen rendering.

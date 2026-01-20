@@ -7379,8 +7379,12 @@ func TestKVS_List(t *testing.T) {
 		}).
 		handle("KVS.List", func(_ map[string]any) (any, error) {
 			return map[string]any{
-				"keys": []string{"key1", "key2", "key3"},
-				"rev":  42,
+				"keys": map[string]any{
+					"key1": map[string]any{"etag": "abc123"},
+					"key2": map[string]any{"etag": "def456"},
+					"key3": map[string]any{"etag": "ghi789"},
+				},
+				"rev": 42,
 			}, nil
 		})
 

@@ -296,6 +296,15 @@ func (m Model) SetSize(width, height int) Model {
 	return m
 }
 
+// SetEditModalSize sets the edit modal dimensions.
+// This should be called with screen-based dimensions when the modal is visible.
+func (m Model) SetEditModalSize(width, height int) Model {
+	if m.editing {
+		m.editModal = m.editModal.SetSize(width, height)
+	}
+	return m
+}
+
 // SetFocused sets the focus state.
 func (m Model) SetFocused(focused bool) Model {
 	m.focused = focused

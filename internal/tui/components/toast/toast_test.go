@@ -479,7 +479,7 @@ func TestModel_ViewAsInputBar_LevelIcons(t *testing.T) {
 		{LevelSuccess, "✓"},
 		{LevelWarning, "!"},
 		{LevelError, "✗"},
-		{LevelInfo, "ℹ"},
+		{LevelInfo, "*"},
 	}
 
 	for _, tt := range tests {

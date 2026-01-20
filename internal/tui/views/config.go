@@ -307,6 +307,7 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 
 	// Handle edit modal opened messages - notify app.go of modal state change
 	if _, ok := msg.(messages.EditOpenedMsg); ok {
+		c.setEditModalDimensions()
 		cmds = append(cmds, func() tea.Msg {
 			return messages.ModalOpenedMsg{ID: focus.OverlayEditModal, Mode: focus.ModeModal}
 		})
@@ -724,6 +725,42 @@ func (c *Config) HasActiveModal() bool {
 		c.protocols.IsEditing() ||
 		c.security.IsEditing()
 	// smarthome doesn't have an edit modal
+}
+
+// setEditModalDimensions sets proper modal dimensions using screen dimensions.
+// This is called when an edit modal opens to ensure it gets screen-based sizing
+// rather than panel-based sizing.
+func (c *Config) setEditModalDimensions() {
+	modalWidth := c.width * 90 / 100
+	modalHeight := c.height * 90 / 100
+	if modalWidth < 60 {
+		modalWidth = 60
+	}
+	if modalHeight < 20 {
+		modalHeight = 20
+	}
+	// Set dimensions for whichever component has an edit modal open
+	if c.wifi.IsEditing() {
+		c.wifi = c.wifi.SetEditModalSize(modalWidth, modalHeight)
+	}
+	if c.system.IsEditing() {
+		c.system = c.system.SetEditModalSize(modalWidth, modalHeight)
+	}
+	if c.cloud.IsEditing() {
+		c.cloud = c.cloud.SetEditModalSize(modalWidth, modalHeight)
+	}
+	if c.inputs.IsEditing() {
+		c.inputs = c.inputs.SetEditModalSize(modalWidth, modalHeight)
+	}
+	if c.ble.IsEditing() {
+		c.ble = c.ble.SetEditModalSize(modalWidth, modalHeight)
+	}
+	if c.protocols.IsEditing() {
+		c.protocols = c.protocols.SetEditModalSize(modalWidth, modalHeight)
+	}
+	if c.security.IsEditing() {
+		c.security = c.security.SetEditModalSize(modalWidth, modalHeight)
+	}
 }
 
 // RenderModal returns the active modal's view for full-screen overlay rendering.
