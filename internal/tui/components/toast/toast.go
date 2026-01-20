@@ -397,7 +397,7 @@ func (m Model) View() string {
 		icon = "✗ "
 	default:
 		style = m.styles.Info
-		icon = "ℹ "
+		icon = "* "
 	}
 
 	// Build the content with icon and styled message

@@ -907,26 +907,16 @@ func (m Model) handleOverlayModeKey(msg tea.KeyPressMsg, action keys.Action) (te
 }
 
 // handleModalModeKey handles keys when a modal dialog is active.
+// All keys pass through raw to the modal - the modal handles its own field
+// navigation (Tab/Shift+Tab) and arrow keys for cursor movement in text inputs.
 func (m Model) handleModalModeKey(msg tea.KeyPressMsg, action keys.Action) (tea.Model, tea.Cmd, bool) {
-	// Handle escape to close modal
-	if action == keys.ActionEscape {
+	// For modals managed by focusState, handle escape at app level
+	if action == keys.ActionEscape && m.focusState.HasOverlay() {
 		return m.closeTopOverlay()
 	}
 
-	// Convert navigation actions to NavigationMsg for consistent behavior
-	if navDir, ok := actionToNavDirection(action); ok {
-		return m.routeNavToModal(navDir)
-	}
-
-	// Tab/Shift+Tab become next/prev field
-	if action == keys.ActionNextField {
-		return m.routeNavToModal(messages.NavDown)
-	}
-	if action == keys.ActionPrevField {
-		return m.routeNavToModal(messages.NavUp)
-	}
-
-	// Other keys go raw to the modal
+	// Pass all keys (including escape) raw to the modal
+	// ViewManager modals handle their own escape key
 	return m.routeToVisibleOverlay(msg)
 }
 
@@ -1006,12 +996,6 @@ func (m Model) routeToVisibleOverlay(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// routeNavToModal routes a NavigationMsg to the visible modal.
-func (m Model) routeNavToModal(dir messages.NavDirection) (tea.Model, tea.Cmd, bool) {
-	navMsg := messages.NavigationMsg{Direction: dir}
-	return m.routeToVisibleOverlay(navMsg)
-}
-
 // closeTopOverlay closes the topmost overlay or modal.
 func (m Model) closeTopOverlay() (tea.Model, tea.Cmd, bool) {
 	// If focusState has overlays, pop from stack
@@ -1063,31 +1047,6 @@ func (m Model) closeTopOverlay() (tea.Model, tea.Cmd, bool) {
 	}
 
 	return m, nil, false
-}
-
-// actionToNavDirection converts a key action to a navigation direction.
-// Returns the direction and true if the action is a navigation action, false otherwise.
-func actionToNavDirection(action keys.Action) (messages.NavDirection, bool) {
-	switch action {
-	case keys.ActionUp:
-		return messages.NavUp, true
-	case keys.ActionDown:
-		return messages.NavDown, true
-	case keys.ActionLeft:
-		return messages.NavLeft, true
-	case keys.ActionRight:
-		return messages.NavRight, true
-	case keys.ActionPageUp:
-		return messages.NavPageUp, true
-	case keys.ActionPageDown:
-		return messages.NavPageDown, true
-	case keys.ActionHome:
-		return messages.NavHome, true
-	case keys.ActionEnd:
-		return messages.NavEnd, true
-	default:
-		return 0, false
-	}
 }
 
 // handleWindowSize handles window resize events.
@@ -2278,105 +2237,151 @@ func (m Model) showControlPanel() (Model, tea.Cmd, bool) {
 		return m, nil, false
 	}
 
-	// Get device data from cache to find available components
 	data := m.cache.GetDevice(selected.Device.Name)
 	if data == nil {
 		return m, nil, false
 	}
 
-	// Set size for the overlay
 	m.controlPanel = m.controlPanel.SetSize(m.width*2/3, m.height*2/3)
-
-	// Get the selected component from deviceInfo panel
-	// componentCursor maps to components in order: switches, lights, covers, inputs, PM...
 	selectedIdx := m.deviceInfo.SelectedComponent()
 
-	// Find which component is selected based on the cursor position
-	// Components are ordered: switches, lights, covers, inputs, power monitoring
-	idx := 0
-
-	// Check switches
-	for _, sw := range data.Switches {
-		if selectedIdx == -1 || selectedIdx == idx {
-			state := control.SwitchState{
-				ID:     sw.ID,
-				Output: sw.On,
-				Source: sw.Source,
-			}
-			m.controlPanel = m.controlPanel.ShowSwitch(selected.Device.Address, state)
-			m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
-			return m, nil, true
-		}
-		idx++
+	// Try to show component at selected index
+	if result, ok := m.showComponentAtIndex(data, selected.Device.Address, selectedIdx); ok {
+		return result, nil, true
 	}
 
-	// Check lights
-	for _, lt := range data.Lights {
-		if selectedIdx == idx {
-			state := control.LightState{
-				ID:     lt.ID,
-				Output: lt.On,
-			}
-			m.controlPanel = m.controlPanel.ShowLight(selected.Device.Address, state)
-			m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
-			return m, nil, true
-		}
-		idx++
-	}
-
-	// Check covers
-	for _, cv := range data.Covers {
-		if selectedIdx == idx {
-			state := control.CoverState{
-				ID:       cv.ID,
-				State:    cv.State,
-				Position: 50, // Default position since cache doesn't track it
-			}
-			m.controlPanel = m.controlPanel.ShowCover(selected.Device.Address, state)
-			m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
-			return m, nil, true
-		}
-		idx++
-	}
-
-	// No controllable component found at selected index
 	// Fall back to first available controllable component
-	if len(data.Switches) > 0 {
-		sw := data.Switches[0]
-		state := control.SwitchState{
-			ID:     sw.ID,
-			Output: sw.On,
-			Source: sw.Source,
-		}
-		m.controlPanel = m.controlPanel.ShowSwitch(selected.Device.Address, state)
-		m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
-		return m, nil, true
-	}
-
-	if len(data.Lights) > 0 {
-		lt := data.Lights[0]
-		state := control.LightState{
-			ID:     lt.ID,
-			Output: lt.On,
-		}
-		m.controlPanel = m.controlPanel.ShowLight(selected.Device.Address, state)
-		m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
-		return m, nil, true
-	}
-
-	if len(data.Covers) > 0 {
-		cv := data.Covers[0]
-		state := control.CoverState{
-			ID:       cv.ID,
-			State:    cv.State,
-			Position: 50,
-		}
-		m.controlPanel = m.controlPanel.ShowCover(selected.Device.Address, state)
-		m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
-		return m, nil, true
+	if result, ok := m.showFirstAvailableComponent(data, selected.Device.Address); ok {
+		return result, nil, true
 	}
 
 	return m, nil, false
+}
+
+// showComponentAtIndex attempts to show the control panel for the component at the given index.
+func (m Model) showComponentAtIndex(data *cache.DeviceData, address string, selectedIdx int) (Model, bool) {
+	idx := 0
+
+	// Switches (index -1 means first switch)
+	for _, sw := range data.Switches {
+		if selectedIdx == -1 || selectedIdx == idx {
+			return m.activateSwitchControl(address, sw), true
+		}
+		idx++
+	}
+
+	// Lights
+	for _, lt := range data.Lights {
+		if selectedIdx == idx {
+			return m.activateLightControl(address, lt), true
+		}
+		idx++
+	}
+
+	// Covers
+	for _, cv := range data.Covers {
+		if selectedIdx == idx {
+			return m.activateCoverControl(address, cv), true
+		}
+		idx++
+	}
+
+	// RGBs
+	for _, rgb := range data.RGBs {
+		if selectedIdx == idx {
+			return m.activateRGBControl(address, rgb), true
+		}
+		idx++
+	}
+
+	// Thermostats
+	for _, th := range data.Thermostats {
+		if selectedIdx == idx {
+			return m.activateThermostatControl(address, th), true
+		}
+		idx++
+	}
+
+	return m, false
+}
+
+// showFirstAvailableComponent shows the first available controllable component.
+func (m Model) showFirstAvailableComponent(data *cache.DeviceData, address string) (Model, bool) {
+	if len(data.Switches) > 0 {
+		return m.activateSwitchControl(address, data.Switches[0]), true
+	}
+	if len(data.Lights) > 0 {
+		return m.activateLightControl(address, data.Lights[0]), true
+	}
+	if len(data.Covers) > 0 {
+		return m.activateCoverControl(address, data.Covers[0]), true
+	}
+	if len(data.RGBs) > 0 {
+		return m.activateRGBControl(address, data.RGBs[0]), true
+	}
+	if len(data.Thermostats) > 0 {
+		return m.activateThermostatControl(address, data.Thermostats[0]), true
+	}
+	return m, false
+}
+
+func (m Model) activateSwitchControl(address string, sw cache.SwitchState) Model {
+	state := control.SwitchState{ID: sw.ID, Output: sw.On, Source: sw.Source}
+	m.controlPanel = m.controlPanel.ShowSwitch(address, state)
+	m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
+	return m
+}
+
+func (m Model) activateLightControl(address string, lt cache.LightState) Model {
+	state := control.LightState{ID: lt.ID, Output: lt.On}
+	m.controlPanel = m.controlPanel.ShowLight(address, state)
+	m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
+	return m
+}
+
+func (m Model) activateCoverControl(address string, cv cache.CoverState) Model {
+	state := control.CoverState{ID: cv.ID, State: cv.State, Position: 50}
+	m.controlPanel = m.controlPanel.ShowCover(address, state)
+	m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
+	return m
+}
+
+func (m Model) activateRGBControl(address string, rgb cache.RGBState) Model {
+	state := control.RGBState{
+		ID:         rgb.ID,
+		Name:       rgb.Name,
+		Output:     rgb.Output,
+		Brightness: rgb.Brightness,
+		Red:        rgb.Red,
+		Green:      rgb.Green,
+		Blue:       rgb.Blue,
+		White:      rgb.White,
+		Power:      rgb.Power,
+		Source:     rgb.Source,
+	}
+	m.controlPanel = m.controlPanel.ShowRGB(address, state)
+	m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
+	return m
+}
+
+func (m Model) activateThermostatControl(address string, th cache.ThermostatState) Model {
+	state := control.ThermostatState{
+		ID:              th.ID,
+		Name:            th.Name,
+		Enabled:         th.Enabled,
+		Mode:            th.Mode,
+		TargetC:         th.TargetC,
+		CurrentC:        th.CurrentC,
+		CurrentHumidity: th.CurrentHumidity,
+		ValvePosition:   th.ValvePosition,
+		BoostActive:     th.BoostActive,
+		BoostRemaining:  th.BoostRemaining,
+		OverrideActive:  th.OverrideActive,
+		Source:          th.Source,
+	}
+	m.controlPanel = m.controlPanel.ShowThermostat(address, state)
+	m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
+	return m
 }
 
 // executeDeviceAction executes a device action on the selected device.

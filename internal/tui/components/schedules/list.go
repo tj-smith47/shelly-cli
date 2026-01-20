@@ -80,6 +80,12 @@ type CreateScheduleMsg struct {
 	Device string
 }
 
+// EditScheduleMsg signals that a schedule should be edited.
+type EditScheduleMsg struct {
+	Device   string
+	Schedule Schedule
+}
+
 // ListModel displays schedules for a device.
 type ListModel struct {
 	helpers.Sizable
@@ -325,9 +331,12 @@ func (m ListModel) handleActionMsg(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m, nil
 	}
 	switch msg.(type) {
-	case messages.ViewRequestMsg, messages.EditRequestMsg:
+	case messages.ViewRequestMsg:
 		m.pendingDelete = 0
 		return m, m.selectSchedule()
+	case messages.EditRequestMsg:
+		m.pendingDelete = 0
+		return m, m.editSchedule()
 	case messages.ToggleEnableRequestMsg:
 		m.pendingDelete = 0
 		return m, m.toggleSchedule()
@@ -492,6 +501,17 @@ func (m ListModel) selectSchedule() tea.Cmd {
 	schedule := m.schedules[cursor]
 	return func() tea.Msg {
 		return SelectScheduleMsg{Schedule: schedule}
+	}
+}
+
+func (m ListModel) editSchedule() tea.Cmd {
+	cursor := m.Scroller.Cursor()
+	if len(m.schedules) == 0 || cursor >= len(m.schedules) {
+		return nil
+	}
+	schedule := m.schedules[cursor]
+	return func() tea.Msg {
+		return EditScheduleMsg{Device: m.device, Schedule: schedule}
 	}
 }
 

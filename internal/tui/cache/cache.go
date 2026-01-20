@@ -48,10 +48,12 @@ type DeviceData struct {
 	Temperature float64
 
 	// Component states
-	Switches []SwitchState
-	Lights   []LightState
-	Covers   []CoverState
-	Inputs   []InputState
+	Switches    []SwitchState
+	Lights      []LightState
+	Covers      []CoverState
+	Inputs      []InputState
+	RGBs        []RGBState
+	Thermostats []ThermostatState
 
 	// Per-component power tracking for accurate aggregation
 	SwitchPowers map[int]float64
@@ -101,6 +103,36 @@ type InputState struct {
 	State bool   // HIGH (true) / LOW (false)
 	Type  string // "button", "switch", "analog"
 	Name  string // User-configured name
+}
+
+// RGBState holds the state of an RGB/RGBW component.
+type RGBState struct {
+	ID         int
+	Name       string
+	Output     bool
+	Brightness int // 0-100
+	Red        int // 0-255
+	Green      int // 0-255
+	Blue       int // 0-255
+	White      int // 0-255 (for RGBW devices)
+	Power      float64
+	Source     string
+}
+
+// ThermostatState holds the state of a thermostat component.
+type ThermostatState struct {
+	ID              int
+	Name            string
+	Enabled         bool
+	Mode            string  // "heat", "cool", "auto", "off"
+	TargetC         float64 // Target temperature in Celsius
+	CurrentC        float64 // Current temperature in Celsius
+	CurrentHumidity float64 // Current humidity percentage
+	ValvePosition   int     // Valve position 0-100%
+	BoostActive     bool
+	BoostRemaining  int // Seconds remaining in boost
+	OverrideActive  bool
+	Source          string
 }
 
 // DeviceUpdateMsg is sent when a single device's data is updated.

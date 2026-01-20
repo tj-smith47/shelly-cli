@@ -18,6 +18,8 @@ const (
 	ComponentLight       = "light"
 	ComponentCover       = "cover"
 	ComponentInput       = "input"
+	ComponentRGB         = "rgb"
+	ComponentThermostat  = "thermostat"
 	ComponentPM          = "pm"
 	ComponentPM1         = "pm1"
 	ComponentEM          = "em"
@@ -57,10 +59,12 @@ type ParsedStatus struct {
 	MAC        string
 
 	// Component states
-	Switches []SwitchState
-	Lights   []LightState
-	Covers   []CoverState
-	Inputs   []InputState
+	Switches    []SwitchState
+	Lights      []LightState
+	Covers      []CoverState
+	Inputs      []InputState
+	RGBs        []RGBState
+	Thermostats []ThermostatState
 
 	// Per-component power tracking for accurate WebSocket aggregation
 	SwitchPowers map[int]float64
@@ -167,6 +171,10 @@ func parseGen2Component(result *ParsedStatus, key string, rawStatus json.RawMess
 		parseCoverComponent(result, rawStatus)
 	case ComponentInput:
 		parseInputComponent(result, rawStatus)
+	case ComponentRGB:
+		parseRGBComponent(result, rawStatus)
+	case ComponentThermostat:
+		parseThermostatComponent(result, rawStatus)
 	case ComponentPM, ComponentPM1:
 		parsePMComponent(result, rawStatus)
 	case ComponentEM:
@@ -350,6 +358,93 @@ func parseInputComponent(result *ParsedStatus, rawStatus json.RawMessage) {
 		ID:    inp.ID,
 		State: state,
 	})
+}
+
+// rgbStatusData holds parsed RGB/RGBW status fields.
+type rgbStatusData struct {
+	ID         int      `json:"id"`
+	Output     bool     `json:"output"`
+	Brightness *int     `json:"brightness,omitempty"`
+	RGB        *[3]int  `json:"rgb,omitempty"`
+	White      *int     `json:"white,omitempty"`
+	APower     *float64 `json:"apower,omitempty"`
+	Source     string   `json:"source,omitempty"`
+}
+
+// parseRGBComponent parses an RGB/RGBW component status.
+func parseRGBComponent(result *ParsedStatus, rawStatus json.RawMessage) {
+	rgb, err := unmarshalJSON[rgbStatusData](rawStatus)
+	if err != nil {
+		return
+	}
+
+	state := RGBState{
+		ID:     rgb.ID,
+		Output: rgb.Output,
+		Source: rgb.Source,
+	}
+
+	if rgb.Brightness != nil {
+		state.Brightness = *rgb.Brightness
+	}
+	if rgb.RGB != nil {
+		state.Red = rgb.RGB[0]
+		state.Green = rgb.RGB[1]
+		state.Blue = rgb.RGB[2]
+	}
+	if rgb.White != nil {
+		state.White = *rgb.White
+	}
+	if rgb.APower != nil {
+		state.Power = *rgb.APower
+		result.Power += *rgb.APower
+	}
+
+	result.RGBs = append(result.RGBs, state)
+}
+
+// thermostatStatusData holds parsed thermostat status fields.
+type thermostatStatusData struct {
+	ID     int  `json:"id"`
+	Enable bool `json:"enable"`
+	Output bool `json:"output"`
+	Target *struct {
+		C float64 `json:"C"`
+	} `json:"target_C,omitempty"`
+	Current *struct {
+		C float64 `json:"C"`
+	} `json:"current_C,omitempty"`
+	Humidity *struct {
+		Value float64 `json:"value"`
+	} `json:"humidity,omitempty"`
+	Schedule bool   `json:"schedule"`
+	Source   string `json:"source,omitempty"`
+}
+
+// parseThermostatComponent parses a thermostat component status.
+func parseThermostatComponent(result *ParsedStatus, rawStatus json.RawMessage) {
+	th, err := unmarshalJSON[thermostatStatusData](rawStatus)
+	if err != nil {
+		return
+	}
+
+	state := ThermostatState{
+		ID:      th.ID,
+		Enabled: th.Enable,
+		Source:  th.Source,
+	}
+
+	if th.Target != nil {
+		state.TargetC = th.Target.C
+	}
+	if th.Current != nil {
+		state.CurrentC = th.Current.C
+	}
+	if th.Humidity != nil {
+		state.CurrentHumidity = th.Humidity.Value
+	}
+
+	result.Thermostats = append(result.Thermostats, state)
 }
 
 // parsePMComponent parses a PM/PM1 (power meter) component status.
@@ -752,6 +847,12 @@ func applyParsedComponentStates(data *DeviceData, parsed *ParsedStatus) {
 	if len(parsed.Inputs) > 0 {
 		data.Inputs = parsed.Inputs
 	}
+	if len(parsed.RGBs) > 0 {
+		data.RGBs = parsed.RGBs
+	}
+	if len(parsed.Thermostats) > 0 {
+		data.Thermostats = parsed.Thermostats
+	}
 }
 
 // applyParsedPowerMaps updates per-component power maps for accurate WebSocket aggregation.
@@ -856,6 +957,10 @@ func ApplyIncrementalUpdate(data *DeviceData, componentType string, componentID 
 		applyIncrementalCover(data, componentID, status)
 	case ComponentInput:
 		applyIncrementalInput(data, componentID, status)
+	case ComponentRGB:
+		applyIncrementalRGB(data, componentID, status)
+	case ComponentThermostat:
+		applyIncrementalThermostat(data, componentID, status)
 	case ComponentPM, ComponentPM1:
 		applyIncrementalPM(data, componentID, status)
 	case ComponentEM:
@@ -1069,6 +1174,102 @@ func updateOrAppendInput(inputs *[]InputState, id int, state bool) {
 	*inputs = append(*inputs, InputState{ID: id, State: state})
 }
 
+// incrementalRGBStatus holds incremental RGB update fields.
+type incrementalRGBStatus struct {
+	Output     *bool    `json:"output,omitempty"`
+	Brightness *int     `json:"brightness,omitempty"`
+	RGB        *[3]int  `json:"rgb,omitempty"`
+	White      *int     `json:"white,omitempty"`
+	APower     *float64 `json:"apower,omitempty"`
+}
+
+// applyIncrementalRGB applies an RGB status change.
+func applyIncrementalRGB(data *DeviceData, id int, raw json.RawMessage) {
+	status, err := unmarshalJSON[incrementalRGBStatus](raw)
+	if err != nil {
+		return
+	}
+
+	// Find or create RGB state
+	idx := -1
+	for i := range data.RGBs {
+		if data.RGBs[i].ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		data.RGBs = append(data.RGBs, RGBState{ID: id})
+		idx = len(data.RGBs) - 1
+	}
+
+	if status.Output != nil {
+		data.RGBs[idx].Output = *status.Output
+	}
+	if status.Brightness != nil {
+		data.RGBs[idx].Brightness = *status.Brightness
+	}
+	if status.RGB != nil {
+		data.RGBs[idx].Red = status.RGB[0]
+		data.RGBs[idx].Green = status.RGB[1]
+		data.RGBs[idx].Blue = status.RGB[2]
+	}
+	if status.White != nil {
+		data.RGBs[idx].White = *status.White
+	}
+	if status.APower != nil {
+		data.RGBs[idx].Power = *status.APower
+	}
+}
+
+// incrementalThermostatStatus holds incremental thermostat update fields.
+type incrementalThermostatStatus struct {
+	Enable *bool `json:"enable,omitempty"`
+	Target *struct {
+		C float64 `json:"C"`
+	} `json:"target_C,omitempty"`
+	Current *struct {
+		C float64 `json:"C"`
+	} `json:"current_C,omitempty"`
+	Humidity *struct {
+		Value float64 `json:"value"`
+	} `json:"humidity,omitempty"`
+}
+
+// applyIncrementalThermostat applies a thermostat status change.
+func applyIncrementalThermostat(data *DeviceData, id int, raw json.RawMessage) {
+	status, err := unmarshalJSON[incrementalThermostatStatus](raw)
+	if err != nil {
+		return
+	}
+
+	// Find or create thermostat state
+	idx := -1
+	for i := range data.Thermostats {
+		if data.Thermostats[i].ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		data.Thermostats = append(data.Thermostats, ThermostatState{ID: id})
+		idx = len(data.Thermostats) - 1
+	}
+
+	if status.Enable != nil {
+		data.Thermostats[idx].Enabled = *status.Enable
+	}
+	if status.Target != nil {
+		data.Thermostats[idx].TargetC = status.Target.C
+	}
+	if status.Current != nil {
+		data.Thermostats[idx].CurrentC = status.Current.C
+	}
+	if status.Humidity != nil {
+		data.Thermostats[idx].CurrentHumidity = status.Humidity.Value
+	}
+}
+
 // applyIncrementalPM applies a PM/PM1 status change.
 func applyIncrementalPM(data *DeviceData, id int, raw json.RawMessage) {
 	pm, err := unmarshalJSON[model.PMStatus](raw)
@@ -1214,10 +1415,12 @@ func matchesAny(s string, patterns []string) bool {
 
 // ComponentNames maps component IDs to their user-configured names.
 type ComponentNames struct {
-	Switches map[int]string
-	Lights   map[int]string
-	Covers   map[int]string
-	Inputs   map[int]string
+	Switches    map[int]string
+	Lights      map[int]string
+	Covers      map[int]string
+	Inputs      map[int]string
+	RGBs        map[int]string
+	Thermostats map[int]string
 }
 
 // componentConfigData holds common config fields we care about.
@@ -1230,10 +1433,12 @@ type componentConfigData struct {
 // ParseFullConfig parses a Gen2+ Shelly.GetConfig response to extract component names.
 func ParseFullConfig(configMap map[string]json.RawMessage) *ComponentNames {
 	names := &ComponentNames{
-		Switches: make(map[int]string),
-		Lights:   make(map[int]string),
-		Covers:   make(map[int]string),
-		Inputs:   make(map[int]string),
+		Switches:    make(map[int]string),
+		Lights:      make(map[int]string),
+		Covers:      make(map[int]string),
+		Inputs:      make(map[int]string),
+		RGBs:        make(map[int]string),
+		Thermostats: make(map[int]string),
 	}
 
 	for key, raw := range configMap {
@@ -1252,6 +1457,10 @@ func ParseFullConfig(configMap map[string]json.RawMessage) *ComponentNames {
 			names.Covers[cfg.ID] = *cfg.Name
 		case ComponentInput:
 			names.Inputs[cfg.ID] = *cfg.Name
+		case ComponentRGB:
+			names.RGBs[cfg.ID] = *cfg.Name
+		case ComponentThermostat:
+			names.Thermostats[cfg.ID] = *cfg.Name
 		}
 	}
 
@@ -1261,10 +1470,12 @@ func ParseFullConfig(configMap map[string]json.RawMessage) *ComponentNames {
 // ParseGen1Config parses a Gen1 /settings response to extract component names.
 func ParseGen1Config(configMap map[string]json.RawMessage) *ComponentNames {
 	names := &ComponentNames{
-		Switches: make(map[int]string),
-		Lights:   make(map[int]string),
-		Covers:   make(map[int]string),
-		Inputs:   make(map[int]string),
+		Switches:    make(map[int]string),
+		Lights:      make(map[int]string),
+		Covers:      make(map[int]string),
+		Inputs:      make(map[int]string),
+		RGBs:        make(map[int]string),
+		Thermostats: make(map[int]string),
 	}
 
 	// Gen1 relays have name field
@@ -1336,6 +1547,16 @@ func ApplyConfigNames(data *DeviceData, names *ComponentNames) {
 	for i := range data.Inputs {
 		if name, ok := names.Inputs[data.Inputs[i].ID]; ok {
 			data.Inputs[i].Name = name
+		}
+	}
+	for i := range data.RGBs {
+		if name, ok := names.RGBs[data.RGBs[i].ID]; ok {
+			data.RGBs[i].Name = name
+		}
+	}
+	for i := range data.Thermostats {
+		if name, ok := names.Thermostats[data.Thermostats[i].ID]; ok {
+			data.Thermostats[i].Name = name
 		}
 	}
 }

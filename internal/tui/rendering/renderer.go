@@ -329,7 +329,7 @@ func NewModal(screenWidth, screenHeight int, title, footer string) *Renderer {
 // ModalInputWidth returns the recommended input width for modals given screen dimensions.
 // This ensures inputs are appropriately sized without arbitrary limits.
 func ModalInputWidth(screenWidth int) int {
-	overlayWidth := screenWidth * 80 / 100
+	overlayWidth := screenWidth * 90 / 100
 	inputWidth := overlayWidth - 20 // Account for borders, padding, labels
 	if inputWidth < 40 {
 		inputWidth = 40

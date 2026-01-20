@@ -43,6 +43,17 @@ var (
 // automationLoadPhase tracks which component is being loaded.
 type automationLoadPhase int
 
+// scriptStoppedForEditMsg signals that a running script was stopped for editing.
+type scriptStoppedForEditMsg struct {
+	script scripts.Script
+	err    error
+}
+
+// scriptRestartedMsg signals that a script was restarted after editing.
+type scriptRestartedMsg struct {
+	err error
+}
+
 const (
 	automationLoadIdle automationLoadPhase = iota
 	automationLoadScripts
@@ -111,6 +122,7 @@ type Automation struct {
 	schedules      schedules.ListModel
 	scheduleCreate schedules.CreateModel
 	scheduleEditor schedules.EditorModel
+	scheduleEdit   schedules.EditModel
 	webhooks       webhooks.Model
 	virtuals       virtuals.Model
 	kvs            kvs.Model
@@ -121,17 +133,20 @@ type Automation struct {
 	evalOpen       bool
 
 	// State
-	device      string
-	focusState  *focus.State // Unified focus state (single source of truth)
-	width       int
-	height      int
-	styles      AutomationStyles
-	loadPhase   automationLoadPhase // Tracks sequential loading progress
-	pendingEdit bool                // Flag to launch editor after code loads
+	device               string
+	focusState           *focus.State // Unified focus state (single source of truth)
+	width                int
+	height               int
+	styles               AutomationStyles
+	loadPhase            automationLoadPhase // Tracks sequential loading progress
+	pendingEdit          bool                // Flag to launch editor after code loads
+	editScriptID         int                 // Script ID being edited (for restart after save)
+	editScriptWasRunning bool                // Whether script was running before edit (to restart after save)
 
 	// Modal state (script and schedule editors are modals, not panels)
 	scriptEditorOpen   bool
-	scheduleEditorOpen bool
+	scheduleEditorOpen bool // Read-only view
+	scheduleEditOpen   bool // Editable form
 	consoleOpen        bool
 
 	// Layout calculator for flexible panel sizing
@@ -218,6 +233,7 @@ func NewAutomation(deps AutomationDeps) *Automation {
 		schedules:      schedules.NewList(schedulesListDeps),
 		scheduleCreate: schedules.NewCreateModel(deps.Ctx, deps.AutoSvc),
 		scheduleEditor: schedules.NewEditor(),
+		scheduleEdit:   schedules.NewEditModel(deps.Ctx, deps.AutoSvc),
 		webhooks:       webhooks.New(webhooksDeps),
 		virtuals:       virtuals.New(virtualsDeps),
 		kvs:            kvs.New(kvsDeps),
@@ -249,6 +265,7 @@ func (a *Automation) Init() tea.Cmd {
 		a.schedules.Init(),
 		a.scheduleCreate.Init(),
 		a.scheduleEditor.Init(),
+		a.scheduleEdit.Init(),
 		a.webhooks.Init(),
 		a.virtuals.Init(),
 		a.kvs.Init(),
@@ -467,6 +484,13 @@ func (a *Automation) routeToActiveModal(msg tea.Msg) (tea.Cmd, bool) {
 		return tea.Batch(cmds...), true
 	}
 
+	if a.scheduleEditOpen {
+		var cmd tea.Cmd
+		a.scheduleEdit, cmd = a.scheduleEdit.Update(msg)
+		cmds = append(cmds, cmd, a.handleScheduleEditModalMessages(msg))
+		return tea.Batch(cmds...), true
+	}
+
 	if a.consoleOpen {
 		var cmd tea.Cmd
 		a.scriptConsole, cmd = a.scriptConsole.Update(msg)
@@ -640,12 +664,16 @@ func (a *Automation) handleScriptMessages(msg tea.Msg) tea.Cmd {
 		return a.handleScriptCreated(msg)
 	case scripts.EditScriptMsg:
 		return a.handleScriptEdit(msg)
+	case scriptStoppedForEditMsg:
+		return a.handleScriptStoppedForEdit(msg)
 	case scripts.CodeLoadedMsg:
 		return a.handleCodeLoaded()
 	case scripts.EditorFinishedMsg:
 		return a.handleEditorFinished(msg)
 	case scripts.CodeUploadedMsg:
 		return a.handleCodeUploaded(msg)
+	case scriptRestartedMsg:
+		return a.handleScriptRestarted(msg)
 	case scripts.ScriptDownloadedMsg:
 		return a.handleScriptDownloaded(msg)
 	case scripts.InsertTemplateMsg:
@@ -660,10 +688,14 @@ func (a *Automation) handleScheduleMessages(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case schedules.SelectScheduleMsg:
 		return a.handleScheduleSelect(msg)
+	case schedules.EditScheduleMsg:
+		return a.handleScheduleEdit(msg)
 	case schedules.CreateScheduleMsg:
 		return a.handleScheduleCreate(msg)
 	case schedules.CreatedMsg:
 		return a.handleScheduleCreated(msg)
+	case schedules.UpdatedMsg:
+		return a.handleScheduleUpdated(msg)
 	case messages.EditClosedMsg:
 		if msg.Saved {
 			return toast.Success("Changes saved")
@@ -740,6 +772,27 @@ func (a *Automation) handleScheduleEditorModalMessages(msg tea.Msg) tea.Cmd {
 			var cmd tea.Cmd
 			a.schedules, cmd = a.schedules.Refresh()
 			return tea.Batch(cmd, toast.Success("Schedule saved"))
+		}
+		return nil
+	}
+	return nil
+}
+
+func (a *Automation) handleScheduleEditModalMessages(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		// Close modal on Escape
+		if msg.String() == keyconst.KeyEsc {
+			a.scheduleEditOpen = false
+			return nil
+		}
+	case messages.EditClosedMsg:
+		a.scheduleEditOpen = false
+		if msg.Saved {
+			// Refresh schedules list
+			var cmd tea.Cmd
+			a.schedules, cmd = a.schedules.Refresh()
+			return tea.Batch(cmd, toast.Success("Schedule updated"))
 		}
 		return nil
 	}
@@ -976,9 +1029,38 @@ func (a *Automation) handleScriptCreated(msg scripts.CreatedMsg) tea.Cmd {
 
 func (a *Automation) handleScriptEdit(msg scripts.EditScriptMsg) tea.Cmd {
 	a.pendingEdit = true
+	a.editScriptID = msg.Script.ID
+	a.editScriptWasRunning = msg.Script.Running
+
+	// If script is running, stop it first (Shelly API doesn't allow editing running scripts)
+	if msg.Script.Running {
+		// Store script for later use in handler
+		script := msg.Script
+		return func() tea.Msg {
+			ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
+			defer cancel()
+
+			err := a.autoSvc.StopScript(ctx, a.device, script.ID)
+			return scriptStoppedForEditMsg{script: script, err: err}
+		}
+	}
+
 	var loadCmd tea.Cmd
 	a.scriptEditor, loadCmd = a.scriptEditor.SetScript(a.device, msg.Script)
 	return loadCmd
+}
+
+func (a *Automation) handleScriptStoppedForEdit(msg scriptStoppedForEditMsg) tea.Cmd {
+	if msg.err != nil {
+		a.pendingEdit = false
+		a.editScriptWasRunning = false
+		return toast.Error("Failed to stop script for editing: " + msg.err.Error())
+	}
+
+	// Script stopped, now load it for editing
+	var loadCmd tea.Cmd
+	a.scriptEditor, loadCmd = a.scriptEditor.SetScript(a.device, msg.script)
+	return tea.Batch(loadCmd, toast.Info("Script stopped for editing"))
 }
 
 func (a *Automation) handleCodeLoaded() tea.Cmd {
@@ -998,16 +1080,41 @@ func (a *Automation) handleEditorFinished(msg scripts.EditorFinishedMsg) tea.Cmd
 
 func (a *Automation) handleCodeUploaded(msg scripts.CodeUploadedMsg) tea.Cmd {
 	if msg.Err != nil {
+		// Reset edit state on error
+		a.editScriptWasRunning = false
+		a.editScriptID = 0
 		return toast.Error("Failed to save script: " + msg.Err.Error())
 	}
-	cmds := make([]tea.Cmd, 0, 3)
+
+	cmds := make([]tea.Cmd, 0, 4)
 	var scriptsCmd tea.Cmd
 	a.scripts, scriptsCmd = a.scripts.Refresh()
 	cmds = append(cmds, scriptsCmd, toast.Success("Script saved to device"))
 	var editorCmd tea.Cmd
 	a.scriptEditor, editorCmd = a.scriptEditor.Refresh()
 	cmds = append(cmds, editorCmd)
+
+	// Restart the script if it was running before editing
+	if a.editScriptWasRunning && a.editScriptID == msg.ScriptID {
+		cmds = append(cmds, a.restartScriptAfterEdit(msg.Device, msg.ScriptID))
+	}
+
 	return tea.Batch(cmds...)
+}
+
+func (a *Automation) handleScriptRestarted(msg scriptRestartedMsg) tea.Cmd {
+	// Reset edit state
+	a.editScriptWasRunning = false
+	a.editScriptID = 0
+
+	if msg.err != nil {
+		return toast.Warning("Script saved but failed to restart: " + msg.err.Error())
+	}
+
+	// Refresh the scripts list to show updated running status
+	var cmd tea.Cmd
+	a.scripts, cmd = a.scripts.Refresh()
+	return tea.Batch(cmd, toast.Success("Script restarted"))
 }
 
 func (a *Automation) handleScriptDownloaded(msg scripts.ScriptDownloadedMsg) tea.Cmd {
@@ -1036,10 +1143,27 @@ func (a *Automation) handleScheduleSelect(msg schedules.SelectScheduleMsg) tea.C
 	return nil
 }
 
+func (a *Automation) handleScheduleEdit(msg schedules.EditScheduleMsg) tea.Cmd {
+	a.scheduleEdit = a.scheduleEdit.Show(msg.Device, msg.Schedule)
+	a.scheduleEdit = a.scheduleEdit.SetSize(a.width, a.height)
+	a.scheduleEditOpen = true
+	return nil
+}
+
 func (a *Automation) handleScheduleCreate(_ schedules.CreateScheduleMsg) tea.Cmd {
 	a.scheduleCreate = a.scheduleCreate.Show(a.device)
 	a.scheduleCreate = a.scheduleCreate.SetSize(a.width, a.height)
 	return nil
+}
+
+func (a *Automation) handleScheduleUpdated(msg schedules.UpdatedMsg) tea.Cmd {
+	if msg.Err != nil {
+		return toast.Error("Failed to update schedule: " + msg.Err.Error())
+	}
+	// Refresh schedules list
+	var cmd tea.Cmd
+	a.schedules, cmd = a.schedules.Refresh()
+	return tea.Batch(cmd, toast.Success("Schedule updated"))
 }
 
 func (a *Automation) handleScheduleCreated(msg schedules.CreatedMsg) tea.Cmd {
@@ -1126,6 +1250,17 @@ func (a *Automation) uploadScriptCode(device string, scriptID int, code string) 
 
 		err := a.autoSvc.UpdateScriptCode(ctx, device, scriptID, code, false)
 		return scripts.CodeUploadedMsg{Device: device, ScriptID: scriptID, Err: err}
+	}
+}
+
+// restartScriptAfterEdit restarts a script that was stopped for editing.
+func (a *Automation) restartScriptAfterEdit(device string, scriptID int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
+		defer cancel()
+
+		err := a.autoSvc.StartScript(ctx, device, scriptID)
+		return scriptRestartedMsg{err: err}
 	}
 }
 
@@ -1259,8 +1394,8 @@ func (a *Automation) Device() string {
 func (a *Automation) HasActiveModal() bool {
 	return a.scriptCreate.IsVisible() || a.scheduleCreate.IsVisible() ||
 		a.webhooks.IsEditing() || a.virtuals.IsEditing() || a.kvs.IsEditing() ||
-		a.alertFormOpen || a.scriptEditorOpen || a.scheduleEditorOpen || a.consoleOpen ||
-		a.templateOpen || a.evalOpen
+		a.alertFormOpen || a.scriptEditorOpen || a.scheduleEditorOpen || a.scheduleEditOpen ||
+		a.consoleOpen || a.templateOpen || a.evalOpen
 }
 
 // RenderModal returns the active modal content for full-screen rendering.
@@ -1289,6 +1424,9 @@ func (a *Automation) RenderModal() string {
 	}
 	if a.scheduleEditorOpen {
 		return a.scheduleEditor.View()
+	}
+	if a.scheduleEditOpen {
+		return a.scheduleEdit.View()
 	}
 	if a.consoleOpen {
 		return a.scriptConsole.View()

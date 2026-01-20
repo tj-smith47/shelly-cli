@@ -65,16 +65,16 @@ type EditModel struct {
 func NewEditModel(ctx context.Context, svc *shellykvs.Service) EditModel {
 	keyInput := form.NewTextInput(
 		form.WithPlaceholder("my_key"),
-		form.WithCharLimit(256),
+		form.WithCharLimit(42), // Shelly KVS max key length
 		form.WithWidth(40),
-		form.WithHelp("Key must be alphanumeric with underscores"),
+		form.WithHelp("Max 42 characters"),
 	)
 
 	valueInput := form.NewTextArea(
 		form.WithTextAreaPlaceholder("Enter value (JSON or plain text)"),
-		form.WithTextAreaCharLimit(4096),
+		form.WithTextAreaCharLimit(253), // Shelly KVS max value length
 		form.WithTextAreaDimensions(40, 6),
-		form.WithTextAreaHelp("JSON will be parsed, otherwise stored as string"),
+		form.WithTextAreaHelp("Max 253 chars; JSON parsed, otherwise stored as string"),
 	)
 
 	return EditModel{
@@ -214,27 +214,12 @@ func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
 
-	// Action messages from context system
-	case messages.NavigationMsg:
-		return m.handleNavigation(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 
 	// Forward to focused input
 	return m.updateFocusedInput(msg)
-}
-
-func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
-		return m.prevField(), nil
-	case messages.NavDown:
-		return m.nextField(), nil
-	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
-		// Not applicable for this form
-	}
-	return m, nil
 }
 
 func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
@@ -359,16 +344,10 @@ func (m EditModel) save() (EditModel, tea.Cmd) {
 		return m, nil
 	}
 
-	// Validate key format (alphanumeric and underscores only)
-	for _, c := range key {
-		isLower := c >= 'a' && c <= 'z'
-		isUpper := c >= 'A' && c <= 'Z'
-		isDigit := c >= '0' && c <= '9'
-		isUnderscore := c == '_'
-		if !isLower && !isUpper && !isDigit && !isUnderscore {
-			m.err = fmt.Errorf("key must contain only alphanumeric characters and underscores")
-			return m, nil
-		}
+	// Validate key length (Shelly KVS max key length is 42 characters)
+	if len(key) > 42 {
+		m.err = fmt.Errorf("key must be 42 characters or less")
+		return m, nil
 	}
 
 	// Parse value
@@ -430,7 +409,7 @@ func (m EditModel) renderFormFields() string {
 	// Key field
 	keyLabel := "Key:"
 	if !m.isNew {
-		keyLabel = "Key: (read-only)"
+		keyLabel = "Key (RO):"
 	}
 	content.WriteString(m.renderField(EditFieldKey, keyLabel, m.keyInput.View()))
 	content.WriteString("\n\n")

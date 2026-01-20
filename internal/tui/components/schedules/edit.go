@@ -1,4 +1,3 @@
-// Package schedules provides TUI components for managing device schedules.
 package schedules
 
 import (
@@ -19,110 +18,58 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
-// CreateField represents a field in the schedule create form.
-type CreateField int
+// EditField represents a field in the schedule edit form.
+type EditField int
 
-// Create field constants.
+// Edit field constants.
 const (
-	CreateFieldTimePattern CreateField = iota
-	CreateFieldHour
-	CreateFieldMinute
-	CreateFieldSecond
-	CreateFieldMethod
-	CreateFieldParams
-	CreateFieldCount
+	EditFieldEnabled EditField = iota
+	EditFieldTimePattern
+	EditFieldHour
+	EditFieldMinute
+	EditFieldSecond
+	EditFieldMethod
+	EditFieldParams
+	EditFieldCount
 )
 
-// Time pattern options.
-const (
-	patternDaily    = "Daily"
-	patternWeekdays = "Weekdays (Mon-Fri)"
-	patternWeekends = "Weekends (Sat-Sun)"
-	patternCustom   = "Custom Days"
-)
-
-// Cron weekday patterns.
-const (
-	cronWeekdays = "MON,TUE,WED,THU,FRI"
-	cronWeekends = "SAT,SUN"
-)
-
-// Common RPC methods for schedules.
-const (
-	methodCustom      = "(Custom method)"
-	methodSwitchOn    = "Switch.Set → on"
-	methodSwitchOff   = "Switch.Set → off"
-	methodSwitchTog   = "Switch.Toggle"
-	methodCoverOpen   = "Cover.Open"
-	methodCoverClose  = "Cover.Close"
-	methodCoverStop   = "Cover.Stop"
-	methodLightOn     = "Light.Set → on"
-	methodLightOff    = "Light.Set → off"
-	methodScriptStart = "Script.Start"
-	methodScriptStop  = "Script.Stop"
-)
-
-// rpcMethodInfo maps display names to actual RPC method and default params.
-type rpcMethodInfo struct {
-	Method string
-	Params map[string]any
-}
-
-// getRPCMethodInfo returns the RPC method details for a display name.
-func getRPCMethodInfo(displayName string) rpcMethodInfo {
-	methods := map[string]rpcMethodInfo{
-		methodSwitchOn:    {Method: "Switch.Set", Params: map[string]any{"id": 0, "on": true}},
-		methodSwitchOff:   {Method: "Switch.Set", Params: map[string]any{"id": 0, "on": false}},
-		methodSwitchTog:   {Method: "Switch.Toggle", Params: map[string]any{"id": 0}},
-		methodCoverOpen:   {Method: "Cover.Open", Params: map[string]any{"id": 0}},
-		methodCoverClose:  {Method: "Cover.Close", Params: map[string]any{"id": 0}},
-		methodCoverStop:   {Method: "Cover.Stop", Params: map[string]any{"id": 0}},
-		methodLightOn:     {Method: "Light.Set", Params: map[string]any{"id": 0, "on": true}},
-		methodLightOff:    {Method: "Light.Set", Params: map[string]any{"id": 0, "on": false}},
-		methodScriptStart: {Method: "Script.Start", Params: map[string]any{"id": 1}},
-		methodScriptStop:  {Method: "Script.Stop", Params: map[string]any{"id": 1}},
-	}
-	if info, ok := methods[displayName]; ok {
-		return info
-	}
-	return rpcMethodInfo{}
-}
-
-// CreatedMsg signals that a new schedule was created.
-type CreatedMsg struct {
+// UpdatedMsg signals that a schedule was updated.
+type UpdatedMsg struct {
 	Device     string
 	ScheduleID int
 	Err        error
 }
 
-// CreateModel represents the schedule create modal.
-type CreateModel struct {
-	ctx     context.Context
-	svc     *automation.Service
-	device  string
-	visible bool
-	cursor  CreateField
-	saving  bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+// EditModel represents the schedule edit modal.
+type EditModel struct {
+	ctx        context.Context
+	svc        *automation.Service
+	device     string
+	scheduleID int
+	visible    bool
+	cursor     EditField
+	saving     bool
+	err        error
+	width      int
+	height     int
+	styles     editmodal.Styles
 
 	// Form inputs
+	enableToggle      bool // Simple toggle instead of dropdown
 	patternDropdown   form.Select
 	hourInput         form.TextInput
 	minuteInput       form.TextInput
 	secondInput       form.TextInput
 	methodDropdown    form.Select
-	customMethodInput form.TextInput // Used when methodCustom is selected
+	customMethodInput form.TextInput
 	paramsInput       form.TextInput
 
 	// Custom day selection (for patternCustom)
-	selectedDays [7]bool // Sun(0) through Sat(6)
+	selectedDays [7]bool
 }
 
-// NewCreateModel creates a new schedule create modal.
-func NewCreateModel(ctx context.Context, svc *automation.Service) CreateModel {
+// NewEditModel creates a new schedule edit modal.
+func NewEditModel(ctx context.Context, svc *automation.Service) EditModel {
 	patternDropdown := form.NewSelect(
 		form.WithSelectOptions([]string{
 			patternDaily,
@@ -182,10 +129,10 @@ func NewCreateModel(ctx context.Context, svc *automation.Service) CreateModel {
 		form.WithPlaceholder("{\"id\":0,\"on\":true}"),
 		form.WithCharLimit(256),
 		form.WithWidth(40),
-		form.WithHelp("JSON parameters (optional override)"),
+		form.WithHelp("JSON parameters"),
 	)
 
-	return CreateModel{
+	return EditModel{
 		ctx:               ctx,
 		svc:               svc,
 		styles:            editmodal.DefaultStyles().WithLabelWidth(10),
@@ -199,32 +146,192 @@ func NewCreateModel(ctx context.Context, svc *automation.Service) CreateModel {
 	}
 }
 
-// Show displays the create modal.
-func (m CreateModel) Show(device string) CreateModel {
+// Show displays the edit modal with the schedule data pre-populated.
+func (m EditModel) Show(device string, schedule Schedule) EditModel {
 	m.device = device
+	m.scheduleID = schedule.ID
 	m.visible = true
-	m.cursor = CreateFieldTimePattern
+	m.cursor = EditFieldEnabled
 	m.saving = false
 	m.err = nil
 
-	// Reset inputs to defaults
-	m.patternDropdown = m.patternDropdown.SetSelected(0)
-	m.hourInput = m.hourInput.SetValue("12")
-	m.minuteInput = m.minuteInput.SetValue("00")
-	m.secondInput = m.secondInput.SetValue("0")
-	m.methodDropdown = m.methodDropdown.SetSelected(0)
-	m.customMethodInput = m.customMethodInput.SetValue("")
-	m.paramsInput = m.paramsInput.SetValue("")
-	m.selectedDays = [7]bool{} // Reset days
+	// Populate from schedule
+	m.enableToggle = schedule.Enable
 
-	// Focus pattern dropdown
-	m.patternDropdown = m.patternDropdown.Focus()
+	// Parse timespec to populate form fields
+	m = m.populateFromTimespec(schedule.Timespec)
+
+	// Populate method and params from first call
+	if len(schedule.Calls) > 0 {
+		call := schedule.Calls[0]
+		m = m.populateFromCall(call)
+	} else {
+		// Default to first method
+		m.methodDropdown = m.methodDropdown.SetSelected(0)
+		m.customMethodInput = m.customMethodInput.SetValue("")
+		m.paramsInput = m.paramsInput.SetValue("")
+	}
 
 	return m
 }
 
-// Hide hides the create modal.
-func (m CreateModel) Hide() CreateModel {
+// populateFromTimespec parses a timespec and sets form fields.
+// Format: ss mm hh DD MM WW.
+func (m EditModel) populateFromTimespec(timespec string) EditModel {
+	parts := strings.Fields(timespec)
+	if len(parts) < 6 {
+		// Default values if timespec can't be parsed
+		m.secondInput = m.secondInput.SetValue("0")
+		m.minuteInput = m.minuteInput.SetValue("0")
+		m.hourInput = m.hourInput.SetValue("12")
+		m.patternDropdown = m.patternDropdown.SetSelected(0)
+		return m
+	}
+
+	m.secondInput = m.secondInput.SetValue(parts[0])
+	m.minuteInput = m.minuteInput.SetValue(parts[1])
+	m.hourInput = m.hourInput.SetValue(parts[2])
+
+	// Parse weekday pattern
+	weekday := parts[5]
+	switch {
+	case weekday == "*":
+		m.patternDropdown = m.patternDropdown.SetSelected(0) // Daily
+	case isWeekdaysPattern(weekday):
+		m.patternDropdown = m.patternDropdown.SetSelected(1) // Weekdays
+	case isWeekendsPattern(weekday):
+		m.patternDropdown = m.patternDropdown.SetSelected(2) // Weekends
+	default:
+		m.patternDropdown = m.patternDropdown.SetSelected(3) // Custom
+		m = m.parseCustomDays(weekday)
+	}
+	return m
+}
+
+func isWeekdaysPattern(pattern string) bool {
+	upper := strings.ToUpper(pattern)
+	return strings.Contains(upper, "MON") && strings.Contains(upper, "FRI") && !strings.Contains(upper, "SAT")
+}
+
+func isWeekendsPattern(pattern string) bool {
+	upper := strings.ToUpper(pattern)
+	return (strings.Contains(upper, "SAT") || strings.Contains(upper, "SUN")) &&
+		!strings.Contains(upper, "MON") && !strings.Contains(upper, "TUE")
+}
+
+func (m EditModel) parseCustomDays(pattern string) EditModel {
+	m.selectedDays = [7]bool{} // Reset
+	upper := strings.ToUpper(pattern)
+
+	dayMappings := map[string]int{
+		"SUN": 0, "MON": 1, "TUE": 2, "WED": 3, "THU": 4, "FRI": 5, "SAT": 6,
+		"0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6,
+	}
+
+	for day, idx := range dayMappings {
+		if strings.Contains(upper, day) {
+			m.selectedDays[idx] = true
+		}
+	}
+	return m
+}
+
+// populateFromCall populates method and params fields from a schedule call.
+func (m EditModel) populateFromCall(call automation.ScheduleCall) EditModel {
+	// Try to match to a predefined method
+	methodIndex := m.findMethodIndex(call.Method, call.Params)
+	if methodIndex >= 0 {
+		m.methodDropdown = m.methodDropdown.SetSelected(methodIndex)
+		m.customMethodInput = m.customMethodInput.SetValue("")
+	} else {
+		// Custom method
+		m.methodDropdown = m.methodDropdown.SetSelected(10) // methodCustom index
+		m.customMethodInput = m.customMethodInput.SetValue(call.Method)
+	}
+
+	// Populate params
+	if len(call.Params) > 0 {
+		paramsJSON, err := json.Marshal(call.Params)
+		if err == nil {
+			m.paramsInput = m.paramsInput.SetValue(string(paramsJSON))
+		}
+	} else {
+		m.paramsInput = m.paramsInput.SetValue("")
+	}
+	return m
+}
+
+// findMethodIndex finds the index of a predefined method matching the call.
+func (m EditModel) findMethodIndex(method string, params map[string]any) int {
+	// Map of method+key params to display option index
+	methods := []struct {
+		Method string
+		Params map[string]any
+		Index  int
+	}{
+		{"Switch.Set", map[string]any{"on": true}, 0},
+		{"Switch.Set", map[string]any{"on": false}, 1},
+		{"Switch.Toggle", nil, 2},
+		{"Cover.Open", nil, 3},
+		{"Cover.Close", nil, 4},
+		{"Cover.Stop", nil, 5},
+		{"Light.Set", map[string]any{"on": true}, 6},
+		{"Light.Set", map[string]any{"on": false}, 7},
+		{"Script.Start", nil, 8},
+		{"Script.Stop", nil, 9},
+	}
+
+	for _, m := range methods {
+		if m.Method == method {
+			if m.Params == nil {
+				return m.Index
+			}
+			// Check key params match
+			if paramsMatch(params, m.Params) {
+				return m.Index
+			}
+		}
+	}
+	return -1 // Custom
+}
+
+// paramsMatch checks if expected params are present in actual params.
+func paramsMatch(actual, expected map[string]any) bool {
+	for k, v := range expected {
+		if av, ok := actual[k]; !ok || !valuesEqual(av, v) {
+			return false
+		}
+	}
+	return true
+}
+
+func valuesEqual(a, b any) bool {
+	// Simple comparison for bool and numeric types
+	switch av := a.(type) {
+	case bool:
+		if bv, ok := b.(bool); ok {
+			return av == bv
+		}
+	case float64:
+		if bv, ok := b.(float64); ok {
+			return av == bv
+		}
+		if bv, ok := b.(int); ok {
+			return av == float64(bv)
+		}
+	case int:
+		if bv, ok := b.(int); ok {
+			return av == bv
+		}
+		if bv, ok := b.(float64); ok {
+			return float64(av) == bv
+		}
+	}
+	return false
+}
+
+// Hide hides the edit modal.
+func (m EditModel) Hide() EditModel {
 	m.visible = false
 	m.patternDropdown = m.patternDropdown.Blur()
 	m.hourInput = m.hourInput.Blur()
@@ -237,24 +344,24 @@ func (m CreateModel) Hide() CreateModel {
 }
 
 // IsVisible returns whether the modal is visible.
-func (m CreateModel) IsVisible() bool {
+func (m EditModel) IsVisible() bool {
 	return m.visible
 }
 
 // SetSize sets the modal dimensions.
-func (m CreateModel) SetSize(width, height int) CreateModel {
+func (m EditModel) SetSize(width, height int) EditModel {
 	m.width = width
 	m.height = height
 	return m
 }
 
 // Init returns the initial command.
-func (m CreateModel) Init() tea.Cmd {
+func (m EditModel) Init() tea.Cmd {
 	return nil
 }
 
 // Update handles messages.
-func (m CreateModel) Update(msg tea.Msg) (CreateModel, tea.Cmd) {
+func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 	if !m.visible {
 		return m, nil
 	}
@@ -262,19 +369,17 @@ func (m CreateModel) Update(msg tea.Msg) (CreateModel, tea.Cmd) {
 	return m.handleMessage(msg)
 }
 
-func (m CreateModel) handleMessage(msg tea.Msg) (CreateModel, tea.Cmd) {
+func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case CreatedMsg:
+	case UpdatedMsg:
 		m.saving = false
 		if msg.Err != nil {
 			m.err = msg.Err
 			return m, nil
 		}
-		// Success - close modal
 		m = m.Hide()
 		return m, func() tea.Msg { return messages.EditClosedMsg{Saved: true} }
 
-	// Action messages from context system
 	case messages.NavigationMsg:
 		return m.handleNavigation(msg)
 	case messages.ToggleEnableRequestMsg:
@@ -285,24 +390,22 @@ func (m CreateModel) handleMessage(msg tea.Msg) (CreateModel, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
-	// Forward to focused input
 	return m.updateFocusedInput(msg)
 }
 
-func (m CreateModel) handleNavigation(msg messages.NavigationMsg) (CreateModel, tea.Cmd) {
+func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.Cmd) {
 	switch msg.Direction {
 	case messages.NavUp:
 		return m.prevField(), nil
 	case messages.NavDown:
 		return m.nextField(), nil
 	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
-		// Not applicable for this form
+		// Not applicable
 	}
 	return m, nil
 }
 
-func (m CreateModel) handleKey(msg tea.KeyPressMsg) (CreateModel, tea.Cmd) {
-	// Modal-specific keys not covered by action messages
+func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	switch msg.String() {
 	case keyconst.KeyEsc, "ctrl+[":
 		m = m.Hide()
@@ -321,83 +424,88 @@ func (m CreateModel) handleKey(msg tea.KeyPressMsg) (CreateModel, tea.Cmd) {
 		return m.prevField(), nil
 	}
 
-	// Forward to focused input
 	return m.updateFocusedInput(msg)
 }
 
-func (m CreateModel) handleEnter() (CreateModel, tea.Cmd) {
-	// If on dropdown and expanded, collapse it
-	if m.cursor == CreateFieldTimePattern && m.patternDropdown.IsExpanded() {
+func (m EditModel) handleEnter() (EditModel, tea.Cmd) {
+	if m.cursor == EditFieldEnabled {
+		m.enableToggle = !m.enableToggle
+		return m, nil
+	}
+	if m.cursor == EditFieldTimePattern && m.patternDropdown.IsExpanded() {
 		m.patternDropdown = m.patternDropdown.Collapse()
 		return m, nil
 	}
-	if m.cursor == CreateFieldMethod && m.methodDropdown.IsExpanded() {
+	if m.cursor == EditFieldMethod && m.methodDropdown.IsExpanded() {
 		m.methodDropdown = m.methodDropdown.Collapse()
 		return m, nil
 	}
-	// Otherwise save
 	return m.save()
 }
 
-func (m CreateModel) handleSpace() (bool, CreateModel) {
+func (m EditModel) handleSpace() (bool, EditModel) {
 	switch m.cursor {
-	case CreateFieldTimePattern:
+	case EditFieldEnabled:
+		m.enableToggle = !m.enableToggle
+		return true, m
+	case EditFieldTimePattern:
 		if m.patternDropdown.IsExpanded() {
 			m.patternDropdown = m.patternDropdown.Collapse()
 		} else {
 			m.patternDropdown = m.patternDropdown.Expand()
 		}
 		return true, m
-	case CreateFieldMethod:
+	case EditFieldMethod:
 		if m.methodDropdown.IsExpanded() {
 			m.methodDropdown = m.methodDropdown.Collapse()
 		} else {
 			m.methodDropdown = m.methodDropdown.Expand()
 		}
 		return true, m
-	case CreateFieldHour, CreateFieldMinute, CreateFieldSecond, CreateFieldParams, CreateFieldCount:
+	case EditFieldHour, EditFieldMinute, EditFieldSecond, EditFieldParams, EditFieldCount:
 		// Space handled by text inputs
 	}
 	return false, m
 }
 
-func (m CreateModel) updateFocusedInput(msg tea.Msg) (CreateModel, tea.Cmd) {
+func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch m.cursor {
-	case CreateFieldTimePattern:
+	case EditFieldEnabled:
+		// No input for toggle
+	case EditFieldTimePattern:
 		m.patternDropdown, cmd = m.patternDropdown.Update(msg)
-	case CreateFieldHour:
+	case EditFieldHour:
 		m.hourInput, cmd = m.hourInput.Update(msg)
-	case CreateFieldMinute:
+	case EditFieldMinute:
 		m.minuteInput, cmd = m.minuteInput.Update(msg)
-	case CreateFieldSecond:
+	case EditFieldSecond:
 		m.secondInput, cmd = m.secondInput.Update(msg)
-	case CreateFieldMethod:
-		// Update both dropdown and custom input based on selection
+	case EditFieldMethod:
 		m.methodDropdown, cmd = m.methodDropdown.Update(msg)
 		if m.methodDropdown.SelectedValue() == methodCustom {
 			m.customMethodInput, cmd = m.customMethodInput.Update(msg)
 		}
-	case CreateFieldParams:
+	case EditFieldParams:
 		m.paramsInput, cmd = m.paramsInput.Update(msg)
-	case CreateFieldCount:
+	case EditFieldCount:
 		// No-op
 	}
 
 	return m, cmd
 }
 
-func (m CreateModel) nextField() CreateModel {
+func (m EditModel) nextField() EditModel {
 	m = m.blurCurrentField()
-	if m.cursor < CreateFieldCount-1 {
+	if m.cursor < EditFieldCount-1 {
 		m.cursor++
 	}
 	m = m.focusCurrentField()
 	return m
 }
 
-func (m CreateModel) prevField() CreateModel {
+func (m EditModel) prevField() EditModel {
 	m = m.blurCurrentField()
 	if m.cursor > 0 {
 		m.cursor--
@@ -406,70 +514,71 @@ func (m CreateModel) prevField() CreateModel {
 	return m
 }
 
-func (m CreateModel) blurCurrentField() CreateModel {
+func (m EditModel) blurCurrentField() EditModel {
 	switch m.cursor {
-	case CreateFieldTimePattern:
+	case EditFieldEnabled:
+		// No input to blur
+	case EditFieldTimePattern:
 		m.patternDropdown = m.patternDropdown.Blur()
-	case CreateFieldHour:
+	case EditFieldHour:
 		m.hourInput = m.hourInput.Blur()
-	case CreateFieldMinute:
+	case EditFieldMinute:
 		m.minuteInput = m.minuteInput.Blur()
-	case CreateFieldSecond:
+	case EditFieldSecond:
 		m.secondInput = m.secondInput.Blur()
-	case CreateFieldMethod:
+	case EditFieldMethod:
 		m.methodDropdown = m.methodDropdown.Blur()
 		m.customMethodInput = m.customMethodInput.Blur()
-	case CreateFieldParams:
+	case EditFieldParams:
 		m.paramsInput = m.paramsInput.Blur()
-	case CreateFieldCount:
+	case EditFieldCount:
 		// No-op
 	}
 	return m
 }
 
-func (m CreateModel) focusCurrentField() CreateModel {
+func (m EditModel) focusCurrentField() EditModel {
 	switch m.cursor {
-	case CreateFieldTimePattern:
+	case EditFieldEnabled:
+		// No input to focus
+	case EditFieldTimePattern:
 		m.patternDropdown = m.patternDropdown.Focus()
-	case CreateFieldHour:
+	case EditFieldHour:
 		m.hourInput, _ = m.hourInput.Focus()
-	case CreateFieldMinute:
+	case EditFieldMinute:
 		m.minuteInput, _ = m.minuteInput.Focus()
-	case CreateFieldSecond:
+	case EditFieldSecond:
 		m.secondInput, _ = m.secondInput.Focus()
-	case CreateFieldMethod:
+	case EditFieldMethod:
 		m.methodDropdown = m.methodDropdown.Focus()
-		// Also focus custom input if custom method selected
 		if m.methodDropdown.SelectedValue() == methodCustom {
 			m.customMethodInput, _ = m.customMethodInput.Focus()
 		}
-	case CreateFieldParams:
+	case EditFieldParams:
 		m.paramsInput, _ = m.paramsInput.Focus()
-	case CreateFieldCount:
+	case EditFieldCount:
 		// No-op
 	}
 	return m
 }
 
-func (m CreateModel) save() (CreateModel, tea.Cmd) {
+func (m EditModel) save() (EditModel, tea.Cmd) {
 	if m.saving {
 		return m, nil
 	}
 
-	// Get method and params from selection
+	// Get method and params
 	selectedMethod := m.methodDropdown.SelectedValue()
 	var method string
 	var params map[string]any
 
 	if selectedMethod == methodCustom {
-		// Use custom method input
 		method = strings.TrimSpace(m.customMethodInput.Value())
 		if method == "" {
 			m.err = fmt.Errorf("custom RPC method is required")
 			return m, nil
 		}
 	} else {
-		// Use predefined method info
 		info := getRPCMethodInfo(selectedMethod)
 		method = info.Method
 		params = info.Params
@@ -484,7 +593,7 @@ func (m CreateModel) save() (CreateModel, tea.Cmd) {
 		}
 	}
 
-	// Validate and parse hour/minute/second
+	// Validate time fields
 	hour := strings.TrimSpace(m.hourInput.Value())
 	minute := strings.TrimSpace(m.minuteInput.Value())
 	second := strings.TrimSpace(m.secondInput.Value())
@@ -499,7 +608,6 @@ func (m CreateModel) save() (CreateModel, tea.Cmd) {
 		second = "0"
 	}
 
-	// Validate numeric values
 	if err := validateTimeField(hour, 23, "hour"); err != nil {
 		m.err = err
 		return m, nil
@@ -523,26 +631,10 @@ func (m CreateModel) save() (CreateModel, tea.Cmd) {
 	m.saving = true
 	m.err = nil
 
-	return m, m.createSaveCmd(timespec, method, params)
+	return m, m.createUpdateCmd(timespec, method, params)
 }
 
-func validateTimeField(value string, maxVal int, name string) error {
-	var num int
-	if _, err := fmt.Sscanf(value, "%d", &num); err != nil {
-		return fmt.Errorf("%s must be a number", name)
-	}
-	if num < 0 || num > maxVal {
-		return fmt.Errorf("%s must be between 0 and %d", name, maxVal)
-	}
-	return nil
-}
-
-func (m CreateModel) buildTimespec(second, minute, hour string) (string, error) {
-	// Shelly timespec: ss mm hh DD MM WW
-	// DD = day of month (1-31 or *)
-	// MM = month (1-12 or *)
-	// WW = weekday (0-6, SUN-SAT, or MON-FRI, etc.)
-
+func (m EditModel) buildTimespec(second, minute, hour string) (string, error) {
 	pattern := m.patternDropdown.SelectedValue()
 	var weekday string
 
@@ -562,11 +654,10 @@ func (m CreateModel) buildTimespec(second, minute, hour string) (string, error) 
 		weekday = "*"
 	}
 
-	// Format: ss mm hh DD MM WW
 	return fmt.Sprintf("%s %s %s * * %s", second, minute, hour, weekday), nil
 }
 
-func (m CreateModel) buildCustomDays() string {
+func (m EditModel) buildCustomDays() string {
 	dayNames := []string{"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"}
 	var selected []string
 	for i, sel := range m.selectedDays {
@@ -577,8 +668,10 @@ func (m CreateModel) buildCustomDays() string {
 	return strings.Join(selected, ",")
 }
 
-func (m CreateModel) createSaveCmd(timespec, method string, params map[string]any) tea.Cmd {
+func (m EditModel) createUpdateCmd(timespec, method string, params map[string]any) tea.Cmd {
 	device := m.device
+	scheduleID := m.scheduleID
+	enable := m.enableToggle
 
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
@@ -591,54 +684,57 @@ func (m CreateModel) createSaveCmd(timespec, method string, params map[string]an
 			},
 		}
 
-		scheduleID, err := m.svc.CreateSchedule(ctx, device, true, timespec, calls)
+		err := m.svc.UpdateSchedule(ctx, device, scheduleID, &enable, &timespec, calls)
 		if err != nil {
-			return CreatedMsg{Device: device, Err: err}
+			return UpdatedMsg{Device: device, ScheduleID: scheduleID, Err: err}
 		}
 
-		return CreatedMsg{Device: device, ScheduleID: scheduleID}
+		return UpdatedMsg{Device: device, ScheduleID: scheduleID}
 	}
 }
 
-// View renders the create modal.
-func (m CreateModel) View() string {
+// View renders the edit modal.
+func (m EditModel) View() string {
 	if !m.visible {
 		return ""
 	}
 
-	// Build footer
 	footer := "Tab: Next | Ctrl+S: Save | Esc: Cancel"
 	if m.saving {
-		footer = "Creating..."
+		footer = "Saving..."
 	}
 
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, "New Schedule", footer)
-
-	// Build content
+	r := rendering.NewModal(m.width, m.height, fmt.Sprintf("Edit Schedule #%d", m.scheduleID), footer)
 	return r.SetContent(m.renderFormFields()).Render()
 }
 
-func (m CreateModel) renderFormFields() string {
+func (m EditModel) renderFormFields() string {
 	var content strings.Builder
 
-	// Time Pattern field
-	content.WriteString(m.renderField(CreateFieldTimePattern, "Pattern:", m.patternDropdown.View()))
+	// Enabled toggle
+	enabledValue := "Disabled"
+	if m.enableToggle {
+		enabledValue = "Enabled"
+	}
+	content.WriteString(m.renderField(EditFieldEnabled, "Enabled:", enabledValue))
 	content.WriteString("\n\n")
 
-	// Time fields (hour:minute:second)
-	content.WriteString(m.renderField(CreateFieldHour, "Hour:", m.hourInput.View()))
-	content.WriteString("  ")
-	content.WriteString(m.renderField(CreateFieldMinute, "Min:", m.minuteInput.View()))
-	content.WriteString("  ")
-	content.WriteString(m.renderField(CreateFieldSecond, "Sec:", m.secondInput.View()))
+	// Time Pattern
+	content.WriteString(m.renderField(EditFieldTimePattern, "Pattern:", m.patternDropdown.View()))
 	content.WriteString("\n\n")
 
-	// Action/Method field
-	content.WriteString(m.renderField(CreateFieldMethod, "Action:", m.methodDropdown.View()))
+	// Time fields
+	content.WriteString(m.renderField(EditFieldHour, "Hour:", m.hourInput.View()))
+	content.WriteString("  ")
+	content.WriteString(m.renderField(EditFieldMinute, "Min:", m.minuteInput.View()))
+	content.WriteString("  ")
+	content.WriteString(m.renderField(EditFieldSecond, "Sec:", m.secondInput.View()))
+	content.WriteString("\n\n")
+
+	// Action/Method
+	content.WriteString(m.renderField(EditFieldMethod, "Action:", m.methodDropdown.View()))
 	content.WriteString("\n")
 
-	// Show custom method input only when custom is selected
 	if m.methodDropdown.SelectedValue() == methodCustom {
 		content.WriteString("  ")
 		content.WriteString(m.styles.Label.Render("Custom:"))
@@ -648,10 +744,10 @@ func (m CreateModel) renderFormFields() string {
 	}
 	content.WriteString("\n")
 
-	// Params field (optional override)
-	content.WriteString(m.renderField(CreateFieldParams, "Params:", m.paramsInput.View()))
+	// Params
+	content.WriteString(m.renderField(EditFieldParams, "Params:", m.paramsInput.View()))
 	content.WriteString("\n")
-	content.WriteString(m.styles.Muted.Render("  (optional JSON override)"))
+	content.WriteString(m.styles.Muted.Render("  (JSON parameters)"))
 
 	// Error display
 	if m.err != nil {
@@ -663,7 +759,7 @@ func (m CreateModel) renderFormFields() string {
 	return content.String()
 }
 
-func (m CreateModel) renderField(field CreateField, label, input string) string {
+func (m EditModel) renderField(field EditField, label, input string) string {
 	var selector, labelStr string
 
 	if m.cursor == field {

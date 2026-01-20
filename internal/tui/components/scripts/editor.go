@@ -354,8 +354,14 @@ func (m EditorModel) handleNavigation(msg messages.NavigationMsg) (EditorModel, 
 
 func (m EditorModel) handleKey(msg tea.KeyPressMsg) (EditorModel, tea.Cmd) {
 	// Handle component-specific keys not covered by action messages
-	if msg.String() == "n" {
+	switch msg.String() {
+	case "n":
 		m.showNumbers = !m.showNumbers
+	case "u":
+		// Upload from the same file path used by download
+		if m.device != "" && m.scriptID > 0 {
+			return m, m.Upload(m.getScriptFilePath())
+		}
 	}
 	return m, nil
 }
@@ -429,7 +435,7 @@ func (m EditorModel) View() string {
 		SetTitle(title).
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex).
-		SetFooter(theme.StyledKeybindings("j/k:scroll g/G:top/end d:download esc:close"))
+		SetFooter(theme.StyledKeybindings("j/k:scroll g/G:top/end d:download u:upload esc:close"))
 
 	if m.scriptID == 0 {
 		r.SetContent(styles.EmptyStateWithBorder("No script selected", m.Width, m.Height))
@@ -598,6 +604,9 @@ func (m EditorModel) Edit() tea.Cmd {
 
 	//nolint:gosec,noctx // G204: User's EDITOR env var; context N/A for tea.ExecProcess
 	c := exec.Command(editorCmd, editorArgs...)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
 
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		//nolint:gosec // G304: Reading temp file we created - safe and expected
@@ -622,6 +631,18 @@ func (m EditorModel) Device() string {
 	return m.device
 }
 
+// getScriptFilePath returns the standard file path for this script.
+// Used by both Download and Upload to ensure consistency.
+func (m EditorModel) getScriptFilePath() string {
+	name := m.scriptName
+	if name == "" {
+		name = fmt.Sprintf("script_%d", m.scriptID)
+	}
+	safeName := strings.ReplaceAll(name, "/", "_")
+	safeDevice := strings.ReplaceAll(m.device, ".", "_")
+	return fmt.Sprintf("scripts/%s_%s.js", safeDevice, safeName)
+}
+
 // Download saves the script code to a file.
 func (m EditorModel) Download() tea.Cmd {
 	if m.device == "" || m.scriptID == 0 || m.code == "" {
@@ -631,22 +652,13 @@ func (m EditorModel) Download() tea.Cmd {
 	device := m.device
 	scriptID := m.scriptID
 	code := m.code
-	name := m.scriptName
-	if name == "" {
-		name = fmt.Sprintf("script_%d", scriptID)
-	}
+	filename := m.getScriptFilePath()
 
 	return func() tea.Msg {
 		// Create scripts directory if it doesn't exist
-		dir := "scripts"
-		if err := os.MkdirAll(dir, 0o750); err != nil {
+		if err := os.MkdirAll("scripts", 0o750); err != nil {
 			return ScriptDownloadedMsg{Device: device, ScriptID: scriptID, Err: err}
 		}
-
-		// Generate filename: scripts/<device>_<name>.js
-		safeName := strings.ReplaceAll(name, "/", "_")
-		safeDevice := strings.ReplaceAll(device, ".", "_")
-		filename := fmt.Sprintf("%s/%s_%s.js", dir, safeDevice, safeName)
 
 		// Write file
 		if err := os.WriteFile(filename, []byte(code), 0o600); err != nil {

@@ -58,8 +58,13 @@ func (k *KVSComponent) List(ctx context.Context) (*KVSListResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Extract key names from the map
+	keys := make([]string, 0, len(result.Keys))
+	for key := range result.Keys {
+		keys = append(keys, key)
+	}
 	return &KVSListResult{
-		Keys: result.Keys,
+		Keys: keys,
 		Rev:  result.Rev,
 	}, nil
 }
