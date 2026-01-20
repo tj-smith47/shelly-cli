@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/errutil"
 )
 
 // EnhanceDeviceError improves error messages for device-related failures.
@@ -15,21 +16,12 @@ func EnhanceDeviceError(err error, device string) error {
 		return nil
 	}
 
-	errStr := strings.ToLower(err.Error())
-
-	// Check for DNS lookup failures
-	if isDNSError(errStr) {
+	// Use shared detection for DNS errors
+	if errutil.IsDNS(err) {
 		return enhanceWithSuggestions(device)
 	}
 
 	return err
-}
-
-// isDNSError checks if the error message indicates a DNS lookup failure.
-func isDNSError(errStr string) bool {
-	return strings.Contains(errStr, "no such host") ||
-		strings.Contains(errStr, "server misbehaving") ||
-		(strings.Contains(errStr, "lookup") && strings.Contains(errStr, "dial tcp"))
 }
 
 // enhanceWithSuggestions adds device name suggestions to the error message.

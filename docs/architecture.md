@@ -19,6 +19,7 @@ This document defines **where code belongs** in the shelly-cli codebase. For **h
 | Export data to external format | `shelly/export/` |
 | Define domain types | `model/` |
 | Add CLI infrastructure (flags, runners) | `cmdutil/` |
+| Detect/categorize errors | `errutil/` |
 | Add shared utilities | `utils/` |
 | Manage configuration | `config/` |
 
@@ -126,6 +127,9 @@ internal/
 │
 ├── download/           # HTTP download utilities
 │   └── download.go     # Download(), DownloadWithProgress()
+│
+├── errutil/            # Shared error detection and categorization
+│   └── detect.go       # IsTimeout(), IsDNS(), IsNetwork(), IsAuth(), etc.
 │
 ├── github/             # GitHub integration
 │   ├── releases.go     # Release checking, downloads
@@ -454,12 +458,17 @@ Is it a cobra command definition?
                     ├── Yes → cmdutil/
                     │         (factory, flags, runner, factories/)
                     │
-                    └── No → Is it config-related?
+                    └── No → Is it error detection/categorization?
                         │
-                        ├── Yes → config/
+                        ├── Yes → errutil/
+                        │         (shared by CLI and TUI)
                         │
-                        └── No → utils/
-                                  (shared utilities)
+                        └── No → Is it config-related?
+                            │
+                            ├── Yes → config/
+                            │
+                            └── No → utils/
+                                      (shared utilities)
 ```
 
 ---

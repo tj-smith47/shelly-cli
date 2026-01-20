@@ -2,10 +2,7 @@
 package tuierrors
 
 import (
-	"context"
-	"errors"
-	"net"
-	"strings"
+	"github.com/tj-smith47/shelly-cli/internal/errutil"
 )
 
 // Category represents the type of error for display purposes.
@@ -50,98 +47,60 @@ func Categorize(err error) CategorizedError {
 		return CategorizedError{}
 	}
 
-	errStr := strings.ToLower(err.Error())
+	// Use shared detection, then apply TUI-specific messaging
+	cat := errutil.Categorize(err)
 
-	if cat := checkTimeout(err, errStr); cat != nil {
-		return *cat
-	}
-
-	if cat := checkNetwork(err, errStr); cat != nil {
-		return *cat
-	}
-
-	if cat := checkAuth(err, errStr); cat != nil {
-		return *cat
-	}
-
-	if cat := checkDevice(err, errStr); cat != nil {
-		return *cat
-	}
-
-	// Unknown error - show original message
-	return CategorizedError{
-		Category: CategoryUnknown,
-		Original: err,
-		Message:  "Error: " + err.Error(),
-		Hint:     "An unexpected error occurred.",
-	}
-}
-
-func checkTimeout(err error, errStr string) *CategorizedError {
-	if errors.Is(err, context.DeadlineExceeded) ||
-		strings.Contains(errStr, "timeout") ||
-		strings.Contains(errStr, "deadline exceeded") ||
-		strings.Contains(errStr, "timed out") {
-		return &CategorizedError{
+	switch cat {
+	case errutil.CategoryTimeout:
+		return CategorizedError{
 			Category: CategoryTimeout,
 			Original: err,
 			Message:  "Request timed out",
 			Hint:     "Device may be unresponsive. Check if device is powered on.",
 		}
-	}
-	return nil
-}
 
-func checkNetwork(err error, errStr string) *CategorizedError {
-	var netErr net.Error
-	if errors.As(err, &netErr) ||
-		strings.Contains(errStr, "connection refused") ||
-		strings.Contains(errStr, "no route to host") ||
-		strings.Contains(errStr, "network unreachable") ||
-		strings.Contains(errStr, "host unreachable") ||
-		strings.Contains(errStr, "no such host") ||
-		strings.Contains(errStr, "dial tcp") ||
-		strings.Contains(errStr, "i/o timeout") {
-		return &CategorizedError{
+	case errutil.CategoryDNS, errutil.CategoryNetwork:
+		// TUI doesn't distinguish DNS from other network errors
+		return CategorizedError{
 			Category: CategoryNetwork,
 			Original: err,
 			Message:  "Network error",
 			Hint:     "Check device connectivity and network settings.",
 		}
-	}
-	return nil
-}
 
-func checkAuth(err error, errStr string) *CategorizedError {
-	if strings.Contains(errStr, "401") ||
-		strings.Contains(errStr, "403") ||
-		strings.Contains(errStr, "unauthorized") ||
-		strings.Contains(errStr, "forbidden") ||
-		strings.Contains(errStr, "authentication") ||
-		strings.Contains(errStr, "invalid password") ||
-		strings.Contains(errStr, "access denied") {
-		return &CategorizedError{
+	case errutil.CategoryAuth:
+		return CategorizedError{
 			Category: CategoryAuth,
 			Original: err,
 			Message:  "Authentication failed",
 			Hint:     "Check device credentials in configuration.",
 		}
-	}
-	return nil
-}
 
-func checkDevice(err error, errStr string) *CategorizedError {
-	if strings.Contains(errStr, "device") ||
-		strings.Contains(errStr, "shelly") ||
-		strings.Contains(errStr, "component") {
-		return &CategorizedError{
+	case errutil.CategoryUnsupported:
+		return CategorizedError{
+			Category: CategoryUnsupported,
+			Original: err,
+			Message:  "Feature not supported",
+			Hint:     "This feature may not be available on this device.",
+		}
+
+	case errutil.CategoryDevice:
+		return CategorizedError{
 			Category: CategoryDevice,
 			Original: err,
 			Message:  "Device error: " + err.Error(),
 			Hint:     "The device reported an error. Check device status.",
 		}
+
+	default:
+		// Unknown error - show original message
+		return CategorizedError{
+			Category: CategoryUnknown,
+			Original: err,
+			Message:  "Error: " + err.Error(),
+			Hint:     "An unexpected error occurred.",
+		}
 	}
-	return nil
 }
 
 // IsUnsupportedFeature checks if an error indicates a feature not supported on the device.
@@ -152,14 +111,7 @@ func checkDevice(err error, errStr string) *CategorizedError {
 //   - "unknown method" - Method not implemented
 //   - "not found" - Resource not found
 func IsUnsupportedFeature(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	errStr := strings.ToLower(err.Error())
-	return strings.Contains(errStr, "404") ||
-		strings.Contains(errStr, "unknown method") ||
-		strings.Contains(errStr, "not found")
+	return errutil.IsUnsupported(err)
 }
 
 // UnsupportedMessage returns a standardized message for features not supported on a device.

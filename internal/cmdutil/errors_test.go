@@ -66,31 +66,6 @@ func TestEnhanceDeviceError_NonDNSError(t *testing.T) {
 	}
 }
 
-func TestIsDNSError(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		errStr string
-		want   bool
-	}{
-		{"no such host", true},
-		{"server misbehaving", true},
-		{"lookup test on 127.0.0.53:53: dial tcp failed", true},
-		{"connection refused", false},
-		{"timeout", false},
-		{"", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.errStr, func(t *testing.T) {
-			t.Parallel()
-			got := isDNSError(tt.errStr)
-			if got != tt.want {
-				t.Errorf("isDNSError(%q) = %v, want %v", tt.errStr, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestIsSimilar(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
