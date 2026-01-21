@@ -2,12 +2,12 @@
 
 ## Overview
 
-The `shelly tui` command launches an interactive terminal interface for managing Shelly devices. The TUI provides real-time device monitoring, control, and configuration in a multi-panel layout.
+The `shelly dash` command launches an interactive terminal interface for managing Shelly devices. The TUI provides real-time device monitoring, control, and configuration in a multi-panel layout.
 
 ## Launching
 
 ```bash
-shelly tui [--filter <pattern>] [--refresh <duration>]
+shelly dash [--filter <pattern>] [--refresh <duration>]
 ```
 
 **Options:**

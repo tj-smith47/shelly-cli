@@ -19,11 +19,12 @@ const (
 
 // Common key constants.
 const (
-	KeyEnter    = "enter"
-	KeySpace    = "space"
-	KeyTab      = "tab"
-	KeyShiftTab = "shift+tab"
-	KeyEsc      = "esc"
+	KeyEnter           = "enter"
+	KeySpace           = "space"
+	KeyTab             = "tab"
+	KeyShiftTab        = "shift+tab"
+	KeyEsc             = "esc"
+	KeyCtrlOpenBracket = "ctrl+[" // Alternative for Esc on iPad and some terminals
 )
 
 // Navigation key constants.

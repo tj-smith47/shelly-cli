@@ -87,11 +87,13 @@ type Model struct {
 	loading       bool
 	starting      bool
 	editing       bool
+	pairing       bool
 	err           error
 	focused       bool
 	panelIndex    int // 1-based panel index for Shift+N hotkey hint
 	styles        Styles
 	editModal     EditModel
+	pairModal     PairModel
 	cacheStatus   cachestatus.Model
 }
 
@@ -167,6 +169,7 @@ func New(deps Deps) Model {
 		styles:        DefaultStyles(),
 		cacheStatus:   cachestatus.New(),
 		editModal:     NewEditModel(deps.Ctx, deps.Svc),
+		pairModal:     NewPairModel(deps.Ctx, deps.Svc),
 	}
 	m.Loader = m.Loader.SetMessage("Loading Bluetooth settings...")
 	return m
@@ -325,6 +328,15 @@ func (m Model) SetEditModalSize(width, height int) Model {
 	return m
 }
 
+// SetPairModalSize sets the pairing modal dimensions.
+// This should be called with screen-based dimensions when the modal is visible.
+func (m Model) SetPairModalSize(width, height int) Model {
+	if m.pairing {
+		m.pairModal = m.pairModal.SetSize(width, height)
+	}
+	return m
+}
+
 // SetFocused sets the focus state.
 func (m Model) SetFocused(focused bool) Model {
 	m.focused = focused
@@ -342,6 +354,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Handle edit modal if visible
 	if m.editing {
 		return m.handleEditModalUpdate(msg)
+	}
+
+	// Handle pairing modal if visible
+	if m.pairing {
+		return m.handlePairModalUpdate(msg)
 	}
 
 	// Forward tick messages to loader when loading
@@ -408,6 +425,8 @@ func (m Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleEditKey()
 	case messages.DeleteRequestMsg:
 		return m.handleRemoveKey()
+	case messages.NewRequestMsg:
+		return m.handlePairKey()
 	}
 	return m, nil
 }
@@ -551,6 +570,53 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m Model) handlePairModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.pairModal, cmd = m.pairModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.pairModal.Visible() {
+		m.pairing = false
+		// Invalidate cache and refresh data after pairing
+		m.loading = true
+		return m, tea.Batch(
+			cmd,
+			m.Loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeBLE),
+			m.fetchAndCacheStatus(),
+		)
+	}
+
+	// Handle device added message
+	if addMsg, ok := msg.(DeviceAddedMsg); ok {
+		if addMsg.Err == nil {
+			m.pairing = false
+			m.pairModal = m.pairModal.Hide()
+			// Invalidate cache and refresh data after successful add
+			m.loading = true
+			return m, tea.Batch(
+				m.Loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeBLE),
+				m.fetchAndCacheStatus(),
+				func() tea.Msg { return PairClosedMsg{Added: true} },
+			)
+		}
+	}
+
+	return m, cmd
+}
+
+func (m Model) handlePairKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.ble == nil || !m.ble.Enable {
+		return m, nil
+	}
+	m.pairing = true
+	m.pairModal = m.pairModal.SetSize(m.Width, m.Height)
+	var cmd tea.Cmd
+	m.pairModal, cmd = m.pairModal.Show(m.device)
+	return m, cmd
+}
+
 func (m Model) handleRefresh() (Model, tea.Cmd) {
 	if m.loading || m.device == "" {
 		return m, nil
@@ -585,12 +651,16 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// Handle escape to cancel pending removal
-	if msg.String() == "esc" || msg.String() == "ctrl+[" {
+	switch msg.String() {
+	case "esc", "ctrl+[":
+		// Handle escape to cancel pending removal
 		if m.pendingRemove >= 0 {
 			m.pendingRemove = -1
 			return m, nil
 		}
+	case "p":
+		// Pair new BTHome device
+		return m.handlePairKey()
 	}
 	return m, nil
 }
@@ -676,6 +746,11 @@ func (m Model) View() string {
 		return m.editModal.View()
 	}
 
+	// Render pairing modal if pairing
+	if m.pairing {
+		return m.pairModal.View()
+	}
+
 	r := rendering.New(m.Width, m.Height).
 		SetTitle("Bluetooth").
 		SetFocused(m.focused).
@@ -725,9 +800,9 @@ func (m Model) buildFooter() string {
 	var footer string
 	switch {
 	case m.ble != nil && m.ble.Enable && len(m.devices) > 0:
-		footer = "e:edit d:discover x:remove r:refresh"
+		footer = "e:edit d:discover p:pair x:remove r:refresh"
 	case m.ble != nil && m.ble.Enable:
-		footer = "e:edit d:discover r:refresh"
+		footer = "e:edit d:discover p:pair r:refresh"
 	default:
 		footer = "e:edit r:refresh"
 	}
@@ -936,4 +1011,17 @@ func (m Model) RenderEditModal() string {
 		return ""
 	}
 	return m.editModal.View()
+}
+
+// IsPairing returns whether the pairing modal is currently visible.
+func (m Model) IsPairing() bool {
+	return m.pairing
+}
+
+// RenderPairModal returns the pairing modal view for full-screen overlay rendering.
+func (m Model) RenderPairModal() string {
+	if !m.pairing {
+		return ""
+	}
+	return m.pairModal.View()
 }

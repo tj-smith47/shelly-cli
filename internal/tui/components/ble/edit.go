@@ -186,7 +186,7 @@ func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.
 func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	// Modal-specific keys not covered by action messages
 	switch msg.String() {
-	case "esc", "ctrl+[":
+	case keyconst.KeyEsc, keyconst.KeyCtrlOpenBracket:
 		if m.saving {
 			return m, nil
 		}
@@ -205,7 +205,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 		}
 		return m.prevField(), nil
 
-	case "enter", "ctrl+s":
+	case keyconst.KeyEnter, keyconst.KeyCtrlS:
 		if m.saving {
 			return m, nil
 		}
