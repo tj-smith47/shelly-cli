@@ -5,6 +5,7 @@ package ble
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
@@ -46,14 +48,16 @@ func (d Deps) Validate() error {
 
 // CachedBLEData holds BLE status for caching.
 type CachedBLEData struct {
-	BLE       *shelly.BLEConfig       `json:"ble"`
-	Discovery *shelly.BTHomeDiscovery `json:"discovery"`
+	BLE       *shelly.BLEConfig        `json:"ble"`
+	Discovery *shelly.BTHomeDiscovery  `json:"discovery"`
+	Devices   []model.BTHomeDeviceInfo `json:"devices"`
 }
 
 // StatusLoadedMsg signals that BLE status was loaded.
 type StatusLoadedMsg struct {
 	BLE       *shelly.BLEConfig
 	Discovery *shelly.BTHomeDiscovery
+	Devices   []model.BTHomeDeviceInfo
 	Err       error
 }
 
@@ -62,24 +66,33 @@ type DiscoveryStartedMsg struct {
 	Err error
 }
 
+// DeviceRemovedMsg signals that a BTHome device was removed.
+type DeviceRemovedMsg struct {
+	DeviceID int
+	Err      error
+}
+
 // Model displays BLE and BTHome settings for a device.
 type Model struct {
 	helpers.Sizable
-	ctx         context.Context
-	svc         *shelly.Service
-	fileCache   *cache.FileCache
-	device      string
-	ble         *shelly.BLEConfig
-	discovery   *shelly.BTHomeDiscovery
-	loading     bool
-	starting    bool
-	editing     bool
-	err         error
-	focused     bool
-	panelIndex  int // 1-based panel index for Shift+N hotkey hint
-	styles      Styles
-	editModal   EditModel
-	cacheStatus cachestatus.Model
+	ctx           context.Context
+	svc           *shelly.Service
+	fileCache     *cache.FileCache
+	device        string
+	ble           *shelly.BLEConfig
+	discovery     *shelly.BTHomeDiscovery
+	devices       []model.BTHomeDeviceInfo // BTHome paired devices
+	cursor        int                      // Selected device index
+	pendingRemove int                      // Device ID pending removal (-1 = none)
+	loading       bool
+	starting      bool
+	editing       bool
+	err           error
+	focused       bool
+	panelIndex    int // 1-based panel index for Shift+N hotkey hint
+	styles        Styles
+	editModal     EditModel
+	cacheStatus   cachestatus.Model
 }
 
 // Styles holds styles for the BLE component.
@@ -93,6 +106,11 @@ type Styles struct {
 	Muted     lipgloss.Style
 	Section   lipgloss.Style
 	Warning   lipgloss.Style
+	Selected  lipgloss.Style
+	DevName   lipgloss.Style
+	DevAddr   lipgloss.Style
+	Signal    lipgloss.Style
+	Battery   lipgloss.Style
 }
 
 // DefaultStyles returns the default styles for the BLE component.
@@ -119,6 +137,17 @@ func DefaultStyles() Styles {
 			Bold(true),
 		Warning: lipgloss.NewStyle().
 			Foreground(colors.Warning),
+		Selected: lipgloss.NewStyle().
+			Background(colors.AltBackground),
+		DevName: lipgloss.NewStyle().
+			Foreground(colors.Text).
+			Bold(true),
+		DevAddr: lipgloss.NewStyle().
+			Foreground(colors.Muted),
+		Signal: lipgloss.NewStyle().
+			Foreground(colors.Warning),
+		Battery: lipgloss.NewStyle().
+			Foreground(colors.Success),
 	}
 }
 
@@ -130,13 +159,14 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:     helpers.NewSizableLoaderOnly(),
-		ctx:         deps.Ctx,
-		svc:         deps.Svc,
-		fileCache:   deps.FileCache,
-		styles:      DefaultStyles(),
-		cacheStatus: cachestatus.New(),
-		editModal:   NewEditModel(deps.Ctx, deps.Svc),
+		Sizable:       helpers.NewSizableLoaderOnly(),
+		ctx:           deps.Ctx,
+		svc:           deps.Svc,
+		fileCache:     deps.FileCache,
+		pendingRemove: -1, // -1 means no pending removal
+		styles:        DefaultStyles(),
+		cacheStatus:   cachestatus.New(),
+		editModal:     NewEditModel(deps.Ctx, deps.Svc),
 	}
 	m.Loader = m.Loader.SetMessage("Loading Bluetooth settings...")
 	return m
@@ -152,6 +182,9 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.device = device
 	m.ble = nil
 	m.discovery = nil
+	m.devices = nil
+	m.cursor = 0
+	m.pendingRemove = -1
 	m.err = nil
 	m.loading = true
 	m.cacheStatus = cachestatus.New()
@@ -213,6 +246,14 @@ func (m Model) fetchAndCacheStatus() tea.Cmd {
 			data.Discovery = discovery
 		}
 
+		// Fetch BTHome devices if BLE is enabled
+		if data.BLE != nil && data.BLE.Enable {
+			devices, err := m.svc.Wireless().FetchBTHomeDevices(ctx, m.device, nil)
+			if err == nil {
+				data.Devices = devices
+			}
+		}
+
 		// If we got nothing, return an error
 		if data.BLE == nil && data.Discovery == nil {
 			return nil, fmt.Errorf("BLE not supported on this device")
@@ -240,6 +281,14 @@ func (m Model) backgroundRefresh() tea.Cmd {
 		discovery, err := m.svc.GetBTHomeStatus(ctx, m.device)
 		if err == nil {
 			data.Discovery = discovery
+		}
+
+		// Fetch BTHome devices if BLE is enabled
+		if data.BLE != nil && data.BLE.Enable {
+			devices, err := m.svc.Wireless().FetchBTHomeDevices(ctx, m.device, nil)
+			if err == nil {
+				data.Devices = devices
+			}
 		}
 
 		// If we got nothing, return an error
@@ -297,8 +346,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	if m.loading {
-		if model, cmd, done := m.updateLoading(msg); done {
-			return model, cmd
+		if updated, cmd, done := m.updateLoading(msg); done {
+			return updated, cmd
 		}
 	}
 
@@ -326,38 +375,57 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleStatusLoaded(msg)
 	case DiscoveryStartedMsg:
 		return m.handleDiscoveryStarted(msg)
-	// Action messages from context system
-	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleRefresh()
-	case messages.ScanRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleScanDiscovery()
-	case messages.EditRequestMsg, messages.ViewRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleEditKey()
+	case DeviceRemovedMsg:
+		return m.handleDeviceRemoved(msg)
+	case messages.NavigationMsg:
+		return m.handleNavigationMsg(msg)
+	case messages.RefreshRequestMsg, messages.ScanRequestMsg, messages.EditRequestMsg,
+		messages.ViewRequestMsg, messages.DeleteRequestMsg:
+		return m.handleActionMsg(msg)
 	case tea.KeyPressMsg:
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleKey(msg)
+		return m.handleKeyMsg(msg)
 	}
 	return m, nil
 }
 
+func (m Model) handleNavigationMsg(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleNavigation(msg)
+}
+
+func (m Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	switch msg.(type) {
+	case messages.RefreshRequestMsg:
+		return m.handleRefresh()
+	case messages.ScanRequestMsg:
+		return m.handleScanDiscovery()
+	case messages.EditRequestMsg, messages.ViewRequestMsg:
+		return m.handleEditKey()
+	case messages.DeleteRequestMsg:
+		return m.handleRemoveKey()
+	}
+	return m, nil
+}
+
+func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+	return m.handleKey(msg)
+}
+
 func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
-	result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
-		switch msg.(type) {
+	result := generics.UpdateLoader(m.Loader, msg, func(inMsg tea.Msg) bool {
+		switch inMsg.(type) {
 		case StatusLoadedMsg, DiscoveryStartedMsg:
 			return true
 		}
-		return generics.IsPanelCacheMsg(msg)
+		return generics.IsPanelCacheMsg(inMsg)
 	})
 	m.Loader = result.Loader
 	return m, result.Cmd, result.Consumed
@@ -372,11 +440,14 @@ func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
 	if err == nil {
 		m.ble = data.BLE
 		m.discovery = data.Discovery
+		m.devices = sortBTHomeDevices(data.Devices)
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
 	// Emit StatusLoadedMsg with cached data so sequential loading can advance
-	loadedCmd := func() tea.Msg { return StatusLoadedMsg{BLE: m.ble, Discovery: m.discovery} }
+	loadedCmd := func() tea.Msg {
+		return StatusLoadedMsg{BLE: m.ble, Discovery: m.discovery, Devices: m.devices}
+	}
 
 	if msg.NeedsRefresh {
 		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
@@ -408,9 +479,12 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	if data, ok := msg.Data.(CachedBLEData); ok {
 		m.ble = data.BLE
 		m.discovery = data.Discovery
+		m.devices = sortBTHomeDevices(data.Devices)
 	}
 	// Emit StatusLoadedMsg so sequential loading can advance
-	return m, func() tea.Msg { return StatusLoadedMsg{BLE: m.ble, Discovery: m.discovery} }
+	return m, func() tea.Msg {
+		return StatusLoadedMsg{BLE: m.ble, Discovery: m.discovery, Devices: m.devices}
+	}
 }
 
 func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
@@ -422,6 +496,7 @@ func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
 	}
 	m.ble = msg.BLE
 	m.discovery = msg.Discovery
+	m.devices = sortBTHomeDevices(msg.Devices)
 	return m, nil
 }
 
@@ -510,10 +585,88 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// Component-specific keys not covered by action messages
-	// (none currently - all keys migrated to action messages)
-	_ = msg
+	// Handle escape to cancel pending removal
+	if msg.String() == "esc" || msg.String() == "ctrl+[" {
+		if m.pendingRemove >= 0 {
+			m.pendingRemove = -1
+			return m, nil
+		}
+	}
 	return m, nil
+}
+
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	if len(m.devices) == 0 {
+		return m, nil
+	}
+	switch msg.Direction {
+	case messages.NavUp:
+		if m.cursor > 0 {
+			m.cursor--
+			m.pendingRemove = -1 // Cancel pending removal when navigating
+		}
+	case messages.NavDown:
+		if m.cursor < len(m.devices)-1 {
+			m.cursor++
+			m.pendingRemove = -1 // Cancel pending removal when navigating
+		}
+	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
+		// Not applicable for this component
+	}
+	return m, nil
+}
+
+func (m Model) handleRemoveKey() (Model, tea.Cmd) {
+	if len(m.devices) == 0 || m.cursor >= len(m.devices) {
+		return m, nil
+	}
+	device := m.devices[m.cursor]
+
+	// If this device is already pending removal, confirm and remove
+	if m.pendingRemove == device.ID {
+		m.pendingRemove = -1
+		return m, m.removeDevice(device.ID)
+	}
+
+	// Otherwise, mark as pending removal
+	m.pendingRemove = device.ID
+	return m, nil
+}
+
+func (m Model) removeDevice(deviceID int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
+		err := m.svc.Wireless().BTHomeRemoveDevice(ctx, m.device, deviceID)
+		return DeviceRemovedMsg{DeviceID: deviceID, Err: err}
+	}
+}
+
+func (m Model) handleDeviceRemoved(msg DeviceRemovedMsg) (Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+
+	// Remove from list and adjust cursor
+	for i, dev := range m.devices {
+		if dev.ID == msg.DeviceID {
+			m.devices = append(m.devices[:i], m.devices[i+1:]...)
+			break
+		}
+	}
+	if m.cursor >= len(m.devices) && m.cursor > 0 {
+		m.cursor--
+	}
+
+	// Invalidate cache and refresh
+	m.loading = true
+	return m, tea.Batch(
+		m.Loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeBLE),
+		m.fetchAndCacheStatus(),
+	)
 }
 
 // View renders the BLE component.
@@ -557,18 +710,32 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		var footer string
-		if m.ble != nil && m.ble.Enable {
-			footer = "e:edit r:refresh d:discover"
-		} else {
-			footer = "e:edit r:refresh"
-		}
-		if cs := m.cacheStatus.View(); cs != "" {
-			footer += " | " + cs
-		}
+		footer := m.buildFooter()
 		r.SetFooter(footer)
 	}
 	return r.Render()
+}
+
+func (m Model) buildFooter() string {
+	// Show removal confirmation prompt
+	if m.pendingRemove >= 0 {
+		return m.styles.Enabled.Render("Press 'x' again to confirm removal, Esc to cancel")
+	}
+
+	var footer string
+	switch {
+	case m.ble != nil && m.ble.Enable && len(m.devices) > 0:
+		footer = "e:edit d:discover x:remove r:refresh"
+	case m.ble != nil && m.ble.Enable:
+		footer = "e:edit d:discover r:refresh"
+	default:
+		footer = "e:edit r:refresh"
+	}
+
+	if cs := m.cacheStatus.View(); cs != "" {
+		footer += " | " + cs
+	}
+	return footer
 }
 
 func (m Model) renderBLEConfig() string {
@@ -618,6 +785,9 @@ func (m Model) renderBTHome() string {
 	var content strings.Builder
 
 	content.WriteString(m.styles.Section.Render("BTHome Devices"))
+	if len(m.devices) > 0 {
+		content.WriteString(m.styles.Muted.Render(fmt.Sprintf(" (%d)", len(m.devices))))
+	}
 	content.WriteString("\n")
 
 	if m.ble == nil || !m.ble.Enable {
@@ -629,18 +799,91 @@ func (m Model) renderBTHome() string {
 	switch {
 	case m.discovery != nil && m.discovery.Active:
 		content.WriteString("  " + m.styles.Warning.Render("◐ Discovery in progress...") + "\n")
-		content.WriteString(m.styles.Muted.Render(
-			fmt.Sprintf("    Duration: %ds", m.discovery.Duration),
-		))
 	case m.starting:
-		content.WriteString("  " + m.styles.Muted.Render("◐ Starting discovery..."))
-	default:
-		content.WriteString("  " + m.styles.Muted.Render("No active discovery"))
+		content.WriteString("  " + m.styles.Muted.Render("◐ Starting discovery...") + "\n")
+	}
+
+	// Device list
+	if len(m.devices) == 0 {
+		content.WriteString("  " + m.styles.Muted.Render("No paired devices"))
 		content.WriteString("\n")
 		content.WriteString("  " + m.styles.Muted.Render("Press 'd' to scan for BTHome devices"))
+	} else {
+		content.WriteString("\n")
+		for i, dev := range m.devices {
+			line := m.renderBTHomeDevice(dev, i == m.cursor)
+			content.WriteString(line)
+			content.WriteString("\n")
+		}
 	}
 
 	return content.String()
+}
+
+func (m Model) renderBTHomeDevice(dev model.BTHomeDeviceInfo, selected bool) string {
+	var parts []string
+
+	// Status indicator (pending removal or signal quality)
+	parts = append(parts, m.renderDeviceStatus(dev))
+
+	// Name and Address
+	name := dev.Name
+	if name == "" {
+		name = "Unnamed"
+	}
+	nameStyle := m.styles.DevName
+	if selected {
+		nameStyle = m.styles.Selected.Inherit(nameStyle)
+	}
+	parts = append(parts, nameStyle.Render(truncate(name, 18)), m.styles.DevAddr.Render(dev.Addr))
+
+	// RSSI
+	if dev.RSSI != nil {
+		parts = append(parts, m.styles.Signal.Render(fmt.Sprintf("%ddBm", *dev.RSSI)))
+	}
+
+	// Battery
+	if dev.Battery != nil {
+		parts = append(parts, m.styles.Battery.Render(fmt.Sprintf("🔋%d%%", *dev.Battery)))
+	}
+
+	return "  " + strings.Join(parts, "  ")
+}
+
+func (m Model) renderDeviceStatus(dev model.BTHomeDeviceInfo) string {
+	switch {
+	case m.pendingRemove == dev.ID:
+		return m.styles.Error.Render("✗")
+	case dev.RSSI != nil && *dev.RSSI >= -60:
+		return m.styles.Enabled.Render("●")
+	case dev.RSSI != nil && *dev.RSSI >= -80:
+		return m.styles.Warning.Render("●")
+	case dev.RSSI != nil:
+		return m.styles.Disabled.Render("●")
+	default:
+		return m.styles.Muted.Render("○")
+	}
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-1] + "…"
+}
+
+func sortBTHomeDevices(devices []model.BTHomeDeviceInfo) []model.BTHomeDeviceInfo {
+	if devices == nil {
+		return nil
+	}
+	// Sort by name, then by ID
+	sort.Slice(devices, func(i, j int) bool {
+		if devices[i].Name != devices[j].Name {
+			return devices[i].Name < devices[j].Name
+		}
+		return devices[i].ID < devices[j].ID
+	})
+	return devices
 }
 
 // BLE returns the current BLE configuration.

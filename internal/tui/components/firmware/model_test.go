@@ -11,6 +11,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
+// testDeviceName is the device name used in tests.
+const testDeviceName = "device0"
+
 func TestNew(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -201,7 +204,7 @@ func TestModel_HandleAction_Navigation(t *testing.T) {
 	m := newTestModel()
 	m.focused = true
 	m.devices = []DeviceFirmware{
-		{Name: "device0"},
+		{Name: "testDeviceName"},
 		{Name: "device1"},
 		{Name: "device2"},
 	}
@@ -225,20 +228,20 @@ func TestModel_HandleAction_Toggle(t *testing.T) {
 	m := newTestModel()
 	m.focused = true
 	m.devices = []DeviceFirmware{
-		{Name: "device0", Selected: false},
+		{Name: "testDeviceName", Selected: false},
 		{Name: "device1", Selected: false},
 	}
 
 	// Toggle selection with ToggleEnableRequestMsg
 	updated, _ := m.Update(messages.ToggleEnableRequestMsg{})
 	if !updated.devices[0].Selected {
-		t.Error("device0 should be selected after toggle")
+		t.Error("testDeviceName should be selected after toggle")
 	}
 
 	// Toggle again
 	updated, _ = updated.Update(messages.ToggleEnableRequestMsg{})
 	if updated.devices[0].Selected {
-		t.Error("device0 should be unselected after second toggle")
+		t.Error("testDeviceName should be unselected after second toggle")
 	}
 }
 
@@ -247,7 +250,7 @@ func TestModel_HandleKey_SelectAllWithUpdates(t *testing.T) {
 	m := newTestModel()
 	m.focused = true
 	m.devices = []DeviceFirmware{
-		{Name: "device0", HasUpdate: true, Selected: false},
+		{Name: "testDeviceName", HasUpdate: true, Selected: false},
 		{Name: "device1", HasUpdate: false, Selected: false},
 		{Name: "device2", HasUpdate: true, Selected: false},
 	}
@@ -255,7 +258,7 @@ func TestModel_HandleKey_SelectAllWithUpdates(t *testing.T) {
 	// Select all with updates via 'a'
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'a'})
 	if !updated.devices[0].Selected {
-		t.Error("device0 with update should be selected after 'a'")
+		t.Error("testDeviceName with update should be selected after 'a'")
 	}
 	if updated.devices[1].Selected {
 		t.Error("device1 without update should not be selected after 'a'")
@@ -270,7 +273,7 @@ func TestModel_HandleKey_SelectNone(t *testing.T) {
 	m := newTestModel()
 	m.focused = true
 	m.devices = []DeviceFirmware{
-		{Name: "device0", Selected: true},
+		{Name: "testDeviceName", Selected: true},
 		{Name: "device1", Selected: true},
 	}
 
@@ -285,7 +288,7 @@ func TestModel_HandleAction_Check(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
-	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.devices = []DeviceFirmware{{Name: "testDeviceName"}}
 
 	updated, cmd := m.Update(messages.ScanRequestMsg{})
 
@@ -302,7 +305,7 @@ func TestModel_HandleKey_Update_NoSelection(t *testing.T) {
 	m := newTestModel()
 	m.focused = true
 	m.devices = []DeviceFirmware{
-		{Name: "device0", HasUpdate: true, Selected: false},
+		{Name: "testDeviceName", HasUpdate: true, Selected: false},
 	}
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'u'})
@@ -320,7 +323,7 @@ func TestModel_HandleKey_Update_WithSelection(t *testing.T) {
 	m := newTestModel()
 	m.focused = true
 	m.devices = []DeviceFirmware{
-		{Name: "device0", HasUpdate: true, Selected: true},
+		{Name: "testDeviceName", HasUpdate: true, Selected: true},
 	}
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'u'})
@@ -340,7 +343,7 @@ func TestModel_HandleAction_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = false
-	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.devices = []DeviceFirmware{{Name: "testDeviceName"}}
 	m.Scroller.SetItemCount(len(m.devices))
 
 	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavDown})
@@ -355,7 +358,7 @@ func TestModel_ScrollerCursorBounds(t *testing.T) {
 	m := newTestModel()
 	m.focused = true
 	m.devices = []DeviceFirmware{
-		{Name: "device0"},
+		{Name: "testDeviceName"},
 		{Name: "device1"},
 	}
 	m.Scroller.SetItemCount(len(m.devices))
@@ -396,7 +399,7 @@ func TestModel_SelectedDevices(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.devices = []DeviceFirmware{
-		{Name: "device0", Selected: true},
+		{Name: "testDeviceName", Selected: true},
 		{Name: "device1", Selected: false},
 		{Name: "device2", Selected: true},
 	}
@@ -424,7 +427,7 @@ func TestModel_View_WithDevices(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.devices = []DeviceFirmware{
-		{Name: "device0", Current: "1.0.0", Available: "1.1.0", HasUpdate: true, Checked: true},
+		{Name: "testDeviceName", Current: "1.0.0", Available: "1.1.0", HasUpdate: true, Checked: true},
 		{Name: "device1", Current: "2.0.0", HasUpdate: false, Checked: true},
 	}
 	m = m.SetSize(80, 30)
@@ -439,7 +442,7 @@ func TestModel_View_WithDevices(t *testing.T) {
 func TestModel_View_Checking(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.devices = []DeviceFirmware{{Name: "testDeviceName"}}
 	m.checking = true
 	m = m.SetSize(80, 24)
 
@@ -453,7 +456,7 @@ func TestModel_View_Checking(t *testing.T) {
 func TestModel_View_Updating(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	m.devices = []DeviceFirmware{{Name: "device0", Updating: true}}
+	m.devices = []DeviceFirmware{{Name: "testDeviceName", Updating: true}}
 	m.updating = true
 	m = m.SetSize(80, 24)
 
@@ -468,7 +471,7 @@ func TestModel_Accessors(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.devices = []DeviceFirmware{
-		{Name: "device0", Selected: true, HasUpdate: true},
+		{Name: "testDeviceName", Selected: true, HasUpdate: true},
 		{Name: "device1", Selected: false, HasUpdate: true},
 		{Name: "device2", Selected: true, HasUpdate: false},
 	}
@@ -562,7 +565,7 @@ func TestModel_CheckAll_AlreadyChecking(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.checking = true
-	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.devices = []DeviceFirmware{{Name: "testDeviceName"}}
 
 	updated, cmd := m.CheckAll()
 
@@ -578,7 +581,7 @@ func TestModel_UpdateSelected_NoSelection(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.devices = []DeviceFirmware{
-		{Name: "device0", HasUpdate: true, Selected: false},
+		{Name: "testDeviceName", HasUpdate: true, Selected: false},
 	}
 
 	updated, cmd := m.UpdateSelected()
@@ -596,7 +599,7 @@ func TestModel_UpdateSelected_AlreadyUpdating(t *testing.T) {
 	m := newTestModel()
 	m.updating = true
 	m.devices = []DeviceFirmware{
-		{Name: "device0", HasUpdate: true, Selected: true},
+		{Name: "testDeviceName", HasUpdate: true, Selected: true},
 	}
 
 	updated, cmd := m.UpdateSelected()
@@ -661,7 +664,7 @@ func TestModel_HandleKey_Rollback(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
-	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.devices = []DeviceFirmware{{Name: testDeviceName}}
 	m.Scroller.SetItemCount(len(m.devices))
 
 	// Press 'R' should start confirmation, not immediately rollback
@@ -670,8 +673,8 @@ func TestModel_HandleKey_Rollback(t *testing.T) {
 	if !updated.confirmingRollback {
 		t.Error("should be in confirmingRollback state after 'R' key")
 	}
-	if updated.rollbackDevice != "device0" {
-		t.Errorf("rollbackDevice should be 'device0', got %q", updated.rollbackDevice)
+	if updated.rollbackDevice != testDeviceName {
+		t.Errorf("rollbackDevice should be %q, got %q", testDeviceName, updated.rollbackDevice)
 	}
 	if cmd != nil {
 		t.Error("should not return command until confirmed")
@@ -685,10 +688,10 @@ func TestModel_HandleKey_RollbackConfirmation(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
-	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.devices = []DeviceFirmware{{Name: testDeviceName}}
 	m.Scroller.SetItemCount(len(m.devices))
 	m.confirmingRollback = true
-	m.rollbackDevice = "device0"
+	m.rollbackDevice = testDeviceName
 
 	// Press 'Y' to confirm rollback
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'Y'})
@@ -714,10 +717,10 @@ func TestModel_HandleKey_RollbackCancel(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
-	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.devices = []DeviceFirmware{{Name: testDeviceName}}
 	m.Scroller.SetItemCount(len(m.devices))
 	m.confirmingRollback = true
-	m.rollbackDevice = "device0"
+	m.rollbackDevice = testDeviceName
 
 	// Press 'N' to cancel rollback
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'N'})
@@ -754,7 +757,7 @@ func TestModel_RollbackCurrent_AlreadyUpdating(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.updating = true
-	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.devices = []DeviceFirmware{{Name: "testDeviceName"}}
 	m.Scroller.SetItemCount(1)
 
 	updated, cmd := m.RollbackCurrent()
@@ -771,7 +774,7 @@ func TestModel_FindDeviceIndex(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.devices = []DeviceFirmware{
-		{Name: "device0"},
+		{Name: "testDeviceName"},
 		{Name: "device1"},
 		{Name: "device2"},
 	}
@@ -788,14 +791,14 @@ func TestModel_HandleBatchComplete_WithResults(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.devices = []DeviceFirmware{
-		{Name: "device0", HasUpdate: true, Updating: true},
+		{Name: "testDeviceName", HasUpdate: true, Updating: true},
 		{Name: "device1", HasUpdate: true, Updating: true},
 	}
 	m.updating = true
 
 	msg := updateBatchComplete{
 		Results: []UpdateResult{
-			{Name: "device0", Success: true},
+			{Name: "testDeviceName", Success: true},
 			{Name: "device1", Success: false, Err: errors.New("failed")},
 		},
 	}
@@ -812,7 +815,7 @@ func TestModel_HandleBatchComplete_WithResults(t *testing.T) {
 		t.Errorf("lastResults len = %d, want 2", len(updated.lastResults))
 	}
 	if updated.devices[0].HasUpdate {
-		t.Error("device0 should not have update after successful update")
+		t.Error("testDeviceName should not have update after successful update")
 	}
 	if !updated.devices[1].HasUpdate {
 		t.Error("device1 should still have update after failed update")
@@ -826,7 +829,7 @@ func TestModel_RenderUpdateSummary(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.lastResults = []UpdateResult{
-		{Name: "device0", Success: true},
+		{Name: "testDeviceName", Success: true},
 		{Name: "device1", Success: true},
 		{Name: "device2", Success: false, Err: errors.New("timeout")},
 	}
@@ -845,7 +848,7 @@ func TestModel_HandleKey_DismissSummary(t *testing.T) {
 	m := newTestModel()
 	m.focused = true
 	m.showSummary = true
-	m.lastResults = []UpdateResult{{Name: "device0", Success: true}}
+	m.lastResults = []UpdateResult{{Name: "testDeviceName", Success: true}}
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 's'})
 
@@ -861,7 +864,7 @@ func TestModel_UpdateSelectedStaged_NoDevices(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.devices = []DeviceFirmware{
-		{Name: "device0", HasUpdate: true, Selected: false},
+		{Name: "testDeviceName", HasUpdate: true, Selected: false},
 	}
 
 	updated, cmd := m.UpdateSelectedStaged(25)
@@ -879,7 +882,7 @@ func TestModel_UpdateSelectedStaged_AlreadyUpdating(t *testing.T) {
 	m := newTestModel()
 	m.updating = true
 	m.devices = []DeviceFirmware{
-		{Name: "device0", HasUpdate: true, Selected: true},
+		{Name: "testDeviceName", HasUpdate: true, Selected: true},
 	}
 
 	updated, cmd := m.UpdateSelectedStaged(25)
@@ -896,7 +899,7 @@ func TestModel_UpdateSelectedStaged_StartsUpdate(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.devices = []DeviceFirmware{
-		{Name: "device0", HasUpdate: true, Selected: true},
+		{Name: "testDeviceName", HasUpdate: true, Selected: true},
 		{Name: "device1", HasUpdate: true, Selected: true},
 		{Name: "device2", HasUpdate: true, Selected: true},
 		{Name: "device3", HasUpdate: true, Selected: true},
