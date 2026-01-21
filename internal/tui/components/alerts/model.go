@@ -87,12 +87,13 @@ type Model struct {
 	styles Styles
 
 	// State
-	alerts   []AlertItem
-	cursor   int
-	loading  bool
-	err      error
-	focused  bool
-	panelIdx int
+	alerts        []AlertItem
+	cursor        int
+	loading       bool
+	err           error
+	focused       bool
+	panelIdx      int
+	pendingDelete string // Alert name pending delete confirmation (empty = none)
 }
 
 // Styles for the alerts component.
@@ -224,7 +225,7 @@ func (m *Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
 	case messages.EditRequestMsg:
 		return *m, m.handleEdit()
 	case messages.DeleteRequestMsg:
-		return *m, m.handleDelete()
+		return m.handleDeleteKey()
 	case messages.SnoozeRequestMsg:
 		return m.handleSnoozeMsg(msg)
 	case messages.TestRequestMsg:
@@ -262,11 +263,15 @@ func (m *Model) handleSnoozeMsg(msg messages.SnoozeRequestMsg) (Model, tea.Cmd) 
 }
 
 func (m *Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// Component-specific keys not covered by action messages
-	// (none currently - all keys migrated to action messages)
-	_ = msg
 	if !m.focused {
 		return *m, nil
+	}
+	// Handle escape to cancel pending delete
+	if msg.String() == "esc" || msg.String() == "ctrl+[" {
+		if m.pendingDelete != "" {
+			m.pendingDelete = ""
+			return *m, nil
+		}
 	}
 	return *m, nil
 }
@@ -303,12 +308,21 @@ func (m *Model) handleEdit() tea.Cmd {
 	return func() tea.Msg { return AlertEditMsg{Name: name} }
 }
 
-func (m *Model) handleDelete() tea.Cmd {
+func (m *Model) handleDeleteKey() (Model, tea.Cmd) {
 	if !m.hasSelection() {
-		return nil
+		return *m, nil
 	}
 	name := m.alerts[m.cursor].Name
-	return func() tea.Msg { return AlertDeleteMsg{Name: name} }
+
+	// If this alert is already pending delete, confirm and delete
+	if m.pendingDelete == name {
+		m.pendingDelete = ""
+		return *m, func() tea.Msg { return AlertDeleteMsg{Name: name} }
+	}
+
+	// Otherwise, mark as pending delete
+	m.pendingDelete = name
+	return *m, nil
 }
 
 func (m *Model) handleSnooze(duration time.Duration) tea.Cmd {
@@ -426,7 +440,11 @@ func (m *Model) View() string {
 
 	// Only show footer when focused
 	if m.focused {
-		r.SetFooter(theme.StyledKeybindings("e:toggle n:new d:del s/S:snooze t:test"))
+		if m.pendingDelete != "" {
+			r.SetFooter(m.styles.Enabled.Render("Press 'd' again to confirm delete, Esc to cancel"))
+		} else {
+			r.SetFooter(theme.StyledKeybindings("e:toggle n:new d:del s/S:snooze t:test"))
+		}
 	}
 
 	return r.SetContent(content).Render()

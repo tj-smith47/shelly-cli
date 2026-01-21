@@ -664,16 +664,75 @@ func TestModel_HandleKey_Rollback(t *testing.T) {
 	m.devices = []DeviceFirmware{{Name: "device0"}}
 	m.Scroller.SetItemCount(len(m.devices))
 
+	// Press 'R' should start confirmation, not immediately rollback
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'R'})
 
+	if !updated.confirmingRollback {
+		t.Error("should be in confirmingRollback state after 'R' key")
+	}
+	if updated.rollbackDevice != "device0" {
+		t.Errorf("rollbackDevice should be 'device0', got %q", updated.rollbackDevice)
+	}
+	if cmd != nil {
+		t.Error("should not return command until confirmed")
+	}
+	if updated.updating {
+		t.Error("should not be updating until confirmed")
+	}
+}
+
+func TestModel_HandleKey_RollbackConfirmation(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.Scroller.SetItemCount(len(m.devices))
+	m.confirmingRollback = true
+	m.rollbackDevice = "device0"
+
+	// Press 'Y' to confirm rollback
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'Y'})
+
+	if updated.confirmingRollback {
+		t.Error("should not be in confirmingRollback state after 'Y' key")
+	}
+	if updated.rollbackDevice != "" {
+		t.Errorf("rollbackDevice should be empty after confirmation, got %q", updated.rollbackDevice)
+	}
 	if !updated.updating {
-		t.Error("should be updating after 'R' key")
+		t.Error("should be updating after confirmation")
 	}
 	if cmd == nil {
-		t.Error("should return rollback command")
+		t.Error("should return rollback command after confirmation")
 	}
 	if !updated.devices[0].RollingBack {
 		t.Error("device should have RollingBack=true")
+	}
+}
+
+func TestModel_HandleKey_RollbackCancel(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.Scroller.SetItemCount(len(m.devices))
+	m.confirmingRollback = true
+	m.rollbackDevice = "device0"
+
+	// Press 'N' to cancel rollback
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'N'})
+
+	if updated.confirmingRollback {
+		t.Error("should not be in confirmingRollback state after 'N' key")
+	}
+	if updated.rollbackDevice != "" {
+		t.Errorf("rollbackDevice should be empty after cancel, got %q", updated.rollbackDevice)
+	}
+	if updated.updating {
+		t.Error("should not be updating after cancel")
+	}
+	if cmd != nil {
+		t.Error("should not return command after cancel")
 	}
 }
 

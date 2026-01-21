@@ -121,6 +121,8 @@ type Model struct {
 	endpointCursor          int    // Selected endpoint in JSON panel
 	initialSelectionEmitted bool   // Whether initial device selection has been emitted
 	lastCacheVersion        uint64 // Last observed cache version for detecting WebSocket updates
+	confirmingReboot        bool   // True when showing reboot confirmation
+	pendingRebootDevice     string // Device name pending reboot
 
 	// Dimensions
 	width  int
@@ -793,6 +795,11 @@ func (m Model) updateComponents(msg tea.Msg) (Model, []tea.Cmd) {
 // handleKeyPressMsg handles keyboard input using the FocusState system.
 // It routes keys based on the current focus mode (normal/overlay/modal/input).
 func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	// Handle reboot confirmation
+	if m.confirmingReboot {
+		return m.handleRebootConfirmation(msg)
+	}
+
 	// STEP 1: Determine effective mode from focusState or visibility checks
 	effectiveMode := m.getEffectiveFocusMode()
 
@@ -838,6 +845,43 @@ func (m Model) getEffectiveFocusMode() focus.Mode {
 	}
 
 	return focus.ModeNormal
+}
+
+// handleRebootConfirmation handles Y/N key presses for reboot confirmation.
+func (m Model) handleRebootConfirmation(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	switch msg.String() {
+	case "y", "Y":
+		m.confirmingReboot = false
+		deviceName := m.pendingRebootDevice
+		m.pendingRebootDevice = ""
+		return m, m.executeReboot(deviceName), true
+	case "n", "N", keyconst.KeyEsc:
+		m.confirmingReboot = false
+		m.pendingRebootDevice = ""
+		return m, nil, true
+	}
+	return m, nil, true
+}
+
+// executeReboot executes reboot on the named device.
+func (m Model) executeReboot(deviceName string) tea.Cmd {
+	cfg := config.Get()
+	if cfg == nil {
+		return toast.Error("Config not loaded")
+	}
+	device, ok := cfg.Devices[deviceName]
+	if !ok {
+		return toast.Error("Device not found: " + deviceName)
+	}
+	svc := m.factory.ShellyService()
+	return func() tea.Msg {
+		err := svc.DeviceReboot(m.ctx, device.Address, 0)
+		return DeviceActionMsg{
+			Device: deviceName,
+			Action: actionReboot,
+			Err:    err,
+		}
+	}
 }
 
 // getContextForMode returns the appropriate key context for the focus mode.
@@ -1881,6 +1925,22 @@ func (m Model) dispatchDeviceAction(action string) (Model, tea.Cmd, bool) {
 	if !m.hasDeviceList() {
 		return m, nil, false
 	}
+
+	// Handle reboot with confirmation
+	if action == actionReboot {
+		devices := m.getFilteredDevices()
+		if m.cursor >= len(devices) {
+			return m, nil, false
+		}
+		selected := devices[m.cursor]
+		if !selected.Online {
+			return m, nil, false
+		}
+		m.confirmingReboot = true
+		m.pendingRebootDevice = selected.Device.Name
+		return m, nil, true
+	}
+
 	cmd := m.executeDeviceAction(action)
 	return m, cmd, true
 }
@@ -2552,6 +2612,9 @@ func (m Model) composeLayout(header, tabBar, inputBar, content string) string {
 // applyOverlays applies confirm, device detail, and control panel overlays.
 // Note: Toast is now rendered in the input bar area (renderInputBar), not as an overlay.
 func (m Model) applyOverlays(result string) string {
+	if m.confirmingReboot {
+		result = m.centerOverlay(m.renderRebootConfirmation())
+	}
 	if m.confirm.Visible() {
 		result = m.confirm.Overlay(result)
 	}
@@ -2562,6 +2625,31 @@ func (m Model) applyOverlays(result string) string {
 		result = m.centerOverlay(m.controlPanel.View())
 	}
 	return result
+}
+
+// renderRebootConfirmation renders the reboot confirmation dialog.
+func (m Model) renderRebootConfirmation() string {
+	colors := theme.GetSemanticColors()
+	confirmStyle := lipgloss.NewStyle().
+		Foreground(colors.Error).
+		Bold(true)
+	warningStyle := lipgloss.NewStyle().
+		Foreground(colors.Warning)
+	mutedStyle := lipgloss.NewStyle().
+		Foreground(colors.Muted)
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colors.Error).
+		Padding(1, 3)
+
+	var content strings.Builder
+	content.WriteString(confirmStyle.Render("Reboot device: " + m.pendingRebootDevice + "?"))
+	content.WriteString("\n\n")
+	content.WriteString(warningStyle.Render("The device will be temporarily unavailable."))
+	content.WriteString("\n\n")
+	content.WriteString(mutedStyle.Render("Press Y to confirm, N or Esc to cancel"))
+
+	return borderStyle.Render(content.String())
 }
 
 // centerOverlay centers an overlay on the screen.

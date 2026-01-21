@@ -94,24 +94,26 @@ type RollbackCompleteMsg struct {
 // Model displays firmware management.
 type Model struct {
 	helpers.Sizable
-	ctx           context.Context
-	svc           *shelly.Service
-	fileCache     *cache.FileCache
-	devices       []DeviceFirmware
-	checking      bool
-	updating      bool
-	err           error
-	focused       bool
-	panelIndex    int
-	styles        Styles
-	updateLoader  loading.Model
-	cacheStatus   cachestatus.Model
-	lastChecked   time.Time
-	lastResults   []UpdateResult
-	showSummary   bool
-	stagedPercent int
-	currentStage  int
-	totalStages   int
+	ctx                context.Context
+	svc                *shelly.Service
+	fileCache          *cache.FileCache
+	devices            []DeviceFirmware
+	checking           bool
+	updating           bool
+	err                error
+	focused            bool
+	panelIndex         int
+	confirmingRollback bool   // True when showing rollback confirmation
+	rollbackDevice     string // Device name pending rollback
+	styles             Styles
+	updateLoader       loading.Model
+	cacheStatus        cachestatus.Model
+	lastChecked        time.Time
+	lastResults        []UpdateResult
+	showSummary        bool
+	stagedPercent      int
+	currentStage       int
+	totalStages        int
 }
 
 // Styles holds styles for the Firmware component.
@@ -127,6 +129,8 @@ type Styles struct {
 	Muted     lipgloss.Style
 	Button    lipgloss.Style
 	Version   lipgloss.Style
+	Warning   lipgloss.Style
+	Confirm   lipgloss.Style
 }
 
 // DefaultStyles returns the default styles for the Firmware component.
@@ -159,6 +163,11 @@ func DefaultStyles() Styles {
 			Bold(true),
 		Version: lipgloss.NewStyle().
 			Foreground(colors.Text),
+		Warning: lipgloss.NewStyle().
+			Foreground(colors.Warning),
+		Confirm: lipgloss.NewStyle().
+			Foreground(colors.Error).
+			Bold(true),
 	}
 }
 
@@ -417,7 +426,7 @@ type StagedUpdateCompleteMsg struct {
 	Results     []UpdateResult
 }
 
-// RollbackCurrent starts firmware rollback on the device at cursor.
+// RollbackCurrent starts the rollback confirmation for the device at cursor.
 func (m Model) RollbackCurrent() (Model, tea.Cmd) {
 	if m.updating || m.checking || len(m.devices) == 0 {
 		return m, nil
@@ -428,16 +437,28 @@ func (m Model) RollbackCurrent() (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	device := &m.devices[cursor]
-	device.RollingBack = true
+	// Start rollback confirmation
+	m.confirmingRollback = true
+	m.rollbackDevice = m.devices[cursor].Name
+	return m, nil
+}
+
+// executeRollback performs the actual rollback after confirmation.
+func (m Model) executeRollback(deviceName string) (Model, tea.Cmd) {
+	// Find and update device state
+	for i := range m.devices {
+		if m.devices[i].Name == deviceName {
+			m.devices[i].RollingBack = true
+			break
+		}
+	}
 	m.updating = true
 	m.err = nil
 
-	deviceName := device.Name
-	return m, tea.Batch(m.updateLoader.Tick(), m.rollbackDevice(deviceName))
+	return m, tea.Batch(m.updateLoader.Tick(), m.rollbackDeviceCmd(deviceName))
 }
 
-func (m Model) rollbackDevice(deviceName string) tea.Cmd {
+func (m Model) rollbackDeviceCmd(deviceName string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 60*time.Second)
 		defer cancel()
@@ -463,6 +484,11 @@ func (m Model) rollbackDevice(deviceName string) tea.Cmd {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Handle rollback confirmation
+	if m.confirmingRollback {
+		return m.handleRollbackConfirmation(msg)
+	}
+
 	// Forward tick messages to the appropriate loader
 	var cmd tea.Cmd
 	m, cmd = m.updateLoaders(msg)
@@ -492,6 +518,23 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
+	return m, nil
+}
+
+func (m Model) handleRollbackConfirmation(msg tea.Msg) (Model, tea.Cmd) {
+	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+		switch keyMsg.String() {
+		case "y", "Y":
+			m.confirmingRollback = false
+			deviceName := m.rollbackDevice
+			m.rollbackDevice = ""
+			return m.executeRollback(deviceName)
+		case "n", "N", "esc":
+			m.confirmingRollback = false
+			m.rollbackDevice = ""
+			return m, nil
+		}
+	}
 	return m, nil
 }
 
@@ -883,6 +926,18 @@ func (m Model) View() string {
 			footer += " | " + cs
 		}
 		r.SetFooter(footer)
+	}
+
+	// Show rollback confirmation
+	if m.confirmingRollback {
+		var content strings.Builder
+		content.WriteString(m.styles.Confirm.Render("Rollback firmware on: " + m.rollbackDevice + "?"))
+		content.WriteString("\n\n")
+		content.WriteString(m.styles.Warning.Render("This will revert to the previous firmware version."))
+		content.WriteString("\n\n")
+		content.WriteString(m.styles.Muted.Render("Press Y to confirm, N or Esc to cancel"))
+		r.SetContent(content.String())
+		return r.Render()
 	}
 
 	var content strings.Builder

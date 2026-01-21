@@ -96,20 +96,21 @@ type CreateMsg struct {
 // Model displays webhooks for a device.
 type Model struct {
 	helpers.Sizable
-	ctx         context.Context
-	svc         *shelly.Service
-	fileCache   *cache.FileCache
-	device      string
-	webhooks    []Webhook
-	loading     bool
-	editing     bool
-	testing     bool // True when testing a webhook URL
-	err         error
-	focused     bool
-	panelIndex  int // 1-based panel index for Shift+N hotkey hint
-	styles      Styles
-	editModal   EditModel
-	cacheStatus cachestatus.Model
+	ctx           context.Context
+	svc           *shelly.Service
+	fileCache     *cache.FileCache
+	device        string
+	webhooks      []Webhook
+	loading       bool
+	editing       bool
+	testing       bool // True when testing a webhook URL
+	err           error
+	focused       bool
+	panelIndex    int // 1-based panel index for Shift+N hotkey hint
+	pendingDelete int // Webhook ID pending delete confirmation (-1 = none)
+	styles        Styles
+	editModal     EditModel
+	cacheStatus   cachestatus.Model
 }
 
 // Styles holds styles for the webhook list component.
@@ -158,14 +159,15 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:     helpers.NewSizable(4, panel.NewScroller(0, 1)),
-		ctx:         deps.Ctx,
-		svc:         deps.Svc,
-		fileCache:   deps.FileCache,
-		loading:     false,
-		styles:      DefaultStyles(),
-		cacheStatus: cachestatus.New(),
-		editModal:   NewEditModel(deps.Ctx, deps.Svc),
+		Sizable:       helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		ctx:           deps.Ctx,
+		svc:           deps.Svc,
+		fileCache:     deps.FileCache,
+		loading:       false,
+		pendingDelete: -1, // -1 means no pending delete
+		styles:        DefaultStyles(),
+		cacheStatus:   cachestatus.New(),
+		editModal:     NewEditModel(deps.Ctx, deps.Svc),
 	}
 	m.Loader = m.Loader.SetMessage("Loading webhooks...")
 	return m
@@ -182,6 +184,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.webhooks = nil
 	m.Scroller.SetItemCount(0)
 	m.err = nil
+	m.pendingDelete = -1 // Clear any pending delete when changing device
 	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
@@ -376,7 +379,7 @@ func (m Model) handleActionMsg(msg tea.Msg) (Model, tea.Cmd) {
 	case messages.TestRequestMsg:
 		return m.handleTestKey()
 	case messages.DeleteRequestMsg:
-		return m, m.deleteWebhook()
+		return m.handleDeleteKey()
 	case messages.NewRequestMsg:
 		return m.handleCreateKey()
 	case messages.RefreshRequestMsg:
@@ -543,9 +546,31 @@ func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// Component-specific keys not covered by action messages
-	// (none currently - all keys migrated to action messages)
-	_ = msg
+	// Handle escape to cancel pending delete
+	if msg.String() == "esc" || msg.String() == "ctrl+[" {
+		if m.pendingDelete >= 0 {
+			m.pendingDelete = -1
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleDeleteKey() (Model, tea.Cmd) {
+	cursor := m.Scroller.Cursor()
+	if len(m.webhooks) == 0 || cursor >= len(m.webhooks) {
+		return m, nil
+	}
+	webhook := m.webhooks[cursor]
+
+	// If this webhook is already pending delete, confirm and delete
+	if m.pendingDelete == webhook.ID {
+		m.pendingDelete = -1
+		return m, m.deleteWebhook()
+	}
+
+	// Otherwise, mark as pending delete
+	m.pendingDelete = webhook.ID
 	return m, nil
 }
 
@@ -718,6 +743,13 @@ func (m Model) setFooter(r *rendering.Renderer) {
 	if !m.focused || m.device == "" {
 		return
 	}
+
+	// Show delete confirmation prompt
+	if m.pendingDelete >= 0 {
+		r.SetFooter(m.styles.Enabled.Render("Press 'd' again to confirm delete, Esc to cancel"))
+		return
+	}
+
 	var footer string
 	if len(m.webhooks) > 0 {
 		footer = "e:edit t:toggle T:test d:del n:new r:refresh"
