@@ -101,3 +101,84 @@ func TestDeviceStatus_NilInfo(t *testing.T) {
 		t.Error("Info should be nil")
 	}
 }
+
+func TestConvertToMap(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   any
+		wantErr bool
+		check   func(t *testing.T, result map[string]any)
+	}{
+		{
+			name: "simple struct",
+			input: struct {
+				Name  string `json:"name"`
+				Value int    `json:"value"`
+			}{
+				Name:  "test",
+				Value: 42,
+			},
+			wantErr: false,
+			check: func(t *testing.T, result map[string]any) {
+				if result["name"] != "test" {
+					t.Errorf("name = %v, want test", result["name"])
+				}
+				if result["value"] != float64(42) { // JSON numbers are float64
+					t.Errorf("value = %v, want 42", result["value"])
+				}
+			},
+		},
+		{
+			name: "nested struct",
+			input: struct {
+				Device struct {
+					ID   string `json:"id"`
+					Type string `json:"type"`
+				} `json:"device"`
+			}{
+				Device: struct {
+					ID   string `json:"id"`
+					Type string `json:"type"`
+				}{
+					ID:   "test-id",
+					Type: "plug",
+				},
+			},
+			wantErr: false,
+			check: func(t *testing.T, result map[string]any) {
+				device, ok := result["device"].(map[string]any)
+				if !ok {
+					t.Fatal("device is not a map")
+				}
+				if device["id"] != "test-id" {
+					t.Errorf("device.id = %v, want test-id", device["id"])
+				}
+			},
+		},
+		{
+			name:    "nil input",
+			input:   nil,
+			wantErr: false,
+			check: func(t *testing.T, result map[string]any) {
+				if result != nil {
+					t.Errorf("expected nil result for nil input, got %v", result)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := convertToMap(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("convertToMap() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.check != nil {
+				tt.check(t, result)
+			}
+		})
+	}
+}

@@ -18,6 +18,7 @@ import (
 )
 
 // GetConfig returns the full device configuration.
+// This method assumes Gen2+ devices. For Gen1 support, use GetConfigAuto.
 func (s *Service) GetConfig(ctx context.Context, identifier string) (map[string]any, error) {
 	var result map[string]any
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
@@ -29,6 +30,65 @@ func (s *Service) GetConfig(ctx context.Context, identifier string) (map[string]
 		return nil
 	})
 	return result, err
+}
+
+// GetConfigGen1 returns the full device configuration for a Gen1 device.
+func (s *Service) GetConfigGen1(ctx context.Context, identifier string) (map[string]any, error) {
+	var result map[string]any
+	err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		settings, err := conn.GetSettings(ctx)
+		if err != nil {
+			return err
+		}
+
+		// Convert gen1.Settings to map[string]any
+		settingsMap, err := convertToMap(settings)
+		if err != nil {
+			return err
+		}
+		result = settingsMap
+		return nil
+	})
+	return result, err
+}
+
+// GetConfigAuto returns device configuration, auto-detecting generation (Gen1 vs Gen2).
+// If generation is known from config, it tries that generation first for efficiency.
+// Otherwise it tries Gen2 first (more common), then falls back to Gen1 if Gen2 fails.
+func (s *Service) GetConfigAuto(ctx context.Context, identifier string) (map[string]any, error) {
+	// First resolve to check if we have a stored generation
+	// Error is intentionally ignored - if resolution fails, we try Gen2 first
+	device, err := s.ResolveWithGeneration(ctx, identifier)
+
+	// If we know it's Gen1, try Gen1 first to avoid wasting time on Gen2
+	if err == nil && device.Generation == 1 {
+		gen1Result, gen1Err := s.GetConfigGen1(ctx, identifier)
+		if gen1Err == nil {
+			return gen1Result, nil
+		}
+		// Gen1 failed unexpectedly, try Gen2 as fallback
+		result, err := s.GetConfig(ctx, identifier)
+		if err == nil {
+			return result, nil
+		}
+		// Both failed, return Gen1 error since we knew it was Gen1
+		return nil, gen1Err
+	}
+
+	// Gen2+ or unknown: Try Gen2 first (more common)
+	result, err := s.GetConfig(ctx, identifier)
+	if err == nil {
+		return result, nil
+	}
+
+	// Gen2 failed, try Gen1
+	gen1Result, gen1Err := s.GetConfigGen1(ctx, identifier)
+	if gen1Err == nil {
+		return gen1Result, nil
+	}
+
+	// Both failed, return the original Gen2 error (more informative)
+	return nil, err
 }
 
 // LoadConfig loads a configuration from either a device or a file.

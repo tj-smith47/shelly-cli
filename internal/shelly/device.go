@@ -3,6 +3,7 @@ package shelly
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"time"
 
@@ -28,17 +29,86 @@ type DeviceStatus struct {
 }
 
 // DeviceReboot reboots the device.
+// This method assumes Gen2+ devices. For Gen1 support, use DeviceRebootAuto.
 func (s *Service) DeviceReboot(ctx context.Context, identifier string, delayMS int) error {
 	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		return conn.Reboot(ctx, delayMS)
 	})
 }
 
+// DeviceRebootGen1 reboots a Gen1 device.
+func (s *Service) DeviceRebootGen1(ctx context.Context, identifier string) error {
+	return s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		return conn.Reboot(ctx)
+	})
+}
+
+// DeviceRebootAuto reboots a device, auto-detecting generation (Gen1 vs Gen2).
+// Note: Gen1 devices don't support delay parameter.
+func (s *Service) DeviceRebootAuto(ctx context.Context, identifier string, delayMS int) error {
+	// First resolve to check if we have a stored generation
+	device, err := s.ResolveWithGeneration(ctx, identifier)
+
+	// If we know it's Gen1, use Gen1 method (ignore delay parameter)
+	if err == nil && device.Generation == 1 {
+		return s.DeviceRebootGen1(ctx, identifier)
+	}
+
+	// Gen2+ or unknown: Try Gen2 first (more common)
+	err = s.DeviceReboot(ctx, identifier, delayMS)
+	if err == nil {
+		return nil
+	}
+
+	// Gen2 failed, try Gen1
+	gen1Err := s.DeviceRebootGen1(ctx, identifier)
+	if gen1Err == nil {
+		return nil
+	}
+
+	// Both failed, return the original Gen2 error (more informative)
+	return err
+}
+
 // DeviceFactoryReset performs a factory reset on the device.
+// This method assumes Gen2+ devices. For Gen1 support, use DeviceFactoryResetAuto.
 func (s *Service) DeviceFactoryReset(ctx context.Context, identifier string) error {
 	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		return conn.FactoryReset(ctx)
 	})
+}
+
+// DeviceFactoryResetGen1 performs a factory reset on a Gen1 device.
+func (s *Service) DeviceFactoryResetGen1(ctx context.Context, identifier string) error {
+	return s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		return conn.FactoryReset(ctx)
+	})
+}
+
+// DeviceFactoryResetAuto performs a factory reset, auto-detecting generation (Gen1 vs Gen2).
+func (s *Service) DeviceFactoryResetAuto(ctx context.Context, identifier string) error {
+	// First resolve to check if we have a stored generation
+	device, err := s.ResolveWithGeneration(ctx, identifier)
+
+	// If we know it's Gen1, use Gen1 method
+	if err == nil && device.Generation == 1 {
+		return s.DeviceFactoryResetGen1(ctx, identifier)
+	}
+
+	// Gen2+ or unknown: Try Gen2 first (more common)
+	err = s.DeviceFactoryReset(ctx, identifier)
+	if err == nil {
+		return nil
+	}
+
+	// Gen2 failed, try Gen1
+	gen1Err := s.DeviceFactoryResetGen1(ctx, identifier)
+	if gen1Err == nil {
+		return nil
+	}
+
+	// Both failed, return the original Gen2 error (more informative)
+	return err
 }
 
 // DeviceInfo returns information about the device.
@@ -61,6 +131,7 @@ func (s *Service) DeviceInfo(ctx context.Context, identifier string) (*DeviceInf
 }
 
 // DeviceStatus returns the full status of the device.
+// This method assumes Gen2+ devices. For Gen1 support, use DeviceStatusAuto.
 func (s *Service) DeviceStatus(ctx context.Context, identifier string) (*DeviceStatus, error) {
 	var result *DeviceStatus
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
@@ -85,6 +156,78 @@ func (s *Service) DeviceStatus(ctx context.Context, identifier string) (*DeviceS
 		return nil
 	})
 	return result, err
+}
+
+// DeviceStatusGen1 returns the full status of a Gen1 device.
+func (s *Service) DeviceStatusGen1(ctx context.Context, identifier string) (*DeviceStatus, error) {
+	var result *DeviceStatus
+	err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		info := conn.Info()
+		status, err := conn.GetStatus(ctx)
+		if err != nil {
+			return err
+		}
+
+		// Convert gen1.Status to map[string]any
+		statusMap, err := convertToMap(status)
+		if err != nil {
+			return err
+		}
+
+		result = &DeviceStatus{
+			Info: &DeviceInfo{
+				ID:         info.ID,
+				MAC:        info.MAC,
+				Model:      info.Model,
+				Generation: info.Generation,
+				Firmware:   info.Firmware,
+				App:        info.App,
+				AuthEn:     info.AuthEn,
+			},
+			Status: statusMap,
+		}
+		return nil
+	})
+	return result, err
+}
+
+// DeviceStatusAuto returns device status, auto-detecting generation (Gen1 vs Gen2).
+// If generation is known from config, it tries that generation first for efficiency.
+// Otherwise it tries Gen2 first (more common), then falls back to Gen1 if Gen2 fails.
+func (s *Service) DeviceStatusAuto(ctx context.Context, identifier string) (*DeviceStatus, error) {
+	// First resolve to check if we have a stored generation
+	// Error is intentionally ignored - if resolution fails, we try Gen2 first
+	device, err := s.ResolveWithGeneration(ctx, identifier)
+
+	// If we know it's Gen1, try Gen1 first to avoid wasting time on Gen2
+	if err == nil && device.Generation == 1 {
+		gen1Result, gen1Err := s.DeviceStatusGen1(ctx, identifier)
+		if gen1Err == nil {
+			return gen1Result, nil
+		}
+		// Gen1 failed unexpectedly, try Gen2 as fallback
+		result, err := s.DeviceStatus(ctx, identifier)
+		if err == nil {
+			return result, nil
+		}
+		// Both failed, return Gen1 error since we knew it was Gen1
+		return nil, gen1Err
+	}
+
+	// Gen2+ or unknown: Try Gen2 first (more common)
+	result, err := s.DeviceStatus(ctx, identifier)
+	if err == nil {
+		return result, nil
+	}
+
+	// Gen2 failed, try Gen1
+	gen1Result, gen1Err := s.DeviceStatusGen1(ctx, identifier)
+	if gen1Err == nil {
+		return gen1Result, nil
+	}
+
+	// Both failed, return the original Gen2 error (more informative)
+	return nil, err
 }
 
 // DevicePing checks if the device is reachable by attempting to connect.
@@ -222,4 +365,18 @@ func (s *Service) PopulateDeviceListFirmware(ctx context.Context, devices []mode
 			devices[i].HasUpdate = entry.Info.HasUpdate
 		}
 	}
+}
+
+// convertToMap converts a struct to map[string]any using JSON marshaling.
+// This is used to convert Gen1 status structs to the common map format.
+func convertToMap(v any) (map[string]any, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

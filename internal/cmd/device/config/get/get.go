@@ -72,7 +72,7 @@ func run(ctx context.Context, opts *Options) error {
 	var config map[string]any
 	err := cmdutil.RunWithSpinner(ctx, ios, "Getting configuration...", func(ctx context.Context) error {
 		var err error
-		config, err = svc.GetConfig(ctx, opts.Device)
+		config, err = svc.GetConfigAuto(ctx, opts.Device)
 		return err
 	})
 	if err != nil {

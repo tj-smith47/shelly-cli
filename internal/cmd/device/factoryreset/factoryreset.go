@@ -94,7 +94,7 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	err = cmdutil.RunWithSpinner(ctx, ios, "Factory resetting device...", func(ctx context.Context) error {
-		return svc.DeviceFactoryReset(ctx, opts.Device)
+		return svc.DeviceFactoryResetAuto(ctx, opts.Device)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to factory reset device: %w", err)
