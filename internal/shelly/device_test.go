@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	testModel = "SNSW-001P16EU"
+	testModel     = "SNSW-001P16EU"
+	testValueName = "test"
 )
 
 func TestDeviceInfo_Fields(t *testing.T) {
@@ -117,13 +118,14 @@ func TestConvertToMap(t *testing.T) {
 				Name  string `json:"name"`
 				Value int    `json:"value"`
 			}{
-				Name:  "test",
+				Name:  testValueName,
 				Value: 42,
 			},
 			wantErr: false,
 			check: func(t *testing.T, result map[string]any) {
-				if result["name"] != "test" {
-					t.Errorf("name = %v, want test", result["name"])
+				t.Helper()
+				if result["name"] != testValueName {
+					t.Errorf("name = %v, want %s", result["name"], testValueName)
 				}
 				if result["value"] != float64(42) { // JSON numbers are float64
 					t.Errorf("value = %v, want 42", result["value"])
@@ -148,6 +150,7 @@ func TestConvertToMap(t *testing.T) {
 			},
 			wantErr: false,
 			check: func(t *testing.T, result map[string]any) {
+				t.Helper()
 				device, ok := result["device"].(map[string]any)
 				if !ok {
 					t.Fatal("device is not a map")
@@ -162,6 +165,7 @@ func TestConvertToMap(t *testing.T) {
 			input:   nil,
 			wantErr: false,
 			check: func(t *testing.T, result map[string]any) {
+				t.Helper()
 				if result != nil {
 					t.Errorf("expected nil result for nil input, got %v", result)
 				}
@@ -171,6 +175,7 @@ func TestConvertToMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := convertToMap(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("convertToMap() error = %v, wantErr %v", err, tt.wantErr)
