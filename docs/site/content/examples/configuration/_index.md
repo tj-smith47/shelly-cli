@@ -194,8 +194,8 @@ cloud:
 # =============================================================================
 
 # Devices can be added via:
-#   shelly device add <name> <address>
-#   shelly discover mdns --register
+#   shelly init --device <name>=<address>
+#   shelly discover --register
 #   shelly init (guided setup)
 
 devices:

@@ -48,15 +48,32 @@ New, unconfigured devices broadcast their own WiFi:
 
 ## Registering the Device
 
-### Basic Registration
+### Method 1: Discover and Register (Recommended)
+
+The easiest way to register devices is during discovery:
 
 ```bash
-shelly device add <name> <address>
+shelly discover --register
+```
+
+This will:
+- Find all Shelly devices on your network
+- Automatically register them with appropriate names
+- Skip devices that are already registered
+
+**With authentication:** Devices with passwords will prompt for credentials during registration, or you can set them later using `shelly auth set`.
+
+### Method 2: Manual Registration
+
+Register specific devices using the init command:
+
+```bash
+shelly init --device <name>=<address>
 ```
 
 **Example:**
 ```bash
-shelly device add kitchen 192.168.1.100
+shelly init --device kitchen=192.168.1.100
 ```
 
 **Rules for device names:**
@@ -70,22 +87,17 @@ shelly device add kitchen 192.168.1.100
 If your device has a password set:
 
 ```bash
-shelly device add kitchen 192.168.1.100 --user admin --password yourpassword
+shelly init --device kitchen=192.168.1.100:admin:yourpassword
 ```
 
-**Security tip:** Avoid passwords in shell history by using a prompt:
-
+**Multiple devices:**
 ```bash
-shelly device add kitchen 192.168.1.100 --user admin --password-stdin <<< "yourpassword"
+shelly init --device kitchen=192.168.1.100:admin:pass1 --device living-room=192.168.1.101
 ```
 
-### Registration with Generation Hint
+### Device Generations
 
-If auto-detection fails, specify the generation:
-
-```bash
-shelly device add kitchen 192.168.1.100 --generation 2
-```
+The CLI automatically detects device generations. Supported generations:
 
 | Generation | Devices |
 |------------|---------|
@@ -96,13 +108,17 @@ shelly device add kitchen 192.168.1.100 --generation 2
 
 ### Updating an Existing Device
 
-To update credentials or address:
+To update credentials for a registered device:
 
 ```bash
-shelly device add kitchen 192.168.1.100 --force --user admin --password newpassword
+# Update authentication credentials
+shelly auth set kitchen --user admin --password newpassword
 ```
 
-The `--force` flag overwrites existing device configuration.
+To update the device address, edit the config file directly:
+```bash
+shelly config edit
+```
 
 ## Verifying Connection
 
@@ -192,11 +208,13 @@ curl -u admin:yourpassword http://192.168.1.100/rpc/Shelly.GetDeviceInfo
 
 ### Generation Detection Failed
 
-Explicitly specify the generation:
+The CLI automatically detects the generation. If you need to manually edit it, use:
 
 ```bash
-shelly device add kitchen 192.168.1.100 --generation 2
+shelly config edit
 ```
+
+Then update the `generation` field in the device configuration.
 
 To determine generation:
 - Check model number on the device

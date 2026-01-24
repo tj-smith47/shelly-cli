@@ -27,8 +27,8 @@ shelly init
 ✓ Shelly CLI initialized successfully!
 
 Next steps:
-  1. Run 'shelly discover' to find devices
-  2. Run 'shelly device add <name> <ip>' to register a device
+  1. Run 'shelly discover --register' to find and register devices
+  2. Or run 'shelly init --device <name>=<ip>' to manually add a device
   3. Run 'shelly --help' to see available commands
 ```
 
@@ -51,7 +51,7 @@ shelly1-84CCA8ABC123    192.168.1.100   SHSW-1             1     ●
 shellyplus1-ABC123      192.168.1.101   SNSW-001X16EU      2     ●
 shellypro4pm-XYZ789     192.168.1.102   SNSW-104PM40EU     3     ●
 
-To add a device: shelly device add <friendly-name> <ip-address>
+To register devices: shelly discover --register
 ```
 
 **Options:**
@@ -66,31 +66,34 @@ shelly discover ble
 shelly discover --network 10.0.0.0/24
 ```
 
-## Step 3: Register a Device
+## Step 3: Register Devices
 
-Add a discovered device to your registry:
+### Option 1: Register During Discovery (Recommended)
+
+Register all discovered devices automatically:
 
 ```bash
-shelly device add living-room 192.168.1.101
+shelly discover --register
 ```
 
-**Expected output:**
-```
-✓ Connecting to 192.168.1.101...
-✓ Detected: Shelly Plus 1 (Gen2)
-✓ Device registered as 'living-room'
+This will add all discovered devices to your registry with auto-generated names.
 
-Device details:
-  Name:       living-room
-  Address:    192.168.1.101
-  Model:      SNSW-001X16EU
-  Generation: 2
-  Firmware:   1.0.0
+### Option 2: Manual Registration
+
+Add specific devices during initialization:
+
+```bash
+shelly init --device living-room=192.168.1.101
 ```
 
 **With authentication** (if device has a password):
 ```bash
-shelly device add living-room 192.168.1.101 --user admin --password secret
+shelly init --device living-room=192.168.1.101:admin:secret
+```
+
+**Multiple devices:**
+```bash
+shelly init --device living-room=192.168.1.101 --device kitchen=192.168.1.102
 ```
 
 ## Step 4: Control the Device

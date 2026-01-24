@@ -70,11 +70,11 @@ shelly discover --skip-plugins
 Register a discovered Tasmota device:
 
 ```bash
-# During discovery, select the device to register
+# During discovery, register all devices (including Tasmota)
 shelly discover --register
 
-# Or manually add with platform specified
-shelly device add garage-plug 192.168.1.50 --platform tasmota
+# Or manually add with platform specified during init
+shelly init --device garage-plug=192.168.1.50 --platform tasmota
 ```
 
 ### Device Status

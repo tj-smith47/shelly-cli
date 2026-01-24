@@ -201,7 +201,7 @@ Press `:` to enter command mode. Available commands:
 - Try a different terminal emulator
 
 **Devices not showing:**
-- Verify devices are added via `shelly device add`
+- Verify devices are registered via `shelly discover --register` or `shelly init --device`
 - Check network connectivity
 - Try `shelly device list` to verify configuration
 

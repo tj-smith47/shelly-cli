@@ -17,7 +17,8 @@ Every command supports `--help`:
 ```bash
 shelly --help
 shelly device --help
-shelly device add --help
+shelly discover --help
+shelly init --help
 ```
 
 ## Output Formats

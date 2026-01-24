@@ -73,8 +73,11 @@ go install github.com/tj-smith47/shelly-cli/cmd/shelly@latest
 # Initialize configuration
 shelly init
 
-# Add a device to your registry
-shelly device add living-room 192.168.1.100
+# Discover and register devices
+shelly discover --register
+
+# Or manually add devices during initialization
+shelly init --device living-room=192.168.1.100
 
 # Control devices with quick commands
 shelly on living-room

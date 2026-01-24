@@ -85,11 +85,11 @@ Available for:
 # Initialize the CLI (first-time setup)
 shelly init
 
-# Discover devices on your network
-shelly discover
+# Discover devices on your network and register them
+shelly discover --register
 
-# Add a device to your registry
-shelly device add living-room 192.168.1.100
+# Or manually add devices during initialization
+shelly init --device living-room=192.168.1.100
 
 # Control devices with quick commands
 shelly on living-room
