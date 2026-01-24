@@ -41,3 +41,22 @@ type BTHomeKnownObj struct {
 	Idx       int     `json:"idx"`
 	Component *string `json:"component,omitempty"`
 }
+
+// BTHomeSensorInfo represents a BTHome sensor with its current value.
+type BTHomeSensorInfo struct {
+	ID           int     `json:"id"`
+	Name         string  `json:"name,omitempty"`
+	Addr         string  `json:"addr"`
+	ObjID        int     `json:"obj_id"`
+	Idx          int     `json:"idx"`
+	Value        any     `json:"value"`
+	LastUpdateTS float64 `json:"last_updated_ts"`
+}
+
+// BTHomeObjectInfo represents information about a BTHome object type.
+type BTHomeObjectInfo struct {
+	ObjID int    `json:"obj_id"`
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+	Unit  string `json:"unit,omitempty"`
+}

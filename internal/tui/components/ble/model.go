@@ -48,9 +48,11 @@ func (d Deps) Validate() error {
 
 // CachedBLEData holds BLE status for caching.
 type CachedBLEData struct {
-	BLE       *shelly.BLEConfig        `json:"ble"`
-	Discovery *shelly.BTHomeDiscovery  `json:"discovery"`
-	Devices   []model.BTHomeDeviceInfo `json:"devices"`
+	BLE       *shelly.BLEConfig              `json:"ble"`
+	Discovery *shelly.BTHomeDiscovery        `json:"discovery"`
+	Devices   []model.BTHomeDeviceInfo       `json:"devices"`
+	Sensors   []model.BTHomeSensorInfo       `json:"sensors"`
+	ObjInfos  map[int]model.BTHomeObjectInfo `json:"obj_infos"`
 }
 
 // StatusLoadedMsg signals that BLE status was loaded.
@@ -58,6 +60,8 @@ type StatusLoadedMsg struct {
 	BLE       *shelly.BLEConfig
 	Discovery *shelly.BTHomeDiscovery
 	Devices   []model.BTHomeDeviceInfo
+	Sensors   []model.BTHomeSensorInfo
+	ObjInfos  map[int]model.BTHomeObjectInfo
 	Err       error
 }
 
@@ -81,9 +85,11 @@ type Model struct {
 	device        string
 	ble           *shelly.BLEConfig
 	discovery     *shelly.BTHomeDiscovery
-	devices       []model.BTHomeDeviceInfo // BTHome paired devices
-	cursor        int                      // Selected device index
-	pendingRemove int                      // Device ID pending removal (-1 = none)
+	devices       []model.BTHomeDeviceInfo       // BTHome paired devices
+	sensors       []model.BTHomeSensorInfo       // BTHome sensor readings
+	objInfos      map[int]model.BTHomeObjectInfo // Object ID to name/unit mapping
+	cursor        int                            // Selected device index
+	pendingRemove int                            // Device ID pending removal (-1 = none)
 	loading       bool
 	starting      bool
 	editing       bool
@@ -186,6 +192,8 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.ble = nil
 	m.discovery = nil
 	m.devices = nil
+	m.sensors = nil
+	m.objInfos = nil
 	m.cursor = 0
 	m.pendingRemove = -1
 	m.err = nil
@@ -249,11 +257,18 @@ func (m Model) fetchAndCacheStatus() tea.Cmd {
 			data.Discovery = discovery
 		}
 
-		// Fetch BTHome devices if BLE is enabled
+		// Fetch BTHome devices and sensors if BLE is enabled
 		if data.BLE != nil && data.BLE.Enable {
 			devices, err := m.svc.Wireless().FetchBTHomeDevices(ctx, m.device, nil)
 			if err == nil {
 				data.Devices = devices
+			}
+
+			sensors, err := m.svc.Wireless().FetchBTHomeSensors(ctx, m.device, nil)
+			if err == nil {
+				data.Sensors = sensors
+				// Fetch object info for sensor types
+				data.ObjInfos = fetchObjectInfos(ctx, m.svc, m.device, sensors)
 			}
 		}
 
@@ -286,11 +301,18 @@ func (m Model) backgroundRefresh() tea.Cmd {
 			data.Discovery = discovery
 		}
 
-		// Fetch BTHome devices if BLE is enabled
+		// Fetch BTHome devices and sensors if BLE is enabled
 		if data.BLE != nil && data.BLE.Enable {
 			devices, err := m.svc.Wireless().FetchBTHomeDevices(ctx, m.device, nil)
 			if err == nil {
 				data.Devices = devices
+			}
+
+			sensors, err := m.svc.Wireless().FetchBTHomeSensors(ctx, m.device, nil)
+			if err == nil {
+				data.Sensors = sensors
+				// Fetch object info for sensor types
+				data.ObjInfos = fetchObjectInfos(ctx, m.svc, m.device, sensors)
 			}
 		}
 
@@ -460,12 +482,14 @@ func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
 		m.ble = data.BLE
 		m.discovery = data.Discovery
 		m.devices = sortBTHomeDevices(data.Devices)
+		m.sensors = data.Sensors
+		m.objInfos = data.ObjInfos
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
 	// Emit StatusLoadedMsg with cached data so sequential loading can advance
 	loadedCmd := func() tea.Msg {
-		return StatusLoadedMsg{BLE: m.ble, Discovery: m.discovery, Devices: m.devices}
+		return StatusLoadedMsg{BLE: m.ble, Discovery: m.discovery, Devices: m.devices, Sensors: m.sensors, ObjInfos: m.objInfos}
 	}
 
 	if msg.NeedsRefresh {
@@ -499,10 +523,12 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 		m.ble = data.BLE
 		m.discovery = data.Discovery
 		m.devices = sortBTHomeDevices(data.Devices)
+		m.sensors = data.Sensors
+		m.objInfos = data.ObjInfos
 	}
 	// Emit StatusLoadedMsg so sequential loading can advance
 	return m, func() tea.Msg {
-		return StatusLoadedMsg{BLE: m.ble, Discovery: m.discovery, Devices: m.devices}
+		return StatusLoadedMsg{BLE: m.ble, Discovery: m.discovery, Devices: m.devices, Sensors: m.sensors, ObjInfos: m.objInfos}
 	}
 }
 
@@ -516,6 +542,8 @@ func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
 	m.ble = msg.BLE
 	m.discovery = msg.Discovery
 	m.devices = sortBTHomeDevices(msg.Devices)
+	m.sensors = msg.Sensors
+	m.objInfos = msg.ObjInfos
 	return m, nil
 }
 
@@ -896,6 +924,9 @@ func (m Model) renderBTHome() string {
 }
 
 func (m Model) renderBTHomeDevice(dev model.BTHomeDeviceInfo, selected bool) string {
+	var lines []string
+
+	// First line: status, name, address, RSSI, battery
 	var parts []string
 
 	// Status indicator (pending removal or signal quality)
@@ -922,7 +953,89 @@ func (m Model) renderBTHomeDevice(dev model.BTHomeDeviceInfo, selected bool) str
 		parts = append(parts, m.styles.Battery.Render(fmt.Sprintf("🔋%d%%", *dev.Battery)))
 	}
 
-	return "  " + strings.Join(parts, "  ")
+	lines = append(lines, "  "+strings.Join(parts, "  "))
+
+	// Find sensors for this device by matching address
+	deviceSensors := m.getSensorsForDevice(dev.Addr)
+	if len(deviceSensors) > 0 {
+		sensorLine := m.renderDeviceSensors(deviceSensors)
+		if sensorLine != "" {
+			lines = append(lines, "    "+sensorLine)
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) getSensorsForDevice(addr string) []model.BTHomeSensorInfo {
+	var sensors []model.BTHomeSensorInfo
+	for _, s := range m.sensors {
+		if s.Addr == addr {
+			sensors = append(sensors, s)
+		}
+	}
+	return sensors
+}
+
+func (m Model) renderDeviceSensors(sensors []model.BTHomeSensorInfo) string {
+	var parts []string
+
+	for _, s := range sensors {
+		valueStr := m.formatSensorValue(s)
+		if valueStr != "" {
+			parts = append(parts, valueStr)
+		}
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return m.styles.Muted.Render(strings.Join(parts, " │ "))
+}
+
+func (m Model) formatSensorValue(s model.BTHomeSensorInfo) string {
+	if s.Value == nil {
+		return ""
+	}
+
+	// Get sensor name and unit from object info
+	name := s.Name
+	unit := ""
+	if info, ok := m.objInfos[s.ObjID]; ok {
+		if name == "" {
+			name = info.Name
+		}
+		unit = info.Unit
+	}
+	if name == "" {
+		name = fmt.Sprintf("Obj%d", s.ObjID)
+	}
+
+	// Format value based on type
+	var valueStr string
+	switch v := s.Value.(type) {
+	case float64:
+		if v == float64(int(v)) {
+			valueStr = fmt.Sprintf("%d", int(v))
+		} else {
+			valueStr = fmt.Sprintf("%.1f", v)
+		}
+	case bool:
+		if v {
+			valueStr = "Yes"
+		} else {
+			valueStr = "No"
+		}
+	case string:
+		valueStr = v
+	default:
+		valueStr = fmt.Sprintf("%v", v)
+	}
+
+	if unit != "" {
+		return fmt.Sprintf("%s: %s%s", name, valueStr, unit)
+	}
+	return fmt.Sprintf("%s: %s", name, valueStr)
 }
 
 func (m Model) renderDeviceStatus(dev model.BTHomeDeviceInfo) string {
@@ -959,6 +1072,35 @@ func sortBTHomeDevices(devices []model.BTHomeDeviceInfo) []model.BTHomeDeviceInf
 		return devices[i].ID < devices[j].ID
 	})
 	return devices
+}
+
+// fetchObjectInfos fetches BTHome object info for a list of sensors.
+func fetchObjectInfos(ctx context.Context, svc *shelly.Service, device string, sensors []model.BTHomeSensorInfo) map[int]model.BTHomeObjectInfo {
+	if len(sensors) == 0 {
+		return nil
+	}
+
+	// Collect unique object IDs
+	objIDSet := make(map[int]struct{})
+	for _, s := range sensors {
+		objIDSet[s.ObjID] = struct{}{}
+	}
+
+	objIDs := make([]int, 0, len(objIDSet))
+	for id := range objIDSet {
+		objIDs = append(objIDs, id)
+	}
+
+	infos, err := svc.Wireless().FetchBTHomeObjectInfos(ctx, device, objIDs)
+	if err != nil {
+		return nil
+	}
+
+	result := make(map[int]model.BTHomeObjectInfo, len(infos))
+	for _, info := range infos {
+		result[info.ObjID] = info
+	}
+	return result
 }
 
 // BLE returns the current BLE configuration.

@@ -117,24 +117,20 @@ func TestBTHomeDeviceStatus_Fields(t *testing.T) {
 func TestBTHomeSensorStatus_Fields(t *testing.T) {
 	t.Parallel()
 
-	rssi := -60
-	battery := 80
-
 	status := BTHomeSensorStatus{
-		ID:         2,
-		RSSI:       &rssi,
-		Battery:    &battery,
-		LastUpdate: 1700000001.0,
+		ID:           2,
+		Value:        23.5,
+		LastUpdateTS: 1700000001.0,
 	}
 
 	if status.ID != 2 {
 		t.Errorf("got ID=%d, want 2", status.ID)
 	}
-	if status.RSSI == nil || *status.RSSI != rssi {
-		t.Errorf("got RSSI=%v, want %d", status.RSSI, rssi)
+	if status.Value != 23.5 {
+		t.Errorf("got Value=%v, want 23.5", status.Value)
 	}
-	if status.Battery == nil || *status.Battery != battery {
-		t.Errorf("got Battery=%v, want %d", status.Battery, battery)
+	if status.LastUpdateTS != 1700000001.0 {
+		t.Errorf("got LastUpdateTS=%f, want 1700000001.0", status.LastUpdateTS)
 	}
 }
 
@@ -1118,14 +1114,11 @@ func TestBTHomeSensorStatus_ZeroValue(t *testing.T) {
 	if status.ID != 0 {
 		t.Errorf("got ID=%d, want 0", status.ID)
 	}
-	if status.RSSI != nil {
-		t.Error("expected RSSI to be nil")
+	if status.Value != nil {
+		t.Error("expected Value to be nil")
 	}
-	if status.Battery != nil {
-		t.Error("expected Battery to be nil")
-	}
-	if status.LastUpdate != 0 {
-		t.Errorf("got LastUpdate=%f, want 0", status.LastUpdate)
+	if status.LastUpdateTS != 0 {
+		t.Errorf("got LastUpdateTS=%f, want 0", status.LastUpdateTS)
 	}
 }
 
@@ -1402,13 +1395,10 @@ func TestBTHomeDeviceStatus_JSONSerialization(t *testing.T) {
 func TestBTHomeSensorStatus_JSONSerialization(t *testing.T) {
 	t.Parallel()
 
-	rssi := -60
-	battery := 80
 	status := BTHomeSensorStatus{
-		ID:         2,
-		RSSI:       &rssi,
-		Battery:    &battery,
-		LastUpdate: 1700000001.0,
+		ID:           2,
+		Value:        23.5,
+		LastUpdateTS: 1700000001.0,
 	}
 
 	data, err := json.Marshal(status)
@@ -1424,8 +1414,11 @@ func TestBTHomeSensorStatus_JSONSerialization(t *testing.T) {
 	if decoded.ID != status.ID {
 		t.Errorf("got ID=%d, want %d", decoded.ID, status.ID)
 	}
-	if decoded.RSSI == nil || *decoded.RSSI != rssi {
-		t.Errorf("got RSSI=%v, want %d", decoded.RSSI, rssi)
+	if decoded.Value != status.Value {
+		t.Errorf("got Value=%v, want %v", decoded.Value, status.Value)
+	}
+	if decoded.LastUpdateTS != status.LastUpdateTS {
+		t.Errorf("got LastUpdateTS=%f, want %f", decoded.LastUpdateTS, status.LastUpdateTS)
 	}
 }
 

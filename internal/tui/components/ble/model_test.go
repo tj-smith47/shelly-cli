@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
@@ -515,6 +516,219 @@ func TestDefaultStyles(t *testing.T) {
 	_ = styles.Muted.Render("test")
 	_ = styles.Section.Render("test")
 	_ = styles.Warning.Render("test")
+}
+
+func TestModel_GetSensorsForDevice(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.sensors = []model.BTHomeSensorInfo{
+		{ID: 200, Addr: "AA:BB:CC:DD:EE:01", ObjID: 2, Value: 23.5},
+		{ID: 201, Addr: "AA:BB:CC:DD:EE:01", ObjID: 3, Value: 45.0},
+		{ID: 202, Addr: "AA:BB:CC:DD:EE:02", ObjID: 2, Value: 19.2},
+	}
+
+	sensors := m.getSensorsForDevice("AA:BB:CC:DD:EE:01")
+
+	if len(sensors) != 2 {
+		t.Errorf("got %d sensors, want 2", len(sensors))
+	}
+}
+
+func TestModel_GetSensorsForDevice_NoMatch(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.sensors = []model.BTHomeSensorInfo{
+		{ID: 200, Addr: "AA:BB:CC:DD:EE:01", ObjID: 2, Value: 23.5},
+	}
+
+	sensors := m.getSensorsForDevice("AA:BB:CC:DD:EE:99")
+
+	if len(sensors) != 0 {
+		t.Errorf("got %d sensors, want 0", len(sensors))
+	}
+}
+
+func TestModel_FormatSensorValue_Float(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.objInfos = map[int]model.BTHomeObjectInfo{
+		2: {ObjID: 2, Name: "Temperature", Unit: "°C"},
+	}
+
+	sensor := model.BTHomeSensorInfo{ID: 200, ObjID: 2, Value: 23.5}
+	result := m.formatSensorValue(sensor)
+
+	if result != "Temperature: 23.5°C" {
+		t.Errorf("got %q, want %q", result, "Temperature: 23.5°C")
+	}
+}
+
+func TestModel_FormatSensorValue_Int(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.objInfos = map[int]model.BTHomeObjectInfo{
+		3: {ObjID: 3, Name: "Humidity", Unit: "%"},
+	}
+
+	sensor := model.BTHomeSensorInfo{ID: 201, ObjID: 3, Value: float64(45)}
+	result := m.formatSensorValue(sensor)
+
+	if result != "Humidity: 45%" {
+		t.Errorf("got %q, want %q", result, "Humidity: 45%")
+	}
+}
+
+func TestModel_FormatSensorValue_Bool(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.objInfos = map[int]model.BTHomeObjectInfo{
+		45: {ObjID: 45, Name: "Door", Unit: ""},
+	}
+
+	tests := []struct {
+		name     string
+		value    bool
+		expected string
+	}{
+		{"open", true, "Door: Yes"},
+		{"closed", false, "Door: No"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			sensor := model.BTHomeSensorInfo{ID: 200, ObjID: 45, Value: tt.value}
+			result := m.formatSensorValue(sensor)
+			if result != tt.expected {
+				t.Errorf("got %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestModel_FormatSensorValue_NoObjInfo(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	// No objInfos set
+
+	sensor := model.BTHomeSensorInfo{ID: 200, ObjID: 99, Value: 42.0}
+	result := m.formatSensorValue(sensor)
+
+	if result != "Obj99: 42" {
+		t.Errorf("got %q, want %q", result, "Obj99: 42")
+	}
+}
+
+func TestModel_FormatSensorValue_WithName(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.objInfos = map[int]model.BTHomeObjectInfo{
+		2: {ObjID: 2, Name: "Temperature", Unit: "°C"},
+	}
+
+	// Sensor has a custom name that should override the obj info name
+	sensor := model.BTHomeSensorInfo{ID: 200, Name: "Kitchen Temp", ObjID: 2, Value: 21.5}
+	result := m.formatSensorValue(sensor)
+
+	if result != "Kitchen Temp: 21.5°C" {
+		t.Errorf("got %q, want %q", result, "Kitchen Temp: 21.5°C")
+	}
+}
+
+func TestModel_FormatSensorValue_NilValue(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	sensor := model.BTHomeSensorInfo{ID: 200, ObjID: 2, Value: nil}
+	result := m.formatSensorValue(sensor)
+
+	if result != "" {
+		t.Errorf("got %q, want empty", result)
+	}
+}
+
+func TestModel_RenderDeviceSensors_Empty(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	result := m.renderDeviceSensors(nil)
+
+	if result != "" {
+		t.Errorf("got %q, want empty", result)
+	}
+}
+
+func TestModel_RenderDeviceSensors_Multiple(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.objInfos = map[int]model.BTHomeObjectInfo{
+		2: {ObjID: 2, Name: "Temperature", Unit: "°C"},
+		3: {ObjID: 3, Name: "Humidity", Unit: "%"},
+	}
+	m = m.SetSize(80, 24)
+
+	sensors := []model.BTHomeSensorInfo{
+		{ID: 200, ObjID: 2, Value: 23.5},
+		{ID: 201, ObjID: 3, Value: 45.0},
+	}
+
+	result := m.renderDeviceSensors(sensors)
+
+	if result == "" {
+		t.Error("expected non-empty result")
+	}
+}
+
+func TestModel_View_WithDevicesAndSensors(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.ble = &shelly.BLEConfig{Enable: true}
+	m.devices = []model.BTHomeDeviceInfo{
+		{ID: 200, Name: "Living Room Sensor", Addr: "AA:BB:CC:DD:EE:01"},
+	}
+	m.sensors = []model.BTHomeSensorInfo{
+		{ID: 200, Addr: "AA:BB:CC:DD:EE:01", ObjID: 2, Value: 23.5},
+		{ID: 201, Addr: "AA:BB:CC:DD:EE:01", ObjID: 3, Value: 45.0},
+	}
+	m.objInfos = map[int]model.BTHomeObjectInfo{
+		2: {ObjID: 2, Name: "Temperature", Unit: "°C"},
+		3: {ObjID: 3, Name: "Humidity", Unit: "%"},
+	}
+	m = m.SetSize(80, 40)
+
+	view := m.View()
+
+	if view == "" {
+		t.Error("View() should not return empty string")
+	}
+}
+
+func TestModel_StatusLoaded_WithSensors(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.loading = true
+	objInfos := map[int]model.BTHomeObjectInfo{
+		2: {ObjID: 2, Name: "Temperature", Unit: "°C"},
+	}
+	sensors := []model.BTHomeSensorInfo{
+		{ID: 200, Addr: "AA:BB:CC:DD:EE:01", ObjID: 2, Value: 23.5},
+	}
+	msg := StatusLoadedMsg{
+		BLE:       &shelly.BLEConfig{Enable: true},
+		Discovery: &shelly.BTHomeDiscovery{Active: false},
+		Sensors:   sensors,
+		ObjInfos:  objInfos,
+	}
+
+	updated, _ := m.Update(msg)
+
+	if len(updated.sensors) != 1 {
+		t.Errorf("got %d sensors, want 1", len(updated.sensors))
+	}
+	if len(updated.objInfos) != 1 {
+		t.Errorf("got %d objInfos, want 1", len(updated.objInfos))
+	}
 }
 
 func newTestModel() Model {

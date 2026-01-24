@@ -46,10 +46,9 @@ func CollectBTHomeDevices(status map[string]json.RawMessage, ios *iostreams.IOSt
 
 // BTHomeSensorStatus represents BTHome sensor status from Shelly.GetStatus.
 type BTHomeSensorStatus struct {
-	ID         int     `json:"id"`
-	RSSI       *int    `json:"rssi"`
-	Battery    *int    `json:"battery"`
-	LastUpdate float64 `json:"last_updated_ts"`
+	ID           int     `json:"id"`
+	Value        any     `json:"value"`
+	LastUpdateTS float64 `json:"last_updated_ts"`
 }
 
 // CollectBTHomeSensors collects BTHomeSensor components from device status.
@@ -304,4 +303,112 @@ func getBTHomeKnownObjectsRPC(ctx context.Context, conn *client.Client, params m
 	}
 
 	return objResp.Objects
+}
+
+// FetchBTHomeSensors fetches all BTHome sensors from a gateway with their values.
+func (s *Service) FetchBTHomeSensors(ctx context.Context, identifier string, ios *iostreams.IOStreams) ([]model.BTHomeSensorInfo, error) {
+	var sensors []model.BTHomeSensorInfo
+
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		status, err := getBTHomeDeviceStatus(ctx, conn)
+		if err != nil {
+			return err
+		}
+
+		sensorStatuses := CollectBTHomeSensors(status, ios)
+		sensors = enrichBTHomeSensors(ctx, conn, sensorStatuses)
+		return nil
+	})
+
+	return sensors, err
+}
+
+func enrichBTHomeSensors(ctx context.Context, conn *client.Client, sensorStatuses []BTHomeSensorStatus) []model.BTHomeSensorInfo {
+	sensors := make([]model.BTHomeSensorInfo, 0, len(sensorStatuses))
+
+	for _, sensorStatus := range sensorStatuses {
+		cfg := getBTHomeSensorConfig(ctx, conn, sensorStatus.ID)
+		sensors = append(sensors, model.BTHomeSensorInfo{
+			ID:           sensorStatus.ID,
+			Name:         cfg.Name,
+			Addr:         cfg.Addr,
+			ObjID:        cfg.ObjID,
+			Idx:          cfg.Idx,
+			Value:        sensorStatus.Value,
+			LastUpdateTS: sensorStatus.LastUpdateTS,
+		})
+	}
+
+	return sensors
+}
+
+type bthomeSensorConfig struct {
+	Name  string
+	Addr  string
+	ObjID int
+	Idx   int
+}
+
+func getBTHomeSensorConfig(ctx context.Context, conn *client.Client, id int) bthomeSensorConfig {
+	var cfg bthomeSensorConfig
+
+	configResult, err := conn.Call(ctx, "BTHomeSensor.GetConfig", map[string]any{"id": id})
+	if err != nil {
+		return cfg
+	}
+
+	var rawCfg struct {
+		Name  *string `json:"name"`
+		Addr  string  `json:"addr"`
+		ObjID int     `json:"obj_id"`
+		Idx   int     `json:"idx"`
+	}
+	cfgBytes, err := json.Marshal(configResult)
+	if err != nil {
+		return cfg
+	}
+	if json.Unmarshal(cfgBytes, &rawCfg) != nil {
+		return cfg
+	}
+
+	if rawCfg.Name != nil {
+		cfg.Name = *rawCfg.Name
+	}
+	cfg.Addr = rawCfg.Addr
+	cfg.ObjID = rawCfg.ObjID
+	cfg.Idx = rawCfg.Idx
+
+	return cfg
+}
+
+// FetchBTHomeObjectInfos fetches information about BTHome object types.
+func (s *Service) FetchBTHomeObjectInfos(ctx context.Context, identifier string, objIDs []int) ([]model.BTHomeObjectInfo, error) {
+	var infos []model.BTHomeObjectInfo
+
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		params := map[string]any{
+			"obj_ids": objIDs,
+		}
+
+		result, err := conn.Call(ctx, "BTHome.GetObjectInfos", params)
+		if err != nil {
+			return fmt.Errorf("failed to get object infos: %w", err)
+		}
+
+		var resp struct {
+			Infos []model.BTHomeObjectInfo `json:"infos"`
+		}
+		jsonBytes, err := json.Marshal(result)
+		if err != nil {
+			return fmt.Errorf("failed to marshal result: %w", err)
+		}
+		if err := json.Unmarshal(jsonBytes, &resp); err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
+		}
+
+		infos = resp.Infos
+		return nil
+	})
+
+	return infos, err
 }
