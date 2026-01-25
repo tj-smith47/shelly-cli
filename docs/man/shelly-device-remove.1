@@ -2,24 +2,28 @@
 .TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-device - Manage Shelly devices
+shelly-device-remove - Remove a device from the registry
 
 
 .SH SYNOPSIS
-\fBshelly device [flags]\fP
+\fBshelly device remove  [flags]\fP
 
 
 .SH DESCRIPTION
-Manage Shelly devices in your registry.
+Remove a Shelly device from the local registry.
 
 .PP
-Device commands allow you to add, remove, list, and manage registered devices.
-Registered devices can be referenced by name in other commands.
+The device will also be removed from any groups it belongs to.
+This does not affect the physical device itself.
 
 
 .SH OPTIONS
+\fB-f\fP, \fB--force\fP[=false]
+	Skip confirmation prompt
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
-	help for device
+	help for remove
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -73,16 +77,16 @@ Registered devices can be referenced by name in other commands.
 
 .SH EXAMPLE
 .EX
-  # List all registered devices
-  shelly device list
+  # Remove a device
+  shelly device remove kitchen
 
-  # Get device info
-  shelly dev info kitchen
+  # Remove with force (skip confirmation)
+  shelly device remove kitchen --force
 
-  # Reboot a device
-  shelly device reboot living-room
+  # Short form
+  shelly dev rm bedroom
 .EE
 
 
 .SH SEE ALSO
-\fBshelly(1)\fP, \fBshelly-device-add(1)\fP, \fBshelly-device-alias(1)\fP, \fBshelly-device-config(1)\fP, \fBshelly-device-factory-reset(1)\fP, \fBshelly-device-info(1)\fP, \fBshelly-device-list(1)\fP, \fBshelly-device-ping(1)\fP, \fBshelly-device-reboot(1)\fP, \fBshelly-device-remove(1)\fP, \fBshelly-device-rename(1)\fP, \fBshelly-device-status(1)\fP, \fBshelly-device-ui(1)\fP
+\fBshelly-device(1)\fP

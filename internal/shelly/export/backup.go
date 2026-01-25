@@ -38,7 +38,7 @@ func WriteBackupFile(bkp *backup.DeviceBackup, filePath, format string) error {
 	var err error
 
 	switch format {
-	case "yaml", "yml":
+	case FormatYAML, "yml":
 		data, err = yaml.Marshal(bkp)
 	default:
 		data, err = json.MarshalIndent(bkp, "", "  ")

@@ -494,7 +494,7 @@ func TestFormatConstants(t *testing.T) {
 	if FormatJSON != "json" {
 		t.Errorf("got FormatJSON=%q, want %q", FormatJSON, "json")
 	}
-	if FormatYAML != "yaml" { //nolint:goconst // Testing constant value, FormatYAML constant exists
+	if FormatYAML != "yaml" {
 		t.Errorf("got FormatYAML=%q, want %q", FormatYAML, "yaml")
 	}
 }

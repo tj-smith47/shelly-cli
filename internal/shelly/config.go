@@ -14,18 +14,45 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/connection"
 )
 
+// convertToMap converts any struct to a map[string]any via JSON marshaling.
+// This is useful for converting Gen1 typed responses to the common map format.
+func convertToMap(v any) (map[string]any, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal: %w", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal to map: %w", err)
+	}
+
+	return result, nil
+}
+
 // GetConfig returns the full device configuration.
+// Supports both Gen1 (via /settings endpoint) and Gen2+ (via Shelly.GetConfig RPC).
 func (s *Service) GetConfig(ctx context.Context, identifier string) (map[string]any, error) {
 	var result map[string]any
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		config, err := conn.GetConfig(ctx)
+	err := s.WithDevice(ctx, identifier, func(dev *connection.DeviceClient) error {
+		if dev.IsGen1() {
+			settings, err := dev.Gen1().GetSettings(ctx)
+			if err != nil {
+				return err
+			}
+			result, err = convertToMap(settings)
+			return err
+		}
+
+		// Gen2+
+		cfg, err := dev.Gen2().GetConfig(ctx)
 		if err != nil {
 			return err
 		}
-		result = config
+		result = cfg
 		return nil
 	})
 	return result, err
@@ -41,30 +68,42 @@ func (s *Service) LoadConfig(ctx context.Context, source string) (cfg map[string
 	return s.loadConfigFromDevice(ctx, source)
 }
 
-// loadConfigFromDevice fetches configuration from a live device using raw RPC.
+// loadConfigFromDevice fetches configuration from a live device.
+// Supports both Gen1 (via /settings endpoint) and Gen2+ (via Shelly.GetConfig RPC).
 func (s *Service) loadConfigFromDevice(ctx context.Context, device string) (cfg map[string]any, name string, err error) {
-	conn, err := s.Connect(ctx, device)
-	if err != nil {
-		return nil, "", err
-	}
-	defer iostreams.CloseWithDebug("closing config connection", conn)
-
-	rawResult, err := conn.Call(ctx, "Shelly.GetConfig", nil)
-	if err != nil {
-		return nil, "", err
-	}
-
-	// Convert to map
-	jsonBytes, err := json.Marshal(rawResult)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to marshal config: %w", err)
-	}
-
 	var result map[string]any
-	if err := json.Unmarshal(jsonBytes, &result); err != nil {
-		return nil, "", fmt.Errorf("failed to parse config: %w", err)
-	}
+	err = s.WithDevice(ctx, device, func(dev *connection.DeviceClient) error {
+		if dev.IsGen1() {
+			settings, settingsErr := dev.Gen1().GetSettings(ctx)
+			if settingsErr != nil {
+				return settingsErr
+			}
+			result, settingsErr = convertToMap(settings)
+			return settingsErr
+		}
 
+		// Gen2+ - use raw RPC call for full config
+		rawResult, callErr := dev.Gen2().Call(ctx, "Shelly.GetConfig", nil)
+		if callErr != nil {
+			return callErr
+		}
+
+		// Convert to map
+		jsonBytes, marshalErr := json.Marshal(rawResult)
+		if marshalErr != nil {
+			return fmt.Errorf("failed to marshal config: %w", marshalErr)
+		}
+
+		if unmarshalErr := json.Unmarshal(jsonBytes, &result); unmarshalErr != nil {
+			return fmt.Errorf("failed to parse config: %w", unmarshalErr)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, "", err
+	}
 	return result, device, nil
 }
 
@@ -98,10 +137,16 @@ func IsConfigFile(path string) bool {
 // SetConfig updates device configuration.
 // The config parameter should be a map of component keys to configuration
 // objects. Only specified components will be updated.
+// Note: Gen1 devices have limited config support - only Gen2+ supports bulk config updates.
 func (s *Service) SetConfig(ctx context.Context, identifier string, cfg map[string]any) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		return conn.SetConfig(ctx, cfg)
-	})
+	return s.withGenAwareAction(ctx, identifier,
+		func(_ *client.Gen1Client) error {
+			return fmt.Errorf("bulk config updates are not supported on Gen1 devices; use component-specific commands instead")
+		},
+		func(conn *client.Client) error {
+			return conn.SetConfig(ctx, cfg)
+		},
+	)
 }
 
 // SetComponentConfig updates a specific component's configuration.

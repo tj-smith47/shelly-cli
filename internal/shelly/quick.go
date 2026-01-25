@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/connection"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
@@ -30,6 +31,7 @@ type QuickResult struct {
 // If componentID is nil, turns on all controllable components.
 // If componentID is set, turns on only that specific component.
 // For plugin-managed devices, dispatches to the plugin's control hook.
+// Supports both Gen1 and Gen2+ devices.
 func (s *Service) QuickOn(ctx context.Context, identifier string, componentID *int) (*QuickResult, error) {
 	// Resolve the device to check if it's plugin-managed
 	device, err := s.resolver.Resolve(identifier)
@@ -46,41 +48,14 @@ func (s *Service) QuickOn(ctx context.Context, identifier string, componentID *i
 		return &QuickResult{Count: 1, PluginResult: pluginResult}, nil
 	}
 
-	// Shelly device - use native control
+	// Shelly device - use native control with Gen1/Gen2 support
 	result := &QuickResult{}
 
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		controllable, err := findControllable(ctx, conn)
-		if err != nil {
-			return err
+	err = s.WithDevice(ctx, identifier, func(dev *connection.DeviceClient) error {
+		if dev.IsGen1() {
+			return quickOnGen1(ctx, dev.Gen1(), componentID, result)
 		}
-
-		toControl := selectComponents(controllable, componentID)
-		if len(toControl) == 0 && componentID != nil {
-			return fmt.Errorf("component ID %d not found on device", *componentID)
-		}
-
-		for _, comp := range toControl {
-			var opErr error
-			switch comp.Type {
-			case model.ComponentSwitch:
-				opErr = conn.Switch(comp.ID).On(ctx)
-			case model.ComponentLight:
-				opErr = conn.Light(comp.ID).On(ctx)
-			case model.ComponentRGB:
-				opErr = conn.RGB(comp.ID).On(ctx)
-			case model.ComponentCover:
-				opErr = conn.Cover(comp.ID).Open(ctx, nil)
-			default:
-				continue
-			}
-			if opErr != nil {
-				return fmt.Errorf("failed to turn on %s:%d: %w", comp.Type, comp.ID, opErr)
-			}
-			result.Count++
-		}
-
-		return nil
+		return quickOnGen2(ctx, dev.Gen2(), componentID, result)
 	})
 
 	return result, err
@@ -90,6 +65,7 @@ func (s *Service) QuickOn(ctx context.Context, identifier string, componentID *i
 // If componentID is nil, turns off all controllable components.
 // If componentID is set, turns off only that specific component.
 // For plugin-managed devices, dispatches to the plugin's control hook.
+// Supports both Gen1 and Gen2+ devices.
 func (s *Service) QuickOff(ctx context.Context, identifier string, componentID *int) (*QuickResult, error) {
 	// Resolve the device to check if it's plugin-managed
 	device, err := s.resolver.Resolve(identifier)
@@ -106,41 +82,14 @@ func (s *Service) QuickOff(ctx context.Context, identifier string, componentID *
 		return &QuickResult{Count: 1, PluginResult: pluginResult}, nil
 	}
 
-	// Shelly device - use native control
+	// Shelly device - use native control with Gen1/Gen2 support
 	result := &QuickResult{}
 
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		controllable, err := findControllable(ctx, conn)
-		if err != nil {
-			return err
+	err = s.WithDevice(ctx, identifier, func(dev *connection.DeviceClient) error {
+		if dev.IsGen1() {
+			return quickOffGen1(ctx, dev.Gen1(), componentID, result)
 		}
-
-		toControl := selectComponents(controllable, componentID)
-		if len(toControl) == 0 && componentID != nil {
-			return fmt.Errorf("component ID %d not found on device", *componentID)
-		}
-
-		for _, comp := range toControl {
-			var opErr error
-			switch comp.Type {
-			case model.ComponentSwitch:
-				opErr = conn.Switch(comp.ID).Off(ctx)
-			case model.ComponentLight:
-				opErr = conn.Light(comp.ID).Off(ctx)
-			case model.ComponentRGB:
-				opErr = conn.RGB(comp.ID).Off(ctx)
-			case model.ComponentCover:
-				opErr = conn.Cover(comp.ID).Close(ctx, nil)
-			default:
-				continue
-			}
-			if opErr != nil {
-				return fmt.Errorf("failed to turn off %s:%d: %w", comp.Type, comp.ID, opErr)
-			}
-			result.Count++
-		}
-
-		return nil
+		return quickOffGen2(ctx, dev.Gen2(), componentID, result)
 	})
 
 	return result, err
@@ -150,6 +99,7 @@ func (s *Service) QuickOff(ctx context.Context, identifier string, componentID *
 // If componentID is nil, toggles all controllable components.
 // If componentID is set, toggles only that specific component.
 // For plugin-managed devices, dispatches to the plugin's control hook.
+// Supports both Gen1 and Gen2+ devices.
 func (s *Service) QuickToggle(ctx context.Context, identifier string, componentID *int) (*QuickResult, error) {
 	// Resolve the device to check if it's plugin-managed
 	device, err := s.resolver.Resolve(identifier)
@@ -166,46 +116,14 @@ func (s *Service) QuickToggle(ctx context.Context, identifier string, componentI
 		return &QuickResult{Count: 1, PluginResult: pluginResult}, nil
 	}
 
-	// Shelly device - use native control
+	// Shelly device - use native control with Gen1/Gen2 support
 	result := &QuickResult{}
 
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		controllable, err := findControllable(ctx, conn)
-		if err != nil {
-			return err
+	err = s.WithDevice(ctx, identifier, func(dev *connection.DeviceClient) error {
+		if dev.IsGen1() {
+			return quickToggleGen1(ctx, dev.Gen1(), componentID, result)
 		}
-
-		toControl := selectComponents(controllable, componentID)
-		if len(toControl) == 0 && componentID != nil {
-			return fmt.Errorf("component ID %d not found on device", *componentID)
-		}
-
-		debug.TraceEvent("QuickToggle: found %d controllable, toggling %d components", len(controllable), len(toControl))
-
-		for _, comp := range toControl {
-			debug.TraceEvent("QuickToggle: toggling %s:%d", comp.Type, comp.ID)
-			var opErr error
-			switch comp.Type {
-			case model.ComponentSwitch:
-				_, opErr = conn.Switch(comp.ID).Toggle(ctx)
-			case model.ComponentLight:
-				_, opErr = conn.Light(comp.ID).Toggle(ctx)
-			case model.ComponentRGB:
-				_, opErr = conn.RGB(comp.ID).Toggle(ctx)
-			case model.ComponentCover:
-				opErr = toggleCover(ctx, conn.Cover(comp.ID))
-			default:
-				continue
-			}
-			if opErr != nil {
-				debug.TraceEvent("QuickToggle: error toggling %s:%d: %v", comp.Type, comp.ID, opErr)
-				return fmt.Errorf("failed to toggle %s:%d: %w", comp.Type, comp.ID, opErr)
-			}
-			debug.TraceEvent("QuickToggle: toggled %s:%d successfully", comp.Type, comp.ID)
-			result.Count++
-		}
-
-		return nil
+		return quickToggleGen2(ctx, dev.Gen2(), componentID, result)
 	})
 
 	return result, err
@@ -380,6 +298,329 @@ func toggleCover(ctx context.Context, cover *client.CoverComponent) error {
 		// If stopped mid-way or unknown, open
 		return cover.Open(ctx, nil)
 	}
+}
+
+// quickOnGen2 turns on controllable components on a Gen2+ device.
+func quickOnGen2(ctx context.Context, conn *client.Client, componentID *int, result *QuickResult) error {
+	controllable, err := findControllable(ctx, conn)
+	if err != nil {
+		return err
+	}
+
+	toControl := selectComponents(controllable, componentID)
+	if len(toControl) == 0 && componentID != nil {
+		return fmt.Errorf("component ID %d not found on device", *componentID)
+	}
+
+	for _, comp := range toControl {
+		var opErr error
+		switch comp.Type {
+		case model.ComponentSwitch:
+			opErr = conn.Switch(comp.ID).On(ctx)
+		case model.ComponentLight:
+			opErr = conn.Light(comp.ID).On(ctx)
+		case model.ComponentRGB:
+			opErr = conn.RGB(comp.ID).On(ctx)
+		case model.ComponentCover:
+			opErr = conn.Cover(comp.ID).Open(ctx, nil)
+		default:
+			continue
+		}
+		if opErr != nil {
+			return fmt.Errorf("failed to turn on %s:%d: %w", comp.Type, comp.ID, opErr)
+		}
+		result.Count++
+	}
+
+	return nil
+}
+
+// quickOffGen2 turns off controllable components on a Gen2+ device.
+func quickOffGen2(ctx context.Context, conn *client.Client, componentID *int, result *QuickResult) error {
+	controllable, err := findControllable(ctx, conn)
+	if err != nil {
+		return err
+	}
+
+	toControl := selectComponents(controllable, componentID)
+	if len(toControl) == 0 && componentID != nil {
+		return fmt.Errorf("component ID %d not found on device", *componentID)
+	}
+
+	for _, comp := range toControl {
+		var opErr error
+		switch comp.Type {
+		case model.ComponentSwitch:
+			opErr = conn.Switch(comp.ID).Off(ctx)
+		case model.ComponentLight:
+			opErr = conn.Light(comp.ID).Off(ctx)
+		case model.ComponentRGB:
+			opErr = conn.RGB(comp.ID).Off(ctx)
+		case model.ComponentCover:
+			opErr = conn.Cover(comp.ID).Close(ctx, nil)
+		default:
+			continue
+		}
+		if opErr != nil {
+			return fmt.Errorf("failed to turn off %s:%d: %w", comp.Type, comp.ID, opErr)
+		}
+		result.Count++
+	}
+
+	return nil
+}
+
+// quickToggleGen2 toggles controllable components on a Gen2+ device.
+func quickToggleGen2(ctx context.Context, conn *client.Client, componentID *int, result *QuickResult) error {
+	controllable, err := findControllable(ctx, conn)
+	if err != nil {
+		return err
+	}
+
+	toControl := selectComponents(controllable, componentID)
+	if len(toControl) == 0 && componentID != nil {
+		return fmt.Errorf("component ID %d not found on device", *componentID)
+	}
+
+	debug.TraceEvent("QuickToggle: found %d controllable, toggling %d components", len(controllable), len(toControl))
+
+	for _, comp := range toControl {
+		debug.TraceEvent("QuickToggle: toggling %s:%d", comp.Type, comp.ID)
+		var opErr error
+		switch comp.Type {
+		case model.ComponentSwitch:
+			_, opErr = conn.Switch(comp.ID).Toggle(ctx)
+		case model.ComponentLight:
+			_, opErr = conn.Light(comp.ID).Toggle(ctx)
+		case model.ComponentRGB:
+			_, opErr = conn.RGB(comp.ID).Toggle(ctx)
+		case model.ComponentCover:
+			opErr = toggleCover(ctx, conn.Cover(comp.ID))
+		default:
+			continue
+		}
+		if opErr != nil {
+			debug.TraceEvent("QuickToggle: error toggling %s:%d: %v", comp.Type, comp.ID, opErr)
+			return fmt.Errorf("failed to toggle %s:%d: %w", comp.Type, comp.ID, opErr)
+		}
+		debug.TraceEvent("QuickToggle: toggled %s:%d successfully", comp.Type, comp.ID)
+		result.Count++
+	}
+
+	return nil
+}
+
+// quickOnGen1 turns on controllable components on a Gen1 device.
+func quickOnGen1(ctx context.Context, conn *client.Gen1Client, componentID *int, result *QuickResult) error {
+	controllable, err := findControllableGen1(ctx, conn)
+	if err != nil {
+		return err
+	}
+
+	toControl := selectComponents(controllable, componentID)
+	if len(toControl) == 0 && componentID != nil {
+		return fmt.Errorf("component ID %d not found on device", *componentID)
+	}
+
+	for _, comp := range toControl {
+		var opErr error
+		switch comp.Type {
+		case model.ComponentSwitch:
+			relay, relayErr := conn.Relay(comp.ID)
+			if relayErr != nil {
+				opErr = relayErr
+			} else {
+				opErr = relay.TurnOn(ctx)
+			}
+		case model.ComponentLight:
+			light, lightErr := conn.Light(comp.ID)
+			if lightErr != nil {
+				opErr = lightErr
+			} else {
+				opErr = light.TurnOn(ctx)
+			}
+		case model.ComponentRGB:
+			color, colorErr := conn.Color(comp.ID)
+			if colorErr != nil {
+				opErr = colorErr
+			} else {
+				opErr = color.TurnOn(ctx)
+			}
+		case model.ComponentCover:
+			roller, rollerErr := conn.Roller(comp.ID)
+			if rollerErr != nil {
+				opErr = rollerErr
+			} else {
+				opErr = roller.Open(ctx)
+			}
+		default:
+			continue
+		}
+		if opErr != nil {
+			return fmt.Errorf("failed to turn on %s:%d: %w", comp.Type, comp.ID, opErr)
+		}
+		result.Count++
+	}
+
+	return nil
+}
+
+// quickOffGen1 turns off controllable components on a Gen1 device.
+func quickOffGen1(ctx context.Context, conn *client.Gen1Client, componentID *int, result *QuickResult) error {
+	controllable, err := findControllableGen1(ctx, conn)
+	if err != nil {
+		return err
+	}
+
+	toControl := selectComponents(controllable, componentID)
+	if len(toControl) == 0 && componentID != nil {
+		return fmt.Errorf("component ID %d not found on device", *componentID)
+	}
+
+	for _, comp := range toControl {
+		var opErr error
+		switch comp.Type {
+		case model.ComponentSwitch:
+			relay, relayErr := conn.Relay(comp.ID)
+			if relayErr != nil {
+				opErr = relayErr
+			} else {
+				opErr = relay.TurnOff(ctx)
+			}
+		case model.ComponentLight:
+			light, lightErr := conn.Light(comp.ID)
+			if lightErr != nil {
+				opErr = lightErr
+			} else {
+				opErr = light.TurnOff(ctx)
+			}
+		case model.ComponentRGB:
+			color, colorErr := conn.Color(comp.ID)
+			if colorErr != nil {
+				opErr = colorErr
+			} else {
+				opErr = color.TurnOff(ctx)
+			}
+		case model.ComponentCover:
+			roller, rollerErr := conn.Roller(comp.ID)
+			if rollerErr != nil {
+				opErr = rollerErr
+			} else {
+				opErr = roller.Close(ctx)
+			}
+		default:
+			continue
+		}
+		if opErr != nil {
+			return fmt.Errorf("failed to turn off %s:%d: %w", comp.Type, comp.ID, opErr)
+		}
+		result.Count++
+	}
+
+	return nil
+}
+
+// quickToggleGen1 toggles controllable components on a Gen1 device.
+func quickToggleGen1(ctx context.Context, conn *client.Gen1Client, componentID *int, result *QuickResult) error {
+	controllable, err := findControllableGen1(ctx, conn)
+	if err != nil {
+		return err
+	}
+
+	toControl := selectComponents(controllable, componentID)
+	if len(toControl) == 0 && componentID != nil {
+		return fmt.Errorf("component ID %d not found on device", *componentID)
+	}
+
+	for _, comp := range toControl {
+		var opErr error
+		switch comp.Type {
+		case model.ComponentSwitch:
+			relay, relayErr := conn.Relay(comp.ID)
+			if relayErr != nil {
+				opErr = relayErr
+			} else {
+				opErr = relay.Toggle(ctx)
+			}
+		case model.ComponentLight:
+			light, lightErr := conn.Light(comp.ID)
+			if lightErr != nil {
+				opErr = lightErr
+			} else {
+				opErr = light.Toggle(ctx)
+			}
+		case model.ComponentRGB:
+			color, colorErr := conn.Color(comp.ID)
+			if colorErr != nil {
+				opErr = colorErr
+			} else {
+				opErr = color.Toggle(ctx)
+			}
+		case model.ComponentCover:
+			roller, rollerErr := conn.Roller(comp.ID)
+			if rollerErr != nil {
+				opErr = rollerErr
+			} else {
+				opErr = roller.Stop(ctx)
+			}
+		default:
+			continue
+		}
+		if opErr != nil {
+			return fmt.Errorf("failed to toggle %s:%d: %w", comp.Type, comp.ID, opErr)
+		}
+		result.Count++
+	}
+
+	return nil
+}
+
+// findControllableGen1 discovers controllable components on a Gen1 device.
+// Gen1 devices don't have a ListComponents API, so we query settings to
+// discover which components are available.
+func findControllableGen1(ctx context.Context, conn *client.Gen1Client) ([]model.Component, error) {
+	settings, err := conn.GetSettings(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device settings: %w", err)
+	}
+
+	var controllable []model.Component
+
+	// Check relays (switches)
+	if settings.Relays != nil {
+		for i := range settings.Relays {
+			controllable = append(controllable, model.Component{
+				Type: model.ComponentSwitch,
+				ID:   i,
+			})
+		}
+	}
+
+	// Check lights
+	if settings.Lights != nil {
+		for i := range settings.Lights {
+			controllable = append(controllable, model.Component{
+				Type: model.ComponentLight,
+				ID:   i,
+			})
+		}
+	}
+
+	// Check rollers (covers)
+	if settings.Rollers != nil {
+		for i := range settings.Rollers {
+			controllable = append(controllable, model.Component{
+				Type: model.ComponentCover,
+				ID:   i,
+			})
+		}
+	}
+
+	if len(controllable) == 0 {
+		return nil, fmt.Errorf("no controllable components found on Gen1 device")
+	}
+
+	return controllable, nil
 }
 
 // PartyColors defines RGB colors for party mode.

@@ -634,13 +634,20 @@ func (c *Config) GetEditor() string {
 // DefaultAliases are built-in aliases provided out of the box.
 // These provide shortcuts for common operations.
 var DefaultAliases = map[string]Alias{
-	"cron":        {Command: "schedule create --timespec \"$1\" $2"},
+	// Device management shortcuts
+	"add":    {Command: "device add $@"},
+	"remove": {Command: "device remove $@"},
+	"rename": {Command: "device rename $@"},
+	"ping":   {Command: "device ping $@"},
+	"reboot": {Command: "device reboot $@"},
+	"reset":  {Command: "device factory-reset $@"},
+	"info":   {Command: "device info $@"},
+	// Config shortcuts
 	"diff":        {Command: "device config diff $@"},
 	"export-json": {Command: "device config export $1 $2 --format json"},
 	"export-yaml": {Command: "device config export $1 $2 --format yaml"},
-	"ping":        {Command: "device ping $@"},
-	"reboot":      {Command: "device reboot $@"},
-	"reset":       {Command: "device factory-reset $@"},
+	// Schedule shortcuts
+	"cron": {Command: "schedule create --timespec \"$1\" $2"},
 }
 
 // Load reads configuration from file and environment using the default manager.

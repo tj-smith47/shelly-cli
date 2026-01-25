@@ -2,24 +2,41 @@
 .TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-device - Manage Shelly devices
+shelly-device-add - Add a device to the registry
 
 
 .SH SYNOPSIS
-\fBshelly device [flags]\fP
+\fBshelly device add   [flags]\fP
 
 
 .SH DESCRIPTION
-Manage Shelly devices in your registry.
+Add a Shelly device to the local registry.
 
 .PP
-Device commands allow you to add, remove, list, and manage registered devices.
-Registered devices can be referenced by name in other commands.
+The device will be verified and its generation/model auto-detected
+unless --no-verify is specified.
+
+.PP
+The name is used as a friendly identifier for the device in other commands.
+Names with spaces will be normalized to dashes (e.g., "Master Bathroom"
+becomes "master-bathroom" as the key).
 
 
 .SH OPTIONS
+\fB--auth\fP=""
+	Authentication credentials (user:pass)
+
+.PP
+\fB-g\fP, \fB--generation\fP=0
+	Device generation (auto-detected if omitted)
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
-	help for device
+	help for add
+
+.PP
+\fB--no-verify\fP[=false]
+	Skip connectivity check and auto-detection
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -73,16 +90,19 @@ Registered devices can be referenced by name in other commands.
 
 .SH EXAMPLE
 .EX
-  # List all registered devices
-  shelly device list
+  # Add a device (auto-detects generation and model)
+  shelly device add kitchen 192.168.1.100
 
-  # Get device info
-  shelly dev info kitchen
+  # Add with authentication
+  shelly device add secure-device 192.168.1.101 --auth admin:secret
 
-  # Reboot a device
-  shelly device reboot living-room
+  # Add without verification (offline)
+  shelly device add offline-device 192.168.1.102 --no-verify --generation 2
+
+  # Short form
+  shelly dev add bedroom 192.168.1.103
 .EE
 
 
 .SH SEE ALSO
-\fBshelly(1)\fP, \fBshelly-device-add(1)\fP, \fBshelly-device-alias(1)\fP, \fBshelly-device-config(1)\fP, \fBshelly-device-factory-reset(1)\fP, \fBshelly-device-info(1)\fP, \fBshelly-device-list(1)\fP, \fBshelly-device-ping(1)\fP, \fBshelly-device-reboot(1)\fP, \fBshelly-device-remove(1)\fP, \fBshelly-device-rename(1)\fP, \fBshelly-device-status(1)\fP, \fBshelly-device-ui(1)\fP
+\fBshelly-device(1)\fP

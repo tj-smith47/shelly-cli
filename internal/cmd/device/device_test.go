@@ -28,7 +28,7 @@ func TestNewCommand_Subcommands(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expected := []string{"alias", "config", "factory-reset", "info", "list", "ping", "reboot", "status", "ui"}
+	expected := []string{"add", "alias", "config", "factory-reset", "info", "list", "ping", "reboot", "remove", "rename", "status", "ui"}
 	subCmds := cmd.Commands()
 
 	if len(subCmds) != len(expected) {

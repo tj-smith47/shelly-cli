@@ -99,6 +99,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	mockpkg "github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/telemetry"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 	"github.com/tj-smith47/shelly-cli/internal/version"
@@ -218,6 +219,16 @@ const (
 func init() {
 	// Set pre-run hook
 	rootCmd.PersistentPreRunE = initializeConfig
+
+	// Set custom help function to include aliases
+	defaultHelp := rootCmd.HelpFunc()
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		defaultHelp(cmd, args)
+		// Only show aliases on root command help
+		if cmd == rootCmd {
+			term.PrintAliasHelpSection(cmd.OutOrStdout())
+		}
+	})
 
 	// Global flags
 	rootCmd.PersistentFlags().StringP("output", "o", "table", "Output format (table, json, yaml, template)")
