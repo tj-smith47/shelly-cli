@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Guides on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/guides/</link><description>Recent content in Guides on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/guides/index.xml" rel="self" type="application/rss+xml"/><item><title>TUI Dashboard</title><link>https://tj-smith47.github.io/shelly-cli/docs/guides/tui-dashboard/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/guides/tui-dashboard/</guid><description>&lt;h2 id="overview"&gt;Overview&lt;/h2&gt;
-&lt;p&gt;The &lt;code&gt;shelly tui&lt;/code&gt; command launches an interactive terminal interface for managing Shelly devices. The TUI provides real-time device monitoring, control, and configuration in a multi-panel layout.&lt;/p&gt;
+&lt;p&gt;The &lt;code&gt;shelly dash&lt;/code&gt; command launches an interactive terminal interface for managing Shelly devices. The TUI provides real-time device monitoring, control, and configuration in a multi-panel layout.&lt;/p&gt;
 &lt;h2 id="launching"&gt;Launching&lt;/h2&gt;
 
 
@@ -14,7 +14,7 @@
 &lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;1
 &lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%"&gt;
-&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;shelly tui &lt;span style="color:#ff79c6"&gt;[&lt;/span&gt;--filter &amp;lt;pattern&amp;gt;&lt;span style="color:#ff79c6"&gt;]&lt;/span&gt; &lt;span style="color:#ff79c6"&gt;[&lt;/span&gt;--refresh &amp;lt;duration&amp;gt;&lt;span style="color:#ff79c6"&gt;]&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-bash" data-lang="bash"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;shelly dash &lt;span style="color:#ff79c6"&gt;[&lt;/span&gt;--filter &amp;lt;pattern&amp;gt;&lt;span style="color:#ff79c6"&gt;]&lt;/span&gt; &lt;span style="color:#ff79c6"&gt;[&lt;/span&gt;--refresh &amp;lt;duration&amp;gt;&lt;span style="color:#ff79c6"&gt;]&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;
  &lt;/figure&gt;
