@@ -1,7 +1,7 @@
 ---
 title: "shelly thermostat"
 description: "shelly thermostat"
-weight: 670
+weight: 790
 sidebar:
   collapsed: true
 ---

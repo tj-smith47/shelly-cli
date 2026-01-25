@@ -1,7 +1,7 @@
 ---
 title: "shelly mqtt"
 description: "shelly mqtt"
-weight: 420
+weight: 480
 sidebar:
   collapsed: true
 ---

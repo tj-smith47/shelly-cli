@@ -1,7 +1,7 @@
 ---
 title: "shelly version"
 description: "shelly version"
-weight: 700
+weight: 820
 sidebar:
   collapsed: true
 ---

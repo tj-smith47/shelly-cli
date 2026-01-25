@@ -1,7 +1,7 @@
 ---
 title: "shelly auth"
 description: "shelly auth"
-weight: 60
+weight: 70
 sidebar:
   collapsed: true
 ---

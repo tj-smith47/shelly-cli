@@ -99,7 +99,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	mockpkg "github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/telemetry"
-	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 	"github.com/tj-smith47/shelly-cli/internal/version"
@@ -207,6 +206,7 @@ func execute() int {
 
 // Command group IDs for organized help output.
 const (
+	groupAlias           = "alias"
 	groupShortcuts       = "shortcuts"
 	groupControl         = "control"
 	groupManagement      = "management"
@@ -219,16 +219,6 @@ const (
 func init() {
 	// Set pre-run hook
 	rootCmd.PersistentPreRunE = initializeConfig
-
-	// Set custom help function to include aliases
-	defaultHelp := rootCmd.HelpFunc()
-	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		defaultHelp(cmd, args)
-		// Only show aliases on root command help
-		if cmd == rootCmd {
-			term.PrintAliasHelpSection(cmd.OutOrStdout())
-		}
-	})
 
 	// Global flags
 	rootCmd.PersistentFlags().StringP("output", "o", "table", "Output format (table, json, yaml, template)")
@@ -257,13 +247,14 @@ func init() {
 	utils.Must(viper.BindPFlag("refresh", rootCmd.PersistentFlags().Lookup("refresh")))
 	utils.Must(viper.BindPFlag("offline", rootCmd.PersistentFlags().Lookup("offline")))
 
-	// Define command groups for organized help output
+	// Define command groups for organized help output (alphabetical by title)
 	rootCmd.AddGroup(
-		&cobra.Group{ID: groupShortcuts, Title: "Quick Commands:"},
+		&cobra.Group{ID: groupAlias, Title: "Alias Commands:"},
+		&cobra.Group{ID: groupConfig, Title: "Configuration:"},
 		&cobra.Group{ID: groupControl, Title: "Device Control:"},
 		&cobra.Group{ID: groupManagement, Title: "Device Management:"},
-		&cobra.Group{ID: groupConfig, Title: "Configuration:"},
 		&cobra.Group{ID: groupMonitoring, Title: "Monitoring:"},
+		&cobra.Group{ID: groupShortcuts, Title: "Quick Commands:"},
 		&cobra.Group{ID: groupTroubleshooting, Title: "Troubleshooting:"},
 		&cobra.Group{ID: groupUtility, Title: "Utility:"},
 	)
@@ -280,6 +271,9 @@ func init() {
 			demo.InjectIntoFactory(factory)
 		}
 	}
+
+	// Alias commands - user-defined shortcuts (alphabetically first)
+	cmdutil.AddAliases(rootCmd, groupAlias)
 
 	// Quick commands - shortcuts for common operations
 	cmdutil.AddCommandsToGroup(rootCmd, groupShortcuts,

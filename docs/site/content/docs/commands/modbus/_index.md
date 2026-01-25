@@ -1,7 +1,7 @@
 ---
 title: "shelly modbus"
 description: "shelly modbus"
-weight: 400
+weight: 460
 sidebar:
   collapsed: true
 ---

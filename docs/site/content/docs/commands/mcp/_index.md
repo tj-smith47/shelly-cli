@@ -1,7 +1,7 @@
 ---
 title: "shelly mcp"
 description: "shelly mcp"
-weight: 360
+weight: 420
 sidebar:
   collapsed: true
 ---

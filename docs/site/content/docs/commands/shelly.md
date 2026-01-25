@@ -56,6 +56,7 @@ and controlling Shelly devices on your local network.
 ### SEE ALSO
 
 * [shelly action](shelly_action.md)	 - Manage Gen1 device action URLs
+* [shelly add](shelly_add.md)	 - Alias for "device add $@"
 * [shelly alert](shelly_alert.md)	 - Manage monitoring alerts
 * [shelly alias](shelly_alias.md)	 - Manage command aliases
 * [shelly api](shelly_api.md)	 - Execute API calls on Shelly devices
@@ -71,18 +72,23 @@ and controlling Shelly devices on your local network.
 * [shelly completion](shelly_completion.md)	 - Generate shell completion scripts
 * [shelly config](shelly_config.md)	 - Manage CLI configuration
 * [shelly cover](shelly_cover.md)	 - Control cover/roller components
+* [shelly cron](shelly_cron.md)	 - Alias for "schedule create --timespec \"$1\" $2"
 * [shelly dash](shelly_dash.md)	 - Launch interactive TUI dashboard
 * [shelly debug](shelly_debug.md)	 - Debug and diagnostic commands
 * [shelly device](shelly_device.md)	 - Manage Shelly devices
+* [shelly diff](shelly_diff.md)	 - Alias for "device config diff $@"
 * [shelly discover](shelly_discover.md)	 - Discover Shelly devices on the network
 * [shelly doctor](shelly_doctor.md)	 - Check system health and diagnose issues
 * [shelly energy](shelly_energy.md)	 - Energy monitoring operations (EM/EM1 components)
 * [shelly ethernet](shelly_ethernet.md)	 - Manage device Ethernet configuration
 * [shelly export](shelly_export.md)	 - Export fleet data for infrastructure tools
+* [shelly export-json](shelly_export-json.md)	 - Alias for "device config export $1 $2 --format json"
+* [shelly export-yaml](shelly_export-yaml.md)	 - Alias for "device config export $1 $2 --format yaml"
 * [shelly feedback](shelly_feedback.md)	 - Report issues or request features
 * [shelly firmware](shelly_firmware.md)	 - Manage device firmware
 * [shelly fleet](shelly_fleet.md)	 - Cloud-based fleet management
 * [shelly group](shelly_group.md)	 - Manage device groups
+* [shelly info](shelly_info.md)	 - Alias for "device info $@"
 * [shelly init](shelly_init.md)	 - Initialize shelly CLI for first-time use
 * [shelly input](shelly_input.md)	 - Manage input components
 * [shelly kvs](shelly_kvs.md)	 - Manage device key-value storage
@@ -100,13 +106,18 @@ and controlling Shelly devices on your local network.
 * [shelly off](shelly_off.md)	 - Turn off a device (auto-detects type)
 * [shelly on](shelly_on.md)	 - Turn on a device (auto-detects type)
 * [shelly party](shelly_party.md)	 - Party mode - flash lights!
+* [shelly ping](shelly_ping.md)	 - Alias for "device ping $@"
 * [shelly plugin](shelly_plugin.md)	 - Manage CLI plugins
 * [shelly power](shelly_power.md)	 - Power meter operations (PM/PM1 components)
 * [shelly profile](shelly_profile.md)	 - Device profile information
 * [shelly provision](shelly_provision.md)	 - Provision device settings
 * [shelly qr](shelly_qr.md)	 - Generate device QR code
+* [shelly reboot](shelly_reboot.md)	 - Alias for "device reboot $@"
+* [shelly remove](shelly_remove.md)	 - Alias for "device remove $@"
+* [shelly rename](shelly_rename.md)	 - Alias for "device rename $@"
 * [shelly repl](shelly_repl.md)	 - Launch interactive REPL
 * [shelly report](shelly_report.md)	 - Generate reports
+* [shelly reset](shelly_reset.md)	 - Alias for "device factory-reset $@"
 * [shelly rgb](shelly_rgb.md)	 - Control RGB light components
 * [shelly rgbw](shelly_rgbw.md)	 - Control RGBW LED outputs
 * [shelly scene](shelly_scene.md)	 - Manage device scenes
@@ -116,6 +127,7 @@ and controlling Shelly devices on your local network.
 * [shelly sensoraddon](shelly_sensoraddon.md)	 - Manage Sensor Add-on peripherals
 * [shelly shell](shelly_shell.md)	 - Interactive shell for a specific device
 * [shelly sleep](shelly_sleep.md)	 - Turn device off after a delay
+* [shelly ss](shelly_ss.md)	 - Alias for "switch status"
 * [shelly status](shelly_status.md)	 - Show device status (quick overview)
 * [shelly switch](shelly_switch.md)	 - Control switch components
 * [shelly sync](shelly_sync.md)	 - Synchronize device configurations

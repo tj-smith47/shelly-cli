@@ -1,7 +1,7 @@
 ---
 title: "shelly firmware"
 description: "shelly firmware"
-weight: 260
+weight: 310
 sidebar:
   collapsed: true
 ---

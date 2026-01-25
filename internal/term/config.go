@@ -3,9 +3,7 @@ package term
 
 import (
 	"fmt"
-	"io"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -359,55 +357,4 @@ func DisplayDeviceTemplateList(ios *iostreams.IOStreams, templates []config.Devi
 		ios.DebugErr("print templates table", err)
 	}
 	ios.Printf("\n%d template(s)\n", len(templates))
-}
-
-// PrintAliasHelpSection prints the ALIAS COMMANDS section for help output.
-// Uses io.Writer to integrate with cobra's help system.
-func PrintAliasHelpSection(w io.Writer) {
-	// Collect all aliases (both default and user-configured)
-	allAliases := make(map[string]string)
-
-	// Add default aliases
-	for name, alias := range config.DefaultAliases {
-		allAliases[name] = alias.Command
-	}
-
-	// Add user-configured aliases (these override defaults)
-	for name, alias := range config.ListAliases() {
-		allAliases[name] = alias.Command
-	}
-
-	if len(allAliases) == 0 {
-		return
-	}
-
-	// Sort alias names
-	names := make([]string, 0, len(allAliases))
-	for name := range allAliases {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	// Find max name length for alignment
-	maxLen := 0
-	for _, name := range names {
-		if len(name) > maxLen {
-			maxLen = len(name)
-		}
-	}
-
-	// Write errors to help output are not recoverable in CLI context
-	// (stdout broken = terminal disconnected), so we log to debug
-	if _, err := fmt.Fprintln(w); err != nil {
-		iostreams.DebugErr("write alias help", err)
-	}
-	if _, err := fmt.Fprintln(w, "ALIAS COMMANDS"); err != nil {
-		iostreams.DebugErr("write alias help header", err)
-	}
-	for _, name := range names {
-		cmd := allAliases[name]
-		if _, err := fmt.Fprintf(w, "  %-*s  Alias for %q\n", maxLen, name+":", cmd); err != nil {
-			iostreams.DebugErr("write alias help entry", err)
-		}
-	}
 }
