@@ -19,10 +19,10 @@ endif
 # Default target
 all: build
 
-## audit: Run compliance audit (RULES.md enforcement)
+## audit: Run convention audit (CLAUDE.md enforcement)
 audit:
-	@echo "Running compliance audit..."
-	@./scripts/audit-compliance.sh
+	@echo "Running convention audit..."
+	@./scripts/audit-conventions.sh
 
 ## build: Build the binary
 build:
@@ -33,16 +33,13 @@ build:
 build-test:
 	@go build -o /tmp/shelly-test ./cmd/shelly
 
-## check: Run all checks (format, lint, then compliance audit)
+## check: Run all checks (format, then full convention audit with build/lint/test)
 check:
 	@$(MAKE) fmt
 ifdef FILE
 	@$(MAKE) lint FILE=$(FILE)
-else
-	@$(MAKE) lint
 endif
 	@$(MAKE) audit
-	@$(MAKE) build
 
 ## clean: Remove build artifacts
 clean:
