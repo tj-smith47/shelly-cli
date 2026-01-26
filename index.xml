@@ -115,6 +115,7 @@ and controlling Shelly devices on your local network.&lt;/p&gt;
 &lt;li&gt;&lt;a href="shelly_dash.md"&gt;shelly dash&lt;/a&gt;	 - Launch interactive TUI dashboard&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_debug.md"&gt;shelly debug&lt;/a&gt;	 - Debug and diagnostic commands&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;&lt;a href="shelly_diagram.md"&gt;shelly diagram&lt;/a&gt;	 - Display ASCII wiring diagrams for Shelly devices&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_discover.md"&gt;shelly discover&lt;/a&gt;	 - Discover Shelly devices on the network&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_doctor.md"&gt;shelly doctor&lt;/a&gt;	 - Check system health and diagnose issues&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
