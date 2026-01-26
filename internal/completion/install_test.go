@@ -132,7 +132,7 @@ func TestInstallBash(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, out, errOut)
 
 	script := []byte("# test bash completion script")
-	err := completion.InstallBash(ios, script)
+	err := completion.InstallBash(ios, "shelly", script)
 	if err != nil {
 		t.Logf("InstallBash() error: %v (may be expected)", err)
 	}
@@ -154,7 +154,7 @@ func TestInstallZsh(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, out, errOut)
 
 	script := []byte("# test zsh completion script")
-	err := completion.InstallZsh(ios, script)
+	err := completion.InstallZsh(ios, "shelly", script)
 	if err != nil {
 		t.Logf("InstallZsh() error: %v (may be expected)", err)
 	}
@@ -182,7 +182,7 @@ func TestInstallFish(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, out, errOut)
 
 	script := []byte("# test fish completion script")
-	err := completion.InstallFish(ios, script)
+	err := completion.InstallFish(ios, "shelly", script)
 	if err != nil {
 		t.Logf("InstallFish() error: %v (may be expected)", err)
 	}
@@ -210,7 +210,7 @@ func TestInstallPowerShell(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, out, errOut)
 
 	script := []byte("# test powershell completion script")
-	err := completion.InstallPowerShell(ios, script)
+	err := completion.InstallPowerShell(ios, "shelly", script)
 	if err != nil {
 		t.Logf("InstallPowerShell() error: %v (may be expected)", err)
 	}

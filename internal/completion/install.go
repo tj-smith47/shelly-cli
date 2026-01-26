@@ -18,7 +18,18 @@ import (
 )
 
 // GenerateAndInstall generates and installs completions for the specified shell.
+// It uses the actual binary name from os.Args[0] so completions register for
+// the correct command name (e.g., "shelly-test" when built via make build-test).
 func GenerateAndInstall(ios *iostreams.IOStreams, rootCmd *cobra.Command, shell string) error {
+	// Use actual binary name so completions work regardless of build output name.
+	binaryName := filepath.Base(os.Args[0])
+	origUse := rootCmd.Use
+	if binaryName != "" && binaryName != rootCmd.Name() {
+		rootCmd.Use = binaryName
+		defer func() { rootCmd.Use = origUse }()
+		ios.Info("Registering completions for binary: %s", binaryName)
+	}
+
 	var buf bytes.Buffer
 	var err error
 
@@ -40,25 +51,25 @@ func GenerateAndInstall(ios *iostreams.IOStreams, rootCmd *cobra.Command, shell 
 
 	switch shell {
 	case ShellBash:
-		return InstallBash(ios, buf.Bytes())
+		return InstallBash(ios, binaryName, buf.Bytes())
 	case ShellZsh:
-		return InstallZsh(ios, buf.Bytes())
+		return InstallZsh(ios, binaryName, buf.Bytes())
 	case ShellFish:
-		return InstallFish(ios, buf.Bytes())
+		return InstallFish(ios, binaryName, buf.Bytes())
 	case ShellPowerShell:
-		return InstallPowerShell(ios, buf.Bytes())
+		return InstallPowerShell(ios, binaryName, buf.Bytes())
 	}
 	return nil
 }
 
 // InstallBash installs bash completions.
-func InstallBash(ios *iostreams.IOStreams, script []byte) error {
+func InstallBash(ios *iostreams.IOStreams, binaryName string, script []byte) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
 
-	completionDir, completionFile, err := writeBashCompletion(home, script)
+	completionDir, completionFile, err := writeBashCompletion(home, binaryName, script)
 	if err != nil {
 		return err
 	}
@@ -69,10 +80,9 @@ func InstallBash(ios *iostreams.IOStreams, script []byte) error {
 	userCompletionDir := filepath.Join(home, ".local", "share", "bash-completion", "completions")
 	if completionDir == userCompletionDir {
 		rcFile := filepath.Join(home, ".bashrc")
-		sourceLine := fmt.Sprintf("source %s", completionFile)
 		if needsSourceLine(rcFile, completionFile) {
 			ios.Info("Add the following to your %s to enable completions:", rcFile)
-			ios.Printf("\n  %s\n\n", sourceLine)
+			ios.Printf("\n  source %s\n\n", completionFile)
 		}
 	} else {
 		ios.Info("Completions will be loaded automatically from %s", completionDir)
@@ -84,16 +94,17 @@ func InstallBash(ios *iostreams.IOStreams, script []byte) error {
 
 // writeBashCompletion writes the bash completion script to the appropriate location.
 // It tries the system directory first, then falls back to user directory.
-func writeBashCompletion(home string, script []byte) (completionDir, completionFile string, err error) {
+func writeBashCompletion(home, binaryName string, script []byte) (completionDir, completionFile string, err error) {
 	fs := config.Fs()
 	userDir := filepath.Join(home, ".local", "share", "bash-completion", "completions")
 
 	// Try system-wide completion directory on Linux
+	sysDir := "/etc/bash_completion.d"
 	if runtime.GOOS == "linux" {
-		if _, statErr := fs.Stat("/etc/bash_completion.d"); statErr == nil {
-			completionFile = "/etc/bash_completion.d/shelly"
+		if _, statErr := fs.Stat(sysDir); statErr == nil {
+			completionFile = filepath.Join(sysDir, binaryName)
 			if writeErr := afero.WriteFile(fs, completionFile, script, 0o644); writeErr == nil {
-				return "/etc/bash_completion.d", completionFile, nil
+				return sysDir, completionFile, nil
 			}
 			// Fall through to user directory on write failure
 		}
@@ -104,7 +115,7 @@ func writeBashCompletion(home string, script []byte) (completionDir, completionF
 		return "", "", fmt.Errorf("failed to create completion directory: %w", err)
 	}
 
-	completionFile = filepath.Join(userDir, "shelly")
+	completionFile = filepath.Join(userDir, binaryName)
 	if err = afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
 		return "", "", fmt.Errorf("failed to write completion script: %w", err)
 	}
@@ -113,7 +124,7 @@ func writeBashCompletion(home string, script []byte) (completionDir, completionF
 }
 
 // InstallZsh installs zsh completions.
-func InstallZsh(ios *iostreams.IOStreams, script []byte) error {
+func InstallZsh(ios *iostreams.IOStreams, binaryName string, script []byte) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -127,7 +138,7 @@ func InstallZsh(ios *iostreams.IOStreams, script []byte) error {
 		return fmt.Errorf("failed to create completion directory: %w", err)
 	}
 
-	completionFile := filepath.Join(completionDir, "_shelly")
+	completionFile := filepath.Join(completionDir, "_"+binaryName)
 
 	// Write completion script
 	if err := afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
@@ -189,7 +200,7 @@ func printZshInstructions(ios *iostreams.IOStreams, rcFile, completionDir string
 }
 
 // InstallFish installs fish completions.
-func InstallFish(ios *iostreams.IOStreams, script []byte) error {
+func InstallFish(ios *iostreams.IOStreams, binaryName string, script []byte) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -203,7 +214,7 @@ func InstallFish(ios *iostreams.IOStreams, script []byte) error {
 		return fmt.Errorf("failed to create completion directory: %w", err)
 	}
 
-	completionFile := filepath.Join(completionDir, "shelly.fish")
+	completionFile := filepath.Join(completionDir, binaryName+".fish")
 
 	// Write completion script
 	if err := afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
@@ -217,7 +228,7 @@ func InstallFish(ios *iostreams.IOStreams, script []byte) error {
 }
 
 // InstallPowerShell installs PowerShell completions.
-func InstallPowerShell(ios *iostreams.IOStreams, script []byte) error {
+func InstallPowerShell(ios *iostreams.IOStreams, binaryName string, script []byte) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -237,7 +248,7 @@ func InstallPowerShell(ios *iostreams.IOStreams, script []byte) error {
 		return fmt.Errorf("failed to create profile directory: %w", err)
 	}
 
-	completionFile := filepath.Join(profileDir, "shelly.ps1")
+	completionFile := filepath.Join(profileDir, binaryName+".ps1")
 
 	// Write completion script
 	if err := afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
