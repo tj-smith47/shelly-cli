@@ -76,6 +76,7 @@ and controlling Shelly devices on your local network.
 * [shelly dash](shelly_dash.md)	 - Launch interactive TUI dashboard
 * [shelly debug](shelly_debug.md)	 - Debug and diagnostic commands
 * [shelly device](shelly_device.md)	 - Manage Shelly devices
+* [shelly diagram](shelly_diagram.md)	 - Display ASCII wiring diagrams for Shelly devices
 * [shelly diff](shelly_diff.md)	 - Alias for "device config diff $@"
 * [shelly discover](shelly_discover.md)	 - Discover Shelly devices on the network
 * [shelly doctor](shelly_doctor.md)	 - Check system health and diagnose issues

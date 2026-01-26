@@ -1,7 +1,7 @@
 ---
 title: "shelly rgb"
 description: "shelly rgb"
-weight: 640
+weight: 650
 sidebar:
   collapsed: true
 ---

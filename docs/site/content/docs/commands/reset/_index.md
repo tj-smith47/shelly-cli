@@ -1,7 +1,7 @@
 ---
 title: "shelly reset"
 description: "shelly reset"
-weight: 630
+weight: 640
 sidebar:
   collapsed: true
 ---

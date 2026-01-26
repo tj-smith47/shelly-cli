@@ -36,6 +36,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/dash"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/debug"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device"
+	diagramcmd "github.com/tj-smith47/shelly-cli/internal/cmd/diagram"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/doctor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy"
@@ -367,6 +368,7 @@ func init() {
 		apicmd.NewCommand(factory),
 		cache.NewCommand(factory),
 		completioncmd.NewCommand(factory),
+		diagramcmd.NewCommand(factory),
 		exportcmd.NewCommand(factory),
 		feedback.NewCommand(factory),
 		firmware.NewCommand(factory),

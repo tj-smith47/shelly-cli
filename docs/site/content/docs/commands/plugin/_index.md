@@ -1,7 +1,7 @@
 ---
 title: "shelly plugin"
 description: "shelly plugin"
-weight: 530
+weight: 540
 sidebar:
   collapsed: true
 ---

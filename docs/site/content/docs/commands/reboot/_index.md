@@ -1,7 +1,7 @@
 ---
 title: "shelly reboot"
 description: "shelly reboot"
-weight: 580
+weight: 590
 sidebar:
   collapsed: true
 ---

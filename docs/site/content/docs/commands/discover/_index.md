@@ -1,7 +1,7 @@
 ---
 title: "shelly discover"
 description: "shelly discover"
-weight: 230
+weight: 240
 sidebar:
   collapsed: true
 ---

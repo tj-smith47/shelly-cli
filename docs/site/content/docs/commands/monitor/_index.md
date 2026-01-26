@@ -1,7 +1,7 @@
 ---
 title: "shelly monitor"
 description: "shelly monitor"
-weight: 470
+weight: 480
 sidebar:
   collapsed: true
 ---

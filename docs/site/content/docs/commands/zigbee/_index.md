@@ -1,7 +1,7 @@
 ---
 title: "shelly zigbee"
 description: "shelly zigbee"
-weight: 880
+weight: 890
 sidebar:
   collapsed: true
 ---
