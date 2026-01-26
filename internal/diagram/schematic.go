@@ -1,6 +1,9 @@
 package diagram
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // schematicRenderer renders left-to-right circuit-style wiring diagrams.
 type schematicRenderer struct{}
@@ -79,19 +82,9 @@ func (r *schematicRenderer) renderInputOnly(b *strings.Builder, m DeviceModel) {
 	b.WriteString("    L ─────────┤ L              │\n")
 	b.WriteString("    N ─────────┤ N              │\n")
 	for i := 1; i <= inputs; i++ {
-		b.WriteString("  SW")
-		b.WriteString(" ")
-		writeInputLine(b, i)
+		fmt.Fprintf(b, "  SW%d ─────────┤ SW%d            │\n", i, i)
 	}
 	b.WriteString("               └────────────────┘\n")
-}
-
-func writeInputLine(b *strings.Builder, i int) {
-	label := string(rune('0' + i))
-	b.WriteString(label)
-	b.WriteString(" ─────────┤ SW")
-	b.WriteString(label)
-	b.WriteString("            │\n")
 }
 
 func (r *schematicRenderer) renderPlug(b *strings.Builder, _ DeviceModel) {

@@ -44,6 +44,7 @@ const (
 type DeviceSpecs struct {
 	Voltage         string
 	MaxAmps         float64
+	MaxAmpsTotal    float64
 	PowerMonitoring bool
 	NeutralRequired bool
 	Notes           string
