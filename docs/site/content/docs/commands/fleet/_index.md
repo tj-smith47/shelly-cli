@@ -1,7 +1,7 @@
 ---
 title: "shelly fleet"
 description: "shelly fleet"
-weight: 330
+weight: 280
 sidebar:
   collapsed: true
 ---

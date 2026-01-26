@@ -1,7 +1,7 @@
 ---
 title: "shelly cloud"
 description: "shelly cloud"
-weight: 140
+weight: 130
 sidebar:
   collapsed: true
 ---

@@ -1,7 +1,7 @@
 ---
 title: "shelly alias"
 description: "shelly alias"
-weight: 40
+weight: 30
 sidebar:
   collapsed: true
 ---

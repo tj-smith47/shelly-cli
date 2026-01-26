@@ -1,7 +1,7 @@
 ---
 title: "shelly switch"
 description: "shelly switch"
-weight: 760
+weight: 640
 sidebar:
   collapsed: true
 ---

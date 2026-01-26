@@ -1,7 +1,7 @@
 ---
 title: "shelly rgbw"
 description: "shelly rgbw"
-weight: 660
+weight: 550
 sidebar:
   collapsed: true
 ---

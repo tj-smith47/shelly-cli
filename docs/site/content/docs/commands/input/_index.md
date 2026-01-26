@@ -1,7 +1,7 @@
 ---
 title: "shelly input"
 description: "shelly input"
-weight: 370
+weight: 310
 sidebar:
   collapsed: true
 ---

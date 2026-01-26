@@ -1,7 +1,7 @@
 ---
 title: "shelly profile"
 description: "shelly profile"
-weight: 560
+weight: 490
 sidebar:
   collapsed: true
 ---

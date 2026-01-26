@@ -33,6 +33,17 @@ func SafeConfig(f *Factory) *config.Config {
 	return cfg
 }
 
+// HideAliases marks alias-group commands as hidden so documentation generators
+// skip them. Alias commands are shortcuts (e.g., "add" → "device add $@") that
+// should appear in help output but not in generated markdown/man docs.
+func HideAliases(root *cobra.Command) {
+	for _, c := range root.Commands() {
+		if c.GroupID == "alias" {
+			c.Hidden = true
+		}
+	}
+}
+
 const aliasTextMaxLength = 50
 
 // AddAliases creates cobra commands for each alias and adds them to the parent command.

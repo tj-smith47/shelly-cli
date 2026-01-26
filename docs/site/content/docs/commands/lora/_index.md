@@ -1,7 +1,7 @@
 ---
 title: "shelly lora"
 description: "shelly lora"
-weight: 410
+weight: 350
 sidebar:
   collapsed: true
 ---

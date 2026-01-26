@@ -1,7 +1,7 @@
 ---
 title: "shelly energy"
 description: "shelly energy"
-weight: 260
+weight: 230
 sidebar:
   collapsed: true
 ---

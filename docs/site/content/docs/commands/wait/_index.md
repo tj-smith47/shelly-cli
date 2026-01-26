@@ -1,7 +1,7 @@
 ---
 title: "shelly wait"
 description: "shelly wait"
-weight: 850
+weight: 730
 sidebar:
   collapsed: true
 ---

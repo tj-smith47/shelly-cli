@@ -1,7 +1,7 @@
 ---
 title: "shelly cover"
 description: "shelly cover"
-weight: 170
+weight: 160
 sidebar:
   collapsed: true
 ---

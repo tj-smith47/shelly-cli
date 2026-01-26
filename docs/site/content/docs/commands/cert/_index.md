@@ -1,7 +1,7 @@
 ---
 title: "shelly cert"
 description: "shelly cert"
-weight: 130
+weight: 120
 sidebar:
   collapsed: true
 ---

@@ -1,7 +1,7 @@
 ---
 title: "shelly schedule"
 description: "shelly schedule"
-weight: 680
+weight: 570
 sidebar:
   collapsed: true
 ---

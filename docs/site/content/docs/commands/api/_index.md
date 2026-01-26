@@ -1,7 +1,7 @@
 ---
 title: "shelly api"
 description: "shelly api"
-weight: 50
+weight: 40
 sidebar:
   collapsed: true
 ---

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra/doc"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 func main() {
@@ -39,6 +40,9 @@ func main() {
 
 	// Disable auto-generated timestamp to avoid churn on every regeneration
 	rootCmd.DisableAutoGenTag = true
+
+	// Hide alias commands so they don't get separate doc pages
+	cmdutil.HideAliases(rootCmd)
 
 	// Generate markdown documentation
 	if err := doc.GenMarkdownTree(rootCmd, outputDir); err != nil {

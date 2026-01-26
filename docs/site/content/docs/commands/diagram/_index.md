@@ -1,7 +1,7 @@
 ---
 title: "shelly diagram"
 description: "shelly diagram"
-weight: 220
+weight: 200
 sidebar:
   collapsed: true
 ---

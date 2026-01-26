@@ -1,7 +1,7 @@
 ---
 title: "shelly metrics"
 description: "shelly metrics"
-weight: 440
+weight: 380
 sidebar:
   collapsed: true
 ---

@@ -1,7 +1,7 @@
 ---
 title: "shelly provision"
 description: "shelly provision"
-weight: 570
+weight: 500
 sidebar:
   collapsed: true
 ---

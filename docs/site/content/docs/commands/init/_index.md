@@ -1,7 +1,7 @@
 ---
 title: "shelly init"
 description: "shelly init"
-weight: 360
+weight: 300
 sidebar:
   collapsed: true
 ---

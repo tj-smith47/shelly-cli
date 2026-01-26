@@ -1,7 +1,7 @@
 ---
 title: "shelly alert"
 description: "shelly alert"
-weight: 30
+weight: 20
 sidebar:
   collapsed: true
 ---

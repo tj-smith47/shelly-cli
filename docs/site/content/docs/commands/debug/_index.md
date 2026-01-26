@@ -1,7 +1,7 @@
 ---
 title: "shelly debug"
 description: "shelly debug"
-weight: 200
+weight: 180
 sidebar:
   collapsed: true
 ---

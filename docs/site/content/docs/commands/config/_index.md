@@ -1,7 +1,7 @@
 ---
 title: "shelly config"
 description: "shelly config"
-weight: 160
+weight: 150
 sidebar:
   collapsed: true
 ---

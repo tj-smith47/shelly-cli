@@ -1,7 +1,7 @@
 ---
 title: "shelly party"
 description: "shelly party"
-weight: 520
+weight: 460
 sidebar:
   collapsed: true
 ---

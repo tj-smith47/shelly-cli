@@ -1,7 +1,7 @@
 ---
 title: "shelly completion"
 description: "shelly completion"
-weight: 150
+weight: 140
 sidebar:
   collapsed: true
 ---

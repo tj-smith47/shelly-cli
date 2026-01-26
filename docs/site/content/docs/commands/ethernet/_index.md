@@ -1,7 +1,7 @@
 ---
 title: "shelly ethernet"
 description: "shelly ethernet"
-weight: 270
+weight: 240
 sidebar:
   collapsed: true
 ---

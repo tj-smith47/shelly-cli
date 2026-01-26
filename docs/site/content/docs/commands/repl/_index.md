@@ -1,7 +1,7 @@
 ---
 title: "shelly repl"
 description: "shelly repl"
-weight: 620
+weight: 520
 sidebar:
   collapsed: true
 ---

@@ -1,7 +1,7 @@
 ---
 title: "shelly scene"
 description: "shelly scene"
-weight: 670
+weight: 560
 sidebar:
   collapsed: true
 ---
