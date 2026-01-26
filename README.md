@@ -16,8 +16,8 @@ A powerful, intuitive command-line interface for managing Shelly smart home devi
 
 [Installation](#installation) •
 [Quick Start](#quick-start) •
+[Highlights](#highlights) •
 [Documentation](#documentation) •
-[Examples](examples/) •
 [Contributing](CONTRIBUTING.md)
 
 </div>
@@ -106,17 +106,77 @@ shelly dash
 shelly firmware update living-room
 ```
 
+## Highlights
+
+### TUI Dashboard
+
+Launch an interactive terminal dashboard with real-time device status, quick control, and power monitoring graphs:
+
+```bash
+shelly dash
+```
+
+Keyboard-driven navigation with customizable keybindings and 280+ color themes. Press `?` in the dashboard for help.
+
+### Wiring Diagrams
+
+Print ASCII wiring diagrams for any Shelly device model directly in your terminal:
+
+```bash
+shelly diagram -m plus-2pm
+shelly diagram -m pro-4pm -s detailed
+shelly diagram -m dimmer-2 -g 1 -s compact
+```
+
+Supports schematic, compact, and detailed styles across all device topologies and generations.
+
+### MCP Server (AI Assistant Integration)
+
+Control your Shelly devices through AI assistants via the [Model Context Protocol](https://modelcontextprotocol.io):
+
+```bash
+# One-command setup for popular AI tools
+shelly mcp claude enable
+shelly mcp vscode enable
+shelly mcp cursor enable
+shelly mcp configure --gemini
+```
+
+See the [MCP documentation](docs/site/content/docs/guides/) for manual configuration and available tools.
+
+### Plugin System
+
+Extend functionality with gh-style plugins:
+
+```bash
+shelly plugin install gh:user/shelly-notify
+shelly plugin create myext --lang go
+```
+
+See [docs/plugins.md](docs/plugins.md) for the development guide.
+
+### Themes
+
+280+ built-in color themes:
+
+```bash
+shelly theme set dracula
+shelly theme preview nord
+```
+
+See [docs/themes.md](docs/themes.md) for customization and custom theme creation.
+
 ## Documentation
 
 📖 **[Full Documentation Site](https://tj-smith47.github.io/shelly-cli/)** - Browse the complete documentation online.
 
 ### Guides
-- [Configuration Reference](docs/configuration.md) - Complete configuration options
+- [Configuration Reference](docs/configuration.md) - Complete configuration options and environment variables
 - [Plugin Development](docs/plugins.md) - Create custom plugins
 - [Theme Customization](docs/themes.md) - Theme system details
 
 ### Reference
-- [Command Reference](docs/commands/) - Auto-generated docs for all 347 commands
+- [Command Reference](docs/commands/) - Auto-generated documentation for all commands
 - [Man Pages](docs/man/) - Unix manual pages
 - [Architecture](docs/architecture.md) - Directory structure and placement guide
 - [Development Guide](docs/development.md) - Development patterns and standards
@@ -129,189 +189,6 @@ shelly firmware update living-room
 - [Example Scripts](examples/scripts/) - Automation shell scripts
 - [Example Plugins](examples/plugins/) - Plugin implementation examples
 - [Deployment Examples](examples/deployments/) - Docker, Kubernetes, Prometheus
-
-## Command Overview
-
-<details>
-<summary>⚡ Quick Commands</summary>
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `on` | Turn device on (auto-detects type) | `shelly on kitchen` |
-| `off` | Turn device off | `shelly off kitchen` |
-| `toggle` | Toggle device state | `shelly toggle kitchen` |
-| `status` | Show device status | `shelly status kitchen` |
-| `reboot` | Reboot device | `shelly reboot kitchen` |
-| `reset` | Factory reset (with confirmation) | `shelly reset kitchen --yes` |
-
-</details>
-
-<details>
-<summary>🎮 Device Control</summary>
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `switch` | Control switch components | `shelly switch on kitchen --id 0` |
-| `light` | Control light components | `shelly light set kitchen --brightness 50` |
-| `rgb` | Control RGB lights | `shelly rgb set kitchen --color "#ff0000"` |
-| `cover` | Control covers/rollers | `shelly cover open garage` |
-| `thermostat` | Control thermostats | `shelly thermostat set living-room --temp 22` |
-| `input` | Manage input components | `shelly input status kitchen` |
-| `scene` | Manage scenes | `shelly scene activate movie-night` |
-| `batch` | Batch device operations | `shelly batch on --group all-lights` |
-
-</details>
-
-<details>
-<summary>📦 Device Management</summary>
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `device` | Manage device registry | `shelly device list` |
-| `discover` | Discover devices | `shelly discover` |
-| `group` | Manage device groups | `shelly group create lights` |
-| `backup` | Backup/restore configs | `shelly backup create kitchen` |
-| `migrate` | Migrate configurations | `shelly migrate kitchen new-kitchen` |
-| `schedule` | Manage schedules | `shelly schedule list kitchen` |
-| `script` | Manage device scripts | `shelly script list kitchen` |
-
-</details>
-
-<details>
-<summary>⚙️ Configuration</summary>
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `config` | Manage device config | `shelly config get kitchen` |
-| `wifi` | WiFi configuration | `shelly wifi status kitchen` |
-| `mqtt` | MQTT configuration | `shelly mqtt enable kitchen` |
-| `cloud` | Cloud connection | `shelly cloud status kitchen` |
-| `auth` | Authentication | `shelly auth set kitchen --user admin` |
-| `webhook` | Manage webhooks | `shelly webhook list kitchen` |
-| `kvs` | Key-value storage | `shelly kvs list kitchen` |
-
-</details>
-
-<details>
-<summary>🏠 Smart Home Protocols</summary>
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `bthome` | BTHome Bluetooth devices | `shelly bthome list gateway` |
-| `zigbee` | Zigbee connectivity | `shelly zigbee pair gateway` |
-| `matter` | Matter protocol | `shelly matter status kitchen` |
-| `lora` | LoRa add-on | `shelly lora status kitchen` |
-
-</details>
-
-<details>
-<summary>📈 Monitoring</summary>
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `dash` | TUI dashboard | `shelly dash` |
-| `energy` | Energy monitoring | `shelly energy status kitchen` |
-| `power` | Power monitoring | `shelly power status kitchen` |
-| `monitor` | Real-time monitoring | `shelly monitor kitchen` |
-| `metrics` | Export metrics | `shelly metrics prometheus` |
-| `sensor` | Sensor readings | `shelly sensor status kitchen` |
-
-</details>
-
-<details>
-<summary>🛠️ Utility</summary>
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `alias` | Command aliases | `shelly alias add on-all "batch on lights"` |
-| `plugin` | Plugin management | `shelly plugin list` |
-| `theme` | Theme management | `shelly theme list` |
-| `completion` | Shell completions | `shelly completion bash` |
-| `firmware` | Firmware management | `shelly firmware check kitchen` |
-| `export` | Export data | `shelly export csv --all` |
-| `debug` | Debug commands | `shelly debug rpc kitchen Shelly.GetInfo` |
-
-</details>
-
-## Configuration
-
-Configuration is stored in `~/.config/shelly/config.yaml`. See [docs/configuration.md](docs/configuration.md) for complete reference.
-
-### Example Configuration
-
-```yaml
-# Output settings
-output: table
-color: true
-theme: dracula
-
-# API mode: local (default), cloud, or auto
-api_mode: local
-
-# Discovery settings
-discovery:
-  timeout: 5s
-  mdns: true
-  ble: false
-  coiot: true
-
-# Device registry
-devices:
-  living-room:
-    address: 192.168.1.100
-    generation: 2
-    auth:
-      user: admin
-      password: secret
-  kitchen:
-    address: 192.168.1.101
-    generation: 3
-
-# Device groups
-groups:
-  lights:
-    devices: [living-room, kitchen, bedroom]
-  downstairs:
-    devices: [living-room, kitchen]
-
-# Scenes
-scenes:
-  movie-night:
-    actions:
-      - device: living-room
-        method: Switch.Set
-        params: {id: 0, on: false}
-      - device: kitchen
-        method: Light.Set
-        params: {id: 0, brightness: 20}
-
-# Aliases
-aliases:
-  ll:
-    command: device list
-  morning:
-    command: scene activate morning-routine
-```
-
-### Environment Variables
-
-Environment variables override config file values for the current execution.
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SHELLY_CONFIG` | Config file path | `~/.config/shelly/config.yaml` |
-| `SHELLY_OUTPUT` | Output format | `table` |
-| `SHELLY_NO_COLOR` | Disable colors (presence disables) | unset |
-| `SHELLY_API_MODE` | API mode (`local`, `cloud`, `auto`) | `local` |
-| `SHELLY_VERBOSE` | Enable verbose output | `false` |
-| `SHELLY_QUIET` | Suppress non-essential output | `false` |
-| `SHELLY_NO_UPDATE_CHECK` | Disable update notifications | unset |
-| `SHELLY_CLOUD_EMAIL` | Cloud login email | - |
-| `SHELLY_CLOUD_PASSWORD` | Cloud login password | - |
-| `NO_COLOR` | Standard color disable (https://no-color.org) | unset |
-| `SHELLY_TELEMETRY_ENDPOINT` | Custom telemetry endpoint URL | - |
-
-**Note:** Nested config values use underscores: `SHELLY_CLOUD_ACCESS_TOKEN` maps to `cloud.access_token`.
 
 ## Telemetry
 
@@ -347,328 +224,6 @@ shelly config set telemetry=false
 
 The telemetry data is sent to a self-hosted endpoint and is used solely for understanding which commands are most useful and identifying issues.
 
-## Output Formats
-
-All commands support multiple output formats:
-
-```bash
-# Table (default, human-readable)
-shelly device list
-
-# JSON (machine-readable)
-shelly device list -o json
-
-# YAML
-shelly device list -o yaml
-
-# CSV (for spreadsheets)
-shelly energy history kitchen -o csv > energy.csv
-
-# Template (custom Go template)
-shelly device list -o template --template '{{.Name}}: {{.Address}}'
-```
-
-### Piping and Scripting
-
-```bash
-# JSON output for jq processing
-shelly device list -o json | jq '.[] | select(.online)'
-
-# Script-friendly output
-shelly status kitchen --plain  # Returns "on" or "off"
-
-# Quiet mode for cron jobs
-shelly batch on --group all-lights -q
-
-# Export device config to file
-shelly backup create kitchen -o yaml > kitchen-backup.yaml
-```
-
-## TUI Dashboard
-
-Launch the interactive terminal dashboard:
-
-```bash
-shelly dash
-```
-
-**Features:**
-- Real-time device status
-- Quick device control
-- Power monitoring graphs
-- Keyboard-driven navigation
-- Customizable keybindings
-- 280+ color themes
-
-**Keyboard Shortcuts:**
-- `j/k` or `↓/↑` - Navigate devices
-- `Enter` - Select device
-- `t` - Toggle selected device
-- `o` - Turn on
-- `f` - Turn off
-- `r` - Refresh
-- `/` - Filter devices
-- `?` - Help
-- `q` - Quit
-
-## Plugin System
-
-Extend functionality with plugins. See [docs/plugins.md](docs/plugins.md) for development guide.
-
-```bash
-# List plugins
-shelly plugin list
-
-# Install from GitHub
-shelly plugin install gh:user/shelly-notify
-
-# Install from file
-shelly plugin install ./shelly-myext
-
-# Create new plugin
-shelly plugin create myext --lang go
-
-# Run plugin
-shelly myext [args]
-```
-
-### Example Plugin
-
-```bash
-# Install the example notification plugin
-shelly plugin install examples/plugins/shelly-notify/shelly-notify
-
-# Send notification when device changes state
-shelly notify device kitchen
-```
-
-## Theme System
-
-The CLI supports 280+ built-in themes. See [docs/themes.md](docs/themes.md) for customization.
-
-```bash
-# List available themes
-shelly theme list
-
-# Set theme
-shelly theme set dracula
-
-# Preview theme
-shelly theme preview nord
-
-# Show current theme
-shelly theme current
-```
-
-### Popular Themes
-
-- `dracula` (default) - Dark theme with vibrant colors
-- `nord` - Arctic, bluish color palette
-- `gruvbox` - Warm, retro color scheme
-- `tokyo-night` - Modern dark theme
-- `catppuccin` - Pastel color palette
-- `monokai` - Classic syntax theme
-
-### Custom Themes
-
-Create custom themes in `~/.config/shelly/themes/`:
-
-```yaml
-# mytheme.yaml
-name: mytheme
-colors:
-  foreground: "#f8f8f2"
-  background: "#282a36"
-  green: "#50fa7b"
-  red: "#ff5555"
-  yellow: "#f1fa8c"
-  blue: "#6272a4"
-  cyan: "#8be9fd"
-  purple: "#bd93f9"
-```
-
-## Shell Completions
-
-Generate completions for your shell:
-
-```bash
-# Bash
-shelly completion bash > /etc/bash_completion.d/shelly
-
-# Zsh
-shelly completion zsh > "${fpath[1]}/_shelly"
-
-# Fish
-shelly completion fish > ~/.config/fish/completions/shelly.fish
-
-# PowerShell
-shelly completion powershell > shelly.ps1
-```
-
-## MCP Server (AI Assistant Integration)
-
-Shelly CLI includes an MCP (Model Context Protocol) server that allows AI assistants like Claude, Gemini, and others to control your Shelly devices.
-
-### Quick Setup
-
-```bash
-# Enable in Claude Desktop
-shelly mcp claude enable
-
-# Enable in VS Code / Cursor
-shelly mcp vscode enable
-shelly mcp cursor enable
-
-# Configure Gemini CLI (or other assistants)
-shelly mcp configure --gemini
-```
-
-### Manual Configuration
-
-For **Claude Desktop**, add to `~/.config/claude-desktop/claude_desktop_config.json` (Linux) or `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
-
-```json
-{
-  "mcpServers": {
-    "shelly": {
-      "command": "/path/to/shelly",
-      "args": ["mcp", "start"]
-    }
-  }
-}
-```
-
-For **Claude Code**, add to `~/.claude/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "shelly": {
-      "command": "shelly",
-      "args": ["mcp", "start"]
-    }
-  }
-}
-```
-
-For **Gemini CLI**, add to `~/.gemini/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "shelly": {
-      "command": "shelly",
-      "args": ["mcp", "start"]
-    }
-  }
-}
-```
-
-### Available Commands
-
-```bash
-# Start the MCP server (for manual testing)
-shelly mcp start
-
-# List available MCP tools
-shelly mcp tools
-
-# Dry run configuration
-shelly mcp configure --claude-desktop --dry-run
-```
-
-## Aliases
-
-Create shortcuts for common commands:
-
-```bash
-# Add alias
-shelly alias add morning "scene activate morning-routine"
-
-# List aliases
-shelly alias list
-
-# Run alias
-shelly morning
-
-# Remove alias
-shelly alias remove morning
-```
-
-## Device Groups
-
-Group devices for batch operations:
-
-```bash
-# Create group
-shelly group create lights --devices living-room,kitchen,bedroom
-
-# Control group
-shelly batch on --group lights
-shelly batch off --group lights
-
-# List groups
-shelly group list
-```
-
-## Scenes
-
-Save and activate device states:
-
-```bash
-# Create scene from current state
-shelly scene create movie-night --from living-room,kitchen
-
-# Activate scene
-shelly scene activate movie-night
-
-# List scenes
-shelly scene list
-```
-
-## Energy Monitoring
-
-Track power consumption:
-
-```bash
-# Current power status
-shelly energy status kitchen
-
-# Historical data
-shelly energy history kitchen --period day
-
-# Export to CSV
-shelly energy history kitchen -o csv > energy.csv
-
-# Prometheus metrics
-shelly metrics prometheus
-```
-
-## Backup and Restore
-
-```bash
-# Create backup
-shelly backup create kitchen -o backup.json
-
-# Restore backup
-shelly backup restore kitchen backup.json
-
-# List backups
-shelly backup list
-```
-
-## Examples
-
-The `examples/` directory contains ready-to-use configurations and scripts:
-
-- **[examples/config/](examples/config/)** - Configuration templates (minimal, multi-site)
-- **[examples/aliases/](examples/aliases/)** - Alias collections (shortcuts, automation, power-users)
-- **[examples/scripts/](examples/scripts/)** - Shell scripts (presence detection, workstation sync, bulk updates)
-- **[examples/plugins/](examples/plugins/)** - Plugin examples (desktop notifications)
-- **[examples/deployments/](examples/deployments/)** - Kubernetes, Docker, and Docker Compose deployment examples
-
-**We welcome script / manifest contributions!** If you've written useful automation scripts or integrations, please submit a PR to add them to the examples directory.
-
 ## Contributing
 
 Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting a PR.
@@ -692,6 +247,8 @@ go test ./...
 # Lint
 golangci-lint run ./...
 ```
+
+**We welcome script / manifest contributions!** If you've written useful automation scripts or integrations, please submit a PR to add them to the [examples](examples/) directory.
 
 ## Support & Feedback
 
