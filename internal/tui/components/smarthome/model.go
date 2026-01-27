@@ -1,5 +1,5 @@
 // Package smarthome provides TUI components for managing smart home protocol settings.
-// This includes Matter, Zigbee, and LoRa configuration.
+// This includes Matter, Zigbee, LoRa, and Z-Wave configuration.
 package smarthome
 
 import (
@@ -50,6 +50,7 @@ type CachedSmartHomeData struct {
 	Matter *shelly.TUIMatterStatus `json:"matter"`
 	Zigbee *shelly.TUIZigbeeStatus `json:"zigbee"`
 	LoRa   *shelly.TUILoRaStatus   `json:"lora"`
+	ZWave  *shelly.TUIZWaveStatus  `json:"zwave"`
 }
 
 // Protocol identifies which protocol section is focused.
@@ -60,6 +61,7 @@ const (
 	ProtocolMatter Protocol = iota // Matter protocol section
 	ProtocolZigbee                 // Zigbee protocol section
 	ProtocolLoRa                   // LoRa protocol section
+	ProtocolZWave                  // Z-Wave protocol section
 )
 
 // Zigbee network state constants.
@@ -74,6 +76,7 @@ type StatusLoadedMsg struct {
 	Matter *shelly.TUIMatterStatus
 	Zigbee *shelly.TUIZigbeeStatus
 	LoRa   *shelly.TUILoRaStatus
+	ZWave  *shelly.TUIZWaveStatus
 	Err    error
 }
 
@@ -87,6 +90,7 @@ type Model struct {
 	matter         *shelly.TUIMatterStatus
 	zigbee         *shelly.TUIZigbeeStatus
 	lora           *shelly.TUILoRaStatus
+	zwave          *shelly.TUIZWaveStatus
 	activeProtocol Protocol
 	loading        bool
 	toggling       bool // Matter/Zigbee enable/disable toggle in progress
@@ -94,6 +98,7 @@ type Model struct {
 	pendingLeave   bool // Awaiting Zigbee leave network confirmation (double-press)
 	editing        bool // Matter edit modal visible
 	zigbeeEditing  bool // Zigbee edit modal visible
+	zwaveEditing   bool // Z-Wave edit modal visible
 	err            error
 	focused        bool
 	panelIndex     int // 1-based panel index for Shift+N hotkey hint
@@ -101,6 +106,7 @@ type Model struct {
 	cacheStatus    cachestatus.Model
 	editModal      MatterEditModel
 	zigbeeModal    ZigbeeEditModel
+	zwaveModal     ZWaveEditModel
 }
 
 // Styles holds styles for the SmartHome component.
@@ -164,6 +170,7 @@ func New(deps Deps) Model {
 		cacheStatus: cachestatus.New(),
 		editModal:   NewMatterEditModel(deps.Ctx, deps.Svc),
 		zigbeeModal: NewZigbeeEditModel(deps.Ctx, deps.Svc),
+		zwaveModal:  NewZWaveEditModel(),
 	}
 	m.Loader = m.Loader.SetMessage("Loading smart home protocols...")
 	return m
@@ -180,6 +187,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.matter = nil
 	m.zigbee = nil
 	m.lora = nil
+	m.zwave = nil
 	m.activeProtocol = ProtocolMatter
 	m.err = nil
 	m.loading = true
@@ -188,8 +196,10 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.pendingLeave = false
 	m.editing = false
 	m.zigbeeEditing = false
+	m.zwaveEditing = false
 	m.editModal = m.editModal.Hide()
 	m.zigbeeModal = m.zigbeeModal.Hide()
+	m.zwaveModal = m.zwaveModal.Hide()
 	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
@@ -210,6 +220,7 @@ func (m Model) fetchStatus() tea.Cmd {
 		msg.Matter = m.fetchMatter(ctx)
 		msg.Zigbee = m.fetchZigbee(ctx)
 		msg.LoRa = m.fetchLoRa(ctx)
+		msg.ZWave = m.fetchZWave(ctx)
 
 		return msg
 	}
@@ -239,6 +250,14 @@ func (m Model) fetchLoRa(ctx context.Context) *shelly.TUILoRaStatus {
 	return status
 }
 
+func (m Model) fetchZWave(ctx context.Context) *shelly.TUIZWaveStatus {
+	status, err := m.svc.GetTUIZWaveStatus(ctx, m.device)
+	if err != nil {
+		return nil
+	}
+	return status
+}
+
 // fetchAndCacheStatus fetches fresh data and caches it.
 func (m Model) fetchAndCacheStatus() tea.Cmd {
 	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeMatter, cache.TTLSmartHome, func() (any, error) {
@@ -249,6 +268,7 @@ func (m Model) fetchAndCacheStatus() tea.Cmd {
 			Matter: m.fetchMatter(ctx),
 			Zigbee: m.fetchZigbee(ctx),
 			LoRa:   m.fetchLoRa(ctx),
+			ZWave:  m.fetchZWave(ctx),
 		}
 
 		return data, nil
@@ -265,6 +285,7 @@ func (m Model) backgroundRefresh() tea.Cmd {
 			Matter: m.fetchMatter(ctx),
 			Zigbee: m.fetchZigbee(ctx),
 			LoRa:   m.fetchLoRa(ctx),
+			ZWave:  m.fetchZWave(ctx),
 		}
 
 		return data, nil
@@ -297,6 +318,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 	if m.zigbeeEditing {
 		return m.handleZigbeeEditModalUpdate(msg)
+	}
+	if m.zwaveEditing {
+		return m.handleZWaveEditModalUpdate(msg)
 	}
 
 	// Forward tick messages to loader when loading
@@ -410,11 +434,14 @@ func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
 		m.matter = data.Matter
 		m.zigbee = data.Zigbee
 		m.lora = data.LoRa
+		m.zwave = data.ZWave
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
 	// Emit StatusLoadedMsg with cached data so sequential loading can advance
-	loadedCmd := func() tea.Msg { return StatusLoadedMsg{Matter: m.matter, Zigbee: m.zigbee, LoRa: m.lora} }
+	loadedCmd := func() tea.Msg {
+		return StatusLoadedMsg{Matter: m.matter, Zigbee: m.zigbee, LoRa: m.lora, ZWave: m.zwave}
+	}
 
 	if msg.NeedsRefresh {
 		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
@@ -447,9 +474,12 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 		m.matter = data.Matter
 		m.zigbee = data.Zigbee
 		m.lora = data.LoRa
+		m.zwave = data.ZWave
 	}
 	// Emit StatusLoadedMsg so sequential loading can advance
-	return m, func() tea.Msg { return StatusLoadedMsg{Matter: m.matter, Zigbee: m.zigbee, LoRa: m.lora} }
+	return m, func() tea.Msg {
+		return StatusLoadedMsg{Matter: m.matter, Zigbee: m.zigbee, LoRa: m.lora, ZWave: m.zwave}
+	}
 }
 
 func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
@@ -462,13 +492,14 @@ func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
 	m.matter = msg.Matter
 	m.zigbee = msg.Zigbee
 	m.lora = msg.LoRa
+	m.zwave = msg.ZWave
 	return m, nil
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Component-specific keys not covered by action messages
 	switch msg.String() {
-	case "1", "2", "3":
+	case "1", "2", "3", "4":
 		return m.handleProtocolSelect(msg.String()), nil
 	case "t":
 		return m.handleProtocolToggle()
@@ -503,6 +534,8 @@ func (m Model) handleProtocolSelect(key string) Model {
 		m.activeProtocol = ProtocolZigbee
 	case "3":
 		m.activeProtocol = ProtocolLoRa
+	case "4":
+		m.activeProtocol = ProtocolZWave
 	}
 	return m
 }
@@ -513,7 +546,7 @@ func (m Model) handleProtocolToggle() (Model, tea.Cmd) {
 		return m.handleMatterToggle()
 	case ProtocolZigbee:
 		return m.handleZigbeeToggle()
-	case ProtocolLoRa:
+	case ProtocolLoRa, ProtocolZWave:
 		return m, nil
 	}
 	return m, nil
@@ -525,7 +558,7 @@ func (m Model) handleProtocolDestructive() (Model, tea.Cmd) {
 		return m.handleMatterResetKey()
 	case ProtocolZigbee:
 		return m.handleZigbeeLeaveKey()
-	case ProtocolLoRa:
+	case ProtocolLoRa, ProtocolZWave:
 		return m, nil
 	}
 	return m, nil
@@ -538,6 +571,8 @@ func (m Model) nextProtocol() Model {
 	case ProtocolZigbee:
 		m.activeProtocol = ProtocolLoRa
 	case ProtocolLoRa:
+		m.activeProtocol = ProtocolZWave
+	case ProtocolZWave:
 		m.activeProtocol = ProtocolMatter
 	}
 	return m
@@ -546,11 +581,13 @@ func (m Model) nextProtocol() Model {
 func (m Model) prevProtocol() Model {
 	switch m.activeProtocol {
 	case ProtocolMatter:
-		m.activeProtocol = ProtocolLoRa
+		m.activeProtocol = ProtocolZWave
 	case ProtocolZigbee:
 		m.activeProtocol = ProtocolMatter
 	case ProtocolLoRa:
 		m.activeProtocol = ProtocolZigbee
+	case ProtocolZWave:
+		m.activeProtocol = ProtocolLoRa
 	}
 	return m
 }
@@ -631,6 +668,8 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 		return m.handleMatterEditKey()
 	case ProtocolZigbee:
 		return m.handleZigbeeEditKey()
+	case ProtocolZWave:
+		return m.handleZWaveEditKey()
 	default:
 		return m, nil
 	}
@@ -861,9 +900,34 @@ func (m Model) handleZigbeeLeaveResult(msg ZigbeeLeaveResultMsg) (Model, tea.Cmd
 	)
 }
 
+// --- Z-Wave handlers ---
+
+func (m Model) handleZWaveEditKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.zwave == nil || m.activeProtocol != ProtocolZWave {
+		return m, nil
+	}
+	m.zwaveEditing = true
+	m.zwaveModal = m.zwaveModal.SetSize(m.Width, m.Height)
+	var cmd tea.Cmd
+	m.zwaveModal, cmd = m.zwaveModal.Show(m.device, m.zwave)
+	return m, tea.Batch(cmd, func() tea.Msg { return EditOpenedMsg{} })
+}
+
+func (m Model) handleZWaveEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.zwaveModal, cmd = m.zwaveModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.zwaveModal.Visible() {
+		m.zwaveEditing = false
+	}
+
+	return m, cmd
+}
+
 // IsEditing returns whether any edit modal is currently visible.
 func (m Model) IsEditing() bool {
-	return m.editing || m.zigbeeEditing
+	return m.editing || m.zigbeeEditing || m.zwaveEditing
 }
 
 // RenderEditModal returns the active edit modal view for full-screen overlay rendering.
@@ -873,6 +937,9 @@ func (m Model) RenderEditModal() string {
 	}
 	if m.zigbeeEditing {
 		return m.zigbeeModal.View()
+	}
+	if m.zwaveEditing {
+		return m.zwaveModal.View()
 	}
 	return ""
 }
@@ -885,6 +952,9 @@ func (m Model) SetEditModalSize(width, height int) Model {
 	}
 	if m.zigbeeEditing {
 		m.zigbeeModal = m.zigbeeModal.SetSize(width, height)
+	}
+	if m.zwaveEditing {
+		m.zwaveModal = m.zwaveModal.SetSize(width, height)
 	}
 	return m
 }
@@ -924,6 +994,10 @@ func (m Model) View() string {
 
 	// LoRa Section
 	content.WriteString(m.renderLoRa())
+	content.WriteString("\n\n")
+
+	// Z-Wave Section
+	content.WriteString(m.renderZWave())
 
 	r.SetContent(content.String())
 
@@ -958,8 +1032,10 @@ func (m Model) buildFooter() string {
 		}
 	case m.activeProtocol == ProtocolZigbee && m.zigbee != nil:
 		footer = m.buildZigbeeFooter()
+	case m.activeProtocol == ProtocolZWave && m.zwave != nil:
+		footer = "e:edit r:refresh"
 	default:
-		footer = "1-3:sel j/k:nav r:refresh"
+		footer = "1-4:sel j/k:nav r:refresh"
 	}
 
 	if cs := m.cacheStatus.View(); cs != "" {
@@ -1135,6 +1211,48 @@ func (m Model) renderLoRa() string {
 	return content.String()
 }
 
+func (m Model) renderZWave() string {
+	var content strings.Builder
+
+	// Section header
+	header := "Z-Wave"
+	if m.activeProtocol == ProtocolZWave {
+		header = "▶ " + header
+		content.WriteString(m.styles.Active.Render(header))
+	} else {
+		header = "  " + header
+		content.WriteString(m.styles.Section.Render(header))
+	}
+	content.WriteString("\n")
+
+	if m.zwave == nil {
+		content.WriteString(m.styles.Muted.Render("    Not a Wave device"))
+		return content.String()
+	}
+
+	// Device info
+	content.WriteString("    " + m.styles.Label.Render("Model:  "))
+	content.WriteString(m.styles.Value.Render(m.zwave.DeviceModel))
+	content.WriteString("\n")
+
+	content.WriteString("    " + m.styles.Label.Render("Series: "))
+	if m.zwave.IsPro {
+		content.WriteString(m.styles.Enabled.Render("Wave Pro"))
+	} else {
+		content.WriteString(m.styles.Value.Render("Wave"))
+	}
+	content.WriteString("\n")
+
+	content.WriteString("    " + m.styles.Label.Render("Range:  "))
+	if m.zwave.SupportsLR {
+		content.WriteString(m.styles.Value.Render("Mesh + Long Range"))
+	} else {
+		content.WriteString(m.styles.Value.Render("Mesh"))
+	}
+
+	return content.String()
+}
+
 // Matter returns the current Matter status.
 func (m Model) Matter() *shelly.TUIMatterStatus {
 	return m.matter
@@ -1148,6 +1266,11 @@ func (m Model) Zigbee() *shelly.TUIZigbeeStatus {
 // LoRa returns the current LoRa status.
 func (m Model) LoRa() *shelly.TUILoRaStatus {
 	return m.lora
+}
+
+// ZWave returns the current Z-Wave status.
+func (m Model) ZWave() *shelly.TUIZWaveStatus {
+	return m.zwave
 }
 
 // Device returns the current device address.

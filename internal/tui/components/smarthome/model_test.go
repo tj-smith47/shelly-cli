@@ -3,6 +3,7 @@ package smarthome
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -344,19 +345,31 @@ func TestModel_HandleAction_Navigate(t *testing.T) {
 		t.Errorf("after second NavDown, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolLoRa)
 	}
 
+	// Navigate down to Z-Wave
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
+	if updated.activeProtocol != ProtocolZWave {
+		t.Errorf("after third NavDown, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolZWave)
+	}
+
 	// Navigate down wraps to Matter
 	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.activeProtocol != ProtocolMatter {
 		t.Errorf("after wrap, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolMatter)
 	}
 
-	// Navigate up wraps to LoRa
+	// Navigate up wraps to Z-Wave
 	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
-	if updated.activeProtocol != ProtocolLoRa {
-		t.Errorf("after NavUp from Matter, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolLoRa)
+	if updated.activeProtocol != ProtocolZWave {
+		t.Errorf("after NavUp from Matter, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolZWave)
 	}
 
-	// Navigate up
+	// Navigate up to LoRa
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
+	if updated.activeProtocol != ProtocolLoRa {
+		t.Errorf("after NavUp, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolLoRa)
+	}
+
+	// Navigate up to Zigbee
 	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
 	if updated.activeProtocol != ProtocolZigbee {
 		t.Errorf("after NavUp, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolZigbee)
@@ -668,6 +681,7 @@ func TestModel_Accessors(t *testing.T) {
 	m.matter = &shelly.TUIMatterStatus{Enabled: true}
 	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true}
 	m.lora = &shelly.TUILoRaStatus{Enabled: true}
+	m.zwave = &shelly.TUIZWaveStatus{DeviceModel: "SNSW-102ZW", IsPro: false, SupportsLR: true}
 	m.loading = true
 	m.activeProtocol = ProtocolZigbee
 	m.err = errors.New("test error")
@@ -683,6 +697,9 @@ func TestModel_Accessors(t *testing.T) {
 	}
 	if m.LoRa() == nil || !m.LoRa().Enabled {
 		t.Error("LoRa() incorrect")
+	}
+	if m.ZWave() == nil || m.ZWave().DeviceModel != "SNSW-102ZW" {
+		t.Error("ZWave() incorrect")
 	}
 	if !m.Loading() {
 		t.Error("Loading() should be true")
@@ -749,7 +766,8 @@ func TestNextProtocol(t *testing.T) {
 	}{
 		{ProtocolMatter, ProtocolZigbee},
 		{ProtocolZigbee, ProtocolLoRa},
-		{ProtocolLoRa, ProtocolMatter},
+		{ProtocolLoRa, ProtocolZWave},
+		{ProtocolZWave, ProtocolMatter},
 	}
 
 	for _, tt := range tests {
@@ -768,9 +786,10 @@ func TestPrevProtocol(t *testing.T) {
 		from Protocol
 		want Protocol
 	}{
-		{ProtocolMatter, ProtocolLoRa},
+		{ProtocolMatter, ProtocolZWave},
 		{ProtocolZigbee, ProtocolMatter},
 		{ProtocolLoRa, ProtocolZigbee},
+		{ProtocolZWave, ProtocolLoRa},
 	}
 
 	for _, tt := range tests {
@@ -1764,6 +1783,244 @@ func TestModel_EditModal_ZigbeeClosedRefreshes(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Error("should return refresh commands")
+	}
+}
+
+// --- Z-Wave model tests ---
+
+func TestModel_HandleAction_EditRequest_ZWave(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZWave
+	m.zwave = &shelly.TUIZWaveStatus{DeviceModel: "SNSW-102ZW", DeviceName: "Switch", IsPro: false, SupportsLR: true}
+
+	updated, cmd := m.Update(messages.EditRequestMsg{})
+
+	if !updated.zwaveEditing {
+		t.Error("should open Z-Wave edit modal when Z-Wave is selected")
+	}
+	if cmd == nil {
+		t.Error("should return command for modal open")
+	}
+}
+
+func TestModel_HandleAction_EditRequest_ZWaveNoData(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZWave
+	m.zwave = nil
+
+	updated, _ := m.Update(messages.EditRequestMsg{})
+
+	if updated.zwaveEditing {
+		t.Error("should not open edit modal when zwave data is nil")
+	}
+}
+
+func TestModel_HandleKey_ProtocolSelect_ZWave(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '4'})
+
+	if updated.activeProtocol != ProtocolZWave {
+		t.Errorf("activeProtocol = %d, want %d (ProtocolZWave)", updated.activeProtocol, ProtocolZWave)
+	}
+}
+
+func TestModel_BuildFooter_ZWave(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolZWave
+	m.zwave = &shelly.TUIZWaveStatus{DeviceModel: "SNSW-102ZW"}
+
+	footer := m.buildFooter()
+
+	if !strings.Contains(footer, "e:edit") {
+		t.Errorf("Z-Wave footer should contain 'e:edit', got %q", footer)
+	}
+	if !strings.Contains(footer, "r:refresh") {
+		t.Errorf("Z-Wave footer should contain 'r:refresh', got %q", footer)
+	}
+}
+
+func TestModel_View_ZWave(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.zwave = &shelly.TUIZWaveStatus{
+		DeviceModel: "SNSW-102ZW",
+		DeviceName:  "Switch",
+		IsPro:       false,
+		SupportsLR:  true,
+	}
+	m = m.SetSize(80, 50)
+
+	view := m.View()
+
+	if !strings.Contains(view, "Z-Wave") {
+		t.Error("View should contain Z-Wave section header")
+	}
+	if !strings.Contains(view, "SNSW-102ZW") {
+		t.Error("View should contain device model")
+	}
+}
+
+func TestModel_View_ZWavePro(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.activeProtocol = ProtocolZWave
+	m.zwave = &shelly.TUIZWaveStatus{
+		DeviceModel: "SPSW-201ZW",
+		DeviceName:  "Shutter",
+		IsPro:       true,
+		SupportsLR:  true,
+	}
+	m = m.SetSize(80, 50)
+
+	view := m.View()
+
+	if !strings.Contains(view, "Wave Pro") {
+		t.Error("View should contain 'Wave Pro' for Pro devices")
+	}
+}
+
+func TestModel_View_ZWaveNil(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.activeProtocol = ProtocolZWave
+	m = m.SetSize(80, 50)
+
+	view := m.View()
+
+	if !strings.Contains(view, "Not a Wave device") {
+		t.Error("View should show 'Not a Wave device' when zwave is nil")
+	}
+}
+
+func TestModel_IsEditing_ZWave(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	if m.IsEditing() {
+		t.Error("should not be editing initially")
+	}
+
+	m.zwaveEditing = true
+
+	if !m.IsEditing() {
+		t.Error("should be editing when zwaveEditing=true")
+	}
+}
+
+func TestModel_RenderEditModal_ZWave(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.zwaveEditing = true
+	m.zwaveModal = m.zwaveModal.SetSize(80, 40)
+	m.zwaveModal.visible = true
+
+	view := m.RenderEditModal()
+
+	if view == "" {
+		t.Error("RenderEditModal should return Z-Wave modal view")
+	}
+}
+
+func TestModel_SetEditModalSize_ZWave(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.zwaveEditing = true
+
+	updated := m.SetEditModalSize(100, 50)
+
+	if updated.zwaveModal.width != 100 {
+		t.Errorf("zwaveModal width = %d, want 100", updated.zwaveModal.width)
+	}
+	if updated.zwaveModal.height != 50 {
+		t.Errorf("zwaveModal height = %d, want 50", updated.zwaveModal.height)
+	}
+}
+
+func TestModel_SetDevice_ClearsZWaveEditing(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.zwaveEditing = true
+
+	updated, _ := m.SetDevice(testDevice)
+
+	if updated.zwaveEditing {
+		t.Error("zwaveEditing should be cleared on SetDevice")
+	}
+}
+
+func TestModel_EditModal_ZWaveClosedNoRefresh(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.zwaveEditing = true
+	m.zwave = &shelly.TUIZWaveStatus{DeviceModel: "SNSW-102ZW", DeviceName: "Switch"}
+
+	// Show the Z-Wave modal
+	m.zwaveModal, _ = m.zwaveModal.Show(m.device, m.zwave)
+
+	// Simulate Esc to close modal
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if updated.zwaveEditing {
+		t.Error("zwaveEditing should be false after modal close")
+	}
+	// Z-Wave modal is informational, so no refresh needed
+	if updated.loading {
+		t.Error("should not trigger loading/refresh for informational Z-Wave modal")
+	}
+}
+
+func TestModel_ZWaveToggle_NoOp(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZWave
+	m.zwave = &shelly.TUIZWaveStatus{DeviceModel: "SNSW-102ZW"}
+
+	// Toggle should be no-op for Z-Wave
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if updated.toggling {
+		t.Error("should not toggle for Z-Wave (no RPC support)")
+	}
+	if cmd != nil {
+		t.Error("should not return command for Z-Wave toggle")
+	}
+}
+
+func TestModel_ZWaveDestructive_NoOp(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZWave
+	m.zwave = &shelly.TUIZWaveStatus{DeviceModel: "SNSW-102ZW"}
+
+	// 'R' should be no-op for Z-Wave
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'R'})
+
+	if updated.toggling {
+		t.Error("should not toggle for Z-Wave destructive action")
+	}
+	if cmd != nil {
+		t.Error("should not return command for Z-Wave destructive")
 	}
 }
 

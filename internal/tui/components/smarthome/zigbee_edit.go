@@ -227,7 +227,7 @@ func (m ZigbeeEditModel) handleKey(msg tea.KeyPressMsg) (ZigbeeEditModel, tea.Cm
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 
-	case keyconst.KeyEnter, "ctrl+s":
+	case keyconst.KeyEnter, keyconst.KeyCtrlS:
 		return m.handleSaveOrAction()
 
 	case "t", keyconst.KeySpace:

@@ -843,6 +843,63 @@ func (s *Service) GetTUILoRaStatus(ctx context.Context, identifier string) (*TUI
 	return result, err
 }
 
+// TUIZWaveStatus holds Z-Wave device information for the TUI.
+// Z-Wave devices (Shelly Wave series) are detected via their model identifier
+// and provide informational data derived from the device profile.
+type TUIZWaveStatus struct {
+	DeviceModel string `json:"device_model"`
+	DeviceName  string `json:"device_name"`
+	IsPro       bool   `json:"is_pro"`
+	SupportsLR  bool   `json:"supports_lr"`
+}
+
+// GetTUIZWaveStatus returns the Z-Wave status for the TUI.
+// Returns nil (not an error) if the device is not a Z-Wave device.
+func (s *Service) GetTUIZWaveStatus(ctx context.Context, identifier string) (*TUIZWaveStatus, error) {
+	var result *TUIZWaveStatus
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		infoResult, err := conn.Call(ctx, "Sys.GetDeviceInfo", nil)
+		if err != nil {
+			return err
+		}
+		infoData, err := json.Marshal(infoResult)
+		if err != nil {
+			return err
+		}
+		var info struct {
+			Model string `json:"model"`
+			App   string `json:"app"`
+		}
+		if err := json.Unmarshal(infoData, &info); err != nil {
+			return err
+		}
+
+		// Z-Wave (Shelly Wave) models end with "ZW" suffix
+		model := strings.ToUpper(info.Model)
+		if !strings.HasSuffix(model, "ZW") {
+			return nil
+		}
+
+		// Wave Pro models start with "SPSW" prefix
+		isPro := strings.HasPrefix(model, "SPSW")
+
+		// Derive display name from app or model
+		name := info.App
+		if name == "" {
+			name = info.Model
+		}
+
+		result = &TUIZWaveStatus{
+			DeviceModel: info.Model,
+			DeviceName:  name,
+			IsPro:       isPro,
+			SupportsLR:  true, // All modern Wave devices support Z-Wave Long Range
+		}
+		return nil
+	})
+	return result, err
+}
+
 // TUISecurityStatus holds security status information for the TUI.
 type TUISecurityStatus struct {
 	AuthEnabled  bool   `json:"auth_enabled"`
