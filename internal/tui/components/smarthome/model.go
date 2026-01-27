@@ -81,11 +81,15 @@ type Model struct {
 	lora           *shelly.TUILoRaStatus
 	activeProtocol Protocol
 	loading        bool
+	toggling       bool // Matter enable/disable toggle in progress
+	pendingReset   bool // Awaiting Matter reset confirmation (double-press)
+	editing        bool // Matter edit modal visible
 	err            error
 	focused        bool
 	panelIndex     int // 1-based panel index for Shift+N hotkey hint
 	styles         Styles
 	cacheStatus    cachestatus.Model
+	editModal      MatterEditModel
 }
 
 // Styles holds styles for the SmartHome component.
@@ -147,6 +151,7 @@ func New(deps Deps) Model {
 		fileCache:   deps.FileCache,
 		styles:      DefaultStyles(),
 		cacheStatus: cachestatus.New(),
+		editModal:   NewMatterEditModel(deps.Ctx, deps.Svc),
 	}
 	m.Loader = m.Loader.SetMessage("Loading smart home protocols...")
 	return m
@@ -166,6 +171,10 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.activeProtocol = ProtocolMatter
 	m.err = nil
 	m.loading = true
+	m.toggling = false
+	m.pendingReset = false
+	m.editing = false
+	m.editModal = m.editModal.Hide()
 	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
@@ -267,6 +276,11 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Handle edit modal if visible
+	if m.editing {
+		return m.handleEditModalUpdate(msg)
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
 		if model, cmd, done := m.updateLoading(msg); done {
@@ -296,22 +310,31 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleRefreshComplete(msg)
 	case StatusLoadedMsg:
 		return m.handleStatusLoaded(msg)
-
-	// Action messages from context system
-	case messages.NavigationMsg:
-		if !m.focused {
-			return m, nil
+	case MatterToggleResultMsg:
+		return m.handleMatterToggleResult(msg)
+	case MatterResetResultMsg:
+		return m.handleMatterResetResult(msg)
+	default:
+		if m.focused {
+			return m.handleFocusedAction(msg)
 		}
+	}
+	return m, nil
+}
+
+func (m Model) handleFocusedAction(msg tea.Msg) (Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case messages.NavigationMsg:
 		return m.handleNavigation(msg)
 	case messages.RefreshRequestMsg:
-		if !m.focused {
-			return m, nil
-		}
 		return m.handleRefresh()
+	case messages.EditRequestMsg:
+		return m.handleMatterEditKey()
+	case messages.ResetRequestMsg:
+		return m.handleMatterResetKey()
+	case messages.ViewRequestMsg:
+		return m.handleMatterEditKey() // 'c' for codes also opens edit modal
 	case tea.KeyPressMsg:
-		if !m.focused {
-			return m, nil
-		}
 		return m.handleKey(msg)
 	}
 	return m, nil
@@ -423,10 +446,34 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "1":
 		m.activeProtocol = ProtocolMatter
+		m.pendingReset = false
 	case "2":
 		m.activeProtocol = ProtocolZigbee
+		m.pendingReset = false
 	case "3":
 		m.activeProtocol = ProtocolLoRa
+		m.pendingReset = false
+
+	// Matter-specific keys (only when Matter protocol is selected)
+	case "t":
+		if m.activeProtocol == ProtocolMatter {
+			return m.handleMatterToggle()
+		}
+	case "c":
+		if m.activeProtocol == ProtocolMatter {
+			return m.handleMatterEditKey()
+		}
+	case "R":
+		if m.activeProtocol == ProtocolMatter {
+			return m.handleMatterResetKey()
+		}
+
+	case "esc", "ctrl+[":
+		// Cancel pending reset on escape
+		if m.pendingReset {
+			m.pendingReset = false
+			return m, nil
+		}
 	}
 
 	return m, nil
@@ -452,6 +499,173 @@ func (m Model) prevProtocol() Model {
 		m.activeProtocol = ProtocolMatter
 	case ProtocolLoRa:
 		m.activeProtocol = ProtocolZigbee
+	}
+	return m
+}
+
+func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.editModal, cmd = m.editModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.editModal.Visible() {
+		m.editing = false
+		// Invalidate cache and refresh data after edit
+		m.loading = true
+		return m, tea.Batch(
+			cmd,
+			m.Loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+			m.fetchAndCacheStatus(),
+		)
+	}
+
+	// Handle save result message - close modal and refresh
+	if saveMsg, ok := msg.(MatterEditSaveResultMsg); ok {
+		if saveMsg.Err == nil {
+			m.editing = false
+			m.editModal = m.editModal.Hide()
+			m.loading = true
+			return m, tea.Batch(
+				m.Loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+				m.fetchAndCacheStatus(),
+				func() tea.Msg { return EditClosedMsg{Saved: true} },
+			)
+		}
+	}
+
+	// Handle reset result in modal
+	if resetMsg, ok := msg.(MatterResetResultMsg); ok {
+		if resetMsg.Err == nil {
+			m.editing = false
+			m.editModal = m.editModal.Hide()
+			m.loading = true
+			return m, tea.Batch(
+				m.Loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+				m.fetchAndCacheStatus(),
+				func() tea.Msg { return EditClosedMsg{Saved: true} },
+			)
+		}
+	}
+
+	return m, cmd
+}
+
+func (m Model) handleMatterEditKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.matter == nil || m.activeProtocol != ProtocolMatter {
+		return m, nil
+	}
+	m.editing = true
+	m.pendingReset = false
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	var cmd tea.Cmd
+	m.editModal, cmd = m.editModal.Show(m.device, m.matter)
+	return m, tea.Batch(cmd, func() tea.Msg { return EditOpenedMsg{} })
+}
+
+func (m Model) handleMatterToggle() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.toggling || m.matter == nil {
+		return m, nil
+	}
+	m.toggling = true
+	m.pendingReset = false
+	m.err = nil
+
+	newEnabled := !m.matter.Enabled
+	return m, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		var err error
+		if newEnabled {
+			err = m.svc.Wireless().MatterEnable(ctx, m.device)
+		} else {
+			err = m.svc.Wireless().MatterDisable(ctx, m.device)
+		}
+		return MatterToggleResultMsg{Enabled: newEnabled, Err: err}
+	}
+}
+
+func (m Model) handleMatterToggleResult(msg MatterToggleResultMsg) (Model, tea.Cmd) {
+	m.toggling = false
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	// Invalidate cache and refresh to get fresh status
+	m.loading = true
+	return m, tea.Batch(
+		m.Loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+		m.fetchAndCacheStatus(),
+	)
+}
+
+func (m Model) handleMatterResetKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.matter == nil || !m.matter.Enabled || m.activeProtocol != ProtocolMatter {
+		return m, nil
+	}
+
+	// Double-press confirmation pattern
+	if m.pendingReset {
+		// Second press - execute reset
+		m.pendingReset = false
+		return m.executeMatterReset()
+	}
+
+	// First press - request confirmation
+	m.pendingReset = true
+	return m, nil
+}
+
+func (m Model) executeMatterReset() (Model, tea.Cmd) {
+	m.toggling = true // Reuse toggling flag for busy state
+	m.err = nil
+	return m, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		err := m.svc.Wireless().MatterReset(ctx, m.device)
+		return MatterResetResultMsg{Err: err}
+	}
+}
+
+func (m Model) handleMatterResetResult(msg MatterResetResultMsg) (Model, tea.Cmd) {
+	m.toggling = false
+	m.pendingReset = false
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	// Invalidate cache and refresh to get fresh status
+	m.loading = true
+	return m, tea.Batch(
+		m.Loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+		m.fetchAndCacheStatus(),
+	)
+}
+
+// IsEditing returns whether the edit modal is currently visible.
+func (m Model) IsEditing() bool {
+	return m.editing
+}
+
+// RenderEditModal returns the edit modal view for full-screen overlay rendering.
+func (m Model) RenderEditModal() string {
+	if !m.editing {
+		return ""
+	}
+	return m.editModal.View()
+}
+
+// SetEditModalSize sets the edit modal dimensions.
+// This should be called with screen-based dimensions when the modal is visible.
+func (m Model) SetEditModalSize(width, height int) Model {
+	if m.editing {
+		m.editModal = m.editModal.SetSize(width, height)
 	}
 	return m
 }
@@ -496,13 +710,37 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		footer := "1-3:sel j/k:nav r:refresh"
-		if cs := m.cacheStatus.View(); cs != "" {
-			footer += " | " + cs
-		}
+		footer := m.buildFooter()
 		r.SetFooter(footer)
 	}
 	return r.Render()
+}
+
+func (m Model) buildFooter() string {
+	// Show reset confirmation prompt
+	if m.pendingReset {
+		return m.styles.Enabled.Render("Press 'R' again to confirm factory reset, Esc to cancel")
+	}
+
+	if m.toggling {
+		return "Processing..."
+	}
+
+	var footer string
+	if m.activeProtocol == ProtocolMatter && m.matter != nil {
+		if m.matter.Enabled {
+			footer = "e:edit t:toggle c:codes R:reset r:refresh"
+		} else {
+			footer = "e:edit t:toggle r:refresh"
+		}
+	} else {
+		footer = "1-3:sel j/k:nav r:refresh"
+	}
+
+	if cs := m.cacheStatus.View(); cs != "" {
+		footer += " | " + cs
+	}
+	return footer
 }
 
 func (m Model) renderMatter() string {

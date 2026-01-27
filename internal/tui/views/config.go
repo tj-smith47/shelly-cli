@@ -723,8 +723,8 @@ func (c *Config) HasActiveModal() bool {
 		c.inputs.IsEditing() ||
 		c.ble.IsEditing() ||
 		c.protocols.IsEditing() ||
-		c.security.IsEditing()
-	// smarthome doesn't have an edit modal
+		c.security.IsEditing() ||
+		c.smarthome.IsEditing()
 }
 
 // setEditModalDimensions sets proper modal dimensions using screen dimensions.
@@ -761,6 +761,9 @@ func (c *Config) setEditModalDimensions() {
 	if c.security.IsEditing() {
 		c.security = c.security.SetEditModalSize(modalWidth, modalHeight)
 	}
+	if c.smarthome.IsEditing() {
+		c.smarthome = c.smarthome.SetEditModalSize(modalWidth, modalHeight)
+	}
 }
 
 // RenderModal returns the active modal's view for full-screen overlay rendering.
@@ -787,6 +790,9 @@ func (c *Config) RenderModal() string {
 	}
 	if c.security.IsEditing() {
 		return c.security.RenderEditModal()
+	}
+	if c.smarthome.IsEditing() {
+		return c.smarthome.RenderEditModal()
 	}
 	return ""
 }

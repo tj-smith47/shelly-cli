@@ -788,6 +788,492 @@ func TestPrevProtocol(t *testing.T) {
 	}
 }
 
+func TestModel_HandleAction_EditRequest_Matter(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: true, Commissionable: false, FabricsCount: 1}
+
+	updated, cmd := m.Update(messages.EditRequestMsg{})
+
+	if !updated.editing {
+		t.Error("should be editing after EditRequestMsg with Matter selected")
+	}
+	if cmd == nil {
+		t.Error("should return command for modal open")
+	}
+}
+
+func TestModel_HandleAction_EditRequest_NoMatter(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.matter = nil // Matter not supported
+
+	updated, _ := m.Update(messages.EditRequestMsg{})
+
+	if updated.editing {
+		t.Error("should not open edit modal when matter is nil")
+	}
+}
+
+func TestModel_HandleAction_EditRequest_NotFocused(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = false
+	m.device = testDevice
+	m.matter = &shelly.TUIMatterStatus{Enabled: true}
+
+	updated, _ := m.Update(messages.EditRequestMsg{})
+
+	if updated.editing {
+		t.Error("should not open edit modal when not focused")
+	}
+}
+
+func TestModel_HandleAction_EditRequest_WrongProtocol(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.matter = &shelly.TUIMatterStatus{Enabled: true}
+
+	updated, _ := m.Update(messages.EditRequestMsg{})
+
+	if updated.editing {
+		t.Error("should not open edit modal when Zigbee is selected")
+	}
+}
+
+func TestModel_HandleKey_MatterToggle(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: true}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if !updated.toggling {
+		t.Error("should be toggling after 't' key")
+	}
+	if cmd == nil {
+		t.Error("should return toggle command")
+	}
+}
+
+func TestModel_HandleKey_MatterToggle_NotMatterProtocol(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.matter = &shelly.TUIMatterStatus{Enabled: true}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if updated.toggling {
+		t.Error("should not toggle when Zigbee is selected")
+	}
+}
+
+func TestModel_HandleKey_MatterToggle_NoDevice(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: true}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if updated.toggling {
+		t.Error("should not toggle without device")
+	}
+	if cmd != nil {
+		t.Error("should not return command without device")
+	}
+}
+
+func TestModel_HandleKey_MatterCode(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: true, Commissionable: true}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'c'})
+
+	if !updated.editing {
+		t.Error("should open edit modal for 'c' key")
+	}
+	if cmd == nil {
+		t.Error("should return command for modal open")
+	}
+}
+
+func TestModel_HandleKey_MatterReset(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: true}
+
+	// First press - should set pendingReset
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'R'})
+
+	if !updated.pendingReset {
+		t.Error("should set pendingReset on first 'R' press")
+	}
+	if updated.toggling {
+		t.Error("should not be toggling yet")
+	}
+
+	// Second press - should execute reset
+	updated, cmd := updated.Update(tea.KeyPressMsg{Code: 'R'})
+
+	if updated.pendingReset {
+		t.Error("pendingReset should be false after confirmation")
+	}
+	if !updated.toggling {
+		t.Error("should be toggling (busy) after confirmation")
+	}
+	if cmd == nil {
+		t.Error("should return reset command")
+	}
+}
+
+func TestModel_HandleKey_MatterReset_Disabled(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: false}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'R'})
+
+	if updated.pendingReset {
+		t.Error("should not allow reset when Matter is disabled")
+	}
+}
+
+func TestModel_HandleKey_MatterReset_Cancel(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: true}
+	m.pendingReset = true
+
+	// Press Esc to cancel
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if updated.pendingReset {
+		t.Error("pendingReset should be canceled on Esc")
+	}
+}
+
+func TestModel_HandleKey_NumberClearsPendingReset(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.pendingReset = true
+
+	// Press 2 to switch to Zigbee
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '2'})
+
+	if updated.pendingReset {
+		t.Error("pendingReset should be cleared on protocol switch")
+	}
+	if updated.activeProtocol != ProtocolZigbee {
+		t.Error("should switch to Zigbee")
+	}
+}
+
+func TestModel_MatterToggleResult_Success(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	updated, cmd := m.Update(MatterToggleResultMsg{Enabled: false, Err: nil})
+
+	if updated.toggling {
+		t.Error("toggling should be false after success")
+	}
+	if !updated.loading {
+		t.Error("should be loading (refreshing) after toggle success")
+	}
+	if cmd == nil {
+		t.Error("should return refresh command")
+	}
+}
+
+func TestModel_MatterToggleResult_Error(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	toggleErr := errors.New("toggle failed")
+	updated, _ := m.Update(MatterToggleResultMsg{Err: toggleErr})
+
+	if updated.toggling {
+		t.Error("toggling should be false after error")
+	}
+	if updated.err == nil {
+		t.Error("err should be set")
+	}
+}
+
+func TestModel_MatterResetResult_Success(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+	m.pendingReset = true
+
+	updated, cmd := m.Update(MatterResetResultMsg{Err: nil})
+
+	if updated.toggling {
+		t.Error("toggling should be false after success")
+	}
+	if updated.pendingReset {
+		t.Error("pendingReset should be false after success")
+	}
+	if !updated.loading {
+		t.Error("should be loading (refreshing) after reset success")
+	}
+	if cmd == nil {
+		t.Error("should return refresh command")
+	}
+}
+
+func TestModel_MatterResetResult_Error(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	resetErr := errors.New("reset failed")
+	updated, _ := m.Update(MatterResetResultMsg{Err: resetErr})
+
+	if updated.toggling {
+		t.Error("toggling should be false after error")
+	}
+	if updated.err == nil {
+		t.Error("err should be set")
+	}
+}
+
+func TestModel_IsEditing(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	if m.IsEditing() {
+		t.Error("should not be editing initially")
+	}
+
+	m.editing = true
+
+	if !m.IsEditing() {
+		t.Error("should be editing when editing=true")
+	}
+}
+
+func TestModel_RenderEditModal_NotEditing(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	view := m.RenderEditModal()
+
+	if view != "" {
+		t.Error("RenderEditModal should return empty string when not editing")
+	}
+}
+
+func TestModel_SetEditModalSize(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.editing = true
+
+	updated := m.SetEditModalSize(100, 50)
+
+	if updated.editModal.width != 100 {
+		t.Errorf("editModal width = %d, want 100", updated.editModal.width)
+	}
+	if updated.editModal.height != 50 {
+		t.Errorf("editModal height = %d, want 50", updated.editModal.height)
+	}
+}
+
+func TestModel_SetEditModalSize_NotEditing(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	updated := m.SetEditModalSize(100, 50)
+
+	// Should not set size when not editing
+	if updated.editModal.width == 100 {
+		t.Error("editModal width should not be set when not editing")
+	}
+}
+
+func TestModel_SetDevice_ClearsEditing(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.editing = true
+	m.toggling = true
+	m.pendingReset = true
+
+	updated, _ := m.SetDevice(testDevice)
+
+	if updated.editing {
+		t.Error("editing should be cleared on SetDevice")
+	}
+	if updated.toggling {
+		t.Error("toggling should be cleared on SetDevice")
+	}
+	if updated.pendingReset {
+		t.Error("pendingReset should be cleared on SetDevice")
+	}
+}
+
+func TestModel_BuildFooter_Matter(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: true}
+
+	footer := m.buildFooter()
+
+	if footer == "" {
+		t.Error("footer should not be empty")
+	}
+}
+
+func TestModel_BuildFooter_MatterDisabled(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: false}
+
+	footer := m.buildFooter()
+
+	if footer == "" {
+		t.Error("footer should not be empty")
+	}
+}
+
+func TestModel_BuildFooter_PendingReset(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.pendingReset = true
+
+	footer := m.buildFooter()
+
+	if footer == "" {
+		t.Error("footer should not be empty")
+	}
+}
+
+func TestModel_BuildFooter_Toggling(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.toggling = true
+
+	footer := m.buildFooter()
+
+	if footer == "" {
+		t.Error("footer should not be empty")
+	}
+}
+
+func TestModel_BuildFooter_NonMatterProtocol(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolZigbee
+
+	footer := m.buildFooter()
+
+	if footer == "" {
+		t.Error("footer should not be empty")
+	}
+}
+
+func TestModel_HandleAction_ViewRequest_OpensMatterEdit(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: true, Commissionable: true}
+
+	updated, cmd := m.Update(messages.ViewRequestMsg{})
+
+	if !updated.editing {
+		t.Error("ViewRequestMsg should open edit modal for Matter")
+	}
+	if cmd == nil {
+		t.Error("should return command for modal open")
+	}
+}
+
+func TestModel_HandleAction_ResetRequest(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.matter = &shelly.TUIMatterStatus{Enabled: true}
+
+	updated, _ := m.Update(messages.ResetRequestMsg{})
+
+	if !updated.pendingReset {
+		t.Error("should set pendingReset on ResetRequestMsg")
+	}
+}
+
+func TestModel_EditModal_ClosedRefreshes(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.editing = true
+	m.matter = &shelly.TUIMatterStatus{Enabled: true}
+
+	// Show the modal
+	m.editModal, _ = m.editModal.Show(m.device, m.matter)
+
+	// Simulate Esc to close modal
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if updated.editing {
+		t.Error("editing should be false after modal close")
+	}
+	if !updated.loading {
+		t.Error("should be loading (refreshing) after modal close")
+	}
+	if cmd == nil {
+		t.Error("should return refresh commands")
+	}
+}
+
 func newTestModel() Model {
 	ctx := context.Background()
 	svc := &shelly.Service{}
