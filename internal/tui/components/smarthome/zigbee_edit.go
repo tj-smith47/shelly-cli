@@ -394,7 +394,7 @@ func (m ZigbeeEditModel) View() string {
 
 func (m ZigbeeEditModel) buildFooter() string {
 	if m.saving {
-		return "Saving..."
+		return footerSaving
 	}
 	if m.steering {
 		return "Starting network steering..."

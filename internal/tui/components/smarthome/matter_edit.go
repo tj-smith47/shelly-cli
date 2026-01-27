@@ -384,7 +384,7 @@ func (m MatterEditModel) View() string {
 
 func (m MatterEditModel) buildFooter() string {
 	if m.saving {
-		return "Saving..."
+		return footerSaving
 	}
 	if m.resetting {
 		return "Resetting Matter..."

@@ -351,16 +351,28 @@ func TestModel_HandleAction_Navigate(t *testing.T) {
 		t.Errorf("after third NavDown, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolZWave)
 	}
 
+	// Navigate down to Modbus
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
+	if updated.activeProtocol != ProtocolModbus {
+		t.Errorf("after fourth NavDown, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolModbus)
+	}
+
 	// Navigate down wraps to Matter
 	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
 	if updated.activeProtocol != ProtocolMatter {
 		t.Errorf("after wrap, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolMatter)
 	}
 
-	// Navigate up wraps to Z-Wave
+	// Navigate up wraps to Modbus
+	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
+	if updated.activeProtocol != ProtocolModbus {
+		t.Errorf("after NavUp from Matter, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolModbus)
+	}
+
+	// Navigate up to Z-Wave
 	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
 	if updated.activeProtocol != ProtocolZWave {
-		t.Errorf("after NavUp from Matter, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolZWave)
+		t.Errorf("after NavUp, activeProtocol = %d, want %d", updated.activeProtocol, ProtocolZWave)
 	}
 
 	// Navigate up to LoRa
@@ -767,7 +779,8 @@ func TestNextProtocol(t *testing.T) {
 		{ProtocolMatter, ProtocolZigbee},
 		{ProtocolZigbee, ProtocolLoRa},
 		{ProtocolLoRa, ProtocolZWave},
-		{ProtocolZWave, ProtocolMatter},
+		{ProtocolZWave, ProtocolModbus},
+		{ProtocolModbus, ProtocolMatter},
 	}
 
 	for _, tt := range tests {
@@ -786,10 +799,11 @@ func TestPrevProtocol(t *testing.T) {
 		from Protocol
 		want Protocol
 	}{
-		{ProtocolMatter, ProtocolZWave},
+		{ProtocolMatter, ProtocolModbus},
 		{ProtocolZigbee, ProtocolMatter},
 		{ProtocolLoRa, ProtocolZigbee},
 		{ProtocolZWave, ProtocolLoRa},
+		{ProtocolModbus, ProtocolZWave},
 	}
 
 	for _, tt := range tests {
@@ -2021,6 +2035,382 @@ func TestModel_ZWaveDestructive_NoOp(t *testing.T) {
 	}
 	if cmd != nil {
 		t.Error("should not return command for Z-Wave destructive")
+	}
+}
+
+// --- Modbus model tests ---
+
+func TestModel_HandleAction_EditRequest_Modbus(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolModbus
+	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
+
+	updated, cmd := m.Update(messages.EditRequestMsg{})
+
+	if !updated.modbusEditing {
+		t.Error("should open Modbus edit modal when Modbus is selected")
+	}
+	if cmd == nil {
+		t.Error("should return command for modal open")
+	}
+}
+
+func TestModel_HandleAction_EditRequest_ModbusNoData(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolModbus
+	m.modbus = nil
+
+	updated, _ := m.Update(messages.EditRequestMsg{})
+
+	if updated.modbusEditing {
+		t.Error("should not open edit modal when modbus data is nil")
+	}
+}
+
+func TestModel_HandleKey_ModbusToggle(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolModbus
+	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if !updated.toggling {
+		t.Error("should be toggling after 't' key with Modbus")
+	}
+	if cmd == nil {
+		t.Error("should return toggle command")
+	}
+}
+
+func TestModel_HandleKey_ModbusToggle_NotModbusProtocol(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	// Matter toggle may fire, but modbus should not be affected
+	if updated.activeProtocol != ProtocolMatter {
+		t.Error("activeProtocol should remain Matter")
+	}
+}
+
+func TestModel_HandleKey_ModbusToggle_NoDevice(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolModbus
+	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if updated.toggling {
+		t.Error("should not toggle without device")
+	}
+	if cmd != nil {
+		t.Error("should not return command without device")
+	}
+}
+
+func TestModel_HandleKey_ModbusToggle_NilModbus(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolModbus
+	m.modbus = nil
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if updated.toggling {
+		t.Error("should not toggle when modbus is nil")
+	}
+	if cmd != nil {
+		t.Error("should not return command when modbus is nil")
+	}
+}
+
+func TestModel_HandleKey_ProtocolSelect_Modbus(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '5'})
+
+	if updated.activeProtocol != ProtocolModbus {
+		t.Errorf("activeProtocol = %d, want %d (ProtocolModbus)", updated.activeProtocol, ProtocolModbus)
+	}
+}
+
+func TestModel_ModbusToggleResult_Success(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	updated, cmd := m.Update(ModbusToggleResultMsg{Enabled: false, Err: nil})
+
+	if updated.toggling {
+		t.Error("toggling should be false after success")
+	}
+	if !updated.loading {
+		t.Error("should be loading (refreshing) after toggle success")
+	}
+	if cmd == nil {
+		t.Error("should return refresh command")
+	}
+}
+
+func TestModel_ModbusToggleResult_Error(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	toggleErr := errors.New("toggle failed")
+	updated, _ := m.Update(ModbusToggleResultMsg{Err: toggleErr})
+
+	if updated.toggling {
+		t.Error("toggling should be false after error")
+	}
+	if updated.err == nil {
+		t.Error("err should be set")
+	}
+}
+
+func TestModel_BuildFooter_Modbus(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolModbus
+	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
+
+	footer := m.buildFooter()
+
+	if !strings.Contains(footer, "e:edit") {
+		t.Errorf("Modbus footer should contain 'e:edit', got %q", footer)
+	}
+	if !strings.Contains(footer, "t:toggle") {
+		t.Errorf("Modbus footer should contain 't:toggle', got %q", footer)
+	}
+	if !strings.Contains(footer, "r:refresh") {
+		t.Errorf("Modbus footer should contain 'r:refresh', got %q", footer)
+	}
+}
+
+func TestModel_BuildFooter_ModbusNil(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolModbus
+	m.modbus = nil
+
+	footer := m.buildFooter()
+
+	// Should fall through to default footer
+	if !strings.Contains(footer, "1-5:sel") {
+		t.Errorf("Modbus nil footer should contain '1-5:sel', got %q", footer)
+	}
+}
+
+func TestModel_View_ModbusEnabled(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.activeProtocol = ProtocolModbus
+	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
+	m = m.SetSize(80, 50)
+
+	view := m.View()
+
+	if !strings.Contains(view, "Modbus") {
+		t.Error("View should contain Modbus section header")
+	}
+	if !strings.Contains(view, "502") {
+		t.Error("View should contain port 502 when enabled")
+	}
+}
+
+func TestModel_View_ModbusDisabled(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.activeProtocol = ProtocolModbus
+	m.modbus = &shelly.TUIModbusStatus{Enabled: false}
+	m = m.SetSize(80, 50)
+
+	view := m.View()
+
+	if !strings.Contains(view, "Modbus") {
+		t.Error("View should contain Modbus section header")
+	}
+	if !strings.Contains(view, "Disabled") {
+		t.Error("View should contain 'Disabled' when modbus is off")
+	}
+}
+
+func TestModel_View_ModbusNil(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.activeProtocol = ProtocolModbus
+	m = m.SetSize(80, 50)
+
+	view := m.View()
+
+	if !strings.Contains(view, "Not supported") {
+		t.Error("View should show 'Not supported' when modbus is nil")
+	}
+}
+
+func TestModel_IsEditing_Modbus(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	if m.IsEditing() {
+		t.Error("should not be editing initially")
+	}
+
+	m.modbusEditing = true
+
+	if !m.IsEditing() {
+		t.Error("should be editing when modbusEditing=true")
+	}
+}
+
+func TestModel_RenderEditModal_Modbus(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.modbusEditing = true
+	m.modbusModal = m.modbusModal.SetSize(80, 40)
+	m.modbusModal.visible = true
+
+	view := m.RenderEditModal()
+
+	if view == "" {
+		t.Error("RenderEditModal should return Modbus modal view")
+	}
+}
+
+func TestModel_SetEditModalSize_Modbus(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.modbusEditing = true
+
+	updated := m.SetEditModalSize(100, 50)
+
+	if updated.modbusModal.width != 100 {
+		t.Errorf("modbusModal width = %d, want 100", updated.modbusModal.width)
+	}
+	if updated.modbusModal.height != 50 {
+		t.Errorf("modbusModal height = %d, want 50", updated.modbusModal.height)
+	}
+}
+
+func TestModel_SetDevice_ClearsModbusEditing(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.modbusEditing = true
+	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
+
+	updated, _ := m.SetDevice(testDevice)
+
+	if updated.modbusEditing {
+		t.Error("modbusEditing should be cleared on SetDevice")
+	}
+	if updated.modbus != nil {
+		t.Error("modbus should be nil after SetDevice")
+	}
+}
+
+func TestModel_EditModal_ModbusClosedRefreshes(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.modbusEditing = true
+	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
+
+	// Show the modbus modal
+	m.modbusModal, _ = m.modbusModal.Show(m.device, m.modbus)
+
+	// Simulate Esc to close modal
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if updated.modbusEditing {
+		t.Error("modbusEditing should be false after modal close")
+	}
+	if !updated.loading {
+		t.Error("should be loading (refreshing) after modal close")
+	}
+	if cmd == nil {
+		t.Error("should return refresh commands")
+	}
+}
+
+func TestModel_ModbusDestructive_NoOp(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolModbus
+	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
+
+	// 'R' should be no-op for Modbus
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'R'})
+
+	if updated.toggling {
+		t.Error("should not toggle for Modbus destructive action")
+	}
+	if cmd != nil {
+		t.Error("should not return command for Modbus destructive")
+	}
+}
+
+func TestModel_Accessors_Modbus(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
+
+	if m.Modbus() == nil {
+		t.Error("Modbus() should not be nil")
+	}
+	if !m.Modbus().Enabled {
+		t.Error("Modbus().Enabled should be true")
+	}
+}
+
+func TestModel_Update_StatusLoaded_WithModbus(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.loading = true
+	msg := StatusLoadedMsg{
+		Modbus: &shelly.TUIModbusStatus{Enabled: true},
+	}
+
+	updated, _ := m.Update(msg)
+
+	if updated.loading {
+		t.Error("should not be loading after StatusLoadedMsg")
+	}
+	if updated.modbus == nil {
+		t.Error("modbus should be set")
+	}
+	if !updated.modbus.Enabled {
+		t.Error("modbus.Enabled should be true")
 	}
 }
 

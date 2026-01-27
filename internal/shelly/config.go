@@ -900,6 +900,40 @@ func (s *Service) GetTUIZWaveStatus(ctx context.Context, identifier string) (*TU
 	return result, err
 }
 
+// TUIModbusStatus holds Modbus-TCP status information for the TUI.
+type TUIModbusStatus struct {
+	Enabled bool `json:"enabled"`
+}
+
+// GetTUIModbusStatus returns the Modbus status for the TUI.
+// Returns nil (not an error) if the device does not support Modbus.
+func (s *Service) GetTUIModbusStatus(ctx context.Context, identifier string) (*TUIModbusStatus, error) {
+	var result *TUIModbusStatus
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		// Get config for enable state
+		configResult, err := conn.Call(ctx, "Modbus.GetConfig", nil)
+		if err != nil {
+			return err
+		}
+		configData, err := json.Marshal(configResult)
+		if err != nil {
+			return err
+		}
+		var config struct {
+			Enable bool `json:"enable"`
+		}
+		if err := json.Unmarshal(configData, &config); err != nil {
+			return err
+		}
+
+		result = &TUIModbusStatus{
+			Enabled: config.Enable,
+		}
+		return nil
+	})
+	return result, err
+}
+
 // TUISecurityStatus holds security status information for the TUI.
 type TUISecurityStatus struct {
 	AuthEnabled  bool   `json:"auth_enabled"`
