@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -61,6 +62,13 @@ const (
 	ProtocolLoRa                   // LoRa protocol section
 )
 
+// Zigbee network state constants.
+const (
+	zigbeeStateJoined   = "joined"
+	zigbeeStateSteering = "steering"
+	zigbeeStateReady    = "ready"
+)
+
 // StatusLoadedMsg signals that smart home statuses were loaded.
 type StatusLoadedMsg struct {
 	Matter *shelly.TUIMatterStatus
@@ -81,15 +89,18 @@ type Model struct {
 	lora           *shelly.TUILoRaStatus
 	activeProtocol Protocol
 	loading        bool
-	toggling       bool // Matter enable/disable toggle in progress
+	toggling       bool // Matter/Zigbee enable/disable toggle in progress
 	pendingReset   bool // Awaiting Matter reset confirmation (double-press)
+	pendingLeave   bool // Awaiting Zigbee leave network confirmation (double-press)
 	editing        bool // Matter edit modal visible
+	zigbeeEditing  bool // Zigbee edit modal visible
 	err            error
 	focused        bool
 	panelIndex     int // 1-based panel index for Shift+N hotkey hint
 	styles         Styles
 	cacheStatus    cachestatus.Model
 	editModal      MatterEditModel
+	zigbeeModal    ZigbeeEditModel
 }
 
 // Styles holds styles for the SmartHome component.
@@ -152,6 +163,7 @@ func New(deps Deps) Model {
 		styles:      DefaultStyles(),
 		cacheStatus: cachestatus.New(),
 		editModal:   NewMatterEditModel(deps.Ctx, deps.Svc),
+		zigbeeModal: NewZigbeeEditModel(deps.Ctx, deps.Svc),
 	}
 	m.Loader = m.Loader.SetMessage("Loading smart home protocols...")
 	return m
@@ -173,8 +185,11 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.loading = true
 	m.toggling = false
 	m.pendingReset = false
+	m.pendingLeave = false
 	m.editing = false
+	m.zigbeeEditing = false
 	m.editModal = m.editModal.Hide()
+	m.zigbeeModal = m.zigbeeModal.Hide()
 	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
@@ -278,7 +293,10 @@ func (m Model) SetPanelIndex(index int) Model {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Handle edit modal if visible
 	if m.editing {
-		return m.handleEditModalUpdate(msg)
+		return m.handleMatterEditModalUpdate(msg)
+	}
+	if m.zigbeeEditing {
+		return m.handleZigbeeEditModalUpdate(msg)
 	}
 
 	// Forward tick messages to loader when loading
@@ -314,6 +332,12 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleMatterToggleResult(msg)
 	case MatterResetResultMsg:
 		return m.handleMatterResetResult(msg)
+	case ZigbeeToggleResultMsg:
+		return m.handleZigbeeToggleResult(msg)
+	case ZigbeeSteeringResultMsg:
+		return m.handleZigbeeSteeringResult(msg)
+	case ZigbeeLeaveResultMsg:
+		return m.handleZigbeeLeaveResult(msg)
 	default:
 		if m.focused {
 			return m.handleFocusedAction(msg)
@@ -329,11 +353,11 @@ func (m Model) handleFocusedAction(msg tea.Msg) (Model, tea.Cmd) {
 	case messages.RefreshRequestMsg:
 		return m.handleRefresh()
 	case messages.EditRequestMsg:
-		return m.handleMatterEditKey()
+		return m.handleEditKey()
 	case messages.ResetRequestMsg:
 		return m.handleMatterResetKey()
 	case messages.ViewRequestMsg:
-		return m.handleMatterEditKey() // 'c' for codes also opens edit modal
+		return m.handleEditKey() // 'c' for codes also opens edit modal
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -444,38 +468,66 @@ func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Component-specific keys not covered by action messages
 	switch msg.String() {
-	case "1":
-		m.activeProtocol = ProtocolMatter
-		m.pendingReset = false
-	case "2":
-		m.activeProtocol = ProtocolZigbee
-		m.pendingReset = false
-	case "3":
-		m.activeProtocol = ProtocolLoRa
-		m.pendingReset = false
-
-	// Matter-specific keys (only when Matter protocol is selected)
+	case "1", "2", "3":
+		return m.handleProtocolSelect(msg.String()), nil
 	case "t":
-		if m.activeProtocol == ProtocolMatter {
-			return m.handleMatterToggle()
-		}
+		return m.handleProtocolToggle()
 	case "c":
 		if m.activeProtocol == ProtocolMatter {
 			return m.handleMatterEditKey()
 		}
-	case "R":
-		if m.activeProtocol == ProtocolMatter {
-			return m.handleMatterResetKey()
+	case "p":
+		if m.activeProtocol == ProtocolZigbee {
+			return m.handleZigbeePairKey()
 		}
-
-	case "esc", "ctrl+[":
-		// Cancel pending reset on escape
-		if m.pendingReset {
+	case "R":
+		return m.handleProtocolDestructive()
+	case keyconst.KeyEsc, keyconst.KeyCtrlOpenBracket:
+		if m.pendingReset || m.pendingLeave {
 			m.pendingReset = false
+			m.pendingLeave = false
 			return m, nil
 		}
 	}
 
+	return m, nil
+}
+
+func (m Model) handleProtocolSelect(key string) Model {
+	m.pendingReset = false
+	m.pendingLeave = false
+	switch key {
+	case "1":
+		m.activeProtocol = ProtocolMatter
+	case "2":
+		m.activeProtocol = ProtocolZigbee
+	case "3":
+		m.activeProtocol = ProtocolLoRa
+	}
+	return m
+}
+
+func (m Model) handleProtocolToggle() (Model, tea.Cmd) {
+	switch m.activeProtocol {
+	case ProtocolMatter:
+		return m.handleMatterToggle()
+	case ProtocolZigbee:
+		return m.handleZigbeeToggle()
+	case ProtocolLoRa:
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m Model) handleProtocolDestructive() (Model, tea.Cmd) {
+	switch m.activeProtocol {
+	case ProtocolMatter:
+		return m.handleMatterResetKey()
+	case ProtocolZigbee:
+		return m.handleZigbeeLeaveKey()
+	case ProtocolLoRa:
+		return m, nil
+	}
 	return m, nil
 }
 
@@ -503,7 +555,7 @@ func (m Model) prevProtocol() Model {
 	return m
 }
 
-func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+func (m Model) handleMatterEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.editModal, cmd = m.editModal.Update(msg)
 
@@ -551,6 +603,37 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+func (m Model) handleZigbeeEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.zigbeeModal, cmd = m.zigbeeModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.zigbeeModal.Visible() {
+		m.zigbeeEditing = false
+		// Invalidate cache and refresh data after edit
+		m.loading = true
+		return m, tea.Batch(
+			cmd,
+			m.Loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+			m.fetchAndCacheStatus(),
+		)
+	}
+
+	return m, cmd
+}
+
+func (m Model) handleEditKey() (Model, tea.Cmd) {
+	switch m.activeProtocol {
+	case ProtocolMatter:
+		return m.handleMatterEditKey()
+	case ProtocolZigbee:
+		return m.handleZigbeeEditKey()
+	default:
+		return m, nil
+	}
 }
 
 func (m Model) handleMatterEditKey() (Model, tea.Cmd) {
@@ -648,24 +731,160 @@ func (m Model) handleMatterResetResult(msg MatterResetResultMsg) (Model, tea.Cmd
 	)
 }
 
-// IsEditing returns whether the edit modal is currently visible.
-func (m Model) IsEditing() bool {
-	return m.editing
-}
+// --- Zigbee handlers ---
 
-// RenderEditModal returns the edit modal view for full-screen overlay rendering.
-func (m Model) RenderEditModal() string {
-	if !m.editing {
-		return ""
+func (m Model) handleZigbeeEditKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.zigbee == nil || m.activeProtocol != ProtocolZigbee {
+		return m, nil
 	}
-	return m.editModal.View()
+	m.zigbeeEditing = true
+	m.pendingLeave = false
+	m.zigbeeModal = m.zigbeeModal.SetSize(m.Width, m.Height)
+	var cmd tea.Cmd
+	m.zigbeeModal, cmd = m.zigbeeModal.Show(m.device, m.zigbee)
+	return m, tea.Batch(cmd, func() tea.Msg { return EditOpenedMsg{} })
 }
 
-// SetEditModalSize sets the edit modal dimensions.
-// This should be called with screen-based dimensions when the modal is visible.
+func (m Model) handleZigbeeToggle() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.toggling || m.zigbee == nil {
+		return m, nil
+	}
+	m.toggling = true
+	m.pendingLeave = false
+	m.err = nil
+
+	newEnabled := !m.zigbee.Enabled
+	return m, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		var err error
+		if newEnabled {
+			err = m.svc.Wireless().ZigbeeEnable(ctx, m.device)
+		} else {
+			err = m.svc.Wireless().ZigbeeDisable(ctx, m.device)
+		}
+		return ZigbeeToggleResultMsg{Enabled: newEnabled, Err: err}
+	}
+}
+
+func (m Model) handleZigbeeToggleResult(msg ZigbeeToggleResultMsg) (Model, tea.Cmd) {
+	m.toggling = false
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	// Invalidate cache and refresh to get fresh status
+	m.loading = true
+	return m, tea.Batch(
+		m.Loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+		m.fetchAndCacheStatus(),
+	)
+}
+
+func (m Model) handleZigbeePairKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.toggling || m.zigbee == nil || !m.zigbee.Enabled {
+		return m, nil
+	}
+	m.toggling = true // Reuse toggling flag for busy state
+	m.err = nil
+	return m, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		err := m.svc.Wireless().ZigbeeStartNetworkSteering(ctx, m.device)
+		return ZigbeeSteeringResultMsg{Err: err}
+	}
+}
+
+func (m Model) handleZigbeeSteeringResult(msg ZigbeeSteeringResultMsg) (Model, tea.Cmd) {
+	m.toggling = false
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	// Invalidate cache and refresh to get fresh status
+	m.loading = true
+	return m, tea.Batch(
+		m.Loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+		m.fetchAndCacheStatus(),
+	)
+}
+
+func (m Model) handleZigbeeLeaveKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.zigbee == nil || !m.zigbee.Enabled {
+		return m, nil
+	}
+	if m.zigbee.NetworkState != zigbeeStateJoined {
+		return m, nil
+	}
+
+	// Double-press confirmation pattern
+	if m.pendingLeave {
+		// Second press - execute leave
+		m.pendingLeave = false
+		return m.executeZigbeeLeave()
+	}
+
+	// First press - request confirmation
+	m.pendingLeave = true
+	return m, nil
+}
+
+func (m Model) executeZigbeeLeave() (Model, tea.Cmd) {
+	m.toggling = true // Reuse toggling flag for busy state
+	m.err = nil
+	return m, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		err := m.svc.Wireless().ZigbeeLeaveNetwork(ctx, m.device)
+		return ZigbeeLeaveResultMsg{Err: err}
+	}
+}
+
+func (m Model) handleZigbeeLeaveResult(msg ZigbeeLeaveResultMsg) (Model, tea.Cmd) {
+	m.toggling = false
+	m.pendingLeave = false
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	// Invalidate cache and refresh to get fresh status
+	m.loading = true
+	return m, tea.Batch(
+		m.Loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+		m.fetchAndCacheStatus(),
+	)
+}
+
+// IsEditing returns whether any edit modal is currently visible.
+func (m Model) IsEditing() bool {
+	return m.editing || m.zigbeeEditing
+}
+
+// RenderEditModal returns the active edit modal view for full-screen overlay rendering.
+func (m Model) RenderEditModal() string {
+	if m.editing {
+		return m.editModal.View()
+	}
+	if m.zigbeeEditing {
+		return m.zigbeeModal.View()
+	}
+	return ""
+}
+
+// SetEditModalSize sets the active edit modal dimensions.
+// This should be called with screen-based dimensions when a modal is visible.
 func (m Model) SetEditModalSize(width, height int) Model {
 	if m.editing {
 		m.editModal = m.editModal.SetSize(width, height)
+	}
+	if m.zigbeeEditing {
+		m.zigbeeModal = m.zigbeeModal.SetSize(width, height)
 	}
 	return m
 }
@@ -717,9 +936,12 @@ func (m Model) View() string {
 }
 
 func (m Model) buildFooter() string {
-	// Show reset confirmation prompt
+	// Show confirmation prompts
 	if m.pendingReset {
 		return m.styles.Enabled.Render("Press 'R' again to confirm factory reset, Esc to cancel")
+	}
+	if m.pendingLeave {
+		return m.styles.Enabled.Render("Press 'R' again to confirm leaving network, Esc to cancel")
 	}
 
 	if m.toggling {
@@ -727,13 +949,16 @@ func (m Model) buildFooter() string {
 	}
 
 	var footer string
-	if m.activeProtocol == ProtocolMatter && m.matter != nil {
+	switch {
+	case m.activeProtocol == ProtocolMatter && m.matter != nil:
 		if m.matter.Enabled {
 			footer = "e:edit t:toggle c:codes R:reset r:refresh"
 		} else {
 			footer = "e:edit t:toggle r:refresh"
 		}
-	} else {
+	case m.activeProtocol == ProtocolZigbee && m.zigbee != nil:
+		footer = m.buildZigbeeFooter()
+	default:
 		footer = "1-3:sel j/k:nav r:refresh"
 	}
 
@@ -741,6 +966,16 @@ func (m Model) buildFooter() string {
 		footer += " | " + cs
 	}
 	return footer
+}
+
+func (m Model) buildZigbeeFooter() string {
+	if !m.zigbee.Enabled {
+		return "e:edit t:toggle r:refresh"
+	}
+	if m.zigbee.NetworkState == zigbeeStateJoined {
+		return "e:edit t:toggle p:pair R:leave r:refresh"
+	}
+	return "e:edit t:toggle p:pair r:refresh"
 }
 
 func (m Model) renderMatter() string {
@@ -816,25 +1051,37 @@ func (m Model) renderZigbee() string {
 	// Network state
 	content.WriteString("    " + m.styles.Label.Render("State:   "))
 	switch m.zigbee.NetworkState {
-	case "joined":
+	case zigbeeStateJoined:
 		content.WriteString(m.styles.Enabled.Render("Joined"))
-	case "steering":
+	case zigbeeStateSteering:
 		content.WriteString(m.styles.Warning.Render("Searching..."))
-	case "ready":
+	case zigbeeStateReady:
 		content.WriteString(m.styles.Muted.Render("Ready"))
 	default:
 		content.WriteString(m.styles.Muted.Render(m.zigbee.NetworkState))
 	}
 	content.WriteString("\n")
 
-	// Channel and PAN ID
-	if m.zigbee.NetworkState == "joined" {
+	// Network details (when joined)
+	if m.zigbee.NetworkState == zigbeeStateJoined {
 		content.WriteString("    " + m.styles.Label.Render("Channel: "))
 		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d", m.zigbee.Channel)))
 		content.WriteString("\n")
 
 		content.WriteString("    " + m.styles.Label.Render("PAN ID:  "))
 		content.WriteString(m.styles.Value.Render(fmt.Sprintf("0x%04X", m.zigbee.PANID)))
+
+		if m.zigbee.EUI64 != "" {
+			content.WriteString("\n")
+			content.WriteString("    " + m.styles.Label.Render("EUI-64:  "))
+			content.WriteString(m.styles.Value.Render(m.zigbee.EUI64))
+		}
+
+		if m.zigbee.CoordinatorEUI64 != "" {
+			content.WriteString("\n")
+			content.WriteString("    " + m.styles.Label.Render("Coord:   "))
+			content.WriteString(m.styles.Value.Render(m.zigbee.CoordinatorEUI64))
+		}
 	}
 
 	return content.String()

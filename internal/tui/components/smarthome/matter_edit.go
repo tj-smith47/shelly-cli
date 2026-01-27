@@ -225,7 +225,7 @@ func (m MatterEditModel) handleNavigation(msg messages.NavigationMsg) (MatterEdi
 
 func (m MatterEditModel) handleKey(msg tea.KeyPressMsg) (MatterEditModel, tea.Cmd) {
 	switch msg.String() {
-	case keyconst.KeyEsc, "ctrl+[":
+	case keyconst.KeyEsc, keyconst.KeyCtrlOpenBracket:
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 

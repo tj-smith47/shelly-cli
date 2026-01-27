@@ -52,6 +52,17 @@ func (s *Service) ZigbeeStartNetworkSteering(ctx context.Context, identifier str
 	})
 }
 
+// ZigbeeLeaveNetwork instructs the device to leave the current Zigbee network.
+func (s *Service) ZigbeeLeaveNetwork(ctx context.Context, identifier string) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		_, err := conn.Call(ctx, "Zigbee.LeaveNetwork", nil)
+		if err != nil {
+			return fmt.Errorf("failed to leave Zigbee network: %w", err)
+		}
+		return nil
+	})
+}
+
 // ZigbeeGetStatus gets Zigbee status from a device.
 func (s *Service) ZigbeeGetStatus(ctx context.Context, identifier string) (map[string]any, error) {
 	var status map[string]any

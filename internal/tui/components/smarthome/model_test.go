@@ -11,12 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
-const (
-	testDevice          = "192.168.1.100"
-	zigbeeStateJoined   = "joined"
-	zigbeeStateSteering = "steering"
-	zigbeeStateReady    = "ready"
-)
+const testDevice = "192.168.1.100"
 
 func TestNew(t *testing.T) {
 	t.Parallel()
@@ -1265,6 +1260,504 @@ func TestModel_EditModal_ClosedRefreshes(t *testing.T) {
 
 	if updated.editing {
 		t.Error("editing should be false after modal close")
+	}
+	if !updated.loading {
+		t.Error("should be loading (refreshing) after modal close")
+	}
+	if cmd == nil {
+		t.Error("should return refresh commands")
+	}
+}
+
+// --- Zigbee-specific model tests ---
+
+func TestModel_HandleAction_EditRequest_Zigbee(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateJoined}
+
+	updated, cmd := m.Update(messages.EditRequestMsg{})
+
+	if !updated.zigbeeEditing {
+		t.Error("should open Zigbee edit modal when Zigbee is selected")
+	}
+	if cmd == nil {
+		t.Error("should return command for modal open")
+	}
+}
+
+func TestModel_HandleAction_EditRequest_ZigbeeNoData(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = nil
+
+	updated, _ := m.Update(messages.EditRequestMsg{})
+
+	if updated.zigbeeEditing {
+		t.Error("should not open edit modal when zigbee data is nil")
+	}
+}
+
+func TestModel_HandleKey_ZigbeeToggle(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if !updated.toggling {
+		t.Error("should be toggling after 't' key with Zigbee")
+	}
+	if cmd == nil {
+		t.Error("should return toggle command")
+	}
+}
+
+func TestModel_HandleKey_ZigbeeToggle_NotZigbeeProtocol(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolLoRa
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if updated.toggling {
+		t.Error("should not toggle Zigbee when LoRa is selected")
+	}
+}
+
+func TestModel_HandleKey_ZigbeeToggle_NoDevice(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if updated.toggling {
+		t.Error("should not toggle without device")
+	}
+	if cmd != nil {
+		t.Error("should not return command without device")
+	}
+}
+
+func TestModel_HandleKey_ZigbeePair(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateReady}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'p'})
+
+	if !updated.toggling {
+		t.Error("should be toggling (busy) after 'p' key for pair")
+	}
+	if cmd == nil {
+		t.Error("should return steering command")
+	}
+}
+
+func TestModel_HandleKey_ZigbeePair_NotEnabled(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: false}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'p'})
+
+	if updated.toggling {
+		t.Error("should not pair when Zigbee is disabled")
+	}
+	if cmd != nil {
+		t.Error("should not return command when disabled")
+	}
+}
+
+func TestModel_HandleKey_ZigbeePair_NotZigbeeProtocol(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'p'})
+
+	if updated.toggling {
+		t.Error("should not pair when Matter is selected")
+	}
+}
+
+func TestModel_HandleKey_ZigbeeLeave(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateJoined}
+
+	// First press - should set pendingLeave
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'R'})
+
+	if !updated.pendingLeave {
+		t.Error("should set pendingLeave on first 'R' press")
+	}
+	if updated.toggling {
+		t.Error("should not be toggling yet")
+	}
+
+	// Second press - should execute leave
+	updated, cmd := updated.Update(tea.KeyPressMsg{Code: 'R'})
+
+	if updated.pendingLeave {
+		t.Error("pendingLeave should be false after confirmation")
+	}
+	if !updated.toggling {
+		t.Error("should be toggling (busy) after confirmation")
+	}
+	if cmd == nil {
+		t.Error("should return leave command")
+	}
+}
+
+func TestModel_HandleKey_ZigbeeLeave_NotJoined(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateReady}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'R'})
+
+	if updated.pendingLeave {
+		t.Error("should not allow leave when not joined")
+	}
+}
+
+func TestModel_HandleKey_ZigbeeLeave_Cancel(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateJoined}
+	m.pendingLeave = true
+
+	// Press Esc to cancel
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if updated.pendingLeave {
+		t.Error("pendingLeave should be canceled on Esc")
+	}
+}
+
+func TestModel_HandleKey_NumberClearsPendingLeave(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolZigbee
+	m.pendingLeave = true
+
+	// Press 1 to switch to Matter
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '1'})
+
+	if updated.pendingLeave {
+		t.Error("pendingLeave should be cleared on protocol switch")
+	}
+	if updated.activeProtocol != ProtocolMatter {
+		t.Error("should switch to Matter")
+	}
+}
+
+func TestModel_ZigbeeToggleResult_Success(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	updated, cmd := m.Update(ZigbeeToggleResultMsg{Enabled: false, Err: nil})
+
+	if updated.toggling {
+		t.Error("toggling should be false after success")
+	}
+	if !updated.loading {
+		t.Error("should be loading (refreshing) after toggle success")
+	}
+	if cmd == nil {
+		t.Error("should return refresh command")
+	}
+}
+
+func TestModel_ZigbeeToggleResult_Error(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	toggleErr := errors.New("toggle failed")
+	updated, _ := m.Update(ZigbeeToggleResultMsg{Err: toggleErr})
+
+	if updated.toggling {
+		t.Error("toggling should be false after error")
+	}
+	if updated.err == nil {
+		t.Error("err should be set")
+	}
+}
+
+func TestModel_ZigbeeSteeringResult_Success(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	updated, cmd := m.Update(ZigbeeSteeringResultMsg{Err: nil})
+
+	if updated.toggling {
+		t.Error("toggling should be false after success")
+	}
+	if !updated.loading {
+		t.Error("should be loading (refreshing) after steering success")
+	}
+	if cmd == nil {
+		t.Error("should return refresh command")
+	}
+}
+
+func TestModel_ZigbeeSteeringResult_Error(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	steerErr := errors.New("steering failed")
+	updated, _ := m.Update(ZigbeeSteeringResultMsg{Err: steerErr})
+
+	if updated.toggling {
+		t.Error("toggling should be false after error")
+	}
+	if updated.err == nil {
+		t.Error("err should be set")
+	}
+}
+
+func TestModel_ZigbeeLeaveResult_Success(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+	m.pendingLeave = true
+
+	updated, cmd := m.Update(ZigbeeLeaveResultMsg{Err: nil})
+
+	if updated.toggling {
+		t.Error("toggling should be false after success")
+	}
+	if updated.pendingLeave {
+		t.Error("pendingLeave should be false after success")
+	}
+	if !updated.loading {
+		t.Error("should be loading (refreshing) after leave success")
+	}
+	if cmd == nil {
+		t.Error("should return refresh command")
+	}
+}
+
+func TestModel_ZigbeeLeaveResult_Error(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	leaveErr := errors.New("leave failed")
+	updated, _ := m.Update(ZigbeeLeaveResultMsg{Err: leaveErr})
+
+	if updated.toggling {
+		t.Error("toggling should be false after error")
+	}
+	if updated.err == nil {
+		t.Error("err should be set")
+	}
+}
+
+func TestModel_BuildFooter_Zigbee(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateReady}
+
+	footer := m.buildFooter()
+
+	if footer == "" {
+		t.Error("footer should not be empty")
+	}
+}
+
+func TestModel_BuildFooter_ZigbeeDisabled(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: false}
+
+	footer := m.buildFooter()
+
+	if footer == "" {
+		t.Error("footer should not be empty")
+	}
+}
+
+func TestModel_BuildFooter_ZigbeeJoined(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolZigbee
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateJoined}
+
+	footer := m.buildFooter()
+
+	if footer == "" {
+		t.Error("footer should not be empty")
+	}
+}
+
+func TestModel_BuildFooter_PendingLeave(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.pendingLeave = true
+
+	footer := m.buildFooter()
+
+	if footer == "" {
+		t.Error("footer should not be empty")
+	}
+}
+
+func TestModel_View_ZigbeeJoinedExtended(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.zigbee = &shelly.TUIZigbeeStatus{
+		Enabled:          true,
+		NetworkState:     zigbeeStateJoined,
+		Channel:          15,
+		PANID:            0xABCD,
+		EUI64:            "00:11:22:33:44:55:66:77",
+		CoordinatorEUI64: "AA:BB:CC:DD:EE:FF:00:11",
+	}
+	m.activeProtocol = ProtocolZigbee
+	m = m.SetSize(80, 50)
+
+	view := m.View()
+
+	if view == "" {
+		t.Error("View() should not return empty string")
+	}
+}
+
+func TestModel_SetDevice_ClearsZigbeeEditing(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.zigbeeEditing = true
+	m.pendingLeave = true
+
+	updated, _ := m.SetDevice(testDevice)
+
+	if updated.zigbeeEditing {
+		t.Error("zigbeeEditing should be cleared on SetDevice")
+	}
+	if updated.pendingLeave {
+		t.Error("pendingLeave should be cleared on SetDevice")
+	}
+}
+
+func TestModel_IsEditing_Zigbee(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	if m.IsEditing() {
+		t.Error("should not be editing initially")
+	}
+
+	m.zigbeeEditing = true
+
+	if !m.IsEditing() {
+		t.Error("should be editing when zigbeeEditing=true")
+	}
+
+	m.zigbeeEditing = false
+	m.editing = true
+
+	if !m.IsEditing() {
+		t.Error("should be editing when editing=true")
+	}
+}
+
+func TestModel_RenderEditModal_Zigbee(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.zigbeeEditing = true
+	m.zigbeeModal = m.zigbeeModal.SetSize(80, 40)
+	m.zigbeeModal.visible = true
+
+	view := m.RenderEditModal()
+
+	if view == "" {
+		t.Error("RenderEditModal should return Zigbee modal view")
+	}
+}
+
+func TestModel_SetEditModalSize_Zigbee(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.zigbeeEditing = true
+
+	updated := m.SetEditModalSize(100, 50)
+
+	if updated.zigbeeModal.width != 100 {
+		t.Errorf("zigbeeModal width = %d, want 100", updated.zigbeeModal.width)
+	}
+	if updated.zigbeeModal.height != 50 {
+		t.Errorf("zigbeeModal height = %d, want 50", updated.zigbeeModal.height)
+	}
+}
+
+func TestModel_EditModal_ZigbeeClosedRefreshes(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.zigbeeEditing = true
+	m.zigbee = &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateJoined}
+
+	// Show the zigbee modal
+	m.zigbeeModal, _ = m.zigbeeModal.Show(m.device, m.zigbee)
+
+	// Simulate Esc to close modal
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if updated.zigbeeEditing {
+		t.Error("zigbeeEditing should be false after modal close")
 	}
 	if !updated.loading {
 		t.Error("should be loading (refreshing) after modal close")

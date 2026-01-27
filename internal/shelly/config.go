@@ -722,10 +722,12 @@ func (s *Service) GetTUIMatterStatus(ctx context.Context, identifier string) (*T
 
 // TUIZigbeeStatus holds Zigbee status information for the TUI.
 type TUIZigbeeStatus struct {
-	Enabled      bool   `json:"enabled"`
-	NetworkState string `json:"network_state"`
-	Channel      int    `json:"channel,omitempty"`
-	PANID        uint16 `json:"pan_id,omitempty"`
+	Enabled          bool   `json:"enabled"`
+	NetworkState     string `json:"network_state"`
+	Channel          int    `json:"channel,omitempty"`
+	PANID            uint16 `json:"pan_id,omitempty"`
+	EUI64            string `json:"eui64,omitempty"`
+	CoordinatorEUI64 string `json:"coordinator_eui64,omitempty"`
 }
 
 // GetTUIZigbeeStatus returns the Zigbee status for the TUI.
@@ -758,19 +760,23 @@ func (s *Service) GetTUIZigbeeStatus(ctx context.Context, identifier string) (*T
 			return err
 		}
 		var status struct {
-			NetworkState string `json:"network_state"`
-			Channel      int    `json:"channel"`
-			PANID        uint16 `json:"pan_id"`
+			NetworkState     string `json:"network_state"`
+			Channel          int    `json:"channel"`
+			PANID            uint16 `json:"pan_id"`
+			EUI64            string `json:"eui64"`
+			CoordinatorEUI64 string `json:"coordinator_eui64"`
 		}
 		if err := json.Unmarshal(statusData, &status); err != nil {
 			return err
 		}
 
 		result = &TUIZigbeeStatus{
-			Enabled:      config.Enable,
-			NetworkState: status.NetworkState,
-			Channel:      status.Channel,
-			PANID:        status.PANID,
+			Enabled:          config.Enable,
+			NetworkState:     status.NetworkState,
+			Channel:          status.Channel,
+			PANID:            status.PANID,
+			EUI64:            status.EUI64,
+			CoordinatorEUI64: status.CoordinatorEUI64,
 		}
 		return nil
 	})
