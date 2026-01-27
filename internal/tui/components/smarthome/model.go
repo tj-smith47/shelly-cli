@@ -108,6 +108,7 @@ type Model struct {
 	pendingLeave   bool // Awaiting Zigbee leave network confirmation (double-press)
 	editing        bool // Matter edit modal visible
 	zigbeeEditing  bool // Zigbee edit modal visible
+	loraEditing    bool // LoRa edit modal visible
 	zwaveEditing   bool // Z-Wave edit modal visible
 	modbusEditing  bool // Modbus edit modal visible
 	err            error
@@ -117,6 +118,7 @@ type Model struct {
 	cacheStatus    cachestatus.Model
 	editModal      MatterEditModel
 	zigbeeModal    ZigbeeEditModel
+	loraModal      LoRaEditModel
 	zwaveModal     ZWaveEditModel
 	modbusModal    ModbusEditModel
 }
@@ -182,6 +184,7 @@ func New(deps Deps) Model {
 		cacheStatus: cachestatus.New(),
 		editModal:   NewMatterEditModel(deps.Ctx, deps.Svc),
 		zigbeeModal: NewZigbeeEditModel(deps.Ctx, deps.Svc),
+		loraModal:   NewLoRaEditModel(deps.Ctx, deps.Svc),
 		zwaveModal:  NewZWaveEditModel(),
 		modbusModal: NewModbusEditModel(deps.Ctx, deps.Svc),
 	}
@@ -210,10 +213,12 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.pendingLeave = false
 	m.editing = false
 	m.zigbeeEditing = false
+	m.loraEditing = false
 	m.zwaveEditing = false
 	m.modbusEditing = false
 	m.editModal = m.editModal.Hide()
 	m.zigbeeModal = m.zigbeeModal.Hide()
+	m.loraModal = m.loraModal.Hide()
 	m.zwaveModal = m.zwaveModal.Hide()
 	m.modbusModal = m.modbusModal.Hide()
 	m.cacheStatus = cachestatus.New()
@@ -346,6 +351,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	if m.zigbeeEditing {
 		return m.handleZigbeeEditModalUpdate(msg)
 	}
+	if m.loraEditing {
+		return m.handleLoRaEditModalUpdate(msg)
+	}
 	if m.zwaveEditing {
 		return m.handleZWaveEditModalUpdate(msg)
 	}
@@ -394,6 +402,8 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleZigbeeLeaveResult(msg)
 	case ModbusToggleResultMsg:
 		return m.handleModbusToggleResult(msg)
+	case LoRaTestSendResultMsg:
+		return m.handleLoRaTestSendResult(msg)
 	default:
 		if m.focused {
 			return m.handleFocusedAction(msg)
@@ -545,6 +555,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "p":
 		if m.activeProtocol == ProtocolZigbee {
 			return m.handleZigbeePairKey()
+		}
+	case "T":
+		if m.activeProtocol == ProtocolLoRa {
+			return m.handleLoRaTestSend()
 		}
 	case "R":
 		return m.handleProtocolDestructive()
@@ -711,6 +725,8 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 		return m.handleMatterEditKey()
 	case ProtocolZigbee:
 		return m.handleZigbeeEditKey()
+	case ProtocolLoRa:
+		return m.handleLoRaEditKey()
 	case ProtocolZWave:
 		return m.handleZWaveEditKey()
 	case ProtocolModbus:
@@ -945,6 +961,78 @@ func (m Model) handleZigbeeLeaveResult(msg ZigbeeLeaveResultMsg) (Model, tea.Cmd
 	)
 }
 
+// --- LoRa handlers ---
+
+func (m Model) handleLoRaEditKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.lora == nil || m.activeProtocol != ProtocolLoRa {
+		return m, nil
+	}
+	m.loraEditing = true
+	m.loraModal = m.loraModal.SetSize(m.Width, m.Height)
+	var cmd tea.Cmd
+	m.loraModal, cmd = m.loraModal.Show(m.device, m.lora)
+	return m, tea.Batch(cmd, func() tea.Msg { return EditOpenedMsg{} })
+}
+
+func (m Model) handleLoRaTestSend() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.toggling || m.lora == nil || !m.lora.Enabled {
+		return m, nil
+	}
+	m.toggling = true // Reuse toggling flag for busy state
+	m.err = nil
+	return m, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		err := m.svc.SendLoRaTestPacket(ctx, m.device)
+		return LoRaTestSendResultMsg{Err: err}
+	}
+}
+
+func (m Model) handleLoRaTestSendResult(msg LoRaTestSendResultMsg) (Model, tea.Cmd) {
+	m.toggling = false
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m Model) handleLoRaEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.loraModal, cmd = m.loraModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.loraModal.Visible() {
+		m.loraEditing = false
+		// Invalidate cache and refresh data after edit
+		m.loading = true
+		return m, tea.Batch(
+			cmd,
+			m.Loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+			m.fetchAndCacheStatus(),
+		)
+	}
+
+	// Handle save result message - close modal and refresh
+	if saveMsg, ok := msg.(messages.SaveResultMsg); ok {
+		if saveMsg.Err == nil {
+			m.loraEditing = false
+			m.loraModal = m.loraModal.Hide()
+			m.loading = true
+			return m, tea.Batch(
+				m.Loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+				m.fetchAndCacheStatus(),
+				func() tea.Msg { return EditClosedMsg{Saved: true} },
+			)
+		}
+	}
+
+	return m, cmd
+}
+
 // --- Z-Wave handlers ---
 
 func (m Model) handleZWaveEditKey() (Model, tea.Cmd) {
@@ -1052,7 +1140,7 @@ func (m Model) handleModbusEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 
 // IsEditing returns whether any edit modal is currently visible.
 func (m Model) IsEditing() bool {
-	return m.editing || m.zigbeeEditing || m.zwaveEditing || m.modbusEditing
+	return m.editing || m.zigbeeEditing || m.loraEditing || m.zwaveEditing || m.modbusEditing
 }
 
 // RenderEditModal returns the active edit modal view for full-screen overlay rendering.
@@ -1062,6 +1150,9 @@ func (m Model) RenderEditModal() string {
 	}
 	if m.zigbeeEditing {
 		return m.zigbeeModal.View()
+	}
+	if m.loraEditing {
+		return m.loraModal.View()
 	}
 	if m.zwaveEditing {
 		return m.zwaveModal.View()
@@ -1080,6 +1171,9 @@ func (m Model) SetEditModalSize(width, height int) Model {
 	}
 	if m.zigbeeEditing {
 		m.zigbeeModal = m.zigbeeModal.SetSize(width, height)
+	}
+	if m.loraEditing {
+		m.loraModal = m.loraModal.SetSize(width, height)
 	}
 	if m.zwaveEditing {
 		m.zwaveModal = m.zwaveModal.SetSize(width, height)
@@ -1157,28 +1251,36 @@ func (m Model) buildFooter() string {
 		return "Processing..."
 	}
 
-	var footer string
-	switch {
-	case m.activeProtocol == ProtocolMatter && m.matter != nil:
-		if m.matter.Enabled {
-			footer = "e:edit t:toggle c:codes R:reset r:refresh"
-		} else {
-			footer = footerEditToggleRefresh
-		}
-	case m.activeProtocol == ProtocolZigbee && m.zigbee != nil:
-		footer = m.buildZigbeeFooter()
-	case m.activeProtocol == ProtocolZWave && m.zwave != nil:
-		footer = "e:edit r:refresh"
-	case m.activeProtocol == ProtocolModbus && m.modbus != nil:
-		footer = footerEditToggleRefresh
-	default:
-		footer = "1-5:sel j/k:nav r:refresh"
-	}
+	footer := m.buildProtocolFooter()
 
 	if cs := m.cacheStatus.View(); cs != "" {
 		footer += " | " + cs
 	}
 	return footer
+}
+
+func (m Model) buildProtocolFooter() string {
+	switch {
+	case m.activeProtocol == ProtocolMatter && m.matter != nil:
+		return m.buildMatterFooter()
+	case m.activeProtocol == ProtocolZigbee && m.zigbee != nil:
+		return m.buildZigbeeFooter()
+	case m.activeProtocol == ProtocolLoRa && m.lora != nil:
+		return "e:edit T:test r:refresh"
+	case m.activeProtocol == ProtocolZWave && m.zwave != nil:
+		return "e:edit r:refresh"
+	case m.activeProtocol == ProtocolModbus && m.modbus != nil:
+		return footerEditToggleRefresh
+	default:
+		return "1-5:sel j/k:nav r:refresh"
+	}
+}
+
+func (m Model) buildMatterFooter() string {
+	if m.matter.Enabled {
+		return "e:edit t:toggle c:codes R:reset r:refresh"
+	}
+	return footerEditToggleRefresh
 }
 
 func (m Model) buildZigbeeFooter() string {
@@ -1331,6 +1433,16 @@ func (m Model) renderLoRa() string {
 	content.WriteString("    " + m.styles.Label.Render("Freq:   "))
 	freqMHz := float64(m.lora.Frequency) / 1000000
 	content.WriteString(m.styles.Value.Render(fmt.Sprintf("%.2f MHz", freqMHz)))
+	content.WriteString("\n")
+
+	// Bandwidth
+	content.WriteString("    " + m.styles.Label.Render("BW:     "))
+	content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d kHz", m.lora.Bandwidth)))
+	content.WriteString("\n")
+
+	// Data Rate
+	content.WriteString("    " + m.styles.Label.Render("SF:     "))
+	content.WriteString(m.styles.Value.Render(fmt.Sprintf("SF%d", m.lora.DataRate)))
 	content.WriteString("\n")
 
 	// TX Power

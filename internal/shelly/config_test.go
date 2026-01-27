@@ -371,6 +371,8 @@ func TestTUILoRaStatus_Fields(t *testing.T) {
 	status := TUILoRaStatus{
 		Enabled:   true,
 		Frequency: 868000000,
+		Bandwidth: 125,
+		DataRate:  7,
 		TxPower:   14,
 		RSSI:      -90,
 		SNR:       5.5,
@@ -381,6 +383,12 @@ func TestTUILoRaStatus_Fields(t *testing.T) {
 	}
 	if status.Frequency != 868000000 {
 		t.Error("unexpected Frequency")
+	}
+	if status.Bandwidth != 125 {
+		t.Errorf("expected Bandwidth 125, got %d", status.Bandwidth)
+	}
+	if status.DataRate != 7 {
+		t.Errorf("expected DataRate 7, got %d", status.DataRate)
 	}
 }
 

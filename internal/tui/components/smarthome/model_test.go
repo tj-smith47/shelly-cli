@@ -2414,6 +2414,320 @@ func TestModel_Update_StatusLoaded_WithModbus(t *testing.T) {
 	}
 }
 
+// --- LoRa model tests ---
+
+func TestModel_HandleAction_EditRequest_LoRa(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolLoRa
+	m.lora = &shelly.TUILoRaStatus{Enabled: true, Frequency: 868000000, Bandwidth: 125, DataRate: 7}
+
+	updated, cmd := m.Update(messages.EditRequestMsg{})
+
+	if !updated.loraEditing {
+		t.Error("should open LoRa edit modal when LoRa is selected")
+	}
+	if cmd == nil {
+		t.Error("should return command for modal open")
+	}
+}
+
+func TestModel_HandleAction_EditRequest_LoRaNoData(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolLoRa
+	m.lora = nil
+
+	updated, _ := m.Update(messages.EditRequestMsg{})
+
+	if updated.loraEditing {
+		t.Error("should not open edit modal when lora data is nil")
+	}
+}
+
+func TestModel_HandleKey_LoRaTestSend(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolLoRa
+	m.lora = &shelly.TUILoRaStatus{Enabled: true}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'T'})
+
+	if !updated.toggling {
+		t.Error("should be toggling (busy) after 'T' key with LoRa")
+	}
+	if cmd == nil {
+		t.Error("should return test send command")
+	}
+}
+
+func TestModel_HandleKey_LoRaTestSend_NotLoRaProtocol(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolMatter
+	m.lora = &shelly.TUILoRaStatus{Enabled: true}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'T'})
+
+	if updated.toggling {
+		t.Error("should not toggle when not on LoRa protocol")
+	}
+	if cmd != nil {
+		t.Error("should not return command when not on LoRa protocol")
+	}
+}
+
+func TestModel_HandleKey_LoRaTestSend_NoDevice(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolLoRa
+	m.lora = &shelly.TUILoRaStatus{Enabled: true}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'T'})
+
+	if updated.toggling {
+		t.Error("should not test send without device")
+	}
+	if cmd != nil {
+		t.Error("should not return command without device")
+	}
+}
+
+func TestModel_HandleKey_LoRaTestSend_NilLoRa(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolLoRa
+	m.lora = nil
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'T'})
+
+	if updated.toggling {
+		t.Error("should not test send when lora is nil")
+	}
+	if cmd != nil {
+		t.Error("should not return command when lora is nil")
+	}
+}
+
+func TestModel_HandleKey_LoRaTestSend_DisabledLoRa(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolLoRa
+	m.lora = &shelly.TUILoRaStatus{Enabled: false}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'T'})
+
+	if updated.toggling {
+		t.Error("should not test send when lora is disabled")
+	}
+	if cmd != nil {
+		t.Error("should not return command when lora is disabled")
+	}
+}
+
+func TestModel_LoRaTestSendResult_Success(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	updated, _ := m.Update(LoRaTestSendResultMsg{Err: nil})
+
+	if updated.toggling {
+		t.Error("toggling should be false after success")
+	}
+	if updated.err != nil {
+		t.Error("err should be nil after successful test send")
+	}
+}
+
+func TestModel_LoRaTestSendResult_Error(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.toggling = true
+
+	sendErr := errors.New("test send failed")
+	updated, _ := m.Update(LoRaTestSendResultMsg{Err: sendErr})
+
+	if updated.toggling {
+		t.Error("toggling should be false after error")
+	}
+	if updated.err == nil {
+		t.Error("err should be set")
+	}
+}
+
+func TestModel_BuildFooter_LoRa(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolLoRa
+	m.lora = &shelly.TUILoRaStatus{Enabled: true}
+
+	footer := m.buildFooter()
+
+	if !strings.Contains(footer, "e:edit") {
+		t.Errorf("LoRa footer should contain 'e:edit', got %q", footer)
+	}
+	if !strings.Contains(footer, "T:test") {
+		t.Errorf("LoRa footer should contain 'T:test', got %q", footer)
+	}
+	if !strings.Contains(footer, "r:refresh") {
+		t.Errorf("LoRa footer should contain 'r:refresh', got %q", footer)
+	}
+}
+
+func TestModel_BuildFooter_LoRaNil(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.activeProtocol = ProtocolLoRa
+	m.lora = nil
+
+	footer := m.buildFooter()
+
+	// Should fall through to default footer
+	if !strings.Contains(footer, "1-5:sel") {
+		t.Errorf("LoRa nil footer should contain '1-5:sel', got %q", footer)
+	}
+}
+
+func TestModel_IsEditing_LoRa(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	if m.IsEditing() {
+		t.Error("should not be editing initially")
+	}
+
+	m.loraEditing = true
+
+	if !m.IsEditing() {
+		t.Error("should be editing when loraEditing=true")
+	}
+}
+
+func TestModel_RenderEditModal_LoRa(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.loraEditing = true
+	m.loraModal = m.loraModal.SetSize(80, 40)
+	m.loraModal.visible = true
+
+	view := m.RenderEditModal()
+
+	if view == "" {
+		t.Error("RenderEditModal should return LoRa modal view")
+	}
+}
+
+func TestModel_SetEditModalSize_LoRa(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.loraEditing = true
+
+	updated := m.SetEditModalSize(100, 50)
+
+	if updated.loraModal.width != 100 {
+		t.Errorf("loraModal width = %d, want 100", updated.loraModal.width)
+	}
+	if updated.loraModal.height != 50 {
+		t.Errorf("loraModal height = %d, want 50", updated.loraModal.height)
+	}
+}
+
+func TestModel_SetDevice_ClearsLoRaEditing(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.loraEditing = true
+	m.lora = &shelly.TUILoRaStatus{Enabled: true}
+
+	updated, _ := m.SetDevice(testDevice)
+
+	if updated.loraEditing {
+		t.Error("loraEditing should be cleared on SetDevice")
+	}
+	if updated.lora != nil {
+		t.Error("lora should be nil after SetDevice")
+	}
+}
+
+func TestModel_EditModal_LoRaClosedRefreshes(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.device = testDevice
+	m.loraEditing = true
+	m.lora = &shelly.TUILoRaStatus{Enabled: true, Frequency: 868000000, Bandwidth: 125, DataRate: 7}
+
+	// Show the LoRa modal
+	m.loraModal, _ = m.loraModal.Show(m.device, m.lora)
+
+	// Simulate Esc to close modal
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if updated.loraEditing {
+		t.Error("loraEditing should be false after modal close")
+	}
+	if !updated.loading {
+		t.Error("should be loading (refreshing) after modal close")
+	}
+	if cmd == nil {
+		t.Error("should return refresh commands")
+	}
+}
+
+func TestModel_LoRaToggle_NoOp(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolLoRa
+	m.lora = &shelly.TUILoRaStatus{Enabled: true}
+
+	// Lowercase 't' toggle should be no-op for LoRa
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 't'})
+
+	if updated.toggling {
+		t.Error("should not toggle for LoRa (no toggle support)")
+	}
+	if cmd != nil {
+		t.Error("should not return command for LoRa toggle")
+	}
+}
+
+func TestModel_LoRaDestructive_NoOp(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.device = testDevice
+	m.activeProtocol = ProtocolLoRa
+	m.lora = &shelly.TUILoRaStatus{Enabled: true}
+
+	// 'R' should be no-op for LoRa
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'R'})
+
+	if updated.toggling {
+		t.Error("should not toggle for LoRa destructive action")
+	}
+	if cmd != nil {
+		t.Error("should not return command for LoRa destructive")
+	}
+}
+
 func newTestModel() Model {
 	ctx := context.Background()
 	svc := &shelly.Service{}

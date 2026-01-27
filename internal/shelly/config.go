@@ -787,6 +787,8 @@ func (s *Service) GetTUIZigbeeStatus(ctx context.Context, identifier string) (*T
 type TUILoRaStatus struct {
 	Enabled   bool    `json:"enabled"`
 	Frequency int64   `json:"frequency"`
+	Bandwidth int     `json:"bandwidth"`
+	DataRate  int     `json:"data_rate"`
 	TxPower   int     `json:"tx_power"`
 	RSSI      int     `json:"rssi,omitempty"`
 	SNR       float64 `json:"snr,omitempty"`
@@ -806,9 +808,10 @@ func (s *Service) GetTUILoRaStatus(ctx context.Context, identifier string) (*TUI
 			return err
 		}
 		var config struct {
-			Enable bool  `json:"enable"`
-			Freq   int64 `json:"freq"`
-			TxP    int   `json:"txp"`
+			Freq int64 `json:"freq"`
+			BW   int   `json:"bw"`
+			DR   int   `json:"dr"`
+			TxP  int   `json:"txp"`
 		}
 		if err := json.Unmarshal(configData, &config); err != nil {
 			return err
@@ -831,9 +834,12 @@ func (s *Service) GetTUILoRaStatus(ctx context.Context, identifier string) (*TUI
 			return err
 		}
 
+		// If GetConfig succeeded, the LoRa add-on is active
 		result = &TUILoRaStatus{
-			Enabled:   config.Enable,
+			Enabled:   true,
 			Frequency: config.Freq,
+			Bandwidth: config.BW,
+			DataRate:  config.DR,
 			TxPower:   config.TxP,
 			RSSI:      status.RSSI,
 			SNR:       status.SNR,
@@ -841,6 +847,16 @@ func (s *Service) GetTUILoRaStatus(ctx context.Context, identifier string) (*TUI
 		return nil
 	})
 	return result, err
+}
+
+// SetLoRaConfig updates LoRa RF configuration parameters via the wireless service.
+func (s *Service) SetLoRaConfig(ctx context.Context, identifier string, cfg map[string]any) error {
+	return s.wirelessService.LoRaSetConfig(ctx, identifier, 100, cfg)
+}
+
+// SendLoRaTestPacket sends a test packet via LoRa.
+func (s *Service) SendLoRaTestPacket(ctx context.Context, identifier string) error {
+	return s.wirelessService.LoRaSendBytes(ctx, identifier, 100, "c2hlbGx5LWNsaS10ZXN0")
 }
 
 // TUIZWaveStatus holds Z-Wave device information for the TUI.
