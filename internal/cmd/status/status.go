@@ -4,6 +4,7 @@ package status
 import (
 	"context"
 	"sort"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -51,14 +52,14 @@ with their online/offline status and primary component state.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, 2*shelly.DefaultTimeout)
-	defer cancel()
-
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
 	// Single device status
 	if opts.Device != "" {
+		ctx, cancel := context.WithTimeout(ctx, 2*shelly.DefaultTimeout)
+		defer cancel()
+
 		var componentStates []term.ComponentState
 
 		err := cmdutil.RunWithSpinner(ctx, ios, "Getting status...", func(ctx context.Context) error {
@@ -89,28 +90,41 @@ func run(ctx context.Context, opts *Options) error {
 	}
 	sort.Strings(names)
 
-	var statuses []term.QuickDeviceStatus
+	// Check all devices concurrently with per-device timeouts.
+	// Each device gets its own timeout so one slow/offline device
+	// doesn't starve the rest.
+	statuses := make([]term.QuickDeviceStatus, len(names))
 
 	err := cmdutil.RunWithSpinner(ctx, ios, "Checking devices...", func(ctx context.Context) error {
-		for _, name := range names {
-			ds := term.QuickDeviceStatus{Name: name}
+		var wg sync.WaitGroup
+		for i, name := range names {
+			idx := i
+			deviceName := name
+			wg.Go(func() {
+				devCtx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+				defer cancel()
 
-			connErr := svc.WithDevice(ctx, name, func(dev *shelly.DeviceClient) error {
-				devInfo := dev.Info()
-				ds.Model = devInfo.Model
-				ds.Online = true
-				return nil
-			})
-			if connErr != nil {
-				ds.Online = false
-				// Try to derive state from parent link
-				if ls, linkErr := svc.ResolveLinkStatus(ctx, name); linkErr == nil && ls != nil {
-					ds.LinkState = ls.State
+				ds := term.QuickDeviceStatus{Name: deviceName}
+				connErr := svc.WithDevice(devCtx, deviceName, func(dev *shelly.DeviceClient) error {
+					devInfo := dev.Info()
+					ds.Model = devInfo.Model
+					ds.Online = true
+					return nil
+				})
+				if connErr != nil {
+					ds.Online = false
+					// Use a fresh context for link resolution since the device
+					// timeout may be exhausted from the failed connection attempt.
+					linkCtx, linkCancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+					defer linkCancel()
+					if ls, linkErr := svc.ResolveLinkStatus(linkCtx, deviceName); linkErr == nil && ls != nil {
+						ds.LinkState = ls.State
+					}
 				}
-			}
-
-			statuses = append(statuses, ds)
+				statuses[idx] = ds
+			})
 		}
+		wg.Wait()
 		return nil
 	})
 	if err != nil {
