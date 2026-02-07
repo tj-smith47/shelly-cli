@@ -50,6 +50,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/link"
 	logcmd "github.com/tj-smith47/shelly-cli/internal/cmd/log"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/lora"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/matter"
@@ -306,6 +307,7 @@ func init() {
 	cmdutil.AddCommandsToGroup(rootCmd, groupManagement,
 		device.NewCommand(factory),
 		group.NewCommand(factory),
+		link.NewCommand(factory),
 		discover.NewCommand(factory),
 		script.NewCommand(factory),
 		schedule.NewCommand(factory),

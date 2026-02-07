@@ -316,6 +316,15 @@ func (m *Manager) UnregisterDevice(name string) error {
 		}
 	}
 
+	// Remove links where device is child or parent
+	for childKey, link := range m.config.Links {
+		if childKey == key || childKey == name {
+			delete(m.config.Links, childKey)
+		} else if link.ParentDevice == key || link.ParentDevice == name {
+			delete(m.config.Links, childKey)
+		}
+	}
+
 	return m.saveWithoutLock()
 }
 
@@ -387,6 +396,20 @@ func (m *Manager) RenameDevice(oldName, newName string) error {
 				m.config.Groups[groupName] = group
 				break
 			}
+		}
+	}
+
+	// Update link references
+	// If old device was a child, re-key the link
+	if link, ok := m.config.Links[oldKey]; ok {
+		delete(m.config.Links, oldKey)
+		m.config.Links[newKey] = link
+	}
+	// If old device was a parent, update parent_device references
+	for childKey, link := range m.config.Links {
+		if link.ParentDevice == oldKey {
+			link.ParentDevice = newKey
+			m.config.Links[childKey] = link
 		}
 	}
 

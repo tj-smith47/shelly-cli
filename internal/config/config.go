@@ -60,6 +60,9 @@ type Config struct {
 	// Groups
 	Groups map[string]Group `mapstructure:"groups" yaml:"groups,omitempty"`
 
+	// Links (parent-child power relationships)
+	Links map[string]Link `mapstructure:"links" yaml:"links,omitempty"`
+
 	// Scenes
 	Scenes map[string]Scene `mapstructure:"scenes" yaml:"scenes,omitempty"`
 
@@ -233,6 +236,13 @@ type Alias struct {
 // Group represents a device group.
 type Group struct {
 	Devices []string `mapstructure:"devices" yaml:"devices,omitempty"`
+}
+
+// Link represents a parent-child power relationship between devices.
+// When the child device is offline, its state can be derived from the parent switch state.
+type Link struct {
+	ParentDevice string `mapstructure:"parent_device" yaml:"parent_device"`
+	SwitchID     int    `mapstructure:"switch_id" yaml:"switch_id"`
 }
 
 // Scene represents a saved device state configuration.
@@ -547,6 +557,7 @@ func getDefaultManager() *Manager {
 				Devices: make(map[string]model.Device),
 				Aliases: make(map[string]Alias),
 				Groups:  make(map[string]Group),
+				Links:   make(map[string]Link),
 				Scenes:  make(map[string]Scene),
 				Templates: TemplatesConfig{
 					Device: make(map[string]DeviceTemplate),
@@ -574,6 +585,7 @@ func Get() *Config {
 			Devices: make(map[string]model.Device),
 			Aliases: make(map[string]Alias),
 			Groups:  make(map[string]Group),
+			Links:   make(map[string]Link),
 			Scenes:  make(map[string]Scene),
 			Templates: TemplatesConfig{
 				Device: make(map[string]DeviceTemplate),

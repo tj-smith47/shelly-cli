@@ -110,6 +110,9 @@ func NewTestManager(cfg *Config) *Manager {
 	if cfg.Groups == nil {
 		cfg.Groups = make(map[string]Group)
 	}
+	if cfg.Links == nil {
+		cfg.Links = make(map[string]Link)
+	}
 	if cfg.Scenes == nil {
 		cfg.Scenes = make(map[string]Scene)
 	}
@@ -155,6 +158,9 @@ func (m *Manager) Load() error {
 	}
 	if c.Groups == nil {
 		c.Groups = make(map[string]Group)
+	}
+	if c.Links == nil {
+		c.Links = make(map[string]Link)
 	}
 	if c.Scenes == nil {
 		c.Scenes = make(map[string]Scene)

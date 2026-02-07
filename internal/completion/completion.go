@@ -142,6 +142,21 @@ func GroupNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellC
 	}
 }
 
+// LinkedDeviceNames returns a completion function for linked child device names.
+func LinkedDeviceNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		links := config.ListLinks()
+
+		var completions []string
+		for name := range links {
+			if strings.HasPrefix(name, toComplete) {
+				completions = append(completions, name)
+			}
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 // AliasNames returns a completion function for alias names.
 func AliasNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
