@@ -17,8 +17,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -99,7 +100,7 @@ type EthernetData struct {
 
 // Model displays protocol settings for a device.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx            context.Context
 	svc            *shelly.Service
 	fileCache      *cache.FileCache
@@ -168,7 +169,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:     helpers.NewSizableLoaderOnly(),
+		Sizable:     panel.NewSizableLoaderOnly(),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
@@ -359,6 +360,8 @@ func (m Model) SetSize(width, height int) Model {
 // SetEditModalSize sets the edit modal dimensions.
 // This should be called with screen-based dimensions when the modal is visible.
 func (m Model) SetEditModalSize(width, height int) Model {
+	m.ModalWidth = width
+	m.ModalHeight = height
 	if m.editing {
 		m.mqttEdit = m.mqttEdit.SetSize(width, height)
 	}
@@ -677,12 +680,14 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		var footer string
+		w := keys.FooterHintWidth(m.Width)
+		var hints []keys.Hint
 		if m.activeProtocol == ProtocolMQTT && m.mqtt != nil {
-			footer = "1-3:sel j/k:nav m:mqtt r:refresh"
+			hints = []keys.Hint{{Key: "1-3", Desc: "sel"}, {Key: "j/k", Desc: "nav"}, {Key: "m", Desc: "mqtt"}, {Key: "r", Desc: "refresh"}}
 		} else {
-			footer = "1-3:sel j/k:nav r:refresh"
+			hints = []keys.Hint{{Key: "1-3", Desc: "sel"}, {Key: "j/k", Desc: "nav"}, {Key: "r", Desc: "refresh"}}
 		}
+		footer := theme.StyledKeybindings(keys.FormatHints(hints, w))
 		if cs := m.cacheStatus.View(); cs != "" {
 			footer += " | " + cs
 		}

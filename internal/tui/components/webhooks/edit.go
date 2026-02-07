@@ -14,8 +14,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // EditField represents a field in the webhook edit form.
@@ -30,6 +28,9 @@ const (
 	EditFieldCount
 )
 
+// saveTimeout is the timeout for save operations.
+const saveTimeout = 30 * time.Second
+
 // EditSaveResultMsg is an alias for the shared save result message.
 type EditSaveResultMsg = messages.SaveResultMsg
 
@@ -41,17 +42,8 @@ type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the webhook edit modal.
 type EditModel struct {
-	ctx       context.Context
-	svc       *shelly.Service
-	device    string
+	editmodal.Base
 	webhookID int
-	visible   bool
-	cursor    EditField
-	saving    bool
-	err       error
-	width     int
-	height    int
-	styles    editmodal.Styles
 
 	// Form inputs
 	nameInput   form.TextInput
@@ -91,9 +83,11 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	)
 
 	return EditModel{
-		ctx:         ctx,
-		svc:         svc,
-		styles:      editmodal.DefaultStyles().WithLabelWidth(8),
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles().WithLabelWidth(8),
+		},
 		nameInput:   nameInput,
 		eventInput:  eventInput,
 		urlsInput:   urlsInput,
@@ -103,12 +97,8 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 
 // Show displays the edit modal for an existing webhook.
 func (m EditModel) Show(device string, webhook *Webhook) EditModel {
-	m.device = device
+	m.Base.Show(device, int(EditFieldCount))
 	m.webhookID = webhook.ID
-	m.visible = true
-	m.cursor = EditFieldName
-	m.saving = false
-	m.err = nil
 
 	// Set input values from webhook
 	m.nameInput = m.nameInput.SetValue(webhook.Name)
@@ -127,12 +117,8 @@ func (m EditModel) Show(device string, webhook *Webhook) EditModel {
 
 // ShowCreate displays the edit modal for creating a new webhook.
 func (m EditModel) ShowCreate(device string) EditModel {
-	m.device = device
+	m.Base.Show(device, int(EditFieldCount))
 	m.webhookID = 0 // 0 indicates new webhook
-	m.visible = true
-	m.cursor = EditFieldName
-	m.saving = false
-	m.err = nil
 
 	// Set default values for new webhook
 	m.nameInput = m.nameInput.SetValue("")
@@ -156,7 +142,7 @@ func (m EditModel) IsCreating() bool {
 
 // Hide hides the edit modal.
 func (m EditModel) Hide() EditModel {
-	m.visible = false
+	m.Base.Hide()
 	m.nameInput = m.nameInput.Blur()
 	m.eventInput = m.eventInput.Blur()
 	m.urlsInput = m.urlsInput.Blur()
@@ -166,24 +152,18 @@ func (m EditModel) Hide() EditModel {
 
 // IsVisible returns whether the modal is visible.
 func (m EditModel) IsVisible() bool {
-	return m.visible
+	return m.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m EditModel) SetSize(width, height int) EditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	return m
-}
-
-// Init returns the initial command.
-func (m EditModel) Init() tea.Cmd {
-	return nil
 }
 
 // Update handles messages.
 func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -193,18 +173,13 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		// Success - close modal
-		m = m.Hide()
-		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+		_, cmd := m.HandleSaveResult(msg)
+		return m, cmd
 
 	// Action messages from context system
 	case messages.NavigationMsg:
-		return m.handleNavigation(msg)
+		action := m.HandleNavigation(msg)
+		return m.applyAction(action)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -213,20 +188,23 @@ func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	return m.updateFocusedInput(msg)
 }
 
-func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
+func (m EditModel) applyAction(action editmodal.KeyAction) (EditModel, tea.Cmd) {
+	switch action {
+	case editmodal.ActionNavUp:
 		return m.prevField(), nil
-	case messages.NavDown:
+	case editmodal.ActionNavDown:
 		return m.nextField(), nil
-	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
-		// Not applicable for this form
+	case editmodal.ActionNone, editmodal.ActionClose, editmodal.ActionSave,
+		editmodal.ActionNext, editmodal.ActionPrev:
+		// Not applicable from HandleNavigation
 	}
 	return m, nil
 }
 
 func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
-	// Modal-specific keys not covered by action messages
+	// Webhooks uses Ctrl+S for save but NOT Enter (Enter should go to focused
+	// input, especially the textarea). Do not use HandleKey which maps Enter
+	// to ActionSave.
 	switch msg.String() {
 	case keyconst.KeyEsc, "ctrl+[":
 		m = m.Hide()
@@ -249,7 +227,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldName:
 		m.nameInput, cmd = m.nameInput.Update(msg)
 	case EditFieldEvent:
@@ -267,24 +245,22 @@ func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 
 func (m EditModel) nextField() EditModel {
 	m = m.blurCurrentField()
-	if m.cursor < EditFieldCount-1 {
-		m.cursor++
-	}
+	old, _ := m.NextField()
+	_ = old
 	m = m.focusCurrentField()
 	return m
 }
 
 func (m EditModel) prevField() EditModel {
 	m = m.blurCurrentField()
-	if m.cursor > 0 {
-		m.cursor--
-	}
+	old, _ := m.PrevField()
+	_ = old
 	m = m.focusCurrentField()
 	return m
 }
 
 func (m EditModel) blurCurrentField() EditModel {
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldName:
 		m.nameInput = m.nameInput.Blur()
 	case EditFieldEvent:
@@ -300,7 +276,7 @@ func (m EditModel) blurCurrentField() EditModel {
 }
 
 func (m EditModel) focusCurrentField() EditModel {
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldName:
 		m.nameInput, _ = m.nameInput.Focus()
 	case EditFieldEvent:
@@ -316,21 +292,21 @@ func (m EditModel) focusCurrentField() EditModel {
 }
 
 func (m EditModel) save() (EditModel, tea.Cmd) {
-	if m.saving {
+	if m.Saving {
 		return m, nil
 	}
 
 	// Validate event
 	event := strings.TrimSpace(m.eventInput.Value())
 	if event == "" {
-		m.err = fmt.Errorf("event is required")
+		m.Err = fmt.Errorf("event is required")
 		return m, nil
 	}
 
 	// Parse URLs
 	urlsStr := strings.TrimSpace(m.urlsInput.Value())
 	if urlsStr == "" {
-		m.err = fmt.Errorf("at least one URL is required")
+		m.Err = fmt.Errorf("at least one URL is required")
 		return m, nil
 	}
 
@@ -343,12 +319,11 @@ func (m EditModel) save() (EditModel, tea.Cmd) {
 	}
 
 	if len(urls) == 0 {
-		m.err = fmt.Errorf("at least one URL is required")
+		m.Err = fmt.Errorf("at least one URL is required")
 		return m, nil
 	}
 
-	m.saving = true
-	m.err = nil
+	m.StartSave()
 
 	return m, m.createSaveCmd(event, urls)
 }
@@ -366,10 +341,10 @@ func (m EditModel) createSaveCmd(event string, urls []string) tea.Cmd {
 
 func (m EditModel) createNewWebhookCmd(event string, urls []string, name string, enable bool) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		ctx, cancel := context.WithTimeout(m.Ctx, saveTimeout)
 		defer cancel()
 
-		webhookID, err := m.svc.CreateWebhook(ctx, m.device, shelly.CreateWebhookParams{
+		webhookID, err := m.Svc.CreateWebhook(ctx, m.Device, shelly.CreateWebhookParams{
 			Event:  event,
 			URLs:   urls,
 			Name:   name,
@@ -384,10 +359,10 @@ func (m EditModel) createNewWebhookCmd(event string, urls []string, name string,
 
 func (m EditModel) updateWebhookCmd(event string, urls []string, name string, enable bool) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		ctx, cancel := context.WithTimeout(m.Ctx, saveTimeout)
 		defer cancel()
 
-		err := m.svc.UpdateWebhook(ctx, m.device, m.webhookID, shelly.UpdateWebhookParams{
+		err := m.Svc.UpdateWebhook(ctx, m.Device, m.webhookID, shelly.UpdateWebhookParams{
 			Event:  event,
 			URLs:   urls,
 			Name:   name,
@@ -402,15 +377,12 @@ func (m EditModel) updateWebhookCmd(event string, urls []string, name string, en
 
 // View renders the edit modal.
 func (m EditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
 	// Build footer
-	footer := "Tab: Next | Ctrl+S: Save | Esc: Cancel"
-	if m.saving {
-		footer = "Saving..."
-	}
+	footer := m.RenderSavingFooter("Tab: Next | Ctrl+S: Save | Esc: Cancel")
 
 	// Use appropriate title based on create/edit mode
 	title := "Edit Webhook"
@@ -418,11 +390,10 @@ func (m EditModel) View() string {
 		title = "New Webhook"
 	}
 
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, title, footer)
-
 	// Build content
-	return r.SetContent(m.renderFormFields()).Render()
+	content := m.renderFormFields()
+
+	return m.RenderModal(title, content, footer)
 }
 
 func (m EditModel) renderFormFields() string {
@@ -445,10 +416,9 @@ func (m EditModel) renderFormFields() string {
 	content.WriteString("\n")
 
 	// Error display
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
 	return content.String()
@@ -457,12 +427,12 @@ func (m EditModel) renderFormFields() string {
 func (m EditModel) renderField(field EditField, label, input string) string {
 	var selector, labelStr string
 
-	if m.cursor == field {
-		selector = m.styles.Selector.Render("> ")
-		labelStr = m.styles.LabelFocus.Render(label)
+	if m.Cursor == int(field) {
+		selector = m.Styles.Selector.Render("> ")
+		labelStr = m.Styles.LabelFocus.Render(label)
 	} else {
 		selector = "  "
-		labelStr = m.styles.Label.Render(label)
+		labelStr = m.Styles.Label.Render(label)
 	}
 
 	return selector + labelStr + " " + input

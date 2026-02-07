@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -835,9 +836,9 @@ func (m Model) FooterText() string {
 		return ""
 	}
 	if len(components) == 1 {
-		return theme.StyledKeybindings("space:toggle enter:json")
+		return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "space", Desc: "toggle"}, {Key: "enter", Desc: "json"}}, keys.FooterHintWidth(m.width)))
 	}
-	return theme.StyledKeybindings("h/l:select a:all space:toggle enter:json")
+	return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "h/l", Desc: "select"}, {Key: "a", Desc: "all"}, {Key: "space", Desc: "toggle"}, {Key: "enter", Desc: "json"}}, keys.FooterHintWidth(m.width)))
 }
 
 // formatPower formats a power value with appropriate units.

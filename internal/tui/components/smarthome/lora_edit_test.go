@@ -50,8 +50,8 @@ func TestLoRaEditModel_Show(t *testing.T) {
 	if !shown.Visible() {
 		t.Error("should be visible after Show")
 	}
-	if shown.device != testDevice {
-		t.Errorf("device = %q, want %q", shown.device, testDevice)
+	if shown.Device != testDevice {
+		t.Errorf("device = %q, want %q", shown.Device, testDevice)
 	}
 	if shown.freq != 868000000 {
 		t.Errorf("freq = %d, want 868000000", shown.freq)
@@ -74,8 +74,8 @@ func TestLoRaEditModel_Show(t *testing.T) {
 	if cmd != nil {
 		t.Error("should not return command (no async loading)")
 	}
-	if shown.field != loraFieldFreq {
-		t.Errorf("field = %d, want %d", shown.field, loraFieldFreq)
+	if shown.Cursor != int(loraFieldFreq) {
+		t.Errorf("Cursor = %d, want %d", shown.Cursor, loraFieldFreq)
 	}
 }
 
@@ -137,19 +137,19 @@ func TestLoRaEditModel_ShowResetsState(t *testing.T) {
 	t.Parallel()
 
 	m := newTestLoRaEditModel()
-	m.saving = true
+	m.Saving = true
 	m.sending = true
-	m.err = errors.New("old error")
+	m.Err = errors.New("old error")
 
 	shown, _ := m.Show(testDevice, testLoRaStatus())
 
-	if shown.saving {
+	if shown.Saving {
 		t.Error("saving should be reset")
 	}
 	if shown.sending {
 		t.Error("sending should be reset")
 	}
-	if shown.err != nil {
+	if shown.Err != nil {
 		t.Error("err should be reset")
 	}
 }
@@ -160,11 +160,11 @@ func TestLoRaEditModel_SetSize(t *testing.T) {
 	m := newTestLoRaEditModel()
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("height = %d, want 50", m.Height)
 	}
 }
 
@@ -220,47 +220,47 @@ func TestLoRaEditModel_NavigationUpDown(t *testing.T) {
 	m, _ = m.Show(testDevice, testLoRaStatus())
 
 	// Should start at freq field
-	if m.field != loraFieldFreq {
-		t.Errorf("field = %d, want %d", m.field, loraFieldFreq)
+	if m.Cursor != int(loraFieldFreq) {
+		t.Errorf("Cursor = %d, want %d", m.Cursor, loraFieldFreq)
 	}
 
 	// Navigate up at top - should stay at top
 	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavUp})
-	if updated.field != loraFieldFreq {
-		t.Errorf("field should stay at freq, got %d", updated.field)
+	if updated.Cursor != int(loraFieldFreq) {
+		t.Errorf("Cursor should stay at freq, got %d", updated.Cursor)
 	}
 
 	// Navigate down through all fields
 	updated, _ = m.Update(messages.NavigationMsg{Direction: messages.NavDown})
-	if updated.field != loraFieldBW {
-		t.Errorf("field = %d, want %d (bw)", updated.field, loraFieldBW)
+	if updated.Cursor != int(loraFieldBW) {
+		t.Errorf("Cursor = %d, want %d (bw)", updated.Cursor, loraFieldBW)
 	}
 
 	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
-	if updated.field != loraFieldDR {
-		t.Errorf("field = %d, want %d (dr)", updated.field, loraFieldDR)
+	if updated.Cursor != int(loraFieldDR) {
+		t.Errorf("Cursor = %d, want %d (dr)", updated.Cursor, loraFieldDR)
 	}
 
 	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
-	if updated.field != loraFieldTxP {
-		t.Errorf("field = %d, want %d (txp)", updated.field, loraFieldTxP)
+	if updated.Cursor != int(loraFieldTxP) {
+		t.Errorf("Cursor = %d, want %d (txp)", updated.Cursor, loraFieldTxP)
 	}
 
 	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
-	if updated.field != loraFieldTestSend {
-		t.Errorf("field = %d, want %d (testSend)", updated.field, loraFieldTestSend)
+	if updated.Cursor != int(loraFieldTestSend) {
+		t.Errorf("Cursor = %d, want %d (testSend)", updated.Cursor, loraFieldTestSend)
 	}
 
 	// Navigate down at bottom - should stay
 	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavDown})
-	if updated.field != loraFieldTestSend {
-		t.Errorf("field should stay at testSend, got %d", updated.field)
+	if updated.Cursor != int(loraFieldTestSend) {
+		t.Errorf("Cursor should stay at testSend, got %d", updated.Cursor)
 	}
 
 	// Navigate up from bottom
 	updated, _ = updated.Update(messages.NavigationMsg{Direction: messages.NavUp})
-	if updated.field != loraFieldTxP {
-		t.Errorf("field = %d, want %d (txp)", updated.field, loraFieldTxP)
+	if updated.Cursor != int(loraFieldTxP) {
+		t.Errorf("Cursor = %d, want %d (txp)", updated.Cursor, loraFieldTxP)
 	}
 }
 
@@ -272,19 +272,19 @@ func TestLoRaEditModel_KeyJKNavigation(t *testing.T) {
 
 	// Navigate down with j
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
-	if updated.field != loraFieldBW {
-		t.Errorf("field = %d, want %d after 'j'", updated.field, loraFieldBW)
+	if updated.Cursor != int(loraFieldBW) {
+		t.Errorf("Cursor = %d, want %d after 'j'", updated.Cursor, loraFieldBW)
 	}
 
 	// Navigate up with k
 	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'k'})
-	if updated.field != loraFieldFreq {
-		t.Errorf("field = %d, want %d after 'k'", updated.field, loraFieldFreq)
+	if updated.Cursor != int(loraFieldFreq) {
+		t.Errorf("Cursor = %d, want %d after 'k'", updated.Cursor, loraFieldFreq)
 	}
 
 	// k at top should stay
 	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'k'})
-	if updated.field != loraFieldFreq {
+	if updated.Cursor != int(loraFieldFreq) {
 		t.Error("should stay at top after k at top")
 	}
 }
@@ -305,8 +305,8 @@ func TestLoRaEditModel_NavigationNonApplicable(t *testing.T) {
 
 	for _, dir := range directions {
 		updated, _ := m.Update(messages.NavigationMsg{Direction: dir})
-		if updated.field != loraFieldFreq {
-			t.Errorf("field changed for non-applicable direction %d", dir)
+		if updated.Cursor != int(loraFieldFreq) {
+			t.Errorf("Cursor changed for non-applicable direction %d", dir)
 		}
 	}
 }
@@ -318,7 +318,7 @@ func TestLoRaEditModel_AdjustFrequency(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldFreq
+	m.Cursor = int(loraFieldFreq)
 
 	// Increase frequency by 100 kHz
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
@@ -338,7 +338,7 @@ func TestLoRaEditModel_AdjustFrequencyHLKeys(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldFreq
+	m.Cursor = int(loraFieldFreq)
 
 	// Increase with 'l' key
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'l'})
@@ -360,7 +360,7 @@ func TestLoRaEditModel_AdjustFrequencyBounds(t *testing.T) {
 	lora := testLoRaStatus()
 	lora.Frequency = loraFreqMin
 	m, _ = m.Show(testDevice, lora)
-	m.field = loraFieldFreq
+	m.Cursor = int(loraFieldFreq)
 
 	// Decrease below min - should not change
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
@@ -381,7 +381,7 @@ func TestLoRaEditModel_AdjustFrequencyNavMsg(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldFreq
+	m.Cursor = int(loraFieldFreq)
 
 	// NavLeft/NavRight should also adjust values
 	updated, _ := m.Update(messages.NavigationMsg{Direction: messages.NavRight})
@@ -400,7 +400,7 @@ func TestLoRaEditModel_AdjustBandwidth(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldBW
+	m.Cursor = int(loraFieldBW)
 
 	// Toggle from 125 to 250
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
@@ -426,7 +426,7 @@ func TestLoRaEditModel_AdjustDataRate(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldDR
+	m.Cursor = int(loraFieldDR)
 
 	// Increase from SF7 to SF8
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
@@ -446,7 +446,7 @@ func TestLoRaEditModel_AdjustDataRateBounds(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldDR
+	m.Cursor = int(loraFieldDR)
 
 	// At SF7, decrease should not change
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
@@ -467,7 +467,7 @@ func TestLoRaEditModel_AdjustTxPower(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldTxP
+	m.Cursor = int(loraFieldTxP)
 
 	// Decrease from 14 to 13
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
@@ -489,7 +489,7 @@ func TestLoRaEditModel_AdjustTxPowerBounds(t *testing.T) {
 	lora := testLoRaStatus()
 	lora.TxPower = 0
 	m, _ = m.Show(testDevice, lora)
-	m.field = loraFieldTxP
+	m.Cursor = int(loraFieldTxP)
 
 	// At 0, decrease should not change
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
@@ -510,8 +510,8 @@ func TestLoRaEditModel_AdjustBlockedWhileSaving(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldFreq
-	m.saving = true
+	m.Cursor = int(loraFieldFreq)
+	m.Saving = true
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	if updated.pendingFreq != 868000000 {
@@ -524,7 +524,7 @@ func TestLoRaEditModel_AdjustBlockedWhileSending(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldFreq
+	m.Cursor = int(loraFieldFreq)
 	m.sending = true
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
@@ -538,7 +538,7 @@ func TestLoRaEditModel_AdjustTestSendField(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldTestSend
+	m.Cursor = int(loraFieldTestSend)
 
 	// Arrow keys on test send button should not change any values
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
@@ -622,7 +622,7 @@ func TestLoRaEditModel_SaveWithChanges(t *testing.T) {
 	// Save
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	if !updated.saving {
+	if !updated.Saving {
 		t.Error("should be saving after Enter with changes")
 	}
 	if cmd == nil {
@@ -635,13 +635,13 @@ func TestLoRaEditModel_SaveResultSuccess(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.saving = true
+	m.Saving = true
 	m.pendingFreq = 869000000
 
 	saveMsg := messages.SaveResultMsg{Success: true}
 	updated, cmd := m.Update(saveMsg)
 
-	if updated.saving {
+	if updated.Saving {
 		t.Error("saving should be false after success")
 	}
 	if updated.Visible() {
@@ -669,19 +669,19 @@ func TestLoRaEditModel_SaveResultError(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.saving = true
+	m.Saving = true
 
 	saveErr := errors.New("connection failed")
 	saveMsg := messages.SaveResultMsg{Err: saveErr}
 	updated, _ := m.Update(saveMsg)
 
-	if updated.saving {
+	if updated.Saving {
 		t.Error("saving should be false after error")
 	}
 	if !updated.Visible() {
 		t.Error("should remain visible after error")
 	}
-	if updated.err == nil {
+	if updated.Err == nil {
 		t.Error("err should be set")
 	}
 }
@@ -691,12 +691,12 @@ func TestLoRaEditModel_SaveBlockedWhileSaving(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.saving = true
+	m.Saving = true
 	m.pendingFreq = 869000000
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	if !updated.saving {
+	if !updated.Saving {
 		t.Error("saving should remain true")
 	}
 	if cmd != nil {
@@ -714,7 +714,7 @@ func TestLoRaEditModel_SaveBlockedWhileSending(t *testing.T) {
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	if updated.saving {
+	if updated.Saving {
 		t.Error("should not start saving while sending")
 	}
 	if cmd != nil {
@@ -763,7 +763,7 @@ func TestLoRaEditModel_TestSendViaButton(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.field = loraFieldTestSend
+	m.Cursor = int(loraFieldTestSend)
 
 	// Enter on test send button
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -781,7 +781,7 @@ func TestLoRaEditModel_TestSendBlockedWhileSaving(t *testing.T) {
 
 	m := newTestLoRaEditModel()
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.saving = true
+	m.Saving = true
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'T'})
 
@@ -820,7 +820,7 @@ func TestLoRaEditModel_TestSendResultSuccess(t *testing.T) {
 	if updated.sending {
 		t.Error("sending should be false after success")
 	}
-	if updated.err != nil {
+	if updated.Err != nil {
 		t.Error("err should be nil after success")
 	}
 	if !updated.Visible() {
@@ -841,7 +841,7 @@ func TestLoRaEditModel_TestSendResultError(t *testing.T) {
 	if updated.sending {
 		t.Error("sending should be false after error")
 	}
-	if updated.err == nil {
+	if updated.Err == nil {
 		t.Error("err should be set")
 	}
 	if !updated.Visible() {
@@ -934,7 +934,7 @@ func TestLoRaEditModel_View_Saving(t *testing.T) {
 	m := newTestLoRaEditModel()
 	m = m.SetSize(80, 40)
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.saving = true
+	m.Saving = true
 
 	view := m.View()
 
@@ -964,7 +964,7 @@ func TestLoRaEditModel_View_WithError(t *testing.T) {
 	m := newTestLoRaEditModel()
 	m = m.SetSize(80, 40)
 	m, _ = m.Show(testDevice, testLoRaStatus())
-	m.err = errors.New("test error")
+	m.Err = errors.New("test error")
 
 	view := m.View()
 
@@ -996,7 +996,7 @@ func TestLoRaEditModel_View_FieldSelectors(t *testing.T) {
 	m, _ = m.Show(testDevice, testLoRaStatus())
 
 	// Freq should have arrows when selected
-	m.field = loraFieldFreq
+	m.Cursor = int(loraFieldFreq)
 	view := m.View()
 	if !strings.Contains(view, "◀ ▶") {
 		t.Error("Selected field should show arrow indicators")

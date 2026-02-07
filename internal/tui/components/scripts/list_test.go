@@ -8,7 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -67,7 +66,7 @@ func TestListDeps_Validate(t *testing.T) {
 
 func TestListModel_SetSize(t *testing.T) {
 	t.Parallel()
-	m := ListModel{Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1))}
+	m := ListModel{Sizable: panel.NewSizable(4, panel.NewScroller(0, 1))}
 	m = m.SetSize(100, 50)
 
 	if m.Width != 100 {
@@ -113,7 +112,7 @@ func TestListModel_SetSize_VisibleRows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := ListModel{Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1))}
+			m := ListModel{Sizable: panel.NewSizable(4, panel.NewScroller(0, 1))}
 			m = m.SetSize(80, tt.height)
 			got := m.Scroller.VisibleRows()
 			if got != tt.want {
@@ -132,7 +131,7 @@ func TestListModel_CursorNavigation(t *testing.T) {
 	}
 
 	m := ListModel{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(3, 10)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(3, 10)),
 		scripts: scripts,
 	}
 	m = m.SetSize(80, 20)
@@ -207,7 +206,7 @@ func TestListModel_SelectedScript(t *testing.T) {
 	}
 
 	m := ListModel{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(2, 10)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(2, 10)),
 		scripts: scripts,
 	}
 	m.Scroller.SetCursor(1)
@@ -282,7 +281,7 @@ func TestListModel_Error(t *testing.T) {
 func TestListModel_View_NoDevice(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(0, 1)),
 		device:  "",
 		styles:  DefaultListStyles(),
 	}
@@ -297,7 +296,7 @@ func TestListModel_View_NoDevice(t *testing.T) {
 func TestListModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(0, 1)),
 		device:  "192.168.1.100",
 		loading: true,
 		styles:  DefaultListStyles(),
@@ -313,7 +312,7 @@ func TestListModel_View_Loading(t *testing.T) {
 func TestListModel_View_NoScripts(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(0, 1)),
 		device:  "192.168.1.100",
 		loading: false,
 		scripts: []Script{},
@@ -335,7 +334,7 @@ func TestListModel_View_WithScripts(t *testing.T) {
 		{ID: 3, Name: "disabled_script", Enabled: false, Running: false},
 	}
 	m := ListModel{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(len(scripts), 10)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(len(scripts), 10)),
 		device:  "192.168.1.100",
 		loading: false,
 		scripts: scripts,
@@ -411,7 +410,7 @@ func TestListModel_RenderScriptLine(t *testing.T) {
 func TestListModel_Update_LoadedMsg(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(0, 10)),
 		loading: true,
 		styles:  DefaultListStyles(),
 	}
@@ -440,7 +439,7 @@ func TestListModel_Update_LoadedMsg(t *testing.T) {
 func TestListModel_Update_LoadedMsg_Error(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(0, 10)),
 		loading: true,
 		styles:  DefaultListStyles(),
 	}
@@ -458,7 +457,7 @@ func TestListModel_Update_LoadedMsg_Error(t *testing.T) {
 func TestListModel_Update_KeyPress_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(1, 10)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(1, 10)),
 		focused: false,
 		scripts: []Script{{ID: 1}},
 		styles:  DefaultListStyles(),

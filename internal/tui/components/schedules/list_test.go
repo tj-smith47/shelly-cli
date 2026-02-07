@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 func TestSchedule(t *testing.T) {
@@ -262,7 +262,7 @@ func TestListModel_Error(t *testing.T) {
 func TestListModel_View_NoDevice(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		Sizable: helpers.NewSizableLoaderOnly(),
+		Sizable: panel.NewSizableLoaderOnly(),
 		device:  "",
 		styles:  DefaultListStyles(),
 	}
@@ -277,7 +277,7 @@ func TestListModel_View_NoDevice(t *testing.T) {
 func TestListModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		Sizable: helpers.NewSizableLoaderOnly(),
+		Sizable: panel.NewSizableLoaderOnly(),
 		device:  "192.168.1.100",
 		loading: true,
 		styles:  DefaultListStyles(),
@@ -293,7 +293,7 @@ func TestListModel_View_Loading(t *testing.T) {
 func TestListModel_View_NoSchedules(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		Sizable:   helpers.NewSizableLoaderOnly(),
+		Sizable:   panel.NewSizableLoaderOnly(),
 		device:    "192.168.1.100",
 		loading:   false,
 		schedules: []Schedule{},

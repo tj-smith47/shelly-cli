@@ -19,7 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -27,7 +27,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
-const footerKeybindings = "a:activate v:view e:edit d:del n:new C:capture x:export i:import r:refresh"
+var footerHints = []keys.Hint{
+	{Key: "a", Desc: "activate"},
+	{Key: "v", Desc: "view"},
+	{Key: "e", Desc: "edit"},
+	{Key: "d", Desc: "del"},
+	{Key: "n", Desc: "new"},
+	{Key: "C", Desc: "capture"},
+	{Key: "x", Desc: "export"},
+	{Key: "i", Desc: "import"},
+	{Key: "r", Desc: "refresh"},
+}
 
 // ListDeps holds the dependencies for the scenes list component.
 type ListDeps struct {
@@ -91,7 +101,7 @@ type ImportSceneMsg struct {
 
 // ListModel displays and manages scenes.
 type ListModel struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx           context.Context
 	svc           *shelly.Service
 	scenes        []config.Scene
@@ -152,7 +162,7 @@ func NewList(deps ListDeps) ListModel {
 	}
 
 	m := ListModel{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(0, 10)),
 		ctx:     deps.Ctx,
 		svc:     deps.Svc,
 		styles:  DefaultListStyles(),
@@ -616,7 +626,7 @@ func (m ListModel) buildFooter() string {
 		return m.styles.Success.Render(m.statusMsg)
 	}
 
-	return theme.StyledKeybindings(footerKeybindings)
+	return theme.StyledKeybindings(keys.FormatHints(footerHints, keys.FooterHintWidth(m.Width)))
 }
 
 // SelectedScene returns the currently selected scene, if any.
@@ -657,5 +667,5 @@ func (m ListModel) Refresh() (ListModel, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m ListModel) FooterText() string {
-	return footerKeybindings
+	return keys.FormatHints(footerHints, 0)
 }

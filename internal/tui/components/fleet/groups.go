@@ -15,7 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -43,17 +43,17 @@ type GroupsLoadedMsg struct {
 
 // GroupsModel displays and manages device groups.
 type GroupsModel struct {
-	helpers.Sizable // Embeds Width, Height, Loader, Scroller
-	ctx             context.Context
-	fleet           *integrator.FleetManager
-	groups          []*integrator.DeviceGroup
-	loading         bool
-	editing         bool
-	err             error
-	focused         bool
-	panelIndex      int
-	styles          GroupsStyles
-	editModal       GroupEditModel
+	panel.Sizable // Embeds Width, Height, Loader, Scroller
+	ctx           context.Context
+	fleet         *integrator.FleetManager
+	groups        []*integrator.DeviceGroup
+	loading       bool
+	editing       bool
+	err           error
+	focused       bool
+	panelIndex    int
+	styles        GroupsStyles
+	editModal     GroupEditModel
 }
 
 // GroupsStyles holds styles for the Groups component.
@@ -100,7 +100,7 @@ func NewGroups(deps GroupsDeps) GroupsModel {
 	}
 
 	m := GroupsModel{
-		Sizable:   helpers.NewSizable(5, panel.NewScroller(0, 10)), // 5 accounts for borders, title, stats
+		Sizable:   panel.NewSizable(5, panel.NewScroller(0, 10)), // 5 accounts for borders, title, stats
 		ctx:       deps.Ctx,
 		styles:    DefaultGroupsStyles(),
 		editModal: NewGroupEditModel(),
@@ -309,7 +309,8 @@ func (m GroupsModel) handleCreate() (GroupsModel, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	w, h := m.EditModalDims()
+	m.editModal = m.editModal.SetSize(w, h)
 	m.editModal = m.editModal.ShowCreate(m.fleet)
 	return m, func() tea.Msg { return GroupEditOpenedMsg{} }
 }
@@ -323,7 +324,8 @@ func (m GroupsModel) handleEdit() (GroupsModel, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	w, h := m.EditModalDims()
+	m.editModal = m.editModal.SetSize(w, h)
 	m.editModal = m.editModal.ShowEdit(m.fleet, group)
 	return m, func() tea.Msg { return GroupEditOpenedMsg{} }
 }
@@ -337,7 +339,8 @@ func (m GroupsModel) handleDelete() (GroupsModel, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	w, h := m.EditModalDims()
+	m.editModal = m.editModal.SetSize(w, h)
 	m.editModal = m.editModal.ShowDelete(m.fleet, group)
 	return m, func() tea.Msg { return GroupEditOpenedMsg{} }
 }
@@ -450,7 +453,7 @@ func (m GroupsModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter(theme.StyledKeybindings("n:new e:edit d:del o:on f:off t:toggle r:refresh"))
+		r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "n", Desc: "new"}, {Key: "e", Desc: "edit"}, {Key: "d", Desc: "del"}, {Key: "o", Desc: "on"}, {Key: "f", Desc: "off"}, {Key: "t", Desc: "toggle"}, {Key: "r", Desc: "refresh"}}, keys.FooterHintWidth(m.Width))))
 	}
 
 	// Calculate content area for centering (accounting for panel borders)

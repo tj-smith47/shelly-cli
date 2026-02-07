@@ -15,7 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -34,7 +34,7 @@ type OpenBrowserMsg struct {
 
 // Model holds the device list state.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	cache      *cache.Cache // Shared device cache
 	filter     string       // Current filter string
 	focused    bool         // Whether this component has focus
@@ -125,7 +125,7 @@ func DefaultStyles() Styles {
 // New creates a new device list model using the shared cache.
 func New(c *cache.Cache) Model {
 	m := Model{
-		Sizable: helpers.NewSizable(5, panel.NewScroller(0, 10)),
+		Sizable: panel.NewSizable(5, panel.NewScroller(0, 10)),
 		cache:   c,
 		styles:  DefaultStyles(),
 	}
@@ -380,7 +380,7 @@ func (m Model) detailPanelWidth() int {
 func (m Model) SetSize(width, height int) Model {
 	m.Width = width
 	m.Height = height
-	m.Loader = m.Loader.SetSize(width-helpers.LoaderBorderOffset, height-helpers.LoaderBorderOffset)
+	m.Loader = m.Loader.SetSize(width-panel.LoaderBorderOffset, height-panel.LoaderBorderOffset)
 	m.Scroller.SetVisibleRows(m.visibleRows())
 	return m
 }
@@ -771,7 +771,11 @@ func (m Model) MaxDeviceNameLen() int {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:top/bottom /:filter"
+	return keys.FormatHints([]keys.Hint{
+		{Key: "j/k", Desc: "scroll"},
+		{Key: "g/G", Desc: "top/btm"},
+		{Key: "/", Desc: "filter"},
+	}, keys.FooterHintWidth(m.Width))
 }
 
 // IsLoading returns true if the device list is in a loading state.

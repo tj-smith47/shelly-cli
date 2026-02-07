@@ -16,9 +16,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -78,7 +78,7 @@ type PollMsg struct{}
 
 // Model is the provisioning wizard model.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx          context.Context
 	svc          *shelly.Service
 	step         Step
@@ -147,7 +147,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable: helpers.NewSizableLoaderOnly(),
+		Sizable: panel.NewSizableLoaderOnly(),
 		ctx:     deps.Ctx,
 		svc:     deps.Svc,
 		step:    StepInstructions,

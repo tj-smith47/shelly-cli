@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -16,8 +15,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // EditField represents a field in the KVS edit form.
@@ -41,17 +38,10 @@ type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the KVS edit modal.
 type EditModel struct {
-	ctx     context.Context
-	svc     *shellykvs.Service
-	device  string
-	visible bool
-	isNew   bool // true if creating new entry, false if editing existing
-	cursor  EditField
-	saving  bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+	editmodal.Base
+
+	svc   *shellykvs.Service
+	isNew bool // true if creating new entry, false if editing existing
 
 	// Original item for comparison (nil for new entries)
 	original *Item
@@ -78,9 +68,11 @@ func NewEditModel(ctx context.Context, svc *shellykvs.Service) EditModel {
 	)
 
 	return EditModel{
-		ctx:        ctx,
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Styles: editmodal.DefaultStyles().WithLabelWidth(12),
+		},
 		svc:        svc,
-		styles:     editmodal.DefaultStyles().WithLabelWidth(12),
 		keyInput:   keyInput,
 		valueInput: valueInput,
 	}
@@ -88,12 +80,8 @@ func NewEditModel(ctx context.Context, svc *shellykvs.Service) EditModel {
 
 // ShowNew displays the edit modal for creating a new entry.
 func (m EditModel) ShowNew(device string) EditModel {
-	m.device = device
-	m.visible = true
+	m.Show(device, int(EditFieldCount))
 	m.isNew = true
-	m.cursor = EditFieldKey
-	m.saving = false
-	m.err = nil
 	m.original = nil
 
 	// Clear inputs
@@ -109,12 +97,9 @@ func (m EditModel) ShowNew(device string) EditModel {
 
 // ShowEdit displays the edit modal for editing an existing entry.
 func (m EditModel) ShowEdit(device string, item *Item) EditModel {
-	m.device = device
-	m.visible = true
+	m.Show(device, int(EditFieldCount))
+	m.SetCursor(int(EditFieldValue)) // Skip to value since key is read-only when editing
 	m.isNew = false
-	m.cursor = EditFieldValue // Skip to value since key is read-only when editing
-	m.saving = false
-	m.err = nil
 	m.original = item
 
 	// Set key (will be read-only since isNew is false)
@@ -161,23 +146,21 @@ func formatValueForEdit(value any) string {
 
 // Hide hides the edit modal.
 func (m EditModel) Hide() EditModel {
-	m.visible = false
+	m.Base.Hide()
 	m.keyInput = m.keyInput.Blur()
 	m.valueInput = m.valueInput.Blur()
 	return m
 }
 
-// IsVisible returns whether the modal is visible.
-func (m EditModel) IsVisible() bool {
-	return m.visible
+// Visible returns whether the modal is visible.
+func (m EditModel) Visible() bool {
+	return m.Base.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m EditModel) SetSize(width, height int) EditModel {
-	m.width = width
-	m.height = height
-	// Use common modal helper for input sizing
-	inputWidth := rendering.ModalInputWidth(width)
+	m.Base.SetSize(width, height)
+	inputWidth := m.InputWidth()
 	m.keyInput = m.keyInput.SetWidth(inputWidth)
 	// Value textarea gets more height for JSON content
 	valueHeight := 10
@@ -188,14 +171,9 @@ func (m EditModel) SetSize(width, height int) EditModel {
 	return m
 }
 
-// Init returns the initial command.
-func (m EditModel) Init() tea.Cmd {
-	return nil
-}
-
 // Update handles messages.
 func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -205,14 +183,13 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+		_, cmd := m.HandleSaveResult(msg)
+		if cmd != nil {
+			// Success - modal already hidden by HandleSaveResult
+			return m, cmd
 		}
-		// Success - close modal
-		m = m.Hide()
-		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+		// Error - modal stays open, Err is set by HandleSaveResult
+		return m, nil
 
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
@@ -223,7 +200,10 @@ func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 }
 
 func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
-	// Modal-specific keys not covered by action messages
+	if m.Saving {
+		return m, nil
+	}
+
 	switch msg.String() {
 	case keyconst.KeyEsc, "ctrl+[":
 		m = m.Hide()
@@ -234,7 +214,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 
 	case keyconst.KeyCtrlF:
 		// Format JSON in value field
-		if m.cursor == EditFieldValue {
+		if EditField(m.Cursor) == EditFieldValue {
 			return m.formatValueField(), nil
 		}
 		return m, nil
@@ -246,14 +226,14 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 		return m.prevField(), nil
 	}
 
-	// Forward to focused input
+	// Forward to focused input (including Enter for text area)
 	return m.updateFocusedInput(msg)
 }
 
 func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldKey:
 		// Key is only editable when creating new entry
 		if m.isNew {
@@ -270,12 +250,11 @@ func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 
 func (m EditModel) nextField() EditModel {
 	m = m.blurCurrentField()
-	if m.cursor < EditFieldCount-1 {
-		m.cursor++
-	}
+	oldCursor, newCursor := m.NextField()
+	_ = oldCursor
 	// Skip key field when editing (it's read-only)
-	if !m.isNew && m.cursor == EditFieldKey {
-		m.cursor = EditFieldValue
+	if !m.isNew && EditField(newCursor) == EditFieldKey {
+		m.SetCursor(int(EditFieldValue))
 	}
 	m = m.focusCurrentField()
 	return m
@@ -283,12 +262,11 @@ func (m EditModel) nextField() EditModel {
 
 func (m EditModel) prevField() EditModel {
 	m = m.blurCurrentField()
-	if m.cursor > 0 {
-		m.cursor--
-	}
+	oldCursor, newCursor := m.PrevField()
+	_ = oldCursor
 	// Skip key field when editing (it's read-only)
-	if !m.isNew && m.cursor == EditFieldKey {
-		m.cursor = EditFieldValue
+	if !m.isNew && EditField(newCursor) == EditFieldKey {
+		m.SetCursor(int(EditFieldValue))
 	}
 	m = m.focusCurrentField()
 	return m
@@ -309,7 +287,7 @@ func (m EditModel) formatValueField() EditModel {
 }
 
 func (m EditModel) blurCurrentField() EditModel {
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldKey:
 		m.keyInput = m.keyInput.Blur()
 	case EditFieldValue:
@@ -321,7 +299,7 @@ func (m EditModel) blurCurrentField() EditModel {
 }
 
 func (m EditModel) focusCurrentField() EditModel {
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldKey:
 		m.keyInput, _ = m.keyInput.Focus()
 	case EditFieldValue:
@@ -333,55 +311,47 @@ func (m EditModel) focusCurrentField() EditModel {
 }
 
 func (m EditModel) save() (EditModel, tea.Cmd) {
-	if m.saving {
+	if m.Saving {
 		return m, nil
 	}
 
 	// Validate key
 	key := strings.TrimSpace(m.keyInput.Value())
 	if key == "" {
-		m.err = fmt.Errorf("key is required")
+		m.Err = fmt.Errorf("key is required")
 		return m, nil
 	}
 
 	// Validate key length (Shelly KVS max key length is 42 characters)
 	if len(key) > 42 {
-		m.err = fmt.Errorf("key must be 42 characters or less")
+		m.Err = fmt.Errorf("key must be 42 characters or less")
 		return m, nil
 	}
 
 	// Parse value
 	valueStr := strings.TrimSpace(m.valueInput.Value())
 	if valueStr == "" {
-		m.err = fmt.Errorf("value is required")
+		m.Err = fmt.Errorf("value is required")
 		return m, nil
 	}
 
-	m.saving = true
-	m.err = nil
+	m.StartSave()
 
-	return m, m.createSaveCmd(key, valueStr)
-}
-
-func (m EditModel) createSaveCmd(key, valueStr string) tea.Cmd {
 	// Parse value - try JSON first, fall back to string
 	value := shellykvs.ParseValue(valueStr)
+	svc := m.svc
+	device := m.Device
 
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
+	cmd := m.SaveCmdWithID(key, func(ctx context.Context) error {
+		return svc.Set(ctx, device, key, value)
+	})
 
-		err := m.svc.Set(ctx, m.device, key, value)
-		if err != nil {
-			return messages.NewSaveError(key, err)
-		}
-		return messages.NewSaveResult(key)
-	}
+	return m, cmd
 }
 
 // View renders the edit modal.
 func (m EditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
@@ -392,15 +362,9 @@ func (m EditModel) View() string {
 	}
 
 	// Build footer with keybindings
-	footer := "Tab: Next | Ctrl+F: Format | Ctrl+S: Save | Esc: Cancel"
-	if m.saving {
-		footer = "Saving..."
-	}
+	footer := m.RenderSavingFooter("Tab: Next | Ctrl+F: Format | Ctrl+S: Save | Esc: Cancel")
 
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, title, footer)
-
-	return r.SetContent(m.renderFormFields()).Render()
+	return m.RenderModal(title, m.renderFormFields(), footer)
 }
 
 func (m EditModel) renderFormFields() string {
@@ -419,10 +383,9 @@ func (m EditModel) renderFormFields() string {
 	content.WriteString("\n")
 
 	// Error display
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
 	return content.String()
@@ -431,12 +394,12 @@ func (m EditModel) renderFormFields() string {
 func (m EditModel) renderField(field EditField, label, input string) string {
 	var selector, labelStr string
 
-	if m.cursor == field {
-		selector = m.styles.Selector.Render("▶ ")
-		labelStr = m.styles.LabelFocus.Render(label)
+	if EditField(m.Cursor) == field {
+		selector = m.Styles.Selector.Render("▶ ")
+		labelStr = m.Styles.LabelFocus.Render(label)
 	} else {
 		selector = "  "
-		labelStr = m.styles.Label.Render(label)
+		labelStr = m.Styles.Label.Render(label)
 	}
 
 	prefix := selector + labelStr + " "

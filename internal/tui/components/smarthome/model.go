@@ -17,9 +17,10 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -76,8 +77,10 @@ const (
 // footerSaving is the footer text shown while a save operation is in progress.
 const footerSaving = "Saving..."
 
-// footerEditToggleRefresh is the footer text for protocols with edit, toggle, and refresh.
-const footerEditToggleRefresh = "e:edit t:toggle r:refresh"
+// editToggleRefreshHints returns the footer hints for protocols with edit, toggle, and refresh.
+func editToggleRefreshHints() []keys.Hint {
+	return []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "t", Desc: "toggle"}, {Key: "r", Desc: "refresh"}}
+}
 
 // StatusLoadedMsg signals that smart home statuses were loaded.
 type StatusLoadedMsg struct {
@@ -91,7 +94,7 @@ type StatusLoadedMsg struct {
 
 // Model displays smart home protocol settings for a device.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx            context.Context
 	svc            *shelly.Service
 	fileCache      *cache.FileCache
@@ -176,7 +179,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:     helpers.NewSizableLoaderOnly(),
+		Sizable:     panel.NewSizableLoaderOnly(),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
@@ -742,7 +745,8 @@ func (m Model) handleMatterEditKey() (Model, tea.Cmd) {
 	}
 	m.editing = true
 	m.pendingReset = false
-	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	w, h := m.EditModalDims()
+	m.editModal = m.editModal.SetSize(w, h)
 	var cmd tea.Cmd
 	m.editModal, cmd = m.editModal.Show(m.device, m.matter)
 	return m, tea.Batch(cmd, func() tea.Msg { return EditOpenedMsg{} })
@@ -1166,6 +1170,8 @@ func (m Model) RenderEditModal() string {
 // SetEditModalSize sets the active edit modal dimensions.
 // This should be called with screen-based dimensions when a modal is visible.
 func (m Model) SetEditModalSize(width, height int) Model {
+	m.ModalWidth = width
+	m.ModalHeight = height
 	if m.editing {
 		m.editModal = m.editModal.SetSize(width, height)
 	}
@@ -1260,37 +1266,42 @@ func (m Model) buildFooter() string {
 }
 
 func (m Model) buildProtocolFooter() string {
+	w := keys.FooterHintWidth(m.Width)
+	var hints []keys.Hint
 	switch {
 	case m.activeProtocol == ProtocolMatter && m.matter != nil:
 		return m.buildMatterFooter()
 	case m.activeProtocol == ProtocolZigbee && m.zigbee != nil:
 		return m.buildZigbeeFooter()
 	case m.activeProtocol == ProtocolLoRa && m.lora != nil:
-		return "e:edit T:test r:refresh"
+		hints = []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "T", Desc: "test"}, {Key: "r", Desc: "refresh"}}
 	case m.activeProtocol == ProtocolZWave && m.zwave != nil:
-		return "e:edit r:refresh"
+		hints = []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "r", Desc: "refresh"}}
 	case m.activeProtocol == ProtocolModbus && m.modbus != nil:
-		return footerEditToggleRefresh
+		hints = editToggleRefreshHints()
 	default:
-		return "1-5:sel j/k:nav r:refresh"
+		hints = []keys.Hint{{Key: "1-5", Desc: "sel"}, {Key: "j/k", Desc: "nav"}, {Key: "r", Desc: "refresh"}}
 	}
+	return theme.StyledKeybindings(keys.FormatHints(hints, w))
 }
 
 func (m Model) buildMatterFooter() string {
+	w := keys.FooterHintWidth(m.Width)
 	if m.matter.Enabled {
-		return "e:edit t:toggle c:codes R:reset r:refresh"
+		return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "t", Desc: "toggle"}, {Key: "c", Desc: "codes"}, {Key: "R", Desc: "reset"}, {Key: "r", Desc: "refresh"}}, w))
 	}
-	return footerEditToggleRefresh
+	return theme.StyledKeybindings(keys.FormatHints(editToggleRefreshHints(), w))
 }
 
 func (m Model) buildZigbeeFooter() string {
+	w := keys.FooterHintWidth(m.Width)
 	if !m.zigbee.Enabled {
-		return footerEditToggleRefresh
+		return theme.StyledKeybindings(keys.FormatHints(editToggleRefreshHints(), w))
 	}
 	if m.zigbee.NetworkState == zigbeeStateJoined {
-		return "e:edit t:toggle p:pair R:leave r:refresh"
+		return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "t", Desc: "toggle"}, {Key: "p", Desc: "pair"}, {Key: "R", Desc: "leave"}, {Key: "r", Desc: "refresh"}}, w))
 	}
-	return "e:edit t:toggle p:pair r:refresh"
+	return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "t", Desc: "toggle"}, {Key: "p", Desc: "pair"}, {Key: "r", Desc: "refresh"}}, w))
 }
 
 func (m Model) renderMatter() string {

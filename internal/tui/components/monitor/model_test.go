@@ -3,14 +3,14 @@ package monitor
 import (
 	"testing"
 
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 // createTestModel creates a model with test statuses for navigation testing.
 func createTestModel(statusCount int) Model {
 	m := Model{
-		Sizable:  helpers.NewSizable(11, panel.NewScroller(0, 10)),
+		Sizable:  panel.NewSizable(11, panel.NewScroller(0, 10)),
 		statuses: make([]DeviceStatus, statusCount),
 		styles:   DefaultStyles(),
 	}
@@ -223,5 +223,147 @@ func TestSetSize(t *testing.T) {
 	}
 	if m.Height != 50 {
 		t.Errorf("expected height 50, got %d", m.Height)
+	}
+}
+
+func TestAggregateMetrics_PM(t *testing.T) {
+	t.Parallel()
+
+	freq := 50.0
+	energy := &model.PMEnergyCounters{Total: 1234.5}
+
+	pms := []model.PMStatus{
+		{APower: 100, Voltage: 230, Current: 0.43, Freq: &freq, AEnergy: energy},
+		{APower: 50, Voltage: 231, Current: 0.22},
+	}
+
+	status := &DeviceStatus{}
+	aggregateMetrics(status, pms, false)
+
+	if status.Power != 150 {
+		t.Errorf("expected power 150, got %f", status.Power)
+	}
+	if status.Voltage != 230 {
+		t.Errorf("expected voltage 230 (first non-zero), got %f", status.Voltage)
+	}
+	if status.Current != 0.43 {
+		t.Errorf("expected current 0.43 (first non-zero), got %f", status.Current)
+	}
+	if status.Frequency != 50 {
+		t.Errorf("expected frequency 50, got %f", status.Frequency)
+	}
+	if status.TotalEnergy != 1234.5 {
+		t.Errorf("expected total energy 1234.5, got %f", status.TotalEnergy)
+	}
+}
+
+func TestAggregateMetrics_EM(t *testing.T) {
+	t.Parallel()
+
+	freq := 60.0
+	ems := []model.EMStatus{
+		{TotalActivePower: 500, AVoltage: 120, TotalCurrent: 4.2, AFreq: &freq},
+		{TotalActivePower: 300, AVoltage: 121, TotalCurrent: 2.5},
+	}
+
+	status := &DeviceStatus{}
+	aggregateMetrics(status, ems, true)
+
+	if status.Power != 800 {
+		t.Errorf("expected power 800, got %f", status.Power)
+	}
+	if status.Voltage != 120 {
+		t.Errorf("expected voltage 120 (first non-zero), got %f", status.Voltage)
+	}
+	// EM accumulates current
+	if status.Current != 6.7 {
+		t.Errorf("expected current 6.7 (accumulated), got %f", status.Current)
+	}
+	if status.Frequency != 60 {
+		t.Errorf("expected frequency 60, got %f", status.Frequency)
+	}
+	if status.TotalEnergy != 0 {
+		t.Errorf("expected total energy 0 (EM has no energy), got %f", status.TotalEnergy)
+	}
+}
+
+func TestAggregateMetrics_EM1(t *testing.T) {
+	t.Parallel()
+
+	freq := 50.0
+	em1s := []model.EM1Status{
+		{ActPower: 200, Voltage: 240, Current: 0.83, Freq: &freq},
+		{ActPower: 100, Voltage: 241, Current: 0.42},
+	}
+
+	status := &DeviceStatus{}
+	aggregateMetrics(status, em1s, false)
+
+	if status.Power != 300 {
+		t.Errorf("expected power 300, got %f", status.Power)
+	}
+	if status.Voltage != 240 {
+		t.Errorf("expected voltage 240 (first non-zero), got %f", status.Voltage)
+	}
+	if status.Current != 0.83 {
+		t.Errorf("expected current 0.83 (first non-zero), got %f", status.Current)
+	}
+	if status.Frequency != 50 {
+		t.Errorf("expected frequency 50, got %f", status.Frequency)
+	}
+}
+
+func TestAggregateMetrics_EmptySlice(t *testing.T) {
+	t.Parallel()
+
+	status := &DeviceStatus{}
+	aggregateMetrics(status, []model.PMStatus{}, false)
+
+	if status.Power != 0 {
+		t.Errorf("expected power 0, got %f", status.Power)
+	}
+	if status.Voltage != 0 {
+		t.Errorf("expected voltage 0, got %f", status.Voltage)
+	}
+}
+
+func TestAggregateMetrics_MultipleTypes(t *testing.T) {
+	t.Parallel()
+
+	// Test aggregating across all three types into same status (like checkDeviceStatus does)
+	freq := 50.0
+	energy := &model.PMEnergyCounters{Total: 500}
+
+	status := &DeviceStatus{}
+	aggregateMetrics(status, []model.PMStatus{
+		{APower: 100, Voltage: 230, Current: 0.43, Freq: &freq, AEnergy: energy},
+	}, false)
+	aggregateMetrics(status, []model.EMStatus{
+		{TotalActivePower: 200, AVoltage: 231, TotalCurrent: 1.5},
+	}, true)
+	aggregateMetrics(status, []model.EM1Status{
+		{ActPower: 50, Voltage: 232, Current: 0.21},
+	}, false)
+
+	// Power accumulated from all
+	if status.Power != 350 {
+		t.Errorf("expected power 350, got %f", status.Power)
+	}
+	// Voltage set from first PM (first non-zero)
+	if status.Voltage != 230 {
+		t.Errorf("expected voltage 230, got %f", status.Voltage)
+	}
+	// Current: PM sets 0.43, EM accumulates +1.5, EM1 skipped (already non-zero, not accumulate)
+	expectedCurrent := 0.43 + 1.5
+	if status.Current != expectedCurrent {
+		t.Errorf("expected current %f, got %f", expectedCurrent, status.Current)
+	}
+	// Frequency from PM
+	if status.Frequency != 50 {
+		t.Errorf("expected frequency 50, got %f", status.Frequency)
+	}
+	// Energy from PM only
+	if status.TotalEnergy != 500 {
+		t.Errorf("expected total energy 500, got %f", status.TotalEnergy)
 	}
 }

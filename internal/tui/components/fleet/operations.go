@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -293,7 +294,7 @@ func (m OperationsModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter(theme.StyledKeybindings("1-2:op h/l:sel enter:exec"))
+		r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "1-2", Desc: "op"}, {Key: "h/l", Desc: "sel"}, {Key: "enter", Desc: "exec"}}, keys.FooterHintWidth(m.width))))
 	}
 
 	if m.fleet == nil {

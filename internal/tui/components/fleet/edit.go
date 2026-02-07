@@ -16,8 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // GroupEditMode represents the mode of the group edit modal.
@@ -51,15 +49,10 @@ type GroupEditClosedMsg = messages.EditClosedMsg
 
 // GroupEditModel represents the group edit modal.
 type GroupEditModel struct {
-	fleet   *integrator.FleetManager
-	visible bool
-	mode    GroupEditMode
-	cursor  GroupEditField
-	saving  bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+	editmodal.Base
+
+	fleet *integrator.FleetManager
+	mode  GroupEditMode
 
 	// Group being edited
 	groupID  string
@@ -84,7 +77,7 @@ func NewGroupEditModel() GroupEditModel {
 	)
 
 	return GroupEditModel{
-		styles:         editmodal.DefaultStyles().WithLabelWidth(10),
+		Base:           editmodal.Base{Styles: editmodal.DefaultStyles().WithLabelWidth(10)},
 		nameInput:      nameInput,
 		selectedIDs:    make(map[string]bool),
 		deviceScroller: panel.NewScroller(0, 8),
@@ -94,11 +87,8 @@ func NewGroupEditModel() GroupEditModel {
 // ShowCreate displays the modal for creating a new group.
 func (m GroupEditModel) ShowCreate(fleet *integrator.FleetManager) GroupEditModel {
 	m.fleet = fleet
-	m.visible = true
+	m.Show("", int(GroupEditFieldCount))
 	m.mode = GroupEditModeCreate
-	m.cursor = GroupEditFieldName
-	m.saving = false
-	m.err = nil
 	m.groupID = uuid.New().String()
 	m.original = nil
 
@@ -116,11 +106,8 @@ func (m GroupEditModel) ShowCreate(fleet *integrator.FleetManager) GroupEditMode
 // ShowEdit displays the modal for editing an existing group.
 func (m GroupEditModel) ShowEdit(fleet *integrator.FleetManager, group *integrator.DeviceGroup) GroupEditModel {
 	m.fleet = fleet
-	m.visible = true
+	m.Show("", int(GroupEditFieldCount))
 	m.mode = GroupEditModeEdit
-	m.cursor = GroupEditFieldName
-	m.saving = false
-	m.err = nil
 	m.groupID = group.ID
 	m.original = group
 
@@ -141,11 +128,8 @@ func (m GroupEditModel) ShowEdit(fleet *integrator.FleetManager, group *integrat
 // ShowDelete displays the delete confirmation.
 func (m GroupEditModel) ShowDelete(fleet *integrator.FleetManager, group *integrator.DeviceGroup) GroupEditModel {
 	m.fleet = fleet
-	m.visible = true
+	m.Show("", int(GroupEditFieldCount))
 	m.mode = GroupEditModeDelete
-	m.cursor = GroupEditFieldName
-	m.saving = false
-	m.err = nil
 	m.groupID = group.ID
 	m.original = group
 
@@ -166,20 +150,19 @@ func (m GroupEditModel) loadDevicesInto(target *GroupEditModel) {
 
 // Hide hides the edit modal.
 func (m GroupEditModel) Hide() GroupEditModel {
-	m.visible = false
+	m.Base.Hide()
 	m.nameInput = m.nameInput.Blur()
 	return m
 }
 
 // Visible returns whether the modal is visible.
 func (m GroupEditModel) Visible() bool {
-	return m.visible
+	return m.Base.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m GroupEditModel) SetSize(width, height int) GroupEditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	// Calculate device list height based on modal size
 	deviceListHeight := min(10, height/3)
 	if deviceListHeight < 3 {
@@ -196,7 +179,7 @@ func (m GroupEditModel) Init() tea.Cmd {
 
 // Update handles messages.
 func (m GroupEditModel) Update(msg tea.Msg) (GroupEditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -206,21 +189,18 @@ func (m GroupEditModel) Update(msg tea.Msg) (GroupEditModel, tea.Cmd) {
 func (m GroupEditModel) handleMessage(msg tea.Msg) (GroupEditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+		saved, cmd := m.HandleSaveResult(msg)
+		if saved {
+			return m, cmd
 		}
-		// Success - close modal
-		m = m.Hide()
-		return m, func() tea.Msg { return GroupEditClosedMsg{Saved: true} }
+		return m, nil
 
 	// Action messages from context system
 	case messages.NavigationMsg:
 		return m.handleNavigation(msg)
 	case messages.ToggleEnableRequestMsg:
 		// Toggle device selection if in devices field
-		if m.cursor == GroupEditFieldDevices && len(m.allDevices) > 0 {
+		if GroupEditField(m.Cursor) == GroupEditFieldDevices && len(m.allDevices) > 0 {
 			return m.toggleCurrentDevice(), nil
 		}
 	case tea.KeyPressMsg:
@@ -228,7 +208,7 @@ func (m GroupEditModel) handleMessage(msg tea.Msg) (GroupEditModel, tea.Cmd) {
 	}
 
 	// Forward to focused input (only for name field)
-	if m.cursor == GroupEditFieldName && m.mode != GroupEditModeDelete {
+	if GroupEditField(m.Cursor) == GroupEditFieldName && m.mode != GroupEditModeDelete {
 		var cmd tea.Cmd
 		m.nameInput, cmd = m.nameInput.Update(msg)
 		return m, cmd
@@ -240,13 +220,13 @@ func (m GroupEditModel) handleMessage(msg tea.Msg) (GroupEditModel, tea.Cmd) {
 func (m GroupEditModel) handleNavigation(msg messages.NavigationMsg) (GroupEditModel, tea.Cmd) {
 	switch msg.Direction {
 	case messages.NavUp:
-		if m.cursor == GroupEditFieldDevices {
+		if GroupEditField(m.Cursor) == GroupEditFieldDevices {
 			m.deviceScroller.CursorUp()
 			return m, nil
 		}
 		return m.prevField(), nil
 	case messages.NavDown:
-		if m.cursor == GroupEditFieldDevices {
+		if GroupEditField(m.Cursor) == GroupEditFieldDevices {
 			m.deviceScroller.CursorDown()
 			return m, nil
 		}
@@ -271,7 +251,7 @@ func (m GroupEditModel) handleKey(msg tea.KeyPressMsg) (GroupEditModel, tea.Cmd)
 		m = m.Hide()
 		return m, func() tea.Msg { return GroupEditClosedMsg{Saved: false} }
 	case keyconst.KeyCtrlS:
-		if m.cursor == GroupEditFieldName {
+		if GroupEditField(m.Cursor) == GroupEditFieldName {
 			// Move to devices instead of saving
 			return m.nextField(), nil
 		}
@@ -283,7 +263,7 @@ func (m GroupEditModel) handleKey(msg tea.KeyPressMsg) (GroupEditModel, tea.Cmd)
 	}
 
 	// Forward to name input when focused
-	if m.cursor == GroupEditFieldName {
+	if GroupEditField(m.Cursor) == GroupEditFieldName {
 		var cmd tea.Cmd
 		m.nameInput, cmd = m.nameInput.Update(msg)
 		return m, cmd
@@ -325,8 +305,8 @@ func (m GroupEditModel) toggleCurrentDevice() GroupEditModel {
 
 func (m GroupEditModel) nextField() GroupEditModel {
 	m = m.blurCurrentField()
-	if m.cursor < GroupEditFieldCount-1 {
-		m.cursor++
+	if m.Cursor < int(GroupEditFieldCount)-1 {
+		m.Cursor++
 	}
 	m = m.focusCurrentField()
 	return m
@@ -334,40 +314,39 @@ func (m GroupEditModel) nextField() GroupEditModel {
 
 func (m GroupEditModel) prevField() GroupEditModel {
 	m = m.blurCurrentField()
-	if m.cursor > 0 {
-		m.cursor--
+	if m.Cursor > 0 {
+		m.Cursor--
 	}
 	m = m.focusCurrentField()
 	return m
 }
 
 func (m GroupEditModel) blurCurrentField() GroupEditModel {
-	if m.cursor == GroupEditFieldName {
+	if GroupEditField(m.Cursor) == GroupEditFieldName {
 		m.nameInput = m.nameInput.Blur()
 	}
 	return m
 }
 
 func (m GroupEditModel) focusCurrentField() GroupEditModel {
-	if m.cursor == GroupEditFieldName {
+	if GroupEditField(m.Cursor) == GroupEditFieldName {
 		m.nameInput, _ = m.nameInput.Focus()
 	}
 	return m
 }
 
 func (m GroupEditModel) save() (GroupEditModel, tea.Cmd) {
-	if m.saving {
+	if m.Saving {
 		return m, nil
 	}
 
 	name := strings.TrimSpace(m.nameInput.Value())
 	if name == "" {
-		m.err = fmt.Errorf("group name is required")
+		m.Err = fmt.Errorf("group name is required")
 		return m, nil
 	}
 
-	m.saving = true
-	m.err = nil
+	m.StartSave()
 
 	// Collect selected device IDs
 	deviceIDs := make([]string, 0, len(m.selectedIDs))
@@ -422,12 +401,11 @@ func (m GroupEditModel) createSaveCmd(name string, deviceIDs []string) tea.Cmd {
 }
 
 func (m GroupEditModel) doDelete() (GroupEditModel, tea.Cmd) {
-	if m.saving {
+	if m.Saving {
 		return m, nil
 	}
 
-	m.saving = true
-	m.err = nil
+	m.StartSave()
 
 	return m, func() tea.Msg {
 		if m.fleet == nil {
@@ -445,7 +423,7 @@ func (m GroupEditModel) doDelete() (GroupEditModel, tea.Cmd) {
 
 // View renders the edit modal.
 func (m GroupEditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
@@ -454,7 +432,7 @@ func (m GroupEditModel) View() string {
 	switch m.mode {
 	case GroupEditModeDelete:
 		title = "Delete Group"
-		if m.saving {
+		if m.Saving {
 			footer = "Deleting..."
 		} else {
 			footer = "y: Delete | n/Esc: Cancel"
@@ -467,9 +445,6 @@ func (m GroupEditModel) View() string {
 		footer = m.buildEditFooter()
 	}
 
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, title, footer)
-
 	// Build content based on mode
 	var content string
 	if m.mode == GroupEditModeDelete {
@@ -478,14 +453,14 @@ func (m GroupEditModel) View() string {
 		content = m.renderEditContent()
 	}
 
-	return r.SetContent(content).Render()
+	return m.RenderModal(title, content, footer)
 }
 
 func (m GroupEditModel) buildEditFooter() string {
-	if m.saving {
+	if m.Saving {
 		return "Saving..."
 	}
-	if m.cursor == GroupEditFieldDevices {
+	if GroupEditField(m.Cursor) == GroupEditFieldDevices {
 		return "j/k: Navigate | Space: Toggle | Ctrl+S/Enter: Save | Esc: Cancel"
 	}
 	return "Tab: Next field | Ctrl+S: Save | Esc: Cancel"
@@ -495,19 +470,18 @@ func (m GroupEditModel) renderDeleteContent() string {
 	var content strings.Builder
 
 	if m.original != nil {
-		content.WriteString(m.styles.Warning.Render("Are you sure you want to delete this group?"))
+		content.WriteString(m.Styles.Warning.Render("Are you sure you want to delete this group?"))
 		content.WriteString("\n\n")
-		content.WriteString(m.styles.Label.Render("Name: "))
-		content.WriteString(m.styles.Value.Render(m.original.Name))
+		content.WriteString(m.Styles.Label.Render("Name: "))
+		content.WriteString(m.Styles.Value.Render(m.original.Name))
 		content.WriteString("\n")
-		content.WriteString(m.styles.Label.Render("Devices: "))
-		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d", len(m.original.DeviceIDs))))
+		content.WriteString(m.Styles.Label.Render("Devices: "))
+		content.WriteString(m.Styles.Value.Render(fmt.Sprintf("%d", len(m.original.DeviceIDs))))
 	}
 
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
 	return content.String()
@@ -524,10 +498,9 @@ func (m GroupEditModel) renderEditContent() string {
 	content.WriteString(m.renderDevicesField())
 
 	// Error display
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
 	return content.String()
@@ -536,12 +509,12 @@ func (m GroupEditModel) renderEditContent() string {
 func (m GroupEditModel) renderField(field GroupEditField, label, input string) string {
 	var selector, labelStr string
 
-	if m.cursor == field {
-		selector = m.styles.Selector.Render("> ")
-		labelStr = m.styles.LabelFocus.Render(label)
+	if GroupEditField(m.Cursor) == field {
+		selector = m.Styles.Selector.Render("> ")
+		labelStr = m.Styles.LabelFocus.Render(label)
 	} else {
 		selector = "  "
-		labelStr = m.styles.Label.Render(label)
+		labelStr = m.Styles.Label.Render(label)
 	}
 
 	return selector + labelStr + " " + input
@@ -551,27 +524,27 @@ func (m GroupEditModel) renderDevicesField() string {
 	var content strings.Builder
 
 	// Label
-	if m.cursor == GroupEditFieldDevices {
-		content.WriteString(m.styles.Selector.Render("> "))
-		content.WriteString(m.styles.LabelFocus.Render("Devices:"))
+	if GroupEditField(m.Cursor) == GroupEditFieldDevices {
+		content.WriteString(m.Styles.Selector.Render("> "))
+		content.WriteString(m.Styles.LabelFocus.Render("Devices:"))
 	} else {
 		content.WriteString("  ")
-		content.WriteString(m.styles.Label.Render("Devices:"))
+		content.WriteString(m.Styles.Label.Render("Devices:"))
 	}
 
 	// Selection count
 	content.WriteString(" ")
-	content.WriteString(m.styles.Info.Render(fmt.Sprintf("(%d selected)", len(m.selectedIDs))))
+	content.WriteString(m.Styles.Info.Render(fmt.Sprintf("(%d selected)", len(m.selectedIDs))))
 	content.WriteString("\n")
 
 	if len(m.allDevices) == 0 {
 		content.WriteString("    ")
-		content.WriteString(m.styles.Info.Render("No devices available"))
+		content.WriteString(m.Styles.Info.Render("No devices available"))
 		return content.String()
 	}
 
 	// Device list with scrolling using generic helper
-	fieldFocused := m.cursor == GroupEditFieldDevices
+	fieldFocused := GroupEditField(m.Cursor) == GroupEditFieldDevices
 	content.WriteString(generics.RenderScrollableItems(m.allDevices, m.deviceScroller,
 		func(device integrator.AccountDevice, _ int, scrollerCursor bool) string {
 			isSelected := m.selectedIDs[device.DeviceID]
@@ -582,7 +555,7 @@ func (m GroupEditModel) renderDevicesField() string {
 	// Scroll indicator (with custom indentation for modal alignment)
 	if m.deviceScroller.HasMore() || m.deviceScroller.HasPrevious() {
 		content.WriteString("\n    ")
-		content.WriteString(m.styles.Info.Render(m.deviceScroller.ScrollInfo()))
+		content.WriteString(m.Styles.Info.Render(m.deviceScroller.ScrollInfo()))
 	}
 
 	return content.String()
@@ -596,16 +569,16 @@ func (m GroupEditModel) renderDeviceLine(device integrator.AccountDevice, isSele
 
 	// Cursor indicator
 	if isCursor {
-		line.WriteString(m.styles.Selector.Render("> "))
+		line.WriteString(m.Styles.Selector.Render("> "))
 	} else {
 		line.WriteString("  ")
 	}
 
 	// Checkbox
 	if isSelected {
-		line.WriteString(m.styles.StatusOn.Render("[✓] "))
+		line.WriteString(m.Styles.StatusOn.Render("[✓] "))
 	} else {
-		line.WriteString(m.styles.Muted.Render("[ ] "))
+		line.WriteString(m.Styles.Muted.Render("[ ] "))
 	}
 
 	// Device name
@@ -616,9 +589,9 @@ func (m GroupEditModel) renderDeviceLine(device integrator.AccountDevice, isSele
 	name = output.Truncate(name, 25)
 
 	if isCursor {
-		line.WriteString(m.styles.Selected.Render(name))
+		line.WriteString(m.Styles.Selected.Render(name))
 	} else {
-		line.WriteString(m.styles.Value.Render(name))
+		line.WriteString(m.Styles.Value.Render(name))
 	}
 
 	return line.String()

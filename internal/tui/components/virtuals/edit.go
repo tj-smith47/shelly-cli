@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -15,8 +14,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // EditField represents a field in the virtual component edit form.
@@ -41,17 +38,9 @@ type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the virtual component edit modal.
 type EditModel struct {
-	ctx     context.Context
-	svc     *shelly.Service
-	device  string
-	isNew   bool
-	visible bool
-	cursor  EditField
-	saving  bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+	editmodal.Base
+
+	isNew bool
 
 	// Current virtual being edited
 	virtual *Virtual
@@ -98,9 +87,11 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	)
 
 	return EditModel{
-		ctx:          ctx,
-		svc:          svc,
-		styles:       editmodal.DefaultStyles().WithLabelWidth(10),
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles().WithLabelWidth(10),
+		},
 		typeDropdown: form.NewSelect(form.WithSelectOptions(typeOptions)),
 		nameInput:    nameInput,
 		boolToggle:   boolToggle,
@@ -112,12 +103,8 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 
 // ShowNew displays the edit modal for creating a new virtual component.
 func (m EditModel) ShowNew(device string) EditModel {
-	m.device = device
-	m.visible = true
+	m.Show(device, int(EditFieldCount))
 	m.isNew = true
-	m.cursor = EditFieldType
-	m.saving = false
-	m.err = nil
 	m.virtual = nil
 
 	// Reset inputs
@@ -135,12 +122,9 @@ func (m EditModel) ShowNew(device string) EditModel {
 
 // ShowEdit displays the edit modal for editing an existing virtual component.
 func (m EditModel) ShowEdit(device string, v *Virtual) EditModel {
-	m.device = device
-	m.visible = true
+	m.Show(device, int(EditFieldCount))
+	m.SetCursor(int(EditFieldValue)) // Skip to value since type is fixed
 	m.isNew = false
-	m.cursor = EditFieldValue // Skip to value since type is fixed
-	m.saving = false
-	m.err = nil
 	m.virtual = v
 
 	// Set name
@@ -184,7 +168,7 @@ func (m EditModel) ShowEdit(device string, v *Virtual) EditModel {
 
 // Hide hides the edit modal.
 func (m EditModel) Hide() EditModel {
-	m.visible = false
+	m.Base.Hide()
 	m.typeDropdown = m.typeDropdown.Blur()
 	m.nameInput = m.nameInput.Blur()
 	m.boolToggle = m.boolToggle.Blur()
@@ -194,15 +178,14 @@ func (m EditModel) Hide() EditModel {
 	return m
 }
 
-// IsVisible returns whether the modal is visible.
-func (m EditModel) IsVisible() bool {
-	return m.visible
+// Visible returns whether the modal is visible.
+func (m EditModel) Visible() bool {
+	return m.Base.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m EditModel) SetSize(width, height int) EditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	return m
 }
 
@@ -213,7 +196,7 @@ func (m EditModel) Init() tea.Cmd {
 
 // Update handles messages.
 func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -223,14 +206,13 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+		_, cmd := m.HandleSaveResult(msg)
+		if cmd != nil {
+			// Success - modal already hidden by HandleSaveResult
+			return m, cmd
 		}
-		// Success - close modal
-		m = m.Hide()
-		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+		// Error - modal stays open, Err is set by HandleSaveResult
+		return m, nil
 
 	// Action messages from context system
 	case messages.NavigationMsg:
@@ -244,6 +226,9 @@ func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 }
 
 func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.Cmd) {
+	if m.Saving {
+		return m, nil
+	}
 	switch msg.Direction {
 	case messages.NavUp:
 		return m.prevField(), nil
@@ -256,6 +241,10 @@ func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.
 }
 
 func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
+	if m.Saving {
+		return m, nil
+	}
+
 	// Modal-specific keys not covered by action messages
 	switch msg.String() {
 	case keyconst.KeyEsc, "ctrl+[":
@@ -279,17 +268,17 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 	var cmd tea.Cmd
 
-	if m.isNew && m.cursor == EditFieldType {
+	if m.isNew && EditField(m.Cursor) == EditFieldType {
 		m.typeDropdown, cmd = m.typeDropdown.Update(msg)
 		return m, cmd
 	}
 
-	if m.cursor == EditFieldName {
+	if EditField(m.Cursor) == EditFieldName {
 		m.nameInput, cmd = m.nameInput.Update(msg)
 		return m, cmd
 	}
 
-	if m.cursor == EditFieldValue {
+	if EditField(m.Cursor) == EditFieldValue {
 		return m.updateValueInput(msg)
 	}
 
@@ -344,12 +333,12 @@ func (m EditModel) nextField() EditModel {
 	m = m.blurCurrentField()
 
 	switch {
-	case m.isNew && m.cursor < EditFieldCount-1:
+	case m.isNew && EditField(m.Cursor) < EditFieldCount-1:
 		// New: Type -> Name -> Value
-		m.cursor++
-	case !m.isNew && m.cursor != EditFieldValue:
+		m.Cursor++
+	case !m.isNew && EditField(m.Cursor) != EditFieldValue:
 		// Edit: Jump directly to Value (type is fixed)
-		m.cursor = EditFieldValue
+		m.SetCursor(int(EditFieldValue))
 	}
 
 	m = m.focusCurrentField()
@@ -360,12 +349,12 @@ func (m EditModel) prevField() EditModel {
 	m = m.blurCurrentField()
 
 	if m.isNew {
-		if m.cursor > 0 {
-			m.cursor--
+		if m.Cursor > 0 {
+			m.Cursor--
 		}
 	} else {
 		// For edit, stay on value
-		m.cursor = EditFieldValue
+		m.SetCursor(int(EditFieldValue))
 	}
 
 	m = m.focusCurrentField()
@@ -373,7 +362,7 @@ func (m EditModel) prevField() EditModel {
 }
 
 func (m EditModel) blurCurrentField() EditModel {
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldType:
 		m.typeDropdown = m.typeDropdown.Blur()
 	case EditFieldName:
@@ -390,7 +379,7 @@ func (m EditModel) blurCurrentField() EditModel {
 }
 
 func (m EditModel) focusCurrentField() EditModel {
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldType:
 		m.typeDropdown = m.typeDropdown.Focus()
 	case EditFieldName:
@@ -421,7 +410,7 @@ func (m EditModel) focusValueInput() EditModel {
 }
 
 func (m EditModel) save() (EditModel, tea.Cmd) {
-	if m.saving {
+	if m.Saving {
 		return m, nil
 	}
 
@@ -433,8 +422,7 @@ func (m EditModel) save() (EditModel, tea.Cmd) {
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 	}
 
-	m.saving = true
-	m.err = nil
+	m.StartSave()
 
 	if m.isNew {
 		return m, m.createNewComponent(vType)
@@ -444,51 +432,44 @@ func (m EditModel) save() (EditModel, tea.Cmd) {
 
 func (m EditModel) createNewComponent(vType shelly.VirtualComponentType) tea.Cmd {
 	name := strings.TrimSpace(m.nameInput.Value())
+	device := m.Device
 
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
-
+	return m.SaveCmdWithID(nil, func(ctx context.Context) error {
 		params := shelly.AddVirtualComponentParams{
 			Type: vType,
 			Name: name,
 		}
 
-		id, err := m.svc.AddVirtualComponent(ctx, m.device, params)
+		id, err := m.Svc.AddVirtualComponent(ctx, device, params)
 		if err != nil {
-			return messages.NewSaveError(nil, err)
+			return err
 		}
 
 		// Now set the initial value
 		switch vType {
 		case shelly.VirtualBoolean:
 			val := m.boolToggle.Value()
-			err = m.svc.SetVirtualBoolean(ctx, m.device, id, val)
+			return m.Svc.SetVirtualBoolean(ctx, device, id, val)
 		case shelly.VirtualNumber:
-			key := fmt.Sprintf("virtual:%d", id)
 			val, parseErr := strconv.ParseFloat(strings.TrimSpace(m.numberInput.Value()), 64)
 			if parseErr != nil {
-				return messages.NewSaveError(key, fmt.Errorf("invalid number: %w", parseErr))
+				return fmt.Errorf("invalid number: %w", parseErr)
 			}
-			err = m.svc.SetVirtualNumber(ctx, m.device, id, val)
+			return m.Svc.SetVirtualNumber(ctx, device, id, val)
 		case shelly.VirtualText:
 			val := m.textInput.Value()
-			err = m.svc.SetVirtualText(ctx, m.device, id, val)
+			return m.Svc.SetVirtualText(ctx, device, id, val)
 		case shelly.VirtualEnum:
 			selectedVal := m.enumDropdown.SelectedValue()
 			if selectedVal != "" {
-				err = m.svc.SetVirtualEnum(ctx, m.device, id, selectedVal)
+				return m.Svc.SetVirtualEnum(ctx, device, id, selectedVal)
 			}
 		case shelly.VirtualButton, shelly.VirtualGroup:
 			// No initial value to set for buttons/groups
 		}
 
-		key := fmt.Sprintf("virtual:%d", id)
-		if err != nil {
-			return messages.NewSaveError(key, err)
-		}
-		return messages.NewSaveResult(key)
-	}
+		return nil
+	})
 }
 
 func (m EditModel) updateExistingComponent(vType shelly.VirtualComponentType) tea.Cmd {
@@ -499,44 +480,39 @@ func (m EditModel) updateExistingComponent(vType shelly.VirtualComponentType) te
 	}
 
 	id := m.virtual.ID
+	key := m.virtual.Key
+	device := m.Device
 
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
-
-		var err error
+	return m.SaveCmdWithID(key, func(ctx context.Context) error {
 		switch vType {
 		case shelly.VirtualBoolean:
 			val := m.boolToggle.Value()
-			err = m.svc.SetVirtualBoolean(ctx, m.device, id, val)
+			return m.Svc.SetVirtualBoolean(ctx, device, id, val)
 		case shelly.VirtualNumber:
 			val, parseErr := strconv.ParseFloat(strings.TrimSpace(m.numberInput.Value()), 64)
 			if parseErr != nil {
-				return messages.NewSaveError(m.virtual.Key, fmt.Errorf("invalid number: %w", parseErr))
+				return fmt.Errorf("invalid number: %w", parseErr)
 			}
-			err = m.svc.SetVirtualNumber(ctx, m.device, id, val)
+			return m.Svc.SetVirtualNumber(ctx, device, id, val)
 		case shelly.VirtualText:
 			val := m.textInput.Value()
-			err = m.svc.SetVirtualText(ctx, m.device, id, val)
+			return m.Svc.SetVirtualText(ctx, device, id, val)
 		case shelly.VirtualEnum:
 			selectedVal := m.enumDropdown.SelectedValue()
 			if selectedVal != "" {
-				err = m.svc.SetVirtualEnum(ctx, m.device, id, selectedVal)
+				return m.Svc.SetVirtualEnum(ctx, device, id, selectedVal)
 			}
 		case shelly.VirtualButton, shelly.VirtualGroup:
 			// Buttons are triggered, not edited; groups contain other components
 		}
 
-		if err != nil {
-			return messages.NewSaveError(m.virtual.Key, err)
-		}
-		return messages.NewSaveResult(m.virtual.Key)
-	}
+		return nil
+	})
 }
 
 // View renders the edit modal.
 func (m EditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
@@ -546,16 +522,9 @@ func (m EditModel) View() string {
 		title = "New Virtual Component"
 	}
 
-	footer := "Tab: Next | Ctrl+S: Save | Esc: Cancel"
-	if m.saving {
-		footer = "Saving..."
-	}
+	footer := m.RenderSavingFooter("Tab: Next | Ctrl+S: Save | Esc: Cancel")
 
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, title, footer)
-
-	// Build content
-	return r.SetContent(m.renderFormFields()).Render()
+	return m.RenderModal(title, m.renderFormFields(), footer)
 }
 
 func (m EditModel) renderFormFields() string {
@@ -573,7 +542,7 @@ func (m EditModel) renderFormFields() string {
 	} else if m.virtual != nil {
 		// Show type info for existing
 		typeStr := virtualTypeLabel(m.virtual.Type)
-		content.WriteString(m.styles.Label.Render("Type:") + " " + m.styles.Info.Render(typeStr))
+		content.WriteString(m.Styles.Label.Render("Type:") + " " + m.Styles.Info.Render(typeStr))
 		content.WriteString("\n\n")
 
 		// Show name
@@ -581,7 +550,7 @@ func (m EditModel) renderFormFields() string {
 		if name == "" {
 			name = fmt.Sprintf("#%d", m.virtual.ID)
 		}
-		content.WriteString(m.styles.Label.Render("Name:") + " " + m.styles.Info.Render(name))
+		content.WriteString(m.Styles.Label.Render("Name:") + " " + m.Styles.Info.Render(name))
 		content.WriteString("\n\n")
 	}
 
@@ -591,14 +560,13 @@ func (m EditModel) renderFormFields() string {
 
 	// Range info for numbers
 	if rangeInfo := m.buildRangeInfo(vType); rangeInfo != "" {
-		content.WriteString("\n" + m.styles.Info.Render(rangeInfo))
+		content.WriteString("\n" + m.Styles.Info.Render(rangeInfo))
 	}
 
 	// Error display
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
 	return content.String()
@@ -617,9 +585,9 @@ func (m EditModel) renderValueField(vType shelly.VirtualComponentType) string {
 	case shelly.VirtualEnum:
 		valueView = m.enumDropdown.View()
 	case shelly.VirtualButton:
-		valueView = m.styles.Muted.Render("[Button - press Enter to trigger]")
+		valueView = m.Styles.Muted.Render("[Button - press Enter to trigger]")
 	default:
-		valueView = m.styles.Muted.Render("N/A")
+		valueView = m.Styles.Muted.Render("N/A")
 	}
 
 	return m.renderField(EditFieldValue, "Value:", valueView)
@@ -628,12 +596,12 @@ func (m EditModel) renderValueField(vType shelly.VirtualComponentType) string {
 func (m EditModel) renderField(field EditField, label, input string) string {
 	var selector, labelStr string
 
-	if m.cursor == field {
-		selector = m.styles.Selector.Render("> ")
-		labelStr = m.styles.LabelFocus.Render(label)
+	if EditField(m.Cursor) == field {
+		selector = m.Styles.Selector.Render("> ")
+		labelStr = m.Styles.LabelFocus.Render(label)
 	} else {
 		selector = "  "
-		labelStr = m.styles.Label.Render(label)
+		labelStr = m.Styles.Label.Render(label)
 	}
 
 	return selector + labelStr + " " + input

@@ -13,8 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // LoRaTestSendResultMsg signals that a LoRa test packet send completed.
@@ -50,17 +48,7 @@ var loraBandwidths = [2]int{125, 250}
 
 // LoRaEditModel represents the LoRa configuration edit modal.
 type LoRaEditModel struct {
-	ctx    context.Context
-	svc    *shelly.Service
-	device string
-
-	visible bool
-	saving  bool
-	sending bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+	editmodal.Base
 
 	// Current state (from server)
 	freq int64
@@ -76,27 +64,25 @@ type LoRaEditModel struct {
 	pendingDR   int
 	pendingTxP  int
 
-	// Focus
-	field loraEditField
+	// Sending state for test packets
+	sending bool
 }
 
 // NewLoRaEditModel creates a new LoRa configuration edit modal.
 func NewLoRaEditModel(ctx context.Context, svc *shelly.Service) LoRaEditModel {
 	return LoRaEditModel{
-		ctx:    ctx,
-		svc:    svc,
-		styles: editmodal.DefaultStyles().WithLabelWidth(14),
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles().WithLabelWidth(14),
+		},
 	}
 }
 
 // Show displays the edit modal with the given device and LoRa state.
 func (m LoRaEditModel) Show(device string, lora *shelly.TUILoRaStatus) (LoRaEditModel, tea.Cmd) {
-	m.device = device
-	m.visible = true
-	m.saving = false
+	m.Base.Show(device, loraFieldCount)
 	m.sending = false
-	m.err = nil
-	m.field = loraFieldFreq
 
 	if lora != nil {
 		m.freq = lora.Frequency
@@ -117,25 +103,24 @@ func (m LoRaEditModel) Show(device string, lora *shelly.TUILoRaStatus) (LoRaEdit
 
 // Hide hides the edit modal.
 func (m LoRaEditModel) Hide() LoRaEditModel {
-	m.visible = false
+	m.Base.Hide()
 	return m
 }
 
 // Visible returns whether the modal is visible.
 func (m LoRaEditModel) Visible() bool {
-	return m.visible
+	return m.Base.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m LoRaEditModel) SetSize(width, height int) LoRaEditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	return m
 }
 
 // Update handles messages.
 func (m LoRaEditModel) Update(msg tea.Msg) (LoRaEditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -144,70 +129,93 @@ func (m LoRaEditModel) Update(msg tea.Msg) (LoRaEditModel, tea.Cmd) {
 
 func (m LoRaEditModel) handleMessage(msg tea.Msg) (LoRaEditModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		// Success - update state and close modal
-		m.freq = m.pendingFreq
-		m.bw = m.pendingBW
-		m.dr = m.pendingDR
-		m.txp = m.pendingTxP
-		m = m.Hide()
-		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
-
 	case LoRaTestSendResultMsg:
 		m.sending = false
 		if msg.Err != nil {
-			m.err = msg.Err
+			m.Err = msg.Err
 			return m, nil
 		}
-		m.err = nil
+		m.Err = nil
 		return m, nil
 
+	case messages.SaveResultMsg:
+		saved, cmd := m.HandleSaveResult(msg)
+		if saved {
+			m.freq = m.pendingFreq
+			m.bw = m.pendingBW
+			m.dr = m.pendingDR
+			m.txp = m.pendingTxP
+		}
+		return m, cmd
+
 	case messages.NavigationMsg:
-		return m.handleNavigation(msg)
+		action := m.HandleNavigation(msg)
+		if action != editmodal.ActionNone {
+			return m.applyAction(action)
+		}
+		// Handle left/right for value adjustment
+		switch msg.Direction {
+		case messages.NavLeft:
+			return m.adjustFieldValue(-1), nil
+		case messages.NavRight:
+			return m.adjustFieldValue(1), nil
+		default:
+		}
+		return m, nil
+
+	case messages.ToggleEnableRequestMsg:
+		// LoRa does not have an enable toggle
+		return m, nil
+
 	case tea.KeyPressMsg:
-		return m.handleKey(msg)
+		action := m.HandleKey(msg)
+		if action != editmodal.ActionNone {
+			return m.applyAction(action)
+		}
+		return m.handleCustomKey(msg)
 	}
 
 	return m, nil
 }
 
-func (m LoRaEditModel) handleNavigation(msg messages.NavigationMsg) (LoRaEditModel, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
-		if m.field > 0 {
-			m.field--
-		}
-	case messages.NavDown:
-		if int(m.field) < loraFieldCount-1 {
-			m.field++
-		}
-	case messages.NavLeft:
-		return m.adjustFieldValue(-1), nil
-	case messages.NavRight:
-		return m.adjustFieldValue(1), nil
-	case messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
-		// Not applicable for this component
-	}
-	return m, nil
-}
-
-func (m LoRaEditModel) handleKey(msg tea.KeyPressMsg) (LoRaEditModel, tea.Cmd) {
-	switch msg.String() {
-	case keyconst.KeyEsc, keyconst.KeyCtrlOpenBracket:
+func (m LoRaEditModel) applyAction(action editmodal.KeyAction) (LoRaEditModel, tea.Cmd) {
+	switch action {
+	case editmodal.ActionNone:
+		return m, nil
+	case editmodal.ActionClose:
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
-
-	case keyconst.KeyEnter, keyconst.KeyCtrlS:
-		if m.field == loraFieldTestSend {
+	case editmodal.ActionSave:
+		if loraEditField(m.Cursor) == loraFieldTestSend {
 			return m.sendTestPacket()
 		}
 		return m.save()
+	case editmodal.ActionNavDown:
+		if m.Cursor < loraFieldCount-1 {
+			m.Cursor++
+		}
+		return m, nil
+	case editmodal.ActionNavUp:
+		if m.Cursor > 0 {
+			m.Cursor--
+		}
+		return m, nil
+	case editmodal.ActionNext:
+		if m.Cursor < loraFieldCount-1 {
+			m.Cursor++
+		}
+		return m, nil
+	case editmodal.ActionPrev:
+		if m.Cursor > 0 {
+			m.Cursor--
+		}
+		return m, nil
+	}
+	return m, nil
+}
 
+func (m LoRaEditModel) handleCustomKey(msg tea.KeyPressMsg) (LoRaEditModel, tea.Cmd) {
+	switch msg.String() {
 	case "T":
 		return m.sendTestPacket()
 
@@ -218,14 +226,14 @@ func (m LoRaEditModel) handleKey(msg tea.KeyPressMsg) (LoRaEditModel, tea.Cmd) {
 		return m.adjustFieldValue(1), nil
 
 	case "j", keyconst.KeyDown:
-		if int(m.field) < loraFieldCount-1 {
-			m.field++
+		if m.Cursor < loraFieldCount-1 {
+			m.Cursor++
 		}
 		return m, nil
 
 	case "k", keyconst.KeyUp:
-		if m.field > 0 {
-			m.field--
+		if m.Cursor > 0 {
+			m.Cursor--
 		}
 		return m, nil
 	}
@@ -234,11 +242,11 @@ func (m LoRaEditModel) handleKey(msg tea.KeyPressMsg) (LoRaEditModel, tea.Cmd) {
 }
 
 func (m LoRaEditModel) adjustFieldValue(delta int) LoRaEditModel {
-	if m.saving || m.sending {
+	if m.Saving || m.sending {
 		return m
 	}
 
-	switch m.field {
+	switch loraEditField(m.Cursor) {
 	case loraFieldFreq:
 		newFreq := m.pendingFreq + int64(delta)*loraFreqStep
 		if newFreq >= loraFreqMin && newFreq <= loraFreqMax {
@@ -276,7 +284,7 @@ func (m LoRaEditModel) hasChanges() bool {
 }
 
 func (m LoRaEditModel) save() (LoRaEditModel, tea.Cmd) {
-	if m.saving || m.sending {
+	if m.Saving || m.sending {
 		return m, nil
 	}
 
@@ -286,13 +294,8 @@ func (m LoRaEditModel) save() (LoRaEditModel, tea.Cmd) {
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 	}
 
-	m.saving = true
-	m.err = nil
+	m.StartSave()
 
-	return m, m.createSaveCmd()
-}
-
-func (m LoRaEditModel) createSaveCmd() tea.Cmd {
 	cfg := make(map[string]any)
 	if m.pendingFreq != m.freq {
 		cfg["freq"] = m.pendingFreq
@@ -307,43 +310,36 @@ func (m LoRaEditModel) createSaveCmd() tea.Cmd {
 		cfg["txp"] = m.pendingTxP
 	}
 
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
-
-		err := m.svc.SetLoRaConfig(ctx, m.device, cfg)
-		if err != nil {
-			return messages.NewSaveError(nil, err)
-		}
-		return messages.NewSaveResult(nil)
-	}
+	cmd := m.SaveCmd(func(ctx context.Context) error {
+		return m.Svc.SetLoRaConfig(ctx, m.Device, cfg)
+	})
+	return m, cmd
 }
 
 func (m LoRaEditModel) sendTestPacket() (LoRaEditModel, tea.Cmd) {
-	if m.saving || m.sending {
+	if m.Saving || m.sending {
 		return m, nil
 	}
 
 	m.sending = true
-	m.err = nil
+	m.Err = nil
 
 	return m, func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		ctx, cancel := context.WithTimeout(m.Ctx, 30*time.Second)
 		defer cancel()
 
-		err := m.svc.SendLoRaTestPacket(ctx, m.device)
+		err := m.Svc.SendLoRaTestPacket(ctx, m.Device)
 		return LoRaTestSendResultMsg{Err: err}
 	}
 }
 
 // View renders the edit modal.
 func (m LoRaEditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
 	footer := m.buildFooter()
-	r := rendering.NewModal(m.width, m.height, "LoRa Configuration", footer)
 
 	var content strings.Builder
 
@@ -371,17 +367,16 @@ func (m LoRaEditModel) View() string {
 	content.WriteString(m.renderTestSendButton())
 
 	// Error display
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
-	return r.SetContent(content.String()).Render()
+	return m.RenderModal("LoRa Configuration", content.String(), footer)
 }
 
 func (m LoRaEditModel) buildFooter() string {
-	if m.saving {
+	if m.Saving {
 		return footerSaving
 	}
 	if m.sending {
@@ -393,96 +388,96 @@ func (m LoRaEditModel) buildFooter() string {
 func (m LoRaEditModel) renderStatus() string {
 	var content strings.Builder
 
-	content.WriteString(m.styles.Label.Render("Status:"))
+	content.WriteString(m.Styles.Label.Render("Status:"))
 	content.WriteString(" ")
-	content.WriteString(m.styles.StatusOn.Render("● Active"))
+	content.WriteString(m.Styles.StatusOn.Render("● Active"))
 
 	// Last RSSI/SNR if available
 	if m.rssi != 0 {
 		content.WriteString("\n")
-		content.WriteString(m.styles.Label.Render("Last RSSI:"))
+		content.WriteString(m.Styles.Label.Render("Last RSSI:"))
 		content.WriteString(" ")
-		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d dBm", m.rssi)))
+		content.WriteString(m.Styles.Value.Render(fmt.Sprintf("%d dBm", m.rssi)))
 		content.WriteString("  ")
-		content.WriteString(m.styles.Label.Render("SNR:"))
+		content.WriteString(m.Styles.Label.Render("SNR:"))
 		content.WriteString(" ")
-		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%.1f dB", m.snr)))
+		content.WriteString(m.Styles.Value.Render(fmt.Sprintf("%.1f dB", m.snr)))
 	}
 
 	return content.String()
 }
 
 func (m LoRaEditModel) renderFreqField() string {
-	selected := m.field == loraFieldFreq
+	selected := loraEditField(m.Cursor) == loraFieldFreq
 	freqMHz := float64(m.pendingFreq) / 1000000
 
-	value := m.styles.Value.Render(fmt.Sprintf("%.2f MHz", freqMHz))
+	value := m.Styles.Value.Render(fmt.Sprintf("%.2f MHz", freqMHz))
 	if selected {
-		value += m.styles.Muted.Render("  ◀ ▶")
+		value += m.Styles.Muted.Render("  ◀ ▶")
 	}
 	if m.pendingFreq != m.freq {
-		value += m.styles.Warning.Render(" *")
+		value += m.Styles.Warning.Render(" *")
 	}
 
-	return m.styles.RenderFieldRow(selected, "Frequency:", value)
+	return m.Styles.RenderFieldRow(selected, "Frequency:", value)
 }
 
 func (m LoRaEditModel) renderBWField() string {
-	selected := m.field == loraFieldBW
+	selected := loraEditField(m.Cursor) == loraFieldBW
 
-	value := m.styles.Value.Render(fmt.Sprintf("%d kHz", m.pendingBW))
+	value := m.Styles.Value.Render(fmt.Sprintf("%d kHz", m.pendingBW))
 	if selected {
-		value += m.styles.Muted.Render("  ◀ ▶")
+		value += m.Styles.Muted.Render("  ◀ ▶")
 	}
 	if m.pendingBW != m.bw {
-		value += m.styles.Warning.Render(" *")
+		value += m.Styles.Warning.Render(" *")
 	}
 
-	return m.styles.RenderFieldRow(selected, "Bandwidth:", value)
+	return m.Styles.RenderFieldRow(selected, "Bandwidth:", value)
 }
 
 func (m LoRaEditModel) renderDRField() string {
-	selected := m.field == loraFieldDR
+	selected := loraEditField(m.Cursor) == loraFieldDR
 
-	value := m.styles.Value.Render(fmt.Sprintf("SF%d", m.pendingDR))
+	value := m.Styles.Value.Render(fmt.Sprintf("SF%d", m.pendingDR))
 	if selected {
-		value += m.styles.Muted.Render("  ◀ ▶")
+		value += m.Styles.Muted.Render("  ◀ ▶")
 	}
 	if m.pendingDR != m.dr {
-		value += m.styles.Warning.Render(" *")
+		value += m.Styles.Warning.Render(" *")
 	}
 
-	return m.styles.RenderFieldRow(selected, "Data Rate:", value)
+	return m.Styles.RenderFieldRow(selected, "Data Rate:", value)
 }
 
 func (m LoRaEditModel) renderTxPField() string {
-	selected := m.field == loraFieldTxP
+	selected := loraEditField(m.Cursor) == loraFieldTxP
 
-	value := m.styles.Value.Render(fmt.Sprintf("%d dBm", m.pendingTxP))
+	value := m.Styles.Value.Render(fmt.Sprintf("%d dBm", m.pendingTxP))
 	if selected {
-		value += m.styles.Muted.Render("  ◀ ▶")
+		value += m.Styles.Muted.Render("  ◀ ▶")
 	}
 	if m.pendingTxP != m.txp {
-		value += m.styles.Warning.Render(" *")
+		value += m.Styles.Warning.Render(" *")
 	}
 
-	return m.styles.RenderFieldRow(selected, "TX Power:", value)
+	return m.Styles.RenderFieldRow(selected, "TX Power:", value)
 }
 
 func (m LoRaEditModel) renderChangeIndicator() string {
-	return m.styles.Warning.Render("  ⚡ Configuration changed — Enter to save")
+	return m.Styles.Warning.Render("  ⚡ Configuration changed — Enter to save")
 }
 
 func (m LoRaEditModel) renderTestSendButton() string {
-	selected := m.field == loraFieldTestSend
+	selected := loraEditField(m.Cursor) == loraFieldTestSend
 
-	selector := m.styles.RenderSelector(selected)
+	selector := m.Styles.RenderSelector(selected)
 	label := "Send Test Packet"
 	if m.sending {
 		label = "Sending..."
 	}
 	if selected {
-		return selector + m.styles.ButtonFocus.Render(label)
+		return selector + m.Styles.ButtonFocus.Render(label)
 	}
-	return selector + m.styles.Button.Render(label)
+	return selector + m.Styles.Button.Render(label)
 }

@@ -14,7 +14,7 @@ func TestNewZWaveEditModel(t *testing.T) {
 	t.Parallel()
 	m := NewZWaveEditModel()
 
-	if m.visible {
+	if m.Visible() {
 		t.Error("should not be visible initially")
 	}
 	if len(m.modes) != 3 {
@@ -35,11 +35,11 @@ func TestZWaveEditModel_Show(t *testing.T) {
 
 	m, _ = m.Show(testDevice, zw)
 
-	if !m.visible {
+	if !m.Visible() {
 		t.Error("should be visible after Show")
 	}
-	if m.device != testDevice {
-		t.Errorf("device = %q, want %q", m.device, testDevice)
+	if m.Device != testDevice {
+		t.Errorf("device = %q, want %q", m.Device, testDevice)
 	}
 	if m.deviceModel != "SPSW-001PE16ZW" {
 		t.Errorf("deviceModel = %q, want SPSW-001PE16ZW", m.deviceModel)
@@ -53,8 +53,8 @@ func TestZWaveEditModel_Show(t *testing.T) {
 	if !m.supportsLR {
 		t.Error("supportsLR should be true")
 	}
-	if m.field != zwaveFieldInclusion {
-		t.Errorf("field = %d, want %d", m.field, zwaveFieldInclusion)
+	if zwaveEditField(m.Cursor) != zwaveFieldInclusion {
+		t.Errorf("Cursor = %d, want %d", m.Cursor, zwaveFieldInclusion)
 	}
 	if m.inclusionIdx != 0 {
 		t.Errorf("inclusionIdx = %d, want 0", m.inclusionIdx)
@@ -87,7 +87,7 @@ func TestZWaveEditModel_Show_NilStatus(t *testing.T) {
 
 	m, _ = m.Show(testDevice, nil)
 
-	if !m.visible {
+	if !m.Visible() {
 		t.Error("should be visible even with nil status")
 	}
 	if m.deviceModel != "" {
@@ -104,7 +104,7 @@ func TestZWaveEditModel_Hide(t *testing.T) {
 
 	m = m.Hide()
 
-	if m.visible {
+	if m.Visible() {
 		t.Error("should not be visible after Hide")
 	}
 	if m.pendingReset {
@@ -120,7 +120,7 @@ func TestZWaveEditModel_Visible(t *testing.T) {
 		t.Error("should not be visible initially")
 	}
 
-	m.visible = true
+	m, _ = m.Show(testDevice, nil)
 	if !m.Visible() {
 		t.Error("should be visible")
 	}
@@ -132,11 +132,11 @@ func TestZWaveEditModel_SetSize(t *testing.T) {
 
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("Width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("Height = %d, want 50", m.Height)
 	}
 }
 
@@ -145,49 +145,49 @@ func TestZWaveEditModel_Navigation(t *testing.T) {
 	m := showTestZWaveEditModel()
 
 	// Start on inclusion field
-	if m.field != zwaveFieldInclusion {
-		t.Errorf("initial field = %d, want %d", m.field, zwaveFieldInclusion)
+	if zwaveEditField(m.Cursor) != zwaveFieldInclusion {
+		t.Errorf("initial Cursor = %d, want %d", m.Cursor, zwaveFieldInclusion)
 	}
 
 	// Navigate down through all fields
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
-	if m.field != zwaveFieldExclusion {
-		t.Errorf("after j, field = %d, want %d", m.field, zwaveFieldExclusion)
+	if zwaveEditField(m.Cursor) != zwaveFieldExclusion {
+		t.Errorf("after j, Cursor = %d, want %d", m.Cursor, zwaveFieldExclusion)
 	}
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
-	if m.field != zwaveFieldConfig {
-		t.Errorf("after j, field = %d, want %d", m.field, zwaveFieldConfig)
+	if zwaveEditField(m.Cursor) != zwaveFieldConfig {
+		t.Errorf("after j, Cursor = %d, want %d", m.Cursor, zwaveFieldConfig)
 	}
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
-	if m.field != zwaveFieldReset {
-		t.Errorf("after j, field = %d, want %d", m.field, zwaveFieldReset)
+	if zwaveEditField(m.Cursor) != zwaveFieldReset {
+		t.Errorf("after j, Cursor = %d, want %d", m.Cursor, zwaveFieldReset)
 	}
 
 	// Can't go past last field
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
-	if m.field != zwaveFieldReset {
-		t.Errorf("past bottom, field = %d, want %d", m.field, zwaveFieldReset)
+	if zwaveEditField(m.Cursor) != zwaveFieldReset {
+		t.Errorf("past bottom, Cursor = %d, want %d", m.Cursor, zwaveFieldReset)
 	}
 
 	// Navigate up
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'k'})
-	if m.field != zwaveFieldConfig {
-		t.Errorf("after k, field = %d, want %d", m.field, zwaveFieldConfig)
+	if zwaveEditField(m.Cursor) != zwaveFieldConfig {
+		t.Errorf("after k, Cursor = %d, want %d", m.Cursor, zwaveFieldConfig)
 	}
 
 	// Navigate up to top
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'k'})
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'k'})
-	if m.field != zwaveFieldInclusion {
-		t.Errorf("at top, field = %d, want %d", m.field, zwaveFieldInclusion)
+	if zwaveEditField(m.Cursor) != zwaveFieldInclusion {
+		t.Errorf("at top, Cursor = %d, want %d", m.Cursor, zwaveFieldInclusion)
 	}
 
 	// Can't go past first field
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'k'})
-	if m.field != zwaveFieldInclusion {
-		t.Errorf("past top, field = %d, want %d", m.field, zwaveFieldInclusion)
+	if zwaveEditField(m.Cursor) != zwaveFieldInclusion {
+		t.Errorf("past top, Cursor = %d, want %d", m.Cursor, zwaveFieldInclusion)
 	}
 }
 
@@ -196,20 +196,20 @@ func TestZWaveEditModel_NavigationMsg(t *testing.T) {
 	m := showTestZWaveEditModel()
 
 	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavDown})
-	if m.field != zwaveFieldExclusion {
-		t.Errorf("after NavDown, field = %d, want %d", m.field, zwaveFieldExclusion)
+	if zwaveEditField(m.Cursor) != zwaveFieldExclusion {
+		t.Errorf("after NavDown, Cursor = %d, want %d", m.Cursor, zwaveFieldExclusion)
 	}
 
 	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavUp})
-	if m.field != zwaveFieldInclusion {
-		t.Errorf("after NavUp, field = %d, want %d", m.field, zwaveFieldInclusion)
+	if zwaveEditField(m.Cursor) != zwaveFieldInclusion {
+		t.Errorf("after NavUp, Cursor = %d, want %d", m.Cursor, zwaveFieldInclusion)
 	}
 }
 
 func TestZWaveEditModel_NavigationClearsPendingReset(t *testing.T) {
 	t.Parallel()
 	m := showTestZWaveEditModel()
-	m.field = zwaveFieldReset
+	m.Cursor = int(zwaveFieldReset)
 	m.pendingReset = true
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'k'})
@@ -222,7 +222,7 @@ func TestZWaveEditModel_NavigationClearsPendingReset(t *testing.T) {
 func TestZWaveEditModel_NavigationMsgClearsPendingReset(t *testing.T) {
 	t.Parallel()
 	m := showTestZWaveEditModel()
-	m.field = zwaveFieldReset
+	m.Cursor = int(zwaveFieldReset)
 	m.pendingReset = true
 
 	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavUp})
@@ -318,7 +318,7 @@ func TestZWaveEditModel_InclusionModeNavLeftRight(t *testing.T) {
 func TestZWaveEditModel_InclusionModeOnlyOnInclusionField(t *testing.T) {
 	t.Parallel()
 	m := showTestZWaveEditModel()
-	m.field = zwaveFieldExclusion // Not on inclusion field
+	m.Cursor = int(zwaveFieldExclusion) // Not on inclusion field
 
 	originalIdx := m.inclusionIdx
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
@@ -331,14 +331,14 @@ func TestZWaveEditModel_InclusionModeOnlyOnInclusionField(t *testing.T) {
 func TestZWaveEditModel_ResetConfirmation(t *testing.T) {
 	t.Parallel()
 	m := showTestZWaveEditModel()
-	m.field = zwaveFieldReset
+	m.Cursor = int(zwaveFieldReset)
 
 	// First press - request confirmation
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if !m.pendingReset {
 		t.Error("should set pendingReset on first press")
 	}
-	if !m.visible {
+	if !m.Visible() {
 		t.Error("should still be visible")
 	}
 
@@ -347,7 +347,7 @@ func TestZWaveEditModel_ResetConfirmation(t *testing.T) {
 	if m.pendingReset {
 		t.Error("pendingReset should be false after confirmation")
 	}
-	if m.visible {
+	if m.Visible() {
 		t.Error("should close after second press")
 	}
 	if cmd == nil {
@@ -358,7 +358,7 @@ func TestZWaveEditModel_ResetConfirmation(t *testing.T) {
 func TestZWaveEditModel_ResetNonDestructiveOnOtherFields(t *testing.T) {
 	t.Parallel()
 	m := showTestZWaveEditModel()
-	m.field = zwaveFieldExclusion
+	m.Cursor = int(zwaveFieldExclusion)
 
 	// Enter on non-reset fields should not trigger reset
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -373,7 +373,7 @@ func TestZWaveEditModel_EscClose(t *testing.T) {
 
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
-	if m.visible {
+	if m.Visible() {
 		t.Error("should not be visible after Esc")
 	}
 	if cmd == nil {
@@ -387,7 +387,7 @@ func TestZWaveEditModel_CtrlBracketClose(t *testing.T) {
 
 	m, cmd := m.Update(tea.KeyPressMsg{Mod: tea.ModCtrl, Code: '['})
 
-	if m.visible {
+	if m.Visible() {
 		t.Error("should not be visible after Ctrl+[")
 	}
 	if cmd == nil {
@@ -401,7 +401,7 @@ func TestZWaveEditModel_UpdateNotVisible(t *testing.T) {
 
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	if m.visible {
+	if m.Visible() {
 		t.Error("should not become visible")
 	}
 	if cmd != nil {
@@ -463,7 +463,7 @@ func TestZWaveEditModel_View_PendingReset(t *testing.T) {
 	m = m.SetSize(80, 40)
 	zw := &shelly.TUIZWaveStatus{DeviceModel: "SNSW-001P16ZW"}
 	m, _ = m.Show(testDevice, zw)
-	m.field = zwaveFieldReset
+	m.Cursor = int(zwaveFieldReset)
 	m.pendingReset = true
 
 	view := m.View()
@@ -478,7 +478,7 @@ func TestZWaveEditModel_View_FocusedExclusion(t *testing.T) {
 	m = m.SetSize(80, 40)
 	zw := &shelly.TUIZWaveStatus{DeviceModel: "SNSW-001P16ZW"}
 	m, _ = m.Show(testDevice, zw)
-	m.field = zwaveFieldExclusion
+	m.Cursor = int(zwaveFieldExclusion)
 
 	view := m.View()
 	if view == "" {
@@ -492,7 +492,7 @@ func TestZWaveEditModel_View_FocusedConfig(t *testing.T) {
 	m = m.SetSize(80, 40)
 	zw := &shelly.TUIZWaveStatus{DeviceModel: "SNSW-001P16ZW"}
 	m, _ = m.Show(testDevice, zw)
-	m.field = zwaveFieldConfig
+	m.Cursor = int(zwaveFieldConfig)
 
 	view := m.View()
 	if view == "" {
@@ -509,17 +509,17 @@ func TestZWaveEditModel_Footer(t *testing.T) {
 	}{
 		{
 			name:     "inclusion mode",
-			setup:    func(m *ZWaveEditModel) { m.field = zwaveFieldInclusion },
+			setup:    func(m *ZWaveEditModel) { m.Cursor = int(zwaveFieldInclusion) },
 			contains: "mode",
 		},
 		{
 			name:     "exclusion",
-			setup:    func(m *ZWaveEditModel) { m.field = zwaveFieldExclusion },
+			setup:    func(m *ZWaveEditModel) { m.Cursor = int(zwaveFieldExclusion) },
 			contains: "Navigate",
 		},
 		{
 			name:     "config",
-			setup:    func(m *ZWaveEditModel) { m.field = zwaveFieldConfig },
+			setup:    func(m *ZWaveEditModel) { m.Cursor = int(zwaveFieldConfig) },
 			contains: "Navigate",
 		},
 		{

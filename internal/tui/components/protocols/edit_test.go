@@ -58,8 +58,8 @@ func TestMQTTEditModel_SetSize(t *testing.T) {
 	model := NewMQTTEditModel(ctx, svc)
 	model = model.SetSize(100, 50)
 
-	testutil.AssertEqual(t, 100, model.width)
-	testutil.AssertEqual(t, 50, model.height)
+	testutil.AssertEqual(t, 100, model.Width)
+	testutil.AssertEqual(t, 50, model.Height)
 }
 
 func TestMQTTEditModel_Init(t *testing.T) {
@@ -128,16 +128,16 @@ func TestMQTTEditModel_Update_TabNavigation(t *testing.T) {
 	model = model.Show("192.168.1.100", &MQTTData{})
 
 	// Start at enable field
-	testutil.AssertEqual(t, MQTTFieldEnable, model.cursor)
+	testutil.AssertEqual(t, int(MQTTFieldEnable), model.Cursor)
 
 	// Tab to next field
 	keyMsg := tea.KeyPressMsg{Code: tea.KeyTab}
 	updated, _ := model.Update(keyMsg)
-	testutil.AssertEqual(t, MQTTFieldServer, updated.cursor)
+	testutil.AssertEqual(t, int(MQTTFieldServer), updated.Cursor)
 
 	// Tab again
 	updated, _ = updated.Update(keyMsg)
-	testutil.AssertEqual(t, MQTTFieldUser, updated.cursor)
+	testutil.AssertEqual(t, int(MQTTFieldUser), updated.Cursor)
 }
 
 func TestMQTTEditModel_Update_ShiftTabNavigation(t *testing.T) {
@@ -152,12 +152,12 @@ func TestMQTTEditModel_Update_ShiftTabNavigation(t *testing.T) {
 	// Move to second field first
 	tabMsg := tea.KeyPressMsg{Code: tea.KeyTab}
 	model, _ = model.Update(tabMsg)
-	testutil.AssertEqual(t, MQTTFieldServer, model.cursor)
+	testutil.AssertEqual(t, int(MQTTFieldServer), model.Cursor)
 
 	// Shift+Tab back
 	shiftTabMsg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	updated, _ := model.Update(shiftTabMsg)
-	testutil.AssertEqual(t, MQTTFieldEnable, updated.cursor)
+	testutil.AssertEqual(t, int(MQTTFieldEnable), updated.Cursor)
 }
 
 func TestMQTTEditModel_ValidationServerRequired(t *testing.T) {
@@ -175,8 +175,8 @@ func TestMQTTEditModel_ValidationServerRequired(t *testing.T) {
 	// Try to save
 	updated, _ := model.save()
 
-	testutil.AssertError(t, updated.err)
-	testutil.AssertContains(t, updated.err.Error(), "server address is required")
+	testutil.AssertError(t, updated.Err)
+	testutil.AssertContains(t, updated.Err.Error(), "server address is required")
 }
 
 func TestMQTTEditModel_ValidationTopicPrefix(t *testing.T) {
@@ -213,12 +213,12 @@ func TestMQTTEditModel_ValidationTopicPrefix(t *testing.T) {
 			updated, _ := model.save()
 
 			if tc.wantErr {
-				testutil.AssertError(t, updated.err)
-				testutil.AssertContains(t, updated.err.Error(), tc.errContains)
-			} else if updated.err != nil && !updated.saving {
+				testutil.AssertError(t, updated.Err)
+				testutil.AssertContains(t, updated.Err.Error(), tc.errContains)
+			} else if updated.Err != nil && !updated.Saving {
 				// Note: saving will still fail because we're using a nil service
 				// but the validation should pass
-				t.Errorf("unexpected validation error: %v", updated.err)
+				t.Errorf("unexpected validation error: %v", updated.Err)
 			}
 		})
 	}
@@ -319,14 +319,14 @@ func TestMQTTEditModel_SaveResultMsg(t *testing.T) {
 
 	model := NewMQTTEditModel(ctx, svc)
 	model = model.Show("192.168.1.100", &MQTTData{})
-	model.saving = true
+	model.Saving = true
 
 	// Simulate successful save result
 	saveMsg := MQTTEditSaveResultMsg{Err: nil}
 	updated, cmd := model.Update(saveMsg)
 
 	testutil.AssertFalse(t, updated.IsVisible(), "should be hidden after save")
-	testutil.AssertFalse(t, updated.saving, "saving should be false")
+	testutil.AssertFalse(t, updated.Saving, "saving should be false")
 	if cmd == nil {
 		t.Error("should return close cmd")
 	}

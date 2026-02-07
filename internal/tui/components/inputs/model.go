@@ -16,7 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -90,7 +90,7 @@ type InputAction struct {
 
 // Model displays input settings for a device.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx           context.Context
 	svc           *shelly.Service
 	fileCache     *cache.FileCache
@@ -157,7 +157,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:     helpers.NewSizable(6, panel.NewScroller(0, 10)),
+		Sizable:     panel.NewSizable(6, panel.NewScroller(0, 10)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
@@ -276,6 +276,8 @@ func (m Model) SetSize(width, height int) Model {
 // SetEditModalSize sets the edit modal dimensions.
 // This should be called with screen-based dimensions when the modal is visible.
 func (m Model) SetEditModalSize(width, height int) Model {
+	m.ModalWidth = width
+	m.ModalHeight = height
 	if m.editing {
 		m.editModal = m.editModal.SetSize(width, height)
 	}
@@ -561,7 +563,8 @@ func (m Model) handleEditOpenKey() (Model, tea.Cmd) {
 	if len(m.inputs) > 0 && !m.loading {
 		input := m.inputs[m.Scroller.Cursor()]
 		m.editing = true
-		m.editModal = m.editModal.SetSize(m.Width, m.Height)
+		w, h := m.EditModalDims()
+		m.editModal = m.editModal.SetSize(w, h)
 		var cmd tea.Cmd
 		m.editModal, cmd = m.editModal.Show(m.device, input.ID)
 		return m, tea.Batch(cmd, func() tea.Msg {
@@ -688,7 +691,7 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		footer := "e:edit a:actions T:test R:refresh"
+		footer := theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "a", Desc: "actions"}, {Key: "T", Desc: "test"}, {Key: "R", Desc: "refresh"}}, keys.FooterHintWidth(m.Width)))
 		if cs := m.cacheStatus.View(); cs != "" {
 			footer += " | " + cs
 		}
@@ -774,7 +777,11 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll e:edit r:refresh"
+	return keys.FormatHints([]keys.Hint{
+		{Key: "j/k", Desc: "scroll"},
+		{Key: "e", Desc: "edit"},
+		{Key: "r", Desc: "refresh"},
+	}, keys.FooterHintWidth(m.Width))
 }
 
 // SelectedInput returns the currently selected input, if any.

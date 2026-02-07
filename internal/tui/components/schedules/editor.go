@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -192,7 +193,7 @@ func (m EditorModel) View() string {
 		SetTitle("Schedule Details").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex).
-		SetFooter(theme.StyledKeybindings("j/k:scroll g/G:top/end esc:close"))
+		SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "j/k", Desc: "scroll"}, {Key: "g/G", Desc: "top/end"}, {Key: "esc", Desc: "close"}}, keys.FooterHintWidth(m.width))))
 
 	if m.schedule == nil {
 		r.SetContent(styles.EmptyStateWithBorder("No schedule selected", m.width, m.height))

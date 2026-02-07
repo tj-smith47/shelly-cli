@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 )
 
@@ -259,5 +261,243 @@ func TestBindingSection(t *testing.T) {
 	}
 	if len(section.Bindings) != 1 {
 		t.Errorf("expected 1 binding, got %d", len(section.Bindings))
+	}
+}
+
+const testFilterToggle = "toggle"
+
+func TestSearchActivation(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.SetSize(120, 60)
+	m = m.SetContext(keys.ContextDevices)
+	m = m.Show()
+
+	if m.Searching() {
+		t.Error("should not be searching initially")
+	}
+
+	// Press / to activate search
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/'})
+
+	if !m.Searching() {
+		t.Error("should be searching after pressing /")
+	}
+}
+
+func TestSearchEscapeExitsSearch(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.SetSize(120, 60)
+	m = m.SetContext(keys.ContextDevices)
+	m = m.Show()
+
+	// Activate search
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/'})
+	if !m.Searching() {
+		t.Fatal("should be searching")
+	}
+
+	// Press Escape to exit search
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if m.Searching() {
+		t.Error("should not be searching after Escape")
+	}
+	if !m.Visible() {
+		t.Error("help should still be visible after exiting search")
+	}
+	if m.searchFilter != "" {
+		t.Error("search filter should be cleared after Escape")
+	}
+}
+
+func TestSearchEnterConfirmsFilter(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.SetSize(120, 60)
+	m = m.SetContext(keys.ContextDevices)
+	m = m.Show()
+
+	// Activate search and type something
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/'})
+	m.searchInput.SetValue(testFilterToggle)
+	m.searchFilter = testFilterToggle
+
+	// Press Enter to confirm
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if m.Searching() {
+		t.Error("should not be in search mode after Enter")
+	}
+	if m.searchFilter != testFilterToggle {
+		t.Errorf("search filter should be preserved after Enter, got %q", m.searchFilter)
+	}
+	if !m.Visible() {
+		t.Error("help should still be visible")
+	}
+}
+
+func TestFilterSections(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m.searchFilter = "quit"
+
+	sections := []BindingSection{
+		{
+			Name: "Global",
+			Bindings: []keys.KeyBinding{
+				{Key: "q", Action: keys.ActionQuit, Desc: "Quit"},
+				{Key: "?", Action: keys.ActionHelp, Desc: "Show help"},
+				{Key: "/", Action: keys.ActionFilter, Desc: "Filter"},
+			},
+		},
+	}
+
+	filtered := m.filterSections(sections)
+
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 section, got %d", len(filtered))
+	}
+	if len(filtered[0].Bindings) != 1 {
+		t.Fatalf("expected 1 binding, got %d", len(filtered[0].Bindings))
+	}
+	if filtered[0].Bindings[0].Key != "q" {
+		t.Errorf("expected key 'q', got %q", filtered[0].Bindings[0].Key)
+	}
+}
+
+func TestFilterSectionsMatchesKey(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m.searchFilter = "ctrl"
+
+	sections := []BindingSection{
+		{
+			Name: "Global",
+			Bindings: []keys.KeyBinding{
+				{Key: "ctrl+r", Action: keys.ActionRefreshAll, Desc: "Refresh all"},
+				{Key: "q", Action: keys.ActionQuit, Desc: "Quit"},
+			},
+		},
+	}
+
+	filtered := m.filterSections(sections)
+
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 section, got %d", len(filtered))
+	}
+	if len(filtered[0].Bindings) != 1 {
+		t.Errorf("expected 1 binding matching 'ctrl', got %d", len(filtered[0].Bindings))
+	}
+}
+
+func TestFilterSectionsNoMatch(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m.searchFilter = "xyznonexistent"
+
+	sections := []BindingSection{
+		{
+			Name: "Global",
+			Bindings: []keys.KeyBinding{
+				{Key: "q", Action: keys.ActionQuit, Desc: "Quit"},
+			},
+		},
+	}
+
+	filtered := m.filterSections(sections)
+
+	if len(filtered) != 0 {
+		t.Errorf("expected 0 sections, got %d", len(filtered))
+	}
+}
+
+func TestFilterSectionsCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m.searchFilter = "QUIT"
+
+	sections := []BindingSection{
+		{
+			Name: "Global",
+			Bindings: []keys.KeyBinding{
+				{Key: "q", Action: keys.ActionQuit, Desc: "Quit"},
+				{Key: "?", Action: keys.ActionHelp, Desc: "Show help"},
+			},
+		},
+	}
+
+	filtered := m.filterSections(sections)
+
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 section, got %d", len(filtered))
+	}
+	if len(filtered[0].Bindings) != 1 {
+		t.Errorf("expected 1 binding, got %d", len(filtered[0].Bindings))
+	}
+}
+
+func TestViewWithSearchFilter(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.SetSize(120, 60)
+	m = m.SetContext(keys.ContextDevices)
+	m = m.Show()
+
+	// Set a filter
+	m.searchFilter = testFilterToggle
+
+	view := m.View()
+	if !strings.Contains(view, testFilterToggle) {
+		t.Error("view should contain filter text 'toggle'")
+	}
+}
+
+func TestViewNoMatchesMessage(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.SetSize(120, 60)
+	m = m.SetContext(keys.ContextDevices)
+	m = m.Show()
+
+	m.searchFilter = "xyznonexistent"
+
+	view := m.View()
+	if !strings.Contains(view, "No matching") {
+		t.Error("view should show 'No matching' message for empty results")
+	}
+}
+
+func TestShowClearsSearch(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m.searchFilter = "old search"
+	m.searching = true
+
+	m = m.Show()
+
+	if m.searchFilter != "" {
+		t.Error("Show should clear search filter")
+	}
+	if m.Searching() {
+		t.Error("Show should exit search mode")
+	}
+}
+
+func TestHideClearsSearch(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.Show()
+	m.searchFilter = "test"
+	m.searching = true
+
+	m = m.Hide()
+
+	if m.searchFilter != "" {
+		t.Error("Hide should clear search filter")
+	}
+	if m.Searching() {
+		t.Error("Hide should exit search mode")
 	}
 }

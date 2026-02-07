@@ -5,16 +5,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // EditSaveResultMsg is an alias for the shared save result message.
@@ -28,15 +24,7 @@ type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the cloud configuration edit modal.
 type EditModel struct {
-	ctx     context.Context
-	svc     *shelly.Service
-	device  string
-	visible bool
-	saving  bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+	editmodal.Base
 
 	// Cloud state
 	connected bool   // Current connection status
@@ -50,18 +38,17 @@ type EditModel struct {
 // NewEditModel creates a new cloud configuration edit modal.
 func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	return EditModel{
-		ctx:    ctx,
-		svc:    svc,
-		styles: editmodal.DefaultStyles().WithLabelWidth(12),
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles().WithLabelWidth(12),
+		},
 	}
 }
 
 // Show displays the edit modal with the given device and cloud state.
 func (m EditModel) Show(device string, connected, enabled bool, server string) EditModel {
-	m.device = device
-	m.visible = true
-	m.saving = false
-	m.err = nil
+	m.Base.Show(device, 0)
 	m.connected = connected
 	m.enabled = enabled
 	m.server = server
@@ -72,30 +59,24 @@ func (m EditModel) Show(device string, connected, enabled bool, server string) E
 
 // Hide hides the edit modal.
 func (m EditModel) Hide() EditModel {
-	m.visible = false
+	m.Base.Hide()
 	return m
 }
 
 // Visible returns whether the modal is visible.
 func (m EditModel) Visible() bool {
-	return m.visible
+	return m.Base.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m EditModel) SetSize(width, height int) EditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	return m
-}
-
-// Init returns the initial command.
-func (m EditModel) Init() tea.Cmd {
-	return nil
 }
 
 // Update handles messages.
 func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -105,55 +86,60 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+		saved, cmd := m.HandleSaveResult(msg)
+		if saved {
+			m.enabled = m.pendingEnabled
 		}
-		// Success - update state and close modal
-		m.enabled = m.pendingEnabled
-		m = m.Hide()
-		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+		return m, cmd
 
 	// Action messages from context system
 	case messages.NavigationMsg:
 		// Single toggle component - navigation not applicable
 		return m, nil
 	case messages.ToggleEnableRequestMsg:
-		if !m.saving {
+		if !m.Saving {
 			m.pendingEnabled = !m.pendingEnabled
 		}
 		return m, nil
 	case tea.KeyPressMsg:
-		return m.handleKey(msg)
+		action := m.HandleKey(msg)
+		if action != editmodal.ActionNone {
+			return m.applyAction(action)
+		}
+		return m.handleCustomKey(msg)
 	}
 
 	return m, nil
 }
 
-func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
-	// Modal-specific keys not covered by action messages
-	switch msg.String() {
-	case keyconst.KeyEsc, "ctrl+[":
+func (m EditModel) applyAction(action editmodal.KeyAction) (EditModel, tea.Cmd) {
+	switch action {
+	case editmodal.ActionNone:
+		return m, nil
+	case editmodal.ActionClose:
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
-
-	case keyconst.KeyEnter:
+	case editmodal.ActionSave:
 		return m.save()
+	case editmodal.ActionNext, editmodal.ActionNavDown:
+		// Single toggle, no navigation needed
+		return m, nil
+	case editmodal.ActionPrev, editmodal.ActionNavUp:
+		return m, nil
+	}
+	return m, nil
+}
 
-	case "t":
-		// Toggle cloud enabled state (t key for "toggle")
-		if !m.saving {
-			m.pendingEnabled = !m.pendingEnabled
-			return m, nil
-		}
+func (m EditModel) handleCustomKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
+	if msg.String() == "t" && !m.Saving {
+		m.pendingEnabled = !m.pendingEnabled
 	}
 
 	return m, nil
 }
 
 func (m EditModel) save() (EditModel, tea.Cmd) {
-	if m.saving {
+	if m.Saving {
 		return m, nil
 	}
 
@@ -164,40 +150,22 @@ func (m EditModel) save() (EditModel, tea.Cmd) {
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 	}
 
-	m.saving = true
-	m.err = nil
-
-	return m, m.createSaveCmd()
-}
-
-func (m EditModel) createSaveCmd() tea.Cmd {
+	m.StartSave()
 	newEnabled := m.pendingEnabled
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
+	cmd := m.SaveCmd(func(ctx context.Context) error {
+		return m.Svc.SetCloudEnabled(ctx, m.Device, newEnabled)
+	})
 
-		err := m.svc.SetCloudEnabled(ctx, m.device, newEnabled)
-		if err != nil {
-			return messages.NewSaveError(nil, err)
-		}
-		return messages.NewSaveResult(nil)
-	}
+	return m, cmd
 }
 
 // View renders the edit modal.
 func (m EditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
-	// Build footer
-	footer := "Space: Toggle | Ctrl+S: Save | Esc: Cancel"
-	if m.saving {
-		footer = "Saving..."
-	}
-
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, "Cloud Configuration", footer)
+	footer := m.RenderSavingFooter("Space: Toggle | Ctrl+S: Save | Esc: Cancel")
 
 	// Build content
 	var content strings.Builder
@@ -222,25 +190,24 @@ func (m EditModel) View() string {
 	}
 
 	// Error display
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
-	return r.SetContent(content.String()).Render()
+	return m.RenderModal("Cloud Configuration", content.String(), footer)
 }
 
 func (m EditModel) renderConnectionStatus() string {
 	var content strings.Builder
 
-	content.WriteString(m.styles.Label.Render("Status:"))
+	content.WriteString(m.Styles.Label.Render("Status:"))
 	content.WriteString(" ")
 
 	if m.connected {
-		content.WriteString(m.styles.StatusOn.Render("● Connected"))
+		content.WriteString(m.Styles.StatusOn.Render("● Connected"))
 	} else {
-		content.WriteString(m.styles.StatusOff.Render("○ Disconnected"))
+		content.WriteString(m.Styles.StatusOff.Render("○ Disconnected"))
 	}
 
 	return content.String()
@@ -249,9 +216,9 @@ func (m EditModel) renderConnectionStatus() string {
 func (m EditModel) renderServer() string {
 	var content strings.Builder
 
-	content.WriteString(m.styles.Label.Render("Server:"))
+	content.WriteString(m.Styles.Label.Render("Server:"))
 	content.WriteString(" ")
-	content.WriteString(m.styles.Value.Render(m.server))
+	content.WriteString(m.Styles.Value.Render(m.server))
 
 	return content.String()
 }
@@ -259,13 +226,13 @@ func (m EditModel) renderServer() string {
 func (m EditModel) renderToggle() string {
 	var content strings.Builder
 
-	content.WriteString(m.styles.Label.Render("Enabled:"))
+	content.WriteString(m.Styles.Label.Render("Enabled:"))
 	content.WriteString(" ")
 
 	if m.pendingEnabled {
-		content.WriteString(m.styles.StatusOn.Render("[●] ON "))
+		content.WriteString(m.Styles.StatusOn.Render("[●] ON "))
 	} else {
-		content.WriteString(m.styles.StatusOff.Render("[ ] OFF"))
+		content.WriteString(m.Styles.StatusOff.Render("[ ] OFF"))
 	}
 
 	return content.String()
@@ -278,5 +245,5 @@ func (m EditModel) renderChangeIndicator() string {
 	} else {
 		msg = "Will disable cloud connection"
 	}
-	return m.styles.Warning.Render(fmt.Sprintf("  ⚡ %s", msg))
+	return m.Styles.Warning.Render(fmt.Sprintf("  ⚡ %s", msg))
 }

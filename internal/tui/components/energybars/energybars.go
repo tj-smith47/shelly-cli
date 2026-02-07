@@ -13,7 +13,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -33,7 +32,7 @@ type Bar struct {
 
 // Model represents the energy bars state.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	bars       []Bar
 	cache      *cache.Cache
 	scroller   *panel.Scroller
@@ -85,7 +84,7 @@ func DefaultStyles() Styles {
 // New creates a new energy bars component.
 func New(c *cache.Cache) Model {
 	m := Model{
-		Sizable:   helpers.NewSizableLoaderOnly(),
+		Sizable:   panel.NewSizableLoaderOnly(),
 		cache:     c,
 		scroller:  panel.NewScroller(0, 10), // Will be updated with actual counts
 		barHeight: 1,

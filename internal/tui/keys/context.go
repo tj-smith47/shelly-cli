@@ -381,6 +381,7 @@ func (m *ContextMap) initDefaults() {
 		"q":                ActionEscape,
 		keyconst.KeyEsc:    ActionEscape,
 		"ctrl+[":           ActionEscape,
+		"/":                ActionFilter, // Search keybindings
 		"j":                ActionDown,
 		"k":                ActionUp,
 		keyconst.KeyDown:   ActionDown,

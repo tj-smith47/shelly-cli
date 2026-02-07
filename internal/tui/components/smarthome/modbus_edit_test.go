@@ -37,8 +37,8 @@ func TestModbusEditModel_ShowHide(t *testing.T) {
 	if !shown.Visible() {
 		t.Error("should be visible after Show")
 	}
-	if shown.device != "192.168.1.100" {
-		t.Errorf("device = %q, want %q", shown.device, "192.168.1.100")
+	if shown.Device != "192.168.1.100" {
+		t.Errorf("Device = %q, want %q", shown.Device, "192.168.1.100")
 	}
 	if !shown.enabled {
 		t.Error("enabled should be true")
@@ -97,11 +97,11 @@ func TestModbusEditModel_SetSize(t *testing.T) {
 	m := newTestModbusEditModel()
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("Width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("Height = %d, want 50", m.Height)
 	}
 }
 
@@ -193,24 +193,24 @@ func TestModbusEditModel_NavigationBounds(t *testing.T) {
 	m, _ = m.Show("192.168.1.100", modbus)
 
 	// Should start at enable field
-	if m.field != modbusFieldEnable {
-		t.Errorf("field = %d, want %d", m.field, modbusFieldEnable)
+	if modbusEditField(m.Cursor) != modbusFieldEnable {
+		t.Errorf("Cursor = %d, want %d", m.Cursor, modbusFieldEnable)
 	}
 
 	// Navigate up at top - should stay at top
 	upMsg := messages.NavigationMsg{Direction: messages.NavUp}
 	updated, _ := m.Update(upMsg)
 
-	if updated.field != modbusFieldEnable {
-		t.Errorf("field should stay at %d, got %d", modbusFieldEnable, updated.field)
+	if modbusEditField(updated.Cursor) != modbusFieldEnable {
+		t.Errorf("Cursor should stay at %d, got %d", modbusFieldEnable, updated.Cursor)
 	}
 
 	// Navigate down at bottom (only 1 field) - should stay at bottom
 	downMsg := messages.NavigationMsg{Direction: messages.NavDown}
 	updated, _ = updated.Update(downMsg)
 
-	if updated.field != modbusFieldEnable {
-		t.Errorf("field should stay at %d, got %d", modbusFieldEnable, updated.field)
+	if modbusEditField(updated.Cursor) != modbusFieldEnable {
+		t.Errorf("Cursor should stay at %d, got %d", modbusFieldEnable, updated.Cursor)
 	}
 }
 
@@ -225,16 +225,16 @@ func TestModbusEditModel_KeyJKNavigation(t *testing.T) {
 	jMsg := tea.KeyPressMsg{Code: 'j'}
 	updated, _ := m.Update(jMsg)
 
-	if updated.field != modbusFieldEnable {
-		t.Errorf("field = %d, want %d after 'j' (single field)", updated.field, modbusFieldEnable)
+	if modbusEditField(updated.Cursor) != modbusFieldEnable {
+		t.Errorf("Cursor = %d, want %d after 'j' (single field)", updated.Cursor, modbusFieldEnable)
 	}
 
 	// Navigate up with k (at top, should stay)
 	kMsg := tea.KeyPressMsg{Code: 'k'}
 	updated, _ = updated.Update(kMsg)
 
-	if updated.field != modbusFieldEnable {
-		t.Errorf("field = %d, want %d after 'k'", updated.field, modbusFieldEnable)
+	if modbusEditField(updated.Cursor) != modbusFieldEnable {
+		t.Errorf("Cursor = %d, want %d after 'k'", updated.Cursor, modbusFieldEnable)
 	}
 }
 
@@ -281,7 +281,7 @@ func TestModbusEditModel_SaveWithChanges(t *testing.T) {
 	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updated, cmd := m.Update(enterMsg)
 
-	if !updated.saving {
+	if !updated.Saving {
 		t.Error("should be saving after Enter with changes")
 	}
 	if cmd == nil {
@@ -295,13 +295,13 @@ func TestModbusEditModel_SaveResultSuccess(t *testing.T) {
 	m := newTestModbusEditModel()
 	modbus := &shelly.TUIModbusStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", modbus)
-	m.saving = true
+	m.Saving = true
 	m.pendingEnabled = false
 
 	saveMsg := messages.SaveResultMsg{Success: true}
 	updated, cmd := m.Update(saveMsg)
 
-	if updated.saving {
+	if updated.Saving {
 		t.Error("saving should be false after success")
 	}
 	if updated.Visible() {
@@ -327,19 +327,19 @@ func TestModbusEditModel_SaveResultError(t *testing.T) {
 	m := newTestModbusEditModel()
 	modbus := &shelly.TUIModbusStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", modbus)
-	m.saving = true
+	m.Saving = true
 
 	saveErr := errors.New("connection failed")
 	saveMsg := messages.SaveResultMsg{Err: saveErr}
 	updated, _ := m.Update(saveMsg)
 
-	if updated.saving {
+	if updated.Saving {
 		t.Error("saving should be false after error")
 	}
 	if !updated.Visible() {
 		t.Error("should remain visible after error")
 	}
-	if updated.err == nil {
+	if updated.Err == nil {
 		t.Error("err should be set")
 	}
 }
@@ -350,7 +350,7 @@ func TestModbusEditModel_ToggleBlockedWhileSaving(t *testing.T) {
 	m := newTestModbusEditModel()
 	modbus := &shelly.TUIModbusStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", modbus)
-	m.saving = true
+	m.Saving = true
 
 	// Toggle should be blocked
 	spaceMsg := tea.KeyPressMsg{Code: tea.KeySpace}
@@ -367,7 +367,7 @@ func TestModbusEditModel_ToggleViaMessageBlockedWhileSaving(t *testing.T) {
 	m := newTestModbusEditModel()
 	modbus := &shelly.TUIModbusStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", modbus)
-	m.saving = true
+	m.Saving = true
 
 	updated, _ := m.Update(messages.ToggleEnableRequestMsg{})
 
@@ -382,14 +382,14 @@ func TestModbusEditModel_SaveBlockedWhileSaving(t *testing.T) {
 	m := newTestModbusEditModel()
 	modbus := &shelly.TUIModbusStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", modbus)
-	m.saving = true
+	m.Saving = true
 	m.pendingEnabled = false
 
 	// Save should be blocked while already saving
 	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updated, cmd := m.Update(enterMsg)
 
-	if !updated.saving {
+	if !updated.Saving {
 		t.Error("saving should remain true")
 	}
 	if cmd != nil {
@@ -464,7 +464,7 @@ func TestModbusEditModel_View_Saving(t *testing.T) {
 	m = m.SetSize(80, 40)
 	modbus := &shelly.TUIModbusStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", modbus)
-	m.saving = true
+	m.Saving = true
 
 	view := m.View()
 
@@ -480,7 +480,7 @@ func TestModbusEditModel_View_WithError(t *testing.T) {
 	m = m.SetSize(80, 40)
 	modbus := &shelly.TUIModbusStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", modbus)
-	m.err = errors.New("test error")
+	m.Err = errors.New("test error")
 
 	view := m.View()
 
@@ -524,8 +524,8 @@ func TestModbusEditModel_NavigationNonApplicable(t *testing.T) {
 
 	for _, dir := range directions {
 		updated, _ := m.Update(messages.NavigationMsg{Direction: dir})
-		if updated.field != modbusFieldEnable {
-			t.Errorf("field changed for non-applicable direction %d", dir)
+		if modbusEditField(updated.Cursor) != modbusFieldEnable {
+			t.Errorf("Cursor changed for non-applicable direction %d", dir)
 		}
 	}
 }

@@ -14,8 +14,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -81,7 +82,7 @@ type Deps struct {
 
 // Model holds the alerts panel state.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx    context.Context
 	svc    *shelly.Service
 	styles Styles
@@ -145,7 +146,7 @@ func DefaultStyles() Styles {
 // New creates a new alerts component.
 func New(deps Deps) Model {
 	m := Model{
-		Sizable: helpers.NewSizableLoaderOnly(),
+		Sizable: panel.NewSizableLoaderOnly(),
 		ctx:     deps.Ctx,
 		svc:     deps.Svc,
 		styles:  DefaultStyles(),
@@ -443,7 +444,7 @@ func (m *Model) View() string {
 		if m.pendingDelete != "" {
 			r.SetFooter(m.styles.Enabled.Render("Press 'd' again to confirm delete, Esc to cancel"))
 		} else {
-			r.SetFooter(theme.StyledKeybindings("e:toggle n:new d:del s/S:snooze t:test"))
+			r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "toggle"}, {Key: "n", Desc: "new"}, {Key: "d", Desc: "del"}, {Key: "s/S", Desc: "snooze"}, {Key: "t", Desc: "test"}}, keys.FooterHintWidth(m.Width))))
 		}
 	}
 

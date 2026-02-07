@@ -3,6 +3,7 @@ package migration
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -416,11 +417,12 @@ func TestWizard_FooterText(t *testing.T) {
 
 	for _, tt := range tests {
 		w := newTestWizard()
+		w.Width = 120
 		w.step = tt.step
 
 		got := w.FooterText()
-		if got != tt.want {
-			t.Errorf("FooterText() for step %v = %q, want %q", tt.step, got, tt.want)
+		if !strings.Contains(got, tt.want) {
+			t.Errorf("FooterText() for step %v = %q, want it to contain %q", tt.step, got, tt.want)
 		}
 	}
 }

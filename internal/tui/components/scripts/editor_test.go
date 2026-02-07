@@ -8,7 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 func TestEditorDeps_Validate(t *testing.T) {
@@ -122,7 +122,7 @@ func TestEditorModel_VisibleLines(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := EditorModel{Sizable: helpers.NewSizableLoaderOnly()}
+			m := EditorModel{Sizable: panel.NewSizableLoaderOnly()}
 			m = m.SetSize(80, tt.height)
 			got := m.visibleLines()
 			if got != tt.want {
@@ -149,7 +149,7 @@ func TestEditorModel_MaxScroll(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			lines := make([]string, tt.codeLines)
-			m := EditorModel{Sizable: helpers.NewSizableLoaderOnly(), codeLines: lines}
+			m := EditorModel{Sizable: panel.NewSizableLoaderOnly(), codeLines: lines}
 			m = m.SetSize(80, tt.height)
 			got := m.maxScroll()
 			if got != tt.want {
@@ -167,7 +167,7 @@ func TestEditorModel_ScrollNavigation(t *testing.T) {
 	}
 
 	m := EditorModel{
-		Sizable:   helpers.NewSizableLoaderOnly(),
+		Sizable:   panel.NewSizableLoaderOnly(),
 		codeLines: lines,
 		scroll:    0,
 	}
@@ -213,7 +213,7 @@ func TestEditorModel_PageNavigation(t *testing.T) {
 	}
 
 	m := EditorModel{
-		Sizable:   helpers.NewSizableLoaderOnly(),
+		Sizable:   panel.NewSizableLoaderOnly(),
 		codeLines: lines,
 		scroll:    50,
 	}
@@ -289,7 +289,7 @@ func TestEditorModel_Getters(t *testing.T) {
 func TestEditorModel_View_NoScript(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
-		Sizable:  helpers.NewSizableLoaderOnly(),
+		Sizable:  panel.NewSizableLoaderOnly(),
 		scriptID: 0,
 		styles:   DefaultEditorStyles(),
 	}
@@ -304,7 +304,7 @@ func TestEditorModel_View_NoScript(t *testing.T) {
 func TestEditorModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
-		Sizable:  helpers.NewSizableLoaderOnly(),
+		Sizable:  panel.NewSizableLoaderOnly(),
 		scriptID: 1,
 		loading:  true,
 		styles:   DefaultEditorStyles(),
@@ -320,7 +320,7 @@ func TestEditorModel_View_Loading(t *testing.T) {
 func TestEditorModel_View_Error(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
-		Sizable:  helpers.NewSizableLoaderOnly(),
+		Sizable:  panel.NewSizableLoaderOnly(),
 		scriptID: 1,
 		err:      context.DeadlineExceeded,
 		styles:   DefaultEditorStyles(),
@@ -337,7 +337,7 @@ func TestEditorModel_View_Error(t *testing.T) {
 func TestEditorModel_View_EmptyCode(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
-		Sizable:    helpers.NewSizableLoaderOnly(),
+		Sizable:    panel.NewSizableLoaderOnly(),
 		scriptID:   1,
 		scriptName: "empty_script",
 		codeLines:  []string{},
@@ -354,7 +354,7 @@ func TestEditorModel_View_EmptyCode(t *testing.T) {
 func TestEditorModel_View_WithCode(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
-		Sizable:     helpers.NewSizableLoaderOnly(),
+		Sizable:     panel.NewSizableLoaderOnly(),
 		scriptID:    1,
 		scriptName:  "test_script",
 		codeLines:   []string{"let x = 1;", "let y = 2;", "// comment"},
@@ -372,7 +372,7 @@ func TestEditorModel_View_WithCode(t *testing.T) {
 func TestEditorModel_View_WithStatus(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
-		Sizable:    helpers.NewSizableLoaderOnly(),
+		Sizable:    panel.NewSizableLoaderOnly(),
 		scriptID:   1,
 		scriptName: "running_script",
 		codeLines:  []string{"code"},
@@ -421,7 +421,7 @@ func TestEditorModel_SyntaxHighlighting(t *testing.T) {
 func TestEditorModel_RenderCodeLines(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
-		Sizable:     helpers.NewSizableLoaderOnly(),
+		Sizable:     panel.NewSizableLoaderOnly(),
 		codeLines:   []string{"line1", "line2", "line3"},
 		showNumbers: true,
 		scroll:      0,
@@ -438,7 +438,7 @@ func TestEditorModel_RenderCodeLines(t *testing.T) {
 func TestEditorModel_RenderCodeLines_Empty(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
-		Sizable:   helpers.NewSizableLoaderOnly(),
+		Sizable:   panel.NewSizableLoaderOnly(),
 		codeLines: []string{},
 		styles:    DefaultEditorStyles(),
 	}

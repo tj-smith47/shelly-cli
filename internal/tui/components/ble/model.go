@@ -19,8 +19,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -78,7 +79,7 @@ type DeviceRemovedMsg struct {
 
 // Model displays BLE and BTHome settings for a device.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx           context.Context
 	svc           *shelly.Service
 	fileCache     *cache.FileCache
@@ -167,7 +168,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:       helpers.NewSizableLoaderOnly(),
+		Sizable:       panel.NewSizableLoaderOnly(),
 		ctx:           deps.Ctx,
 		svc:           deps.Svc,
 		fileCache:     deps.FileCache,
@@ -344,6 +345,8 @@ func (m Model) SetSize(width, height int) Model {
 // SetEditModalSize sets the edit modal dimensions.
 // This should be called with screen-based dimensions when the modal is visible.
 func (m Model) SetEditModalSize(width, height int) Model {
+	m.ModalWidth = width
+	m.ModalHeight = height
 	if m.editing {
 		m.editModal = m.editModal.SetSize(width, height)
 	}
@@ -672,7 +675,8 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	w, h := m.EditModalDims()
+	m.editModal = m.editModal.SetSize(w, h)
 	var cmd tea.Cmd
 	m.editModal, cmd = m.editModal.Show(m.device, m.ble)
 	return m, cmd
@@ -825,15 +829,16 @@ func (m Model) buildFooter() string {
 		return m.styles.Enabled.Render("Press 'x' again to confirm removal, Esc to cancel")
 	}
 
-	var footer string
+	var hints []keys.Hint
 	switch {
 	case m.ble != nil && m.ble.Enable && len(m.devices) > 0:
-		footer = "e:edit d:discover p:pair x:remove r:refresh"
+		hints = []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "d", Desc: "discover"}, {Key: "p", Desc: "pair"}, {Key: "x", Desc: "remove"}, {Key: "r", Desc: "refresh"}}
 	case m.ble != nil && m.ble.Enable:
-		footer = "e:edit d:discover p:pair r:refresh"
+		hints = []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "d", Desc: "discover"}, {Key: "p", Desc: "pair"}, {Key: "r", Desc: "refresh"}}
 	default:
-		footer = "e:edit r:refresh"
+		hints = []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "r", Desc: "refresh"}}
 	}
+	footer := theme.StyledKeybindings(keys.FormatHints(hints, keys.FooterHintWidth(m.Width)))
 
 	if cs := m.cacheStatus.View(); cs != "" {
 		footer += " | " + cs

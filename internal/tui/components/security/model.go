@@ -17,8 +17,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -57,7 +58,7 @@ type StatusLoadedMsg struct {
 
 // Model displays security settings for a device.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx         context.Context
 	svc         *shelly.Service
 	fileCache   *cache.FileCache
@@ -126,7 +127,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:     helpers.NewSizableLoaderOnly(),
+		Sizable:     panel.NewSizableLoaderOnly(),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
@@ -211,6 +212,8 @@ func (m Model) SetSize(width, height int) Model {
 // SetEditModalSize sets the edit modal dimensions.
 // This should be called with screen-based dimensions when the modal is visible.
 func (m Model) SetEditModalSize(width, height int) Model {
+	m.ModalWidth = width
+	m.ModalHeight = height
 	if m.editModel.Visible() {
 		m.editModel = m.editModel.SetSize(width, height)
 	}
@@ -391,8 +394,9 @@ func (m Model) handleAuthConfig() (Model, tea.Cmd) {
 	if m.device == "" || m.status == nil || m.loading {
 		return m, nil
 	}
-	m.editModel = m.editModel.Show(m.device, m.status.AuthEnabled)
-	return m, func() tea.Msg { return EditOpenedMsg{} }
+	var cmd tea.Cmd
+	m.editModel, cmd = m.editModel.Show(m.device, m.status.AuthEnabled)
+	return m, cmd
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -452,7 +456,7 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		footer := "a:auth r:refresh"
+		footer := theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "a", Desc: "auth"}, {Key: "r", Desc: "refresh"}}, keys.FooterHintWidth(m.Width)))
 		if cacheView := m.cacheStatus.View(); cacheView != "" {
 			footer += " | " + cacheView
 		}

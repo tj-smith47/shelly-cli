@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -305,7 +306,11 @@ func (m ConsoleModel) View() string {
 		title = fmt.Sprintf("Console (Script %d)", m.scriptID)
 	}
 
-	footer := "↑/↓:Scroll | c:Clear | p:Pause"
+	footer := theme.StyledKeybindings(keys.FormatHints([]keys.Hint{
+		{Key: "↑/↓", Desc: "scroll"},
+		{Key: "c", Desc: "clear"},
+		{Key: "p", Desc: "pause"},
+	}, keys.FooterHintWidth(m.width)))
 	if m.paused {
 		footer = m.styles.Paused.Render("PAUSED") + " | " + footer
 	}

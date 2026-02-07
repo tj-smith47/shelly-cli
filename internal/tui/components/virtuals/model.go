@@ -17,7 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -79,7 +79,7 @@ type ActionMsg struct {
 
 // Model displays virtual components for a device.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx              context.Context
 	svc              *shelly.Service
 	device           string
@@ -159,7 +159,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:     helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		Sizable:     panel.NewSizable(4, panel.NewScroller(0, 10)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		loading:     false,
@@ -299,6 +299,8 @@ func (m Model) SetSize(width, height int) Model {
 // SetEditModalSize sets the edit modal dimensions.
 // This should be called with screen-based dimensions when the modal is visible.
 func (m Model) SetEditModalSize(width, height int) Model {
+	m.ModalWidth = width
+	m.ModalHeight = height
 	if m.editing {
 		m.editModal = m.editModal.SetSize(width, height)
 	}
@@ -500,7 +502,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	m.editModal, cmd = m.editModal.Update(msg)
 
 	// Check if modal was closed
-	if !m.editModal.IsVisible() {
+	if !m.editModal.Visible() {
 		m.editing = false
 		// Invalidate cache and refresh data after edit
 		m.loading = true
@@ -590,7 +592,8 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 	}
 
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	w, h := m.EditModalDims()
+	m.editModal = m.editModal.SetSize(w, h)
 	m.editModal = m.editModal.ShowEdit(m.device, &v)
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
@@ -600,7 +603,8 @@ func (m Model) handleNewKey() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	w, h := m.EditModalDims()
+	m.editModal = m.editModal.SetSize(w, h)
 	m.editModal = m.editModal.ShowNew(m.device)
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
@@ -770,7 +774,14 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		footer := "t:toggle h/l:adjust e:edit n:new d:del R:refresh"
+		footer := theme.StyledKeybindings(keys.FormatHints([]keys.Hint{
+			{Key: "t", Desc: "toggle"},
+			{Key: "h/l", Desc: "adjust"},
+			{Key: "e", Desc: "edit"},
+			{Key: "n", Desc: "new"},
+			{Key: "d", Desc: "del"},
+			{Key: "R", Desc: "refresh"},
+		}, keys.FooterHintWidth(m.Width)))
 		if cs := m.cacheStatus.View(); cs != "" {
 			footer += " | " + cs
 		}
@@ -912,7 +923,11 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:top/bottom enter:details"
+	return keys.FormatHints([]keys.Hint{
+		{Key: "j/k", Desc: "scroll"},
+		{Key: "g/G", Desc: "top/btm"},
+		{Key: "enter", Desc: "details"},
+	}, keys.FooterHintWidth(m.Width))
 }
 
 // IsEditing returns whether the edit modal is currently visible.

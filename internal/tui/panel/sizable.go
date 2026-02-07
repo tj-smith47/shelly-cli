@@ -1,9 +1,8 @@
-// Package helpers provides shared utilities for TUI components.
-package helpers
+// Package panel provides shared utilities for TUI panel components.
+package panel
 
 import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
-	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 // LoaderBorderOffset is the standard offset for loader positioning within borders.
@@ -15,13 +14,13 @@ const LoaderBorderOffset = 4
 // Example usage:
 //
 //	type Model struct {
-//	    helpers.Sizable
+//	    panel.Sizable
 //	    items []Item
 //	}
 //
 //	func New() Model {
 //	    return Model{
-//	        Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
+//	        Sizable: panel.NewSizable(4, panel.NewScroller(0, 10)),
 //	    }
 //	}
 //
@@ -32,15 +31,17 @@ const LoaderBorderOffset = 4
 type Sizable struct {
 	Width        int
 	Height       int
+	ModalWidth   int // Screen-based modal dimensions (set by SetEditModalSize)
+	ModalHeight  int
 	Loader       loading.Model
-	Scroller     *panel.Scroller
+	Scroller     *Scroller
 	scrollOffset int // Header offset for scroller visible rows calculation
 }
 
 // NewSizable creates a Sizable with a scroller and scroll offset.
 // The scrollOffset accounts for borders, title, footer, and other header content.
 // Common offsets: 4 (minimal), 5-6 (with stats), 8-10 (with controls), 12 (complex).
-func NewSizable(scrollOffset int, scroller *panel.Scroller) Sizable {
+func NewSizable(scrollOffset int, scroller *Scroller) Sizable {
 	return Sizable{
 		scrollOffset: scrollOffset,
 		Scroller:     scroller,
@@ -78,6 +79,16 @@ func (s *Sizable) ApplySize(width, height int) {
 		}
 		s.Scroller.SetVisibleRows(rows)
 	}
+}
+
+// EditModalDims returns the screen-based modal dimensions if available,
+// falling back to panel dimensions. Use this when opening edit modals
+// to avoid a first-frame size mismatch.
+func (s *Sizable) EditModalDims() (width, height int) {
+	if s.ModalWidth > 0 && s.ModalHeight > 0 {
+		return s.ModalWidth, s.ModalHeight
+	}
+	return s.Width, s.Height
 }
 
 // SetScrollOffset updates the scroll offset for dynamic layouts.

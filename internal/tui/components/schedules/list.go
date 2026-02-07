@@ -16,7 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -88,7 +88,7 @@ type EditScheduleMsg struct {
 
 // ListModel displays schedules for a device.
 type ListModel struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx           context.Context
 	svc           *automation.Service
 	fileCache     *cache.FileCache
@@ -145,7 +145,7 @@ func NewList(deps ListDeps) ListModel {
 	}
 
 	m := ListModel{
-		Sizable:     helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		Sizable:     panel.NewSizable(4, panel.NewScroller(0, 10)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
@@ -717,7 +717,7 @@ func (m ListModel) buildFooter() string {
 		return m.styles.Error.Render("Press d again to delete, Esc to cancel")
 	}
 
-	footer := theme.StyledKeybindings("e:edit t:toggle d:del n:new")
+	footer := theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "t", Desc: "toggle"}, {Key: "d", Desc: "del"}, {Key: "n", Desc: "new"}}, keys.FooterHintWidth(m.Width)))
 	if cs := m.cacheStatus.View(); cs != "" {
 		footer += " | " + cs
 	}

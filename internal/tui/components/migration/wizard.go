@@ -15,8 +15,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -80,7 +80,7 @@ type ApplyCompleteMsg struct {
 
 // Wizard is the migration wizard model.
 type Wizard struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx           context.Context
 	svc           *shelly.Service
 	step          WizardStep
@@ -165,7 +165,7 @@ func New(deps Deps) Wizard {
 	}
 
 	w := Wizard{
-		Sizable:      helpers.NewSizable(6, panel.NewScroller(0, 10)),
+		Sizable:      panel.NewSizable(6, panel.NewScroller(0, 10)),
 		ctx:          deps.Ctx,
 		svc:          deps.Svc,
 		step:         StepSourceSelect,
@@ -947,18 +947,37 @@ func (w Wizard) renderComplete() string {
 }
 
 func (w Wizard) footerForStep() string {
+	var hints []keys.Hint
 	switch w.step {
 	case StepSourceSelect:
-		return "j/k:nav enter:select w:toggle-wifi"
+		hints = []keys.Hint{
+			{Key: "j/k", Desc: "nav"},
+			{Key: "enter", Desc: "select"},
+			{Key: "w", Desc: "toggle-wifi"},
+		}
 	case StepTargetSelect:
-		return "j/k:nav enter:select esc:back"
+		hints = []keys.Hint{
+			{Key: "j/k", Desc: "nav"},
+			{Key: "enter", Desc: "select"},
+			{Key: "esc", Desc: "back"},
+		}
 	case StepPreview:
-		return "j/k:scroll spc:toggle a:all n:none enter:apply esc:back"
+		hints = []keys.Hint{
+			{Key: "j/k", Desc: "scroll"},
+			{Key: "spc", Desc: "toggle"},
+			{Key: "a", Desc: "all"},
+			{Key: "n", Desc: "none"},
+			{Key: "enter", Desc: "apply"},
+			{Key: "esc", Desc: "back"},
+		}
 	case StepComplete:
-		return "R:new migration"
+		hints = []keys.Hint{
+			{Key: "R", Desc: "new migration"},
+		}
 	default:
 		return ""
 	}
+	return theme.StyledKeybindings(keys.FormatHints(hints, keys.FooterHintWidth(w.Width)))
 }
 
 // Step returns the current wizard step.

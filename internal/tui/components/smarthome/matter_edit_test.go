@@ -42,8 +42,8 @@ func TestMatterEditModel_ShowHide(t *testing.T) {
 	if !shown.Visible() {
 		t.Error("should be visible after Show")
 	}
-	if shown.device != "192.168.1.100" {
-		t.Errorf("device = %q, want %q", shown.device, "192.168.1.100")
+	if shown.Device != "192.168.1.100" {
+		t.Errorf("Device = %q, want %q", shown.Device, "192.168.1.100")
 	}
 	if !shown.enabled {
 		t.Error("enabled should be true")
@@ -111,8 +111,8 @@ func TestMatterEditModel_ShowDisabled(t *testing.T) {
 	if shown.enabled {
 		t.Error("enabled should be false")
 	}
-	if shown.fieldCount != 1 {
-		t.Errorf("fieldCount = %d, want 1 (no reset button when disabled)", shown.fieldCount)
+	if shown.FieldCount != 1 {
+		t.Errorf("FieldCount = %d, want 1 (no reset button when disabled)", shown.FieldCount)
 	}
 	if cmd != nil {
 		t.Error("should not fetch codes when disabled")
@@ -125,11 +125,11 @@ func TestMatterEditModel_SetSize(t *testing.T) {
 	m := newTestMatterEditModel()
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("Width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("Height = %d, want 50", m.Height)
 	}
 }
 
@@ -221,24 +221,24 @@ func TestMatterEditModel_NavigationUpDown(t *testing.T) {
 	m, _ = m.Show("192.168.1.100", matter)
 
 	// Should start at enable field
-	if m.field != matterFieldEnable {
-		t.Errorf("field = %d, want %d", m.field, matterFieldEnable)
+	if matterEditField(m.Cursor) != matterFieldEnable {
+		t.Errorf("Cursor = %d, want %d", m.Cursor, matterFieldEnable)
 	}
 
 	// Navigate down to reset button
 	downMsg := messages.NavigationMsg{Direction: messages.NavDown}
 	updated, _ := m.Update(downMsg)
 
-	if updated.field != matterFieldReset {
-		t.Errorf("field = %d, want %d", updated.field, matterFieldReset)
+	if matterEditField(updated.Cursor) != matterFieldReset {
+		t.Errorf("Cursor = %d, want %d", updated.Cursor, matterFieldReset)
 	}
 
 	// Navigate up back to enable
 	upMsg := messages.NavigationMsg{Direction: messages.NavUp}
 	updated, _ = updated.Update(upMsg)
 
-	if updated.field != matterFieldEnable {
-		t.Errorf("field = %d, want %d", updated.field, matterFieldEnable)
+	if matterEditField(updated.Cursor) != matterFieldEnable {
+		t.Errorf("Cursor = %d, want %d", updated.Cursor, matterFieldEnable)
 	}
 }
 
@@ -253,8 +253,8 @@ func TestMatterEditModel_NavigationBounds(t *testing.T) {
 	upMsg := messages.NavigationMsg{Direction: messages.NavUp}
 	updated, _ := m.Update(upMsg)
 
-	if updated.field != matterFieldEnable {
-		t.Errorf("field should stay at %d, got %d", matterFieldEnable, updated.field)
+	if matterEditField(updated.Cursor) != matterFieldEnable {
+		t.Errorf("Cursor should stay at %d, got %d", matterFieldEnable, updated.Cursor)
 	}
 
 	// Navigate down to reset
@@ -264,8 +264,8 @@ func TestMatterEditModel_NavigationBounds(t *testing.T) {
 	// Navigate down past bottom - should stay at bottom
 	updated, _ = updated.Update(downMsg)
 
-	if updated.field != matterFieldReset {
-		t.Errorf("field should stay at %d, got %d", matterFieldReset, updated.field)
+	if matterEditField(updated.Cursor) != matterFieldReset {
+		t.Errorf("Cursor should stay at %d, got %d", matterFieldReset, updated.Cursor)
 	}
 }
 
@@ -312,7 +312,7 @@ func TestMatterEditModel_SaveWithChanges(t *testing.T) {
 	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updated, cmd := m.Update(enterMsg)
 
-	if !updated.saving {
+	if !updated.Saving {
 		t.Error("should be saving after Enter with changes")
 	}
 	if cmd == nil {
@@ -326,13 +326,13 @@ func TestMatterEditModel_SaveResultSuccess(t *testing.T) {
 	m := newTestMatterEditModel()
 	matter := &shelly.TUIMatterStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", matter)
-	m.saving = true
+	m.Saving = true
 	m.pendingEnabled = false
 
 	saveMsg := messages.SaveResultMsg{Success: true}
 	updated, cmd := m.Update(saveMsg)
 
-	if updated.saving {
+	if updated.Saving {
 		t.Error("saving should be false after success")
 	}
 	if updated.Visible() {
@@ -358,19 +358,19 @@ func TestMatterEditModel_SaveResultError(t *testing.T) {
 	m := newTestMatterEditModel()
 	matter := &shelly.TUIMatterStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", matter)
-	m.saving = true
+	m.Saving = true
 
 	saveErr := errors.New("connection failed")
 	saveMsg := messages.SaveResultMsg{Err: saveErr}
 	updated, _ := m.Update(saveMsg)
 
-	if updated.saving {
+	if updated.Saving {
 		t.Error("saving should be false after error")
 	}
-	if updated.Visible() != true {
+	if !updated.Visible() {
 		t.Error("should remain visible after error")
 	}
-	if updated.err == nil {
+	if updated.Err == nil {
 		t.Error("err should be set")
 	}
 }
@@ -383,7 +383,7 @@ func TestMatterEditModel_ResetConfirmation(t *testing.T) {
 	m, _ = m.Show("192.168.1.100", matter)
 
 	// Navigate to reset button
-	m.field = matterFieldReset
+	m.Cursor = int(matterFieldReset)
 
 	// First Enter - should set pendingReset
 	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
@@ -418,7 +418,7 @@ func TestMatterEditModel_ResetCancelOnFieldChange(t *testing.T) {
 	m, _ = m.Show("192.168.1.100", matter)
 
 	// Navigate to reset and initiate confirmation
-	m.field = matterFieldReset
+	m.Cursor = int(matterFieldReset)
 	m.pendingReset = true
 
 	// Navigate up to cancel confirmation
@@ -470,7 +470,7 @@ func TestMatterEditModel_ResetResultError(t *testing.T) {
 	if !updated.Visible() {
 		t.Error("should remain visible after error")
 	}
-	if updated.err == nil {
+	if updated.Err == nil {
 		t.Error("err should be set")
 	}
 }
@@ -522,8 +522,8 @@ func TestMatterEditModel_CodesLoadedError(t *testing.T) {
 	if updated.codes != nil {
 		t.Error("codes should be nil after error")
 	}
-	// Non-fatal error - should not set m.err
-	if updated.err != nil {
+	// Non-fatal error - should not set m.Err
+	if updated.Err != nil {
 		t.Error("err should not be set for codes load failure")
 	}
 }
@@ -606,7 +606,7 @@ func TestMatterEditModel_View_Saving(t *testing.T) {
 	m = m.SetSize(80, 40)
 	matter := &shelly.TUIMatterStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", matter)
-	m.saving = true
+	m.Saving = true
 
 	view := m.View()
 
@@ -639,7 +639,7 @@ func TestMatterEditModel_View_PendingReset(t *testing.T) {
 	matter := &shelly.TUIMatterStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", matter)
 	m.pendingReset = true
-	m.field = matterFieldReset
+	m.Cursor = int(matterFieldReset)
 
 	view := m.View()
 
@@ -655,7 +655,7 @@ func TestMatterEditModel_View_WithError(t *testing.T) {
 	m = m.SetSize(80, 40)
 	matter := &shelly.TUIMatterStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", matter)
-	m.err = errors.New("test error")
+	m.Err = errors.New("test error")
 
 	view := m.View()
 
@@ -670,7 +670,7 @@ func TestMatterEditModel_ToggleBlockedWhileSaving(t *testing.T) {
 	m := newTestMatterEditModel()
 	matter := &shelly.TUIMatterStatus{Enabled: true}
 	m, _ = m.Show("192.168.1.100", matter)
-	m.saving = true
+	m.Saving = true
 
 	// Toggle should be blocked
 	spaceMsg := tea.KeyPressMsg{Code: tea.KeySpace}
@@ -692,16 +692,16 @@ func TestMatterEditModel_KeyJNavigation(t *testing.T) {
 	jMsg := tea.KeyPressMsg{Code: 'j'}
 	updated, _ := m.Update(jMsg)
 
-	if updated.field != matterFieldReset {
-		t.Errorf("field = %d, want %d after 'j'", updated.field, matterFieldReset)
+	if matterEditField(updated.Cursor) != matterFieldReset {
+		t.Errorf("Cursor = %d, want %d after 'j'", updated.Cursor, matterFieldReset)
 	}
 
 	// Navigate up with k
 	kMsg := tea.KeyPressMsg{Code: 'k'}
 	updated, _ = updated.Update(kMsg)
 
-	if updated.field != matterFieldEnable {
-		t.Errorf("field = %d, want %d after 'k'", updated.field, matterFieldEnable)
+	if matterEditField(updated.Cursor) != matterFieldEnable {
+		t.Errorf("Cursor = %d, want %d after 'k'", updated.Cursor, matterFieldEnable)
 	}
 }
 

@@ -19,7 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -76,7 +76,7 @@ type EditClosedMsg struct {
 
 // Model displays WiFi settings for a device.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx           context.Context
 	svc           *shelly.Service
 	fileCache     *cache.FileCache
@@ -148,7 +148,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:     helpers.NewSizable(12, panel.NewScroller(0, 10)),
+		Sizable:     panel.NewSizable(12, panel.NewScroller(0, 10)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
@@ -272,6 +272,8 @@ func (m Model) SetSize(width, height int) Model {
 // SetEditModalSize sets the edit modal dimensions.
 // This should be called with screen-based dimensions when the modal is visible.
 func (m Model) SetEditModalSize(width, height int) Model {
+	m.ModalWidth = width
+	m.ModalHeight = height
 	if m.editing {
 		m.editModal = m.editModal.SetSize(width, height)
 	}
@@ -609,7 +611,7 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		footer := "e:edit s:scan r:refresh"
+		footer := theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "s", Desc: "scan"}, {Key: "r", Desc: "refresh"}}, keys.FooterHintWidth(m.Width)))
 		if cacheView := m.cacheStatus.View(); cacheView != "" {
 			footer += " | " + cacheView
 		}
@@ -838,7 +840,12 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:top/bottom e:edit s:scan"
+	return keys.FormatHints([]keys.Hint{
+		{Key: "j/k", Desc: "scroll"},
+		{Key: "g/G", Desc: "top/btm"},
+		{Key: "e", Desc: "edit"},
+		{Key: "s", Desc: "scan"},
+	}, keys.FooterHintWidth(m.Width))
 }
 
 // IsEditing returns whether the edit modal is open.

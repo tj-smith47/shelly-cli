@@ -14,8 +14,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // MatterEditSaveResultMsg is an alias for the shared save result message.
@@ -54,15 +52,7 @@ const (
 
 // MatterEditModel represents the Matter configuration edit modal.
 type MatterEditModel struct {
-	ctx     context.Context
-	svc     *shelly.Service
-	device  string
-	visible bool
-	saving  bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+	editmodal.Base
 
 	// Matter state
 	enabled        bool
@@ -79,30 +69,30 @@ type MatterEditModel struct {
 	// Reset confirmation
 	pendingReset bool
 	resetting    bool
-
-	// Focus
-	field      matterEditField
-	fieldCount int // Dynamic based on whether reset is visible
 }
 
 // NewMatterEditModel creates a new Matter configuration edit modal.
 func NewMatterEditModel(ctx context.Context, svc *shelly.Service) MatterEditModel {
 	return MatterEditModel{
-		ctx:    ctx,
-		svc:    svc,
-		styles: editmodal.DefaultStyles().WithLabelWidth(14),
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles().WithLabelWidth(14),
+		},
 	}
 }
 
 // Show displays the edit modal with the given device and Matter state.
 func (m MatterEditModel) Show(device string, matter *shelly.TUIMatterStatus) (MatterEditModel, tea.Cmd) {
-	m.device = device
-	m.visible = true
-	m.saving = false
+	// Calculate field count: enable toggle + reset button (when enabled)
+	fieldCount := 1 // Enable toggle always
+	if matter != nil && matter.Enabled {
+		fieldCount = 2 // Add reset button
+	}
+
+	m.Base.Show(device, fieldCount)
 	m.resetting = false
 	m.pendingReset = false
-	m.err = nil
-	m.field = matterFieldEnable
 	m.codes = nil
 	m.loadingCodes = false
 
@@ -111,12 +101,6 @@ func (m MatterEditModel) Show(device string, matter *shelly.TUIMatterStatus) (Ma
 		m.commissionable = matter.Commissionable
 		m.fabricsCount = matter.FabricsCount
 		m.pendingEnabled = matter.Enabled
-	}
-
-	// Calculate field count: enable toggle + reset button (when enabled)
-	m.fieldCount = 1 // Enable toggle always
-	if m.enabled {
-		m.fieldCount = 2 // Add reset button
 	}
 
 	// Fetch commissioning codes if enabled and commissionable
@@ -131,26 +115,25 @@ func (m MatterEditModel) Show(device string, matter *shelly.TUIMatterStatus) (Ma
 
 // Hide hides the edit modal.
 func (m MatterEditModel) Hide() MatterEditModel {
-	m.visible = false
+	m.Base.Hide()
 	m.pendingReset = false
 	return m
 }
 
 // Visible returns whether the modal is visible.
 func (m MatterEditModel) Visible() bool {
-	return m.visible
+	return m.Base.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m MatterEditModel) SetSize(width, height int) MatterEditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	return m
 }
 
 // Update handles messages.
 func (m MatterEditModel) Update(msg tea.Msg) (MatterEditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -169,21 +152,17 @@ func (m MatterEditModel) handleMessage(msg tea.Msg) (MatterEditModel, tea.Cmd) {
 		return m, nil
 
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+		saved, cmd := m.HandleSaveResult(msg)
+		if saved {
+			m.enabled = m.pendingEnabled
 		}
-		// Success - update state and close modal
-		m.enabled = m.pendingEnabled
-		m = m.Hide()
-		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+		return m, cmd
 
 	case MatterResetResultMsg:
 		m.resetting = false
 		m.pendingReset = false
 		if msg.Err != nil {
-			m.err = msg.Err
+			m.Err = msg.Err
 			return m, nil
 		}
 		// Success - close modal
@@ -191,64 +170,69 @@ func (m MatterEditModel) handleMessage(msg tea.Msg) (MatterEditModel, tea.Cmd) {
 		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
 
 	case messages.NavigationMsg:
-		return m.handleNavigation(msg)
+		action := m.HandleNavigation(msg)
+		return m.applyAction(action)
 	case messages.ToggleEnableRequestMsg:
-		if !m.saving && !m.resetting {
+		if !m.Saving && !m.resetting {
 			m.pendingEnabled = !m.pendingEnabled
 			m.pendingReset = false
 		}
 		return m, nil
 	case tea.KeyPressMsg:
-		return m.handleKey(msg)
+		action := m.HandleKey(msg)
+		if action != editmodal.ActionNone {
+			return m.applyAction(action)
+		}
+		return m.handleCustomKey(msg)
 	}
 
 	return m, nil
 }
 
-func (m MatterEditModel) handleNavigation(msg messages.NavigationMsg) (MatterEditModel, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
-		if m.field > 0 {
-			m.field--
-			m.pendingReset = false
-		}
-	case messages.NavDown:
-		if int(m.field) < m.fieldCount-1 {
-			m.field++
-			m.pendingReset = false
-		}
-	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
-		// Not applicable for this component
-	}
-	return m, nil
-}
-
-func (m MatterEditModel) handleKey(msg tea.KeyPressMsg) (MatterEditModel, tea.Cmd) {
-	switch msg.String() {
-	case keyconst.KeyEsc, keyconst.KeyCtrlOpenBracket:
+func (m MatterEditModel) applyAction(action editmodal.KeyAction) (MatterEditModel, tea.Cmd) {
+	switch action {
+	case editmodal.ActionNone:
+		return m, nil
+	case editmodal.ActionClose:
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
-
-	case keyconst.KeyEnter, keyconst.KeyCtrlS:
+	case editmodal.ActionSave:
 		return m.handleSaveOrAction()
+	case editmodal.ActionNext, editmodal.ActionNavDown:
+		if m.Cursor < m.FieldCount-1 {
+			m.Cursor++
+			m.pendingReset = false
+		}
+		return m, nil
+	case editmodal.ActionPrev, editmodal.ActionNavUp:
+		if m.Cursor > 0 {
+			m.Cursor--
+			m.pendingReset = false
+		}
+		return m, nil
+	}
+	return m, nil
+}
 
+func (m MatterEditModel) handleCustomKey(msg tea.KeyPressMsg) (MatterEditModel, tea.Cmd) {
+	switch msg.String() {
 	case "t", keyconst.KeySpace:
-		if !m.saving && !m.resetting && m.field == matterFieldEnable {
+		if !m.Saving && !m.resetting && matterEditField(m.Cursor) == matterFieldEnable {
 			m.pendingEnabled = !m.pendingEnabled
 			m.pendingReset = false
 		}
 		return m, nil
 
 	case "j", keyconst.KeyDown:
-		if int(m.field) < m.fieldCount-1 {
-			m.field++
+		if m.Cursor < m.FieldCount-1 {
+			m.Cursor++
 			m.pendingReset = false
 		}
 		return m, nil
 
 	case "k", keyconst.KeyUp:
-		if m.field > 0 {
-			m.field--
+		if m.Cursor > 0 {
+			m.Cursor--
 			m.pendingReset = false
 		}
 		return m, nil
@@ -258,17 +242,17 @@ func (m MatterEditModel) handleKey(msg tea.KeyPressMsg) (MatterEditModel, tea.Cm
 }
 
 func (m MatterEditModel) handleSaveOrAction() (MatterEditModel, tea.Cmd) {
-	if m.saving || m.resetting {
+	if m.Saving || m.resetting {
 		return m, nil
 	}
 
 	// If focused on reset button, handle reset confirmation
-	if m.field == matterFieldReset {
+	if matterEditField(m.Cursor) == matterFieldReset {
 		if m.pendingReset {
 			// Second press - confirm reset
 			m.resetting = true
 			m.pendingReset = false
-			m.err = nil
+			m.Err = nil
 			return m, m.createResetCmd()
 		}
 		// First press - request confirmation
@@ -281,7 +265,7 @@ func (m MatterEditModel) handleSaveOrAction() (MatterEditModel, tea.Cmd) {
 }
 
 func (m MatterEditModel) save() (MatterEditModel, tea.Cmd) {
-	if m.saving {
+	if m.Saving {
 		return m, nil
 	}
 
@@ -291,59 +275,45 @@ func (m MatterEditModel) save() (MatterEditModel, tea.Cmd) {
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 	}
 
-	m.saving = true
-	m.err = nil
-
-	return m, m.createSaveCmd()
-}
-
-func (m MatterEditModel) createSaveCmd() tea.Cmd {
+	m.StartSave()
 	newEnabled := m.pendingEnabled
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
 
-		var err error
+	cmd := m.SaveCmd(func(ctx context.Context) error {
 		if newEnabled {
-			err = m.svc.Wireless().MatterEnable(ctx, m.device)
-		} else {
-			err = m.svc.Wireless().MatterDisable(ctx, m.device)
+			return m.Svc.Wireless().MatterEnable(ctx, m.Device)
 		}
-		if err != nil {
-			return messages.NewSaveError(nil, err)
-		}
-		return messages.NewSaveResult(nil)
-	}
+		return m.Svc.Wireless().MatterDisable(ctx, m.Device)
+	})
+	return m, cmd
 }
 
 func (m MatterEditModel) createResetCmd() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		ctx, cancel := context.WithTimeout(m.Ctx, 30*time.Second)
 		defer cancel()
 
-		err := m.svc.Wireless().MatterReset(ctx, m.device)
+		err := m.Svc.Wireless().MatterReset(ctx, m.Device)
 		return MatterResetResultMsg{Err: err}
 	}
 }
 
 func (m MatterEditModel) fetchCodes() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		ctx, cancel := context.WithTimeout(m.Ctx, 10*time.Second)
 		defer cancel()
 
-		info, err := m.svc.Wireless().MatterGetCommissioningCode(ctx, m.device)
+		info, err := m.Svc.Wireless().MatterGetCommissioningCode(ctx, m.Device)
 		return MatterCodesLoadedMsg{Codes: info, Err: err}
 	}
 }
 
 // View renders the edit modal.
 func (m MatterEditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
 	footer := m.buildFooter()
-	r := rendering.NewModal(m.width, m.height, "Matter Configuration", footer)
 
 	var content strings.Builder
 
@@ -373,17 +343,16 @@ func (m MatterEditModel) View() string {
 	}
 
 	// Error display
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
-	return r.SetContent(content.String()).Render()
+	return m.RenderModal("Matter Configuration", content.String(), footer)
 }
 
 func (m MatterEditModel) buildFooter() string {
-	if m.saving {
+	if m.Saving {
 		return footerSaving
 	}
 	if m.resetting {
@@ -398,44 +367,44 @@ func (m MatterEditModel) buildFooter() string {
 func (m MatterEditModel) renderStatus() string {
 	var content strings.Builder
 
-	content.WriteString(m.styles.Label.Render("Status:"))
+	content.WriteString(m.Styles.Label.Render("Status:"))
 	content.WriteString(" ")
 	if m.enabled {
-		content.WriteString(m.styles.StatusOn.Render("● Enabled"))
+		content.WriteString(m.Styles.StatusOn.Render("● Enabled"))
 	} else {
-		content.WriteString(m.styles.StatusOff.Render("○ Disabled"))
+		content.WriteString(m.Styles.StatusOff.Render("○ Disabled"))
 	}
 
 	if m.enabled {
 		content.WriteString("\n")
-		content.WriteString(m.styles.Label.Render("Commission:"))
+		content.WriteString(m.Styles.Label.Render("Commission:"))
 		content.WriteString(" ")
 		if m.commissionable {
-			content.WriteString(m.styles.Warning.Render("Ready to pair"))
+			content.WriteString(m.Styles.Warning.Render("Ready to pair"))
 		} else {
-			content.WriteString(m.styles.Muted.Render("Already paired"))
+			content.WriteString(m.Styles.Muted.Render("Already paired"))
 		}
 
 		content.WriteString("\n")
-		content.WriteString(m.styles.Label.Render("Fabrics:"))
+		content.WriteString(m.Styles.Label.Render("Fabrics:"))
 		content.WriteString(" ")
-		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d", m.fabricsCount)))
+		content.WriteString(m.Styles.Value.Render(fmt.Sprintf("%d", m.fabricsCount)))
 	}
 
 	return content.String()
 }
 
 func (m MatterEditModel) renderEnableToggle() string {
-	selected := m.field == matterFieldEnable
+	selected := matterEditField(m.Cursor) == matterFieldEnable
 
 	var value string
 	if m.pendingEnabled {
-		value = m.styles.StatusOn.Render("[●] ON ")
+		value = m.Styles.StatusOn.Render("[●] ON ")
 	} else {
-		value = m.styles.StatusOff.Render("[ ] OFF")
+		value = m.Styles.StatusOff.Render("[ ] OFF")
 	}
 
-	return m.styles.RenderFieldRow(selected, "Enabled:", value)
+	return m.Styles.RenderFieldRow(selected, "Enabled:", value)
 }
 
 func (m MatterEditModel) renderChangeIndicator() string {
@@ -445,72 +414,72 @@ func (m MatterEditModel) renderChangeIndicator() string {
 	} else {
 		msg = "Will disable Matter"
 	}
-	return m.styles.Warning.Render(fmt.Sprintf("  ⚡ %s", msg))
+	return m.Styles.Warning.Render(fmt.Sprintf("  ⚡ %s", msg))
 }
 
 func (m MatterEditModel) renderCodes() string {
 	var content strings.Builder
 
-	content.WriteString(m.styles.LabelFocus.Render("Commissioning Codes"))
+	content.WriteString(m.Styles.LabelFocus.Render("Commissioning Codes"))
 	content.WriteString("\n")
 
 	if m.loadingCodes {
-		content.WriteString("  " + m.styles.Muted.Render("Loading codes..."))
+		content.WriteString("  " + m.Styles.Muted.Render("Loading codes..."))
 		return content.String()
 	}
 
 	if !m.commissionable {
-		content.WriteString("  " + m.styles.Muted.Render("Device is already paired"))
+		content.WriteString("  " + m.Styles.Muted.Render("Device is already paired"))
 		return content.String()
 	}
 
 	if m.codes == nil || !m.codes.Available {
-		content.WriteString("  " + m.styles.Muted.Render("Codes not available"))
+		content.WriteString("  " + m.Styles.Muted.Render("Codes not available"))
 		return content.String()
 	}
 
 	// Manual code
 	if m.codes.ManualCode != "" {
-		content.WriteString("  " + m.styles.Label.Render("Manual Code:  "))
-		content.WriteString(m.styles.Value.Render(m.codes.ManualCode))
+		content.WriteString("  " + m.Styles.Label.Render("Manual Code:  "))
+		content.WriteString(m.Styles.Value.Render(m.codes.ManualCode))
 		content.WriteString("\n")
 	}
 
 	// QR code string
 	if m.codes.QRCode != "" {
-		content.WriteString("  " + m.styles.Label.Render("QR Code:      "))
-		content.WriteString(m.styles.Value.Render(m.codes.QRCode))
+		content.WriteString("  " + m.Styles.Label.Render("QR Code:      "))
+		content.WriteString(m.Styles.Value.Render(m.codes.QRCode))
 		content.WriteString("\n")
 	}
 
 	// Setup PIN
 	if m.codes.SetupPINCode != 0 {
-		content.WriteString("  " + m.styles.Label.Render("Setup PIN:    "))
-		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d", m.codes.SetupPINCode)))
+		content.WriteString("  " + m.Styles.Label.Render("Setup PIN:    "))
+		content.WriteString(m.Styles.Value.Render(fmt.Sprintf("%d", m.codes.SetupPINCode)))
 		content.WriteString("\n")
 	}
 
 	// Discriminator
 	if m.codes.Discriminator != 0 {
-		content.WriteString("  " + m.styles.Label.Render("Discriminator:"))
+		content.WriteString("  " + m.Styles.Label.Render("Discriminator:"))
 		content.WriteString(" ")
-		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d", m.codes.Discriminator)))
+		content.WriteString(m.Styles.Value.Render(fmt.Sprintf("%d", m.codes.Discriminator)))
 	}
 
 	return content.String()
 }
 
 func (m MatterEditModel) renderResetButton() string {
-	selected := m.field == matterFieldReset
+	selected := matterEditField(m.Cursor) == matterFieldReset
 
 	if m.pendingReset {
-		selector := m.styles.RenderSelector(selected)
-		return selector + m.styles.ButtonDanger.Render("⚠ CONFIRM FACTORY RESET")
+		selector := m.Styles.RenderSelector(selected)
+		return selector + m.Styles.ButtonDanger.Render("⚠ CONFIRM FACTORY RESET")
 	}
 
-	selector := m.styles.RenderSelector(selected)
+	selector := m.Styles.RenderSelector(selected)
 	if selected {
-		return selector + m.styles.ButtonDanger.Render("Factory Reset")
+		return selector + m.Styles.ButtonDanger.Render("Factory Reset")
 	}
-	return selector + m.styles.Button.Render("Factory Reset")
+	return selector + m.Styles.Button.Render("Factory Reset")
 }

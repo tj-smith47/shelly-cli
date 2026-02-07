@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -35,6 +36,9 @@ type Model struct {
 	height       int
 	scrollOffset int
 	styles       Styles
+	searchInput  textinput.Model
+	searching    bool
+	searchFilter string
 }
 
 // Styles for the help component.
@@ -77,9 +81,22 @@ func DefaultStyles() Styles {
 
 // New creates a new help model.
 func New() Model {
+	ti := textinput.New()
+	ti.Placeholder = "search keybindings..."
+	ti.CharLimit = 30
+	ti.SetWidth(25)
+
+	colors := theme.GetSemanticColors()
+	tiStyles := textinput.DefaultStyles(true)
+	tiStyles.Focused.Prompt = tiStyles.Focused.Prompt.Foreground(colors.Highlight)
+	tiStyles.Focused.Text = tiStyles.Focused.Text.Foreground(colors.Text)
+	tiStyles.Focused.Placeholder = tiStyles.Focused.Placeholder.Foreground(colors.Muted)
+	ti.SetStyles(tiStyles)
+
 	return Model{
-		keyMap: keys.NewContextMap(),
-		styles: DefaultStyles(),
+		keyMap:      keys.NewContextMap(),
+		styles:      DefaultStyles(),
+		searchInput: ti,
 	}
 }
 
@@ -94,6 +111,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// When searching, forward all key events to the search input
+	if m.searching {
+		return m.updateSearch(msg)
+	}
+
 	switch msg := msg.(type) {
 	case messages.NavigationMsg:
 		return m.handleNavigation(msg), nil
@@ -101,6 +123,38 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleKeyPress(msg)
 	}
 	return m, nil
+}
+
+func (m Model) updateSearch(msg tea.Msg) (Model, tea.Cmd) {
+	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+		switch {
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys(keyconst.KeyEsc, "ctrl+["))):
+			// Exit search, clear filter
+			m.searching = false
+			m.searchFilter = ""
+			m.searchInput.SetValue("")
+			m.searchInput.Blur()
+			m.scrollOffset = 0
+			return m, nil
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys(keyconst.KeyEnter))):
+			// Confirm search, keep filter active but exit search input mode
+			m.searching = false
+			m.searchInput.Blur()
+			m.scrollOffset = 0
+			return m, nil
+		}
+	}
+
+	var cmd tea.Cmd
+	prevValue := m.searchInput.Value()
+	m.searchInput, cmd = m.searchInput.Update(msg)
+
+	if m.searchInput.Value() != prevValue {
+		m.searchFilter = m.searchInput.Value()
+		m.scrollOffset = 0
+	}
+
+	return m, cmd
 }
 
 func (m Model) handleNavigation(msg messages.NavigationMsg) Model {
@@ -131,7 +185,13 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, key.NewBinding(key.WithKeys("?", "escape", "q"))):
 		m.visible = false
+		m.searchFilter = ""
+		m.searchInput.SetValue("")
 		return m, func() tea.Msg { return CloseMsg{} }
+	case key.Matches(msg, key.NewBinding(key.WithKeys("/"))):
+		m.searching = true
+		m.searchInput.Focus()
+		return m, textinput.Blink
 	case key.Matches(msg, key.NewBinding(key.WithKeys("j", "down"))):
 		m.scrollOffset++
 	case key.Matches(msg, key.NewBinding(key.WithKeys("k", "up"))):
@@ -150,8 +210,13 @@ func (m Model) View() string {
 		return ""
 	}
 
-	// Get bindings for current context
+	// Get bindings for current context, filtered by search
 	sections := m.getContextBindings()
+
+	// Apply search filter
+	if m.searchFilter != "" {
+		sections = m.filterSections(sections)
+	}
 
 	// Build content first to measure it
 	var content string
@@ -162,8 +227,28 @@ func (m Model) View() string {
 		content = m.renderSingleColumnLayout(sections)
 	}
 
+	// Show "no matches" message if search filter is active but no results
+	if m.searchFilter != "" && len(sections) == 0 {
+		noMatch := m.styles.Muted.Render("No matching keybindings for \"" + m.searchFilter + "\"")
+		content = noMatch + "\n"
+	}
+
+	// Search bar (when searching or filter active)
+	if m.searching {
+		searchLabel := m.styles.Key.Render("/ ") + m.searchInput.View()
+		content = searchLabel + "\n\n" + content
+	} else if m.searchFilter != "" {
+		searchLabel := m.styles.Key.Render("/ ") + m.styles.Desc.Render(m.searchFilter) +
+			"  " + m.styles.Muted.Render("(Esc to clear)")
+		content = searchLabel + "\n\n" + content
+	}
+
 	// Footer
-	footer := m.styles.Footer.Render("Press ? or Esc to close")
+	footerText := "? or Esc:close  /:search"
+	if m.searchFilter != "" && !m.searching {
+		footerText = "? or Esc:close  /:search again"
+	}
+	footer := m.styles.Footer.Render(footerText)
 
 	// Measure content dimensions
 	contentLines := strings.Split(content, "\n")
@@ -228,6 +313,30 @@ func (m Model) ViewCompact() string {
 		Padding(0, 1).
 		Width(m.width - 2).
 		Render(content)
+}
+
+// filterSections filters bindings by search text (case-insensitive match on key or description).
+func (m Model) filterSections(sections []BindingSection) []BindingSection {
+	filter := strings.ToLower(m.searchFilter)
+	var result []BindingSection
+
+	for _, section := range sections {
+		var filtered []keys.KeyBinding
+		for _, b := range section.Bindings {
+			if strings.Contains(strings.ToLower(b.Key), filter) ||
+				strings.Contains(strings.ToLower(b.Desc), filter) {
+				filtered = append(filtered, b)
+			}
+		}
+		if len(filtered) > 0 {
+			result = append(result, BindingSection{
+				Name:     section.Name,
+				Bindings: filtered,
+			})
+		}
+	}
+
+	return result
 }
 
 func (m Model) getContextBindings() []BindingSection {
@@ -382,6 +491,11 @@ func (m Model) renderTwoColumnLayout(sections []BindingSection, gap int) string 
 	return content.String()
 }
 
+// Searching returns whether the help overlay is in search mode.
+func (m Model) Searching() bool {
+	return m.searching
+}
+
 // ViewHeight returns the height the compact help bar will take.
 func (m Model) ViewHeight() int {
 	return 2
@@ -410,24 +524,27 @@ func (m Model) SetKeyMap(km *keys.ContextMap) Model {
 func (m Model) Show() Model {
 	m.visible = true
 	m.scrollOffset = 0
+	m.searchFilter = ""
+	m.searchInput.SetValue("")
+	m.searching = false
 	return m
 }
 
 // Hide hides the help overlay.
 func (m Model) Hide() Model {
 	m.visible = false
+	m.searching = false
+	m.searchFilter = ""
+	m.searchInput.SetValue("")
 	return m
 }
 
 // Toggle toggles the help overlay visibility.
 func (m Model) Toggle() Model {
 	if m.visible {
-		m.visible = false
-	} else {
-		m.visible = true
-		m.scrollOffset = 0
+		return m.Hide()
 	}
-	return m
+	return m.Show()
 }
 
 // Visible returns whether the help overlay is visible.
@@ -453,7 +570,7 @@ func (m Model) FullHelp() [][]key.Binding {
 		},
 		{
 			key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
-			key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
+			key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 			key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 			key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
 		},

@@ -23,7 +23,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -121,7 +121,7 @@ type ImportCompleteMsg struct {
 
 // Model displays backup and restore operations.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx          context.Context
 	svc          *shelly.Service
 	mode         Mode
@@ -201,7 +201,7 @@ func New(deps Deps) Model {
 	backupDir := filepath.Join(homeDir, ".shelly", "backups")
 
 	m := Model{
-		Sizable:   helpers.NewSizable(10, panel.NewScroller(0, 10)),
+		Sizable:   panel.NewSizable(10, panel.NewScroller(0, 10)),
 		ctx:       deps.Ctx,
 		svc:       deps.Svc,
 		mode:      ModeExport,
@@ -680,9 +680,9 @@ func (m Model) View() string {
 	// Add footer with keybindings when focused
 	if m.focused {
 		if m.mode == ModeExport {
-			r.SetFooter(theme.StyledKeybindings("spc:sel a:all x:export 2:import"))
+			r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "spc", Desc: "sel"}, {Key: "a", Desc: "all"}, {Key: "x", Desc: "export"}, {Key: "2", Desc: "import"}}, keys.FooterHintWidth(m.Width))))
 		} else {
-			r.SetFooter(theme.StyledKeybindings("enter:import r:refresh 1:export"))
+			r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "enter", Desc: "import"}, {Key: "r", Desc: "refresh"}, {Key: "1", Desc: "export"}}, keys.FooterHintWidth(m.Width))))
 		}
 	}
 
@@ -925,8 +925,13 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
+	action := "restore"
 	if m.mode == ModeExport {
-		return "j/k:scroll g/G:top/bottom enter:backup"
+		action = "backup"
 	}
-	return "j/k:scroll g/G:top/bottom enter:restore"
+	return keys.FormatHints([]keys.Hint{
+		{Key: "j/k", Desc: "scroll"},
+		{Key: "g/G", Desc: "top/btm"},
+		{Key: "enter", Desc: action},
+	}, keys.FooterHintWidth(m.Width))
 }

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
@@ -13,7 +12,7 @@ import (
 // createTestModel creates a model with test events for navigation testing.
 func createTestModel(eventCount int) Model {
 	m := Model{
-		Sizable: helpers.NewSizable(1, panel.NewScroller(eventCount, 10)),
+		Sizable: panel.NewSizable(1, panel.NewScroller(eventCount, 10)),
 		state: &sharedState{
 			userEvents:    make([]Event, eventCount),
 			systemEvents:  make([]Event, 0),

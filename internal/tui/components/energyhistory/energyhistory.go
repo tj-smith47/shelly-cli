@@ -16,7 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -72,7 +71,7 @@ func (k SwitchKey) toID() switchID {
 
 // Model represents the energy history state.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	cache          *cache.Cache
 	mu             *sync.RWMutex
 	history        map[switchID][]DataPoint // Per-switch history keyed by stable ID
@@ -137,7 +136,7 @@ func DefaultStyles() Styles {
 // New creates a new energy history component.
 func New(c *cache.Cache) Model {
 	m := Model{
-		Sizable:        helpers.NewSizableLoaderOnly(),
+		Sizable:        panel.NewSizableLoaderOnly(),
 		cache:          c,
 		mu:             &sync.RWMutex{},
 		history:        make(map[switchID][]DataPoint),

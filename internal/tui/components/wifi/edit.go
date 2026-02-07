@@ -16,8 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // EditMode represents which section is being edited.
@@ -45,17 +43,9 @@ type SaveResultMsg = messages.SaveResultMsg
 
 // EditModel provides a modal form for editing WiFi settings.
 type EditModel struct {
-	ctx      context.Context
-	svc      *shelly.Service
-	device   string
+	editmodal.Base
+
 	mode     EditMode
-	field    Field
-	visible  bool
-	saving   bool
-	err      error
-	width    int
-	height   int
-	styles   editmodal.Styles
 	networks []network.WiFiNetworkFull
 
 	// Station fields
@@ -112,11 +102,12 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	apPassword.SetStyles(inputStyles)
 
 	return EditModel{
-		ctx:         ctx,
-		svc:         svc,
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles().WithLabelWidth(12),
+		},
 		mode:        EditModeStation,
-		field:       FieldSSID,
-		styles:      editmodal.DefaultStyles().WithLabelWidth(12),
 		staSSID:     staSSID,
 		staPassword: staPassword,
 		apSSID:      apSSID,
@@ -131,14 +122,10 @@ func (m EditModel) Init() tea.Cmd {
 
 // Show makes the modal visible and loads current config.
 func (m EditModel) Show(device string, config *network.WiFiConfigFull, networks []network.WiFiNetworkFull) EditModel {
-	m.device = device
-	m.visible = true
-	m.err = nil
-	m.saving = false
+	m.Base.Show(device, int(FieldCount))
 	m.origConfig = config
 	m.networks = networks
 	m.mode = EditModeStation
-	m.field = FieldSSID
 
 	// Populate fields from config
 	if config != nil {
@@ -164,7 +151,7 @@ func (m EditModel) Show(device string, config *network.WiFiConfigFull, networks 
 
 // Hide hides the modal.
 func (m EditModel) Hide() EditModel {
-	m.visible = false
+	m.Base.Hide()
 	m.staSSID.Blur()
 	m.staPassword.Blur()
 	m.apSSID.Blur()
@@ -174,19 +161,18 @@ func (m EditModel) Hide() EditModel {
 
 // IsVisible returns whether the modal is visible.
 func (m EditModel) IsVisible() bool {
-	return m.visible
+	return m.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m EditModel) SetSize(width, height int) EditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	return m
 }
 
 // Update handles messages.
 func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -196,25 +182,23 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Success {
-			m = m.Hide()
-		} else {
-			m.err = msg.Err
-		}
+		// Use Base.HandleSaveResult for state management but ignore the
+		// returned cmd since the parent model handles close detection
+		// and EditClosedMsg sending via the IsVisible() check.
+		m.HandleSaveResult(msg)
 		return m, nil
 
 	// Action messages from context system
 	case messages.NavigationMsg:
-		if m.saving {
+		if m.Base.Saving {
 			return m, nil
 		}
 		return m.handleNavigation(msg)
 	case messages.ToggleEnableRequestMsg:
-		if m.saving {
+		if m.Base.Saving {
 			return m, nil
 		}
-		if m.field == FieldEnabled {
+		if Field(m.Cursor) == FieldEnabled {
 			if m.mode == EditModeStation {
 				m.staEnabled = !m.staEnabled
 			} else {
@@ -246,24 +230,25 @@ func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.
 func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 	var cmd tea.Cmd
 	switch {
-	case m.field == FieldSSID && m.mode == EditModeStation:
+	case Field(m.Cursor) == FieldSSID && m.mode == EditModeStation:
 		m.staSSID, cmd = m.staSSID.Update(msg)
-	case m.field == FieldPassword && m.mode == EditModeStation:
+	case Field(m.Cursor) == FieldPassword && m.mode == EditModeStation:
 		m.staPassword, cmd = m.staPassword.Update(msg)
-	case m.field == FieldSSID && m.mode == EditModeAP:
+	case Field(m.Cursor) == FieldSSID && m.mode == EditModeAP:
 		m.apSSID, cmd = m.apSSID.Update(msg)
-	case m.field == FieldPassword && m.mode == EditModeAP:
+	case Field(m.Cursor) == FieldPassword && m.mode == EditModeAP:
 		m.apPassword, cmd = m.apPassword.Update(msg)
 	}
 	return m, cmd
 }
 
 func (m EditModel) handleKeyPress(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
-	if m.saving {
+	if m.Base.Saving {
 		return m, nil
 	}
 
-	// Modal-specific keys not covered by action messages
+	// WiFi uses Tab/Shift+Tab for mode switching (STA/AP), so handle keys
+	// manually instead of using HandleKey which maps Tab to ActionNext.
 	switch msg.String() {
 	case "esc", "ctrl+[":
 		return m.Hide(), nil
@@ -279,11 +264,11 @@ func (m EditModel) handleKeyPress(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 			m = m.blurAllInputs()
 			m.staSSID.Focus()
 		}
-		m.field = FieldSSID
+		m.Cursor = int(FieldSSID)
 		return m, nil
 
 	case keyconst.KeyEnter:
-		if m.field == FieldEnabled {
+		if Field(m.Cursor) == FieldEnabled {
 			// Toggle enabled state
 			if m.mode == EditModeStation {
 				m.staEnabled = !m.staEnabled
@@ -313,24 +298,24 @@ func (m EditModel) blurAllInputs() EditModel {
 
 func (m EditModel) nextField() EditModel {
 	m = m.blurAllInputs()
-	m.field = (m.field + 1) % FieldCount
+	m.Cursor = (m.Cursor + 1) % int(FieldCount)
 	m = m.focusCurrentField()
 	return m
 }
 
 func (m EditModel) prevField() EditModel {
 	m = m.blurAllInputs()
-	if m.field == 0 {
-		m.field = FieldCount - 1
+	if m.Cursor == 0 {
+		m.Cursor = int(FieldCount) - 1
 	} else {
-		m.field--
+		m.Cursor--
 	}
 	m = m.focusCurrentField()
 	return m
 }
 
 func (m EditModel) focusCurrentField() EditModel {
-	switch m.field {
+	switch Field(m.Cursor) {
 	case FieldSSID:
 		if m.mode == EditModeStation {
 			m.staSSID.Focus()
@@ -350,14 +335,14 @@ func (m EditModel) focusCurrentField() EditModel {
 }
 
 func (m EditModel) save() tea.Cmd {
-	m.saving = true
+	m.StartSave()
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		ctx, cancel := context.WithTimeout(m.Ctx, 30*time.Second)
 		defer cancel()
 
 		// Save station config
 		if m.staSSID.Value() != "" {
-			err := m.svc.SetWiFiStation(ctx, m.device, m.staSSID.Value(), m.staPassword.Value(), m.staEnabled)
+			err := m.Svc.SetWiFiStation(ctx, m.Base.Device, m.staSSID.Value(), m.staPassword.Value(), m.staEnabled)
 			if err != nil {
 				return messages.NewSaveError(nil, fmt.Errorf("station: %w", err))
 			}
@@ -365,7 +350,7 @@ func (m EditModel) save() tea.Cmd {
 
 		// Save AP config
 		if m.apSSID.Value() != "" {
-			err := m.svc.SetWiFiAP(ctx, m.device, m.apSSID.Value(), m.apPassword.Value(), m.apEnabled)
+			err := m.Svc.SetWiFiAP(ctx, m.Base.Device, m.apSSID.Value(), m.apPassword.Value(), m.apEnabled)
 			if err != nil {
 				return messages.NewSaveError(nil, fmt.Errorf("AP: %w", err))
 			}
@@ -377,18 +362,12 @@ func (m EditModel) save() tea.Cmd {
 
 // View renders the edit modal.
 func (m EditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
 	// Build footer with keybindings
-	footer := "Tab: Mode | ↑↓: Navigate | Space: Toggle | Ctrl+S: Save | Esc: Cancel"
-	if m.saving {
-		footer = "Saving..."
-	}
-
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, "Edit WiFi Settings", footer)
+	footer := m.RenderSavingFooter("Tab: Mode | ↑↓: Navigate | Space: Toggle | Ctrl+S: Save | Esc: Cancel")
 
 	// Build content
 	var content strings.Builder
@@ -405,23 +384,22 @@ func (m EditModel) View() string {
 	}
 
 	// Error
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
-	return r.SetContent(content.String()).Render()
+	return m.RenderModal("Edit WiFi Settings", content.String(), footer)
 }
 
 func (m EditModel) renderTabs() string {
 	var staTab, apTab string
 	if m.mode == EditModeStation {
-		staTab = m.styles.TabActive.Render("Station (STA)")
-		apTab = m.styles.Tab.Render("Access Point (AP)")
+		staTab = m.Styles.TabActive.Render("Station (STA)")
+		apTab = m.Styles.Tab.Render("Access Point (AP)")
 	} else {
-		staTab = m.styles.Tab.Render("Station (STA)")
-		apTab = m.styles.TabActive.Render("Access Point (AP)")
+		staTab = m.Styles.Tab.Render("Station (STA)")
+		apTab = m.Styles.TabActive.Render("Access Point (AP)")
 	}
 	return staTab + " " + apTab
 }
@@ -438,12 +416,12 @@ func (m EditModel) renderStationFields() string {
 	content.WriteString("\n")
 
 	// Enabled toggle
-	content.WriteString(m.renderToggleRow("Enabled", m.staEnabled, m.field == FieldEnabled))
+	content.WriteString(m.renderToggleRow("Enabled", m.staEnabled, Field(m.Cursor) == FieldEnabled))
 
 	// Show available networks if any
-	if len(m.networks) > 0 && m.field == FieldSSID {
+	if len(m.networks) > 0 && Field(m.Cursor) == FieldSSID {
 		content.WriteString("\n\n")
-		content.WriteString(m.styles.Help.Render(fmt.Sprintf("Available: %s", m.networksHint())))
+		content.WriteString(m.Styles.Help.Render(fmt.Sprintf("Available: %s", m.networksHint())))
 	}
 
 	return content.String()
@@ -461,28 +439,28 @@ func (m EditModel) renderAPFields() string {
 	content.WriteString("\n")
 
 	// Enabled toggle
-	content.WriteString(m.renderToggleRow("Enabled", m.apEnabled, m.field == FieldEnabled))
+	content.WriteString(m.renderToggleRow("Enabled", m.apEnabled, Field(m.Cursor) == FieldEnabled))
 
 	return content.String()
 }
 
 func (m EditModel) renderFieldRow(label, inputView string) string {
-	labelStr := m.styles.Label.Render(label + ":")
+	labelStr := m.Styles.Label.Render(label + ":")
 	return labelStr + inputView
 }
 
 func (m EditModel) renderToggleRow(label string, enabled, focused bool) string {
-	labelStr := m.styles.Label.Render(label + ":")
+	labelStr := m.Styles.Label.Render(label + ":")
 
 	var toggle string
 	if enabled {
-		toggle = m.styles.StatusOn.Render("[●] On")
+		toggle = m.Styles.StatusOn.Render("[●] On")
 	} else {
-		toggle = m.styles.Muted.Render("[○] Off")
+		toggle = m.Styles.Muted.Render("[○] Off")
 	}
 
 	if focused {
-		toggle = m.styles.Selected.Render(toggle)
+		toggle = m.Styles.Selected.Render(toggle)
 	}
 
 	return labelStr + toggle
@@ -505,10 +483,10 @@ func (m EditModel) networksHint() string {
 
 // Saving returns whether a save is in progress.
 func (m EditModel) Saving() bool {
-	return m.saving
+	return m.Base.Saving
 }
 
 // Device returns the current device.
 func (m EditModel) Device() string {
-	return m.device
+	return m.Base.Device
 }

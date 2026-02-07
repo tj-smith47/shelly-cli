@@ -21,7 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
@@ -117,7 +117,7 @@ type RefreshTickMsg struct{}
 
 // Model holds the events state.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx         context.Context
 	svc         *shelly.Service
 	ios         *iostreams.IOStreams
@@ -249,7 +249,7 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		Sizable:            helpers.NewSizable(1, panel.NewScroller(0, 10)), // overhead: 1 row for header
+		Sizable:            panel.NewSizable(1, panel.NewScroller(0, 10)), // overhead: 1 row for header
 		ctx:                deps.Ctx,
 		svc:                deps.Svc,
 		ios:                deps.IOS,
@@ -1051,7 +1051,7 @@ func (m Model) MaxDescriptionLen() int {
 
 // FooterText returns the keybindings for the wrapper to display.
 func (m Model) FooterText() string {
-	return theme.StyledKeybindings("n/N:page g/G:first/last p:pause c:clear")
+	return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "n/N", Desc: "page"}, {Key: "g/G", Desc: "first/last"}, {Key: "p", Desc: "pause"}, {Key: "c", Desc: "clear"}}, keys.FooterHintWidth(m.Width)))
 }
 
 // StatusBadge returns status indicators for the wrapper to display.

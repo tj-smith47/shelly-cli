@@ -20,8 +20,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -37,7 +37,7 @@ type FetchedMsg struct {
 
 // Model displays JSON responses with syntax highlighting.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx           context.Context
 	svc           *shelly.Service
 	deviceAddress string
@@ -106,7 +106,7 @@ func New(ctx context.Context, svc *shelly.Service) Model {
 	vp := viewport.New(viewport.WithWidth(60), viewport.WithHeight(20))
 
 	m := Model{
-		Sizable:  helpers.NewSizableLoaderOnly(),
+		Sizable:  panel.NewSizableLoaderOnly(),
 		ctx:      ctx,
 		svc:      svc,
 		viewport: vp,

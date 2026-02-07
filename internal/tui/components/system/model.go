@@ -16,8 +16,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -70,7 +71,7 @@ const (
 
 // Model displays system settings for a device.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx         context.Context
 	svc         *shelly.Service
 	fileCache   *cache.FileCache
@@ -134,7 +135,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:     helpers.NewSizableLoaderOnly(),
+		Sizable:     panel.NewSizableLoaderOnly(),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
@@ -240,6 +241,8 @@ func (m Model) SetSize(width, height int) Model {
 // SetEditModalSize sets the edit modal dimensions.
 // This should be called with screen-based dimensions when the modal is visible.
 func (m Model) SetEditModalSize(width, height int) Model {
+	m.ModalWidth = width
+	m.ModalHeight = height
 	if m.editing {
 		m.editModal = m.editModal.SetSize(width, height)
 	}
@@ -476,7 +479,8 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	w, h := m.EditModalDims()
+	m.editModal = m.editModal.SetSize(w, h)
 	m.editModal = m.editModal.Show(m.device, m.config)
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
@@ -486,7 +490,8 @@ func (m Model) handleTimezoneKey() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	w, h := m.EditModalDims()
+	m.editModal = m.editModal.SetSize(w, h)
 	m.editModal = m.editModal.ShowAtTimezone(m.device, m.config)
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
@@ -622,7 +627,7 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		footer := "e:edit z:timezone t:toggle r:refresh"
+		footer := theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "z", Desc: "timezone"}, {Key: "t", Desc: "toggle"}, {Key: "r", Desc: "refresh"}}, keys.FooterHintWidth(m.Width)))
 		if cacheView := m.cacheStatus.View(); cacheView != "" {
 			footer += " | " + cacheView
 		}

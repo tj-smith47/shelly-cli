@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 )
 
 func TestNewList(t *testing.T) {
@@ -166,8 +167,9 @@ func TestListModel_FooterText(t *testing.T) {
 	m := newTestList()
 
 	footer := m.FooterText()
-	if footer != footerKeybindings {
-		t.Errorf("FooterText() = %q, want %q", footer, footerKeybindings)
+	expected := keys.FormatHints(footerHints, 0)
+	if footer != expected {
+		t.Errorf("FooterText() = %q, want %q", footer, expected)
 	}
 }
 

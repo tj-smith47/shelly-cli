@@ -1,15 +1,13 @@
-package helpers
+package panel
 
 import (
 	"testing"
-
-	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 func TestNewSizable(t *testing.T) {
 	t.Parallel()
 
-	scroller := panel.NewScroller(0, 10)
+	scroller := NewScroller(0, 10)
 	s := NewSizable(4, scroller)
 
 	if s.Scroller != scroller {
@@ -76,7 +74,7 @@ func TestSizable_ApplySize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			scroller := panel.NewScroller(0, 100)
+			scroller := NewScroller(0, 100)
 			s := NewSizable(tt.scrollOffset, scroller)
 
 			s.ApplySize(tt.width, tt.height)
@@ -171,7 +169,7 @@ func TestSizable_SetScrollOffset(t *testing.T) {
 func TestSizable_ApplySizeWithExtraLoaders(t *testing.T) {
 	t.Parallel()
 
-	scroller := panel.NewScroller(0, 100)
+	scroller := NewScroller(0, 100)
 	s := NewSizable(4, scroller)
 
 	extra1 := s.Loader

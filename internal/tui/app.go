@@ -941,6 +941,12 @@ func (m Model) handleInputModeKey(msg tea.KeyPressMsg, _ keys.Action) (tea.Model
 
 // handleOverlayModeKey handles keys when an overlay is visible (help, JSON viewer, etc.).
 func (m Model) handleOverlayModeKey(msg tea.KeyPressMsg, action keys.Action) (tea.Model, tea.Cmd, bool) {
+	// When help is searching, route all keys (including Escape) to the help overlay
+	// so the search input can handle them (Escape exits search, not the overlay)
+	if m.help.Visible() && m.help.Searching() {
+		return m.routeToVisibleOverlay(msg)
+	}
+
 	// Handle escape to close overlay
 	if action == keys.ActionEscape {
 		return m.closeTopOverlay()

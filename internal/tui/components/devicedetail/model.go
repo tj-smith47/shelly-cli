@@ -15,7 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
@@ -39,7 +39,7 @@ type ClosedMsg struct{}
 
 // Model holds the device detail state.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx      context.Context
 	svc      *shelly.Service
 	device   *model.Device
@@ -100,7 +100,7 @@ func New(deps Deps) Model {
 	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 
 	m := Model{
-		Sizable:  helpers.NewSizableLoaderOnly(),
+		Sizable:  panel.NewSizableLoaderOnly(),
 		ctx:      deps.Ctx,
 		svc:      deps.Svc,
 		viewport: vp,

@@ -20,13 +20,13 @@ func TestNewZigbeeEditModel(t *testing.T) {
 
 	m := NewZigbeeEditModel(ctx, svc)
 
-	if m.visible {
+	if m.Visible() {
 		t.Error("should not be visible initially")
 	}
-	if m.ctx != ctx {
+	if m.Ctx != ctx {
 		t.Error("ctx not set")
 	}
-	if m.svc != svc {
+	if m.Svc != svc {
 		t.Error("svc not set")
 	}
 }
@@ -46,11 +46,11 @@ func TestZigbeeEditModel_Show(t *testing.T) {
 
 	m, _ = m.Show(testDevice, zigbee)
 
-	if !m.visible {
+	if !m.Visible() {
 		t.Error("should be visible after Show")
 	}
-	if m.device != testDevice {
-		t.Errorf("device = %q, want %q", m.device, testDevice)
+	if m.Device != testDevice {
+		t.Errorf("Device = %q, want %q", m.Device, testDevice)
 	}
 	if !m.enabled {
 		t.Error("enabled should be true")
@@ -73,7 +73,7 @@ func TestZigbeeEditModel_Show(t *testing.T) {
 	if !m.pendingEnabled {
 		t.Error("pendingEnabled should match enabled")
 	}
-	if m.saving || m.steering || m.leaving {
+	if m.Saving || m.steering || m.leaving {
 		t.Error("operation flags should be false")
 	}
 }
@@ -91,8 +91,8 @@ func TestZigbeeEditModel_Show_Disabled(t *testing.T) {
 	if m.pendingEnabled {
 		t.Error("pendingEnabled should be false")
 	}
-	if m.fieldCount != 1 {
-		t.Errorf("fieldCount = %d, want 1 (only enable toggle)", m.fieldCount)
+	if m.FieldCount != 1 {
+		t.Errorf("FieldCount = %d, want 1 (only enable toggle)", m.FieldCount)
 	}
 }
 
@@ -107,8 +107,8 @@ func TestZigbeeEditModel_Show_EnabledNotJoined(t *testing.T) {
 	m, _ = m.Show(testDevice, zigbee)
 
 	// Should have 2 fields: enable + pair
-	if m.fieldCount != 2 {
-		t.Errorf("fieldCount = %d, want 2 (enable + pair)", m.fieldCount)
+	if m.FieldCount != 2 {
+		t.Errorf("FieldCount = %d, want 2 (enable + pair)", m.FieldCount)
 	}
 }
 
@@ -125,8 +125,8 @@ func TestZigbeeEditModel_Show_Joined(t *testing.T) {
 	m, _ = m.Show(testDevice, zigbee)
 
 	// Should have 3 fields: enable + pair + leave
-	if m.fieldCount != 3 {
-		t.Errorf("fieldCount = %d, want 3 (enable + pair + leave)", m.fieldCount)
+	if m.FieldCount != 3 {
+		t.Errorf("FieldCount = %d, want 3 (enable + pair + leave)", m.FieldCount)
 	}
 }
 
@@ -139,7 +139,7 @@ func TestZigbeeEditModel_Hide(t *testing.T) {
 
 	m = m.Hide()
 
-	if m.visible {
+	if m.Visible() {
 		t.Error("should not be visible after Hide")
 	}
 	if m.pendingLeave {
@@ -155,7 +155,7 @@ func TestZigbeeEditModel_Visible(t *testing.T) {
 		t.Error("should not be visible initially")
 	}
 
-	m.visible = true
+	m, _ = m.Show(testDevice, &shelly.TUIZigbeeStatus{Enabled: false})
 	if !m.Visible() {
 		t.Error("should be visible")
 	}
@@ -167,11 +167,11 @@ func TestZigbeeEditModel_SetSize(t *testing.T) {
 
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("Width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("Height = %d, want 50", m.Height)
 	}
 }
 
@@ -203,7 +203,7 @@ func TestZigbeeEditModel_Toggle_NotOnEnableField(t *testing.T) {
 	m, _ = m.Show(testDevice, zigbee)
 
 	// Move to pair field
-	m.field = zigbeeFieldPair
+	m.Cursor = int(zigbeeFieldPair)
 	originalEnabled := m.pendingEnabled
 
 	// Toggle should not work on pair field
@@ -224,44 +224,44 @@ func TestZigbeeEditModel_Navigation(t *testing.T) {
 	m, _ = m.Show(testDevice, zigbee)
 
 	// Start on enable field
-	if m.field != zigbeeFieldEnable {
-		t.Errorf("initial field = %d, want %d", m.field, zigbeeFieldEnable)
+	if zigbeeEditField(m.Cursor) != zigbeeFieldEnable {
+		t.Errorf("initial Cursor = %d, want %d", m.Cursor, zigbeeFieldEnable)
 	}
 
 	// Navigate down
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
-	if m.field != zigbeeFieldPair {
-		t.Errorf("after j, field = %d, want %d", m.field, zigbeeFieldPair)
+	if zigbeeEditField(m.Cursor) != zigbeeFieldPair {
+		t.Errorf("after j, Cursor = %d, want %d", m.Cursor, zigbeeFieldPair)
 	}
 
 	// Navigate down again
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
-	if m.field != zigbeeFieldLeave {
-		t.Errorf("after second j, field = %d, want %d", m.field, zigbeeFieldLeave)
+	if zigbeeEditField(m.Cursor) != zigbeeFieldLeave {
+		t.Errorf("after second j, Cursor = %d, want %d", m.Cursor, zigbeeFieldLeave)
 	}
 
 	// Navigate down at bottom (should stay)
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
-	if m.field != zigbeeFieldLeave {
-		t.Errorf("at bottom, field = %d, want %d", m.field, zigbeeFieldLeave)
+	if zigbeeEditField(m.Cursor) != zigbeeFieldLeave {
+		t.Errorf("at bottom, Cursor = %d, want %d", m.Cursor, zigbeeFieldLeave)
 	}
 
 	// Navigate up
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'k'})
-	if m.field != zigbeeFieldPair {
-		t.Errorf("after k, field = %d, want %d", m.field, zigbeeFieldPair)
+	if zigbeeEditField(m.Cursor) != zigbeeFieldPair {
+		t.Errorf("after k, Cursor = %d, want %d", m.Cursor, zigbeeFieldPair)
 	}
 
 	// Navigate up to top
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'k'})
-	if m.field != zigbeeFieldEnable {
-		t.Errorf("at top, field = %d, want %d", m.field, zigbeeFieldEnable)
+	if zigbeeEditField(m.Cursor) != zigbeeFieldEnable {
+		t.Errorf("at top, Cursor = %d, want %d", m.Cursor, zigbeeFieldEnable)
 	}
 
 	// Navigate up at top (should stay)
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'k'})
-	if m.field != zigbeeFieldEnable {
-		t.Errorf("past top, field = %d, want %d", m.field, zigbeeFieldEnable)
+	if zigbeeEditField(m.Cursor) != zigbeeFieldEnable {
+		t.Errorf("past top, Cursor = %d, want %d", m.Cursor, zigbeeFieldEnable)
 	}
 }
 
@@ -276,13 +276,13 @@ func TestZigbeeEditModel_NavigationMsg(t *testing.T) {
 
 	// Navigate via NavigationMsg
 	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavDown})
-	if m.field != zigbeeFieldPair {
-		t.Errorf("after NavDown, field = %d, want %d", m.field, zigbeeFieldPair)
+	if zigbeeEditField(m.Cursor) != zigbeeFieldPair {
+		t.Errorf("after NavDown, Cursor = %d, want %d", m.Cursor, zigbeeFieldPair)
 	}
 
 	m, _ = m.Update(messages.NavigationMsg{Direction: messages.NavUp})
-	if m.field != zigbeeFieldEnable {
-		t.Errorf("after NavUp, field = %d, want %d", m.field, zigbeeFieldEnable)
+	if zigbeeEditField(m.Cursor) != zigbeeFieldEnable {
+		t.Errorf("after NavUp, Cursor = %d, want %d", m.Cursor, zigbeeFieldEnable)
 	}
 }
 
@@ -294,7 +294,7 @@ func TestZigbeeEditModel_NavigationClearsPendingLeave(t *testing.T) {
 		NetworkState: zigbeeStateJoined,
 	}
 	m, _ = m.Show(testDevice, zigbee)
-	m.field = zigbeeFieldLeave
+	m.Cursor = int(zigbeeFieldLeave)
 	m.pendingLeave = true
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'k'})
@@ -313,7 +313,7 @@ func TestZigbeeEditModel_SaveNoChange(t *testing.T) {
 	// Press Enter with no changes
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	if m.visible {
+	if m.Visible() {
 		t.Error("should close on save with no changes")
 	}
 }
@@ -334,7 +334,7 @@ func TestZigbeeEditModel_SaveToggle(t *testing.T) {
 	// Save
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	if !m.saving {
+	if !m.Saving {
 		t.Error("should be saving")
 	}
 	if cmd == nil {
@@ -347,14 +347,14 @@ func TestZigbeeEditModel_SaveResult_Success(t *testing.T) {
 	m := newTestZigbeeEditModel()
 	zigbee := &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateReady}
 	m, _ = m.Show(testDevice, zigbee)
-	m.saving = true
+	m.Saving = true
 
 	m, cmd := m.Update(messages.NewSaveResult(nil))
 
-	if m.saving {
+	if m.Saving {
 		t.Error("should not be saving after success")
 	}
-	if m.visible {
+	if m.Visible() {
 		t.Error("should close modal after successful save")
 	}
 	if cmd == nil {
@@ -367,17 +367,17 @@ func TestZigbeeEditModel_SaveResult_Error(t *testing.T) {
 	m := newTestZigbeeEditModel()
 	zigbee := &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateReady}
 	m, _ = m.Show(testDevice, zigbee)
-	m.saving = true
+	m.Saving = true
 
 	m, _ = m.Update(messages.NewSaveError(nil, errTest))
 
-	if m.saving {
+	if m.Saving {
 		t.Error("should not be saving after error")
 	}
-	if m.err == nil {
+	if m.Err == nil {
 		t.Error("error should be set")
 	}
-	if !m.visible {
+	if !m.Visible() {
 		t.Error("should still be visible after error")
 	}
 }
@@ -393,8 +393,8 @@ func TestZigbeeEditModel_StartSteering(t *testing.T) {
 
 	// Navigate to pair button
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'j'})
-	if m.field != zigbeeFieldPair {
-		t.Errorf("field = %d, want %d", m.field, zigbeeFieldPair)
+	if zigbeeEditField(m.Cursor) != zigbeeFieldPair {
+		t.Errorf("Cursor = %d, want %d", m.Cursor, zigbeeFieldPair)
 	}
 
 	// Press Enter to start steering
@@ -420,7 +420,7 @@ func TestZigbeeEditModel_SteeringResult_Success(t *testing.T) {
 	if m.steering {
 		t.Error("should not be steering after success")
 	}
-	if m.visible {
+	if m.Visible() {
 		t.Error("should close modal after steering success")
 	}
 	if cmd == nil {
@@ -440,10 +440,10 @@ func TestZigbeeEditModel_SteeringResult_Error(t *testing.T) {
 	if m.steering {
 		t.Error("should not be steering after error")
 	}
-	if m.err == nil {
+	if m.Err == nil {
 		t.Error("error should be set")
 	}
-	if !m.visible {
+	if !m.Visible() {
 		t.Error("should still be visible after error")
 	}
 }
@@ -459,7 +459,7 @@ func TestZigbeeEditModel_LeaveConfirmation(t *testing.T) {
 	m, _ = m.Show(testDevice, zigbee)
 
 	// Navigate to leave button
-	m.field = zigbeeFieldLeave
+	m.Cursor = int(zigbeeFieldLeave)
 
 	// First press - request confirmation
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -500,7 +500,7 @@ func TestZigbeeEditModel_LeaveResult_Success(t *testing.T) {
 	if m.leaving {
 		t.Error("should not be leaving after success")
 	}
-	if m.visible {
+	if m.Visible() {
 		t.Error("should close modal after leave success")
 	}
 	if cmd == nil {
@@ -523,10 +523,10 @@ func TestZigbeeEditModel_LeaveResult_Error(t *testing.T) {
 	if m.leaving {
 		t.Error("should not be leaving after error")
 	}
-	if m.err == nil {
+	if m.Err == nil {
 		t.Error("error should be set")
 	}
-	if !m.visible {
+	if !m.Visible() {
 		t.Error("should still be visible after error")
 	}
 }
@@ -539,7 +539,7 @@ func TestZigbeeEditModel_EscClose(t *testing.T) {
 
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
-	if m.visible {
+	if m.Visible() {
 		t.Error("should not be visible after Esc")
 	}
 	if cmd == nil {
@@ -557,7 +557,7 @@ func TestZigbeeEditModel_CtrlSave(t *testing.T) {
 	m, _ = m.Update(tea.KeyPressMsg{Code: 't'})
 	m, cmd := m.Update(tea.KeyPressMsg{Mod: tea.ModCtrl, Code: 's'})
 
-	if !m.saving {
+	if !m.Saving {
 		t.Error("should be saving after Ctrl+S")
 	}
 	if cmd == nil {
@@ -572,7 +572,7 @@ func TestZigbeeEditModel_UpdateNotVisible(t *testing.T) {
 	// Should be no-op when not visible
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	if m.visible {
+	if m.Visible() {
 		t.Error("should not become visible")
 	}
 	if cmd != nil {
@@ -585,7 +585,7 @@ func TestZigbeeEditModel_NoOpWhileBusy(t *testing.T) {
 	m := newTestZigbeeEditModel()
 	zigbee := &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateReady}
 	m, _ = m.Show(testDevice, zigbee)
-	m.saving = true
+	m.Saving = true
 
 	// Toggle should be ignored while saving
 	original := m.pendingEnabled
@@ -645,7 +645,7 @@ func TestZigbeeEditModel_View_WithError(t *testing.T) {
 	m = m.SetSize(80, 40)
 	zigbee := &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateReady}
 	m, _ = m.Show(testDevice, zigbee)
-	m.err = errTest
+	m.Err = errTest
 
 	view := m.View()
 
@@ -669,7 +669,7 @@ func TestZigbeeEditModel_Footer(t *testing.T) {
 		},
 		{
 			name:     "saving",
-			setup:    func(m *ZigbeeEditModel) { m.saving = true },
+			setup:    func(m *ZigbeeEditModel) { m.Saving = true },
 			contains: "Saving",
 		},
 		{

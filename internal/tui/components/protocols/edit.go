@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -14,8 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // MQTTEditField represents a field in the MQTT edit form.
@@ -55,16 +52,7 @@ type MQTTEditClosedMsg = messages.EditClosedMsg
 
 // MQTTEditModel represents the MQTT configuration edit modal.
 type MQTTEditModel struct {
-	ctx     context.Context
-	svc     *shelly.Service
-	device  string
-	visible bool
-	cursor  MQTTEditField
-	saving  bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+	editmodal.Base
 
 	// Original config for comparison
 	originalData *MQTTData
@@ -127,9 +115,11 @@ func NewMQTTEditModel(ctx context.Context, svc *shelly.Service) MQTTEditModel {
 	)
 
 	return MQTTEditModel{
-		ctx:              ctx,
-		svc:              svc,
-		styles:           editmodal.DefaultStyles(),
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles(),
+		},
 		enableToggle:     enableToggle,
 		serverInput:      serverInput,
 		userInput:        userInput,
@@ -142,11 +132,7 @@ func NewMQTTEditModel(ctx context.Context, svc *shelly.Service) MQTTEditModel {
 
 // Show displays the edit modal with the given device and MQTT data.
 func (m MQTTEditModel) Show(device string, data *MQTTData) MQTTEditModel {
-	m.device = device
-	m.visible = true
-	m.cursor = MQTTFieldEnable
-	m.saving = false
-	m.err = nil
+	m.Base.Show(device, int(MQTTFieldCount))
 	m.originalData = data
 
 	// Populate form fields from current data
@@ -209,20 +195,19 @@ func (m MQTTEditModel) getSSLCAFromDropdown() string {
 
 // Hide hides the edit modal.
 func (m MQTTEditModel) Hide() MQTTEditModel {
-	m.visible = false
+	m.Base.Hide()
 	m = m.blurAllFields()
 	return m
 }
 
 // IsVisible returns whether the modal is visible.
 func (m MQTTEditModel) IsVisible() bool {
-	return m.visible
+	return m.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m MQTTEditModel) SetSize(width, height int) MQTTEditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	return m
 }
 
@@ -233,7 +218,7 @@ func (m MQTTEditModel) Init() tea.Cmd {
 
 // Update handles messages.
 func (m MQTTEditModel) Update(msg tea.Msg) (MQTTEditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.IsVisible() {
 		return m, nil
 	}
 
@@ -243,18 +228,16 @@ func (m MQTTEditModel) Update(msg tea.Msg) (MQTTEditModel, tea.Cmd) {
 func (m MQTTEditModel) handleMessage(msg tea.Msg) (MQTTEditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		// Success - close modal
-		m = m.Hide()
-		return m, func() tea.Msg { return MQTTEditClosedMsg{Saved: true} }
+		_, cmd := m.HandleSaveResult(msg)
+		return m, cmd
 
 	// Action messages from context system
 	case messages.NavigationMsg:
-		return m.handleNavigation(msg)
+		if m.Saving {
+			return m, nil
+		}
+		action := m.HandleNavigation(msg)
+		return m.applyAction(action)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -263,45 +246,63 @@ func (m MQTTEditModel) handleMessage(msg tea.Msg) (MQTTEditModel, tea.Cmd) {
 	return m.updateFocusedInput(msg)
 }
 
-func (m MQTTEditModel) handleNavigation(msg messages.NavigationMsg) (MQTTEditModel, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
-		return m.prevField(), nil
-	case messages.NavDown:
-		return m.nextField(), nil
-	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
-		// Not applicable for this form
+func (m MQTTEditModel) applyAction(action editmodal.KeyAction) (MQTTEditModel, tea.Cmd) {
+	switch action {
+	case editmodal.ActionClose:
+		m = m.Hide()
+		return m, func() tea.Msg { return MQTTEditClosedMsg{Saved: false} }
+	case editmodal.ActionSave:
+		return m.save()
+	case editmodal.ActionNext, editmodal.ActionNavDown:
+		m = m.moveFocus(m.NextField())
+		return m, nil
+	case editmodal.ActionPrev, editmodal.ActionNavUp:
+		m = m.moveFocus(m.PrevField())
+		return m, nil
+	case editmodal.ActionNone:
+		// No action to take
 	}
 	return m, nil
 }
 
 func (m MQTTEditModel) handleKey(msg tea.KeyPressMsg) (MQTTEditModel, tea.Cmd) {
 	// Handle dropdown expansion separately
-	if m.cursor == MQTTFieldTLS && m.tlsDropdown.IsExpanded() {
+	if MQTTEditField(m.Cursor) == MQTTFieldTLS && m.tlsDropdown.IsExpanded() {
 		var cmd tea.Cmd
 		m.tlsDropdown, cmd = m.tlsDropdown.Update(msg)
 		return m, cmd
 	}
 
-	// Modal-specific keys not covered by action messages
+	if m.Saving {
+		return m, nil
+	}
+
+	// This modal has text inputs and password fields, so Enter should NOT trigger save.
+	// Only Ctrl+S saves; Enter is forwarded to focused inputs.
 	switch msg.String() {
 	case keyconst.KeyEsc, "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return MQTTEditClosedMsg{Saved: false} }
 
+	case keyconst.KeyCtrlS:
+		return m.save()
+
 	case keyconst.KeyEnter:
 		// If on TLS dropdown and not expanded, expand it
-		if m.cursor == MQTTFieldTLS && !m.tlsDropdown.IsExpanded() {
+		if MQTTEditField(m.Cursor) == MQTTFieldTLS && !m.tlsDropdown.IsExpanded() {
 			m.tlsDropdown = m.tlsDropdown.Expand()
 			return m, nil
 		}
-		return m.save()
+		// Forward Enter to focused input (not save)
+		return m.updateFocusedInput(msg)
 
 	case keyconst.KeyTab:
-		return m.nextField(), nil
+		m = m.moveFocus(m.NextField())
+		return m, nil
 
 	case keyconst.KeyShiftTab:
-		return m.prevField(), nil
+		m = m.moveFocus(m.PrevField())
+		return m, nil
 	}
 
 	// Forward to focused input
@@ -311,7 +312,7 @@ func (m MQTTEditModel) handleKey(msg tea.KeyPressMsg) (MQTTEditModel, tea.Cmd) {
 func (m MQTTEditModel) updateFocusedInput(msg tea.Msg) (MQTTEditModel, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch m.cursor {
+	switch MQTTEditField(m.Cursor) {
 	case MQTTFieldEnable:
 		m.enableToggle, cmd = m.enableToggle.Update(msg)
 	case MQTTFieldServer:
@@ -333,26 +334,15 @@ func (m MQTTEditModel) updateFocusedInput(msg tea.Msg) (MQTTEditModel, tea.Cmd) 
 	return m, cmd
 }
 
-func (m MQTTEditModel) nextField() MQTTEditModel {
-	m = m.blurCurrentField()
-	if m.cursor < MQTTFieldCount-1 {
-		m.cursor++
-	}
-	m = m.focusCurrentField()
+// moveFocus blurs the old field and focuses the new one.
+func (m MQTTEditModel) moveFocus(oldCursor, newCursor int) MQTTEditModel {
+	m = m.blurField(MQTTEditField(oldCursor))
+	m = m.focusField(MQTTEditField(newCursor))
 	return m
 }
 
-func (m MQTTEditModel) prevField() MQTTEditModel {
-	m = m.blurCurrentField()
-	if m.cursor > 0 {
-		m.cursor--
-	}
-	m = m.focusCurrentField()
-	return m
-}
-
-func (m MQTTEditModel) blurCurrentField() MQTTEditModel {
-	switch m.cursor {
+func (m MQTTEditModel) blurField(field MQTTEditField) MQTTEditModel {
+	switch field {
 	case MQTTFieldEnable:
 		m.enableToggle = m.enableToggle.Blur()
 	case MQTTFieldServer:
@@ -373,8 +363,8 @@ func (m MQTTEditModel) blurCurrentField() MQTTEditModel {
 	return m
 }
 
-func (m MQTTEditModel) focusCurrentField() MQTTEditModel {
-	switch m.cursor {
+func (m MQTTEditModel) focusField(field MQTTEditField) MQTTEditModel {
+	switch field {
 	case MQTTFieldEnable:
 		m.enableToggle = m.enableToggle.Focus()
 	case MQTTFieldServer:
@@ -407,13 +397,13 @@ func (m MQTTEditModel) blurAllFields() MQTTEditModel {
 }
 
 func (m MQTTEditModel) save() (MQTTEditModel, tea.Cmd) {
-	if m.saving {
+	if m.Saving {
 		return m, nil
 	}
 
 	// Validate server address when enabling
 	if m.enableToggle.Value() && m.serverInput.Value() == "" {
-		m.err = fmt.Errorf("server address is required when enabling MQTT")
+		m.Err = fmt.Errorf("server address is required when enabling MQTT")
 		return m, nil
 	}
 
@@ -421,24 +411,19 @@ func (m MQTTEditModel) save() (MQTTEditModel, tea.Cmd) {
 	topicPrefix := m.topicPrefixInput.Value()
 	if topicPrefix != "" {
 		if strings.HasPrefix(topicPrefix, "$") {
-			m.err = fmt.Errorf("topic prefix cannot start with $")
+			m.Err = fmt.Errorf("topic prefix cannot start with $")
 			return m, nil
 		}
 		for _, forbidden := range []string{"#", "+", "%", "?"} {
 			if strings.Contains(topicPrefix, forbidden) {
-				m.err = fmt.Errorf("topic prefix cannot contain %s", forbidden)
+				m.Err = fmt.Errorf("topic prefix cannot contain %s", forbidden)
 				return m, nil
 			}
 		}
 	}
 
-	m.saving = true
-	m.err = nil
+	m.StartSave()
 
-	return m, m.createSaveCmd()
-}
-
-func (m MQTTEditModel) createSaveCmd() tea.Cmd {
 	enabled := m.enableToggle.Value()
 	params := shelly.MQTTSetConfigParams{
 		Enable:      &enabled,
@@ -450,32 +435,22 @@ func (m MQTTEditModel) createSaveCmd() tea.Cmd {
 		SSLCA:       m.getSSLCAFromDropdown(),
 	}
 
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
+	device := m.Device
+	cmd := m.SaveCmd(func(ctx context.Context) error {
+		return m.Svc.SetMQTTConfigFull(ctx, device, params)
+	})
 
-		err := m.svc.SetMQTTConfigFull(ctx, m.device, params)
-		if err != nil {
-			return messages.NewSaveError(nil, err)
-		}
-		return messages.NewSaveResult(nil)
-	}
+	return m, cmd
 }
 
 // View renders the edit modal.
 func (m MQTTEditModel) View() string {
-	if !m.visible {
+	if !m.IsVisible() {
 		return ""
 	}
 
 	// Build footer
-	footer := "Tab: Next | Enter: Save | Esc: Cancel"
-	if m.saving {
-		footer = "Saving..."
-	}
-
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, "MQTT Configuration", footer)
+	footer := m.RenderSavingFooter("Tab: Next | Ctrl+S: Save | Esc: Cancel")
 
 	// Build content
 	var content strings.Builder
@@ -489,22 +464,22 @@ func (m MQTTEditModel) View() string {
 	// Form fields
 	content.WriteString(m.renderFormFields())
 
-	return r.SetContent(content.String()).Render()
+	return m.RenderModal("MQTT Configuration", content.String(), footer)
 }
 
 func (m MQTTEditModel) renderConnectionStatus() string {
 	var content strings.Builder
 
-	content.WriteString(m.styles.Label.Render("Status:"))
+	content.WriteString(m.Styles.Label.Render("Status:"))
 	content.WriteString(" ")
 
 	switch {
 	case m.originalData.Connected:
-		content.WriteString(m.styles.StatusOn.Render("● Connected"))
+		content.WriteString(m.Styles.StatusOn.Render("● Connected"))
 	case m.originalData.Enable:
-		content.WriteString(m.styles.Warning.Render("◐ Enabled (disconnected)"))
+		content.WriteString(m.Styles.Warning.Render("◐ Enabled (disconnected)"))
 	default:
-		content.WriteString(m.styles.StatusOff.Render("○ Disabled"))
+		content.WriteString(m.Styles.StatusOff.Render("○ Disabled"))
 	}
 
 	return content.String()
@@ -514,52 +489,37 @@ func (m MQTTEditModel) renderFormFields() string {
 	var content strings.Builder
 
 	// Enable toggle
-	content.WriteString(m.renderField(MQTTFieldEnable, "Enable:", m.enableToggle.View()))
+	content.WriteString(m.RenderField(int(MQTTFieldEnable), "Enable:", m.enableToggle.View()))
 	content.WriteString("\n\n")
 
 	// Server
-	content.WriteString(m.renderField(MQTTFieldServer, "Server:", m.serverInput.View()))
+	content.WriteString(m.RenderField(int(MQTTFieldServer), "Server:", m.serverInput.View()))
 	content.WriteString("\n\n")
 
 	// User
-	content.WriteString(m.renderField(MQTTFieldUser, "Username:", m.userInput.View()))
+	content.WriteString(m.RenderField(int(MQTTFieldUser), "Username:", m.userInput.View()))
 	content.WriteString("\n\n")
 
 	// Password
-	content.WriteString(m.renderField(MQTTFieldPassword, "Password:", m.passwordInput.View()))
+	content.WriteString(m.RenderField(int(MQTTFieldPassword), "Password:", m.passwordInput.View()))
 	content.WriteString("\n\n")
 
 	// Client ID
-	content.WriteString(m.renderField(MQTTFieldClientID, "Client ID:", m.clientIDInput.View()))
+	content.WriteString(m.RenderField(int(MQTTFieldClientID), "Client ID:", m.clientIDInput.View()))
 	content.WriteString("\n\n")
 
 	// Topic prefix
-	content.WriteString(m.renderField(MQTTFieldTopicPrefix, "Topic Prefix:", m.topicPrefixInput.View()))
+	content.WriteString(m.RenderField(int(MQTTFieldTopicPrefix), "Topic Prefix:", m.topicPrefixInput.View()))
 	content.WriteString("\n\n")
 
 	// TLS settings
-	content.WriteString(m.renderField(MQTTFieldTLS, "TLS:", m.tlsDropdown.View()))
+	content.WriteString(m.RenderField(int(MQTTFieldTLS), "TLS:", m.tlsDropdown.View()))
 
 	// Error display
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
 	return content.String()
-}
-
-func (m MQTTEditModel) renderField(field MQTTEditField, label, input string) string {
-	var selector, labelStr string
-
-	if m.cursor == field {
-		selector = m.styles.Selector.Render("▶ ")
-		labelStr = m.styles.LabelFocus.Render(label)
-	} else {
-		selector = "  "
-		labelStr = m.styles.Label.Render(label)
-	}
-
-	return selector + labelStr + " " + input
 }

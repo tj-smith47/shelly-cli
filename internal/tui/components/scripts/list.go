@@ -15,8 +15,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -96,7 +96,7 @@ type OpenEvalMsg struct {
 
 // ListModel displays scripts for a device.
 type ListModel struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx           context.Context
 	svc           *automation.Service
 	fileCache     *cache.FileCache
@@ -157,7 +157,7 @@ func NewList(deps ListDeps) ListModel {
 	}
 
 	m := ListModel{
-		Sizable:     helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		Sizable:     panel.NewSizable(4, panel.NewScroller(0, 1)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
@@ -650,7 +650,7 @@ func (m ListModel) buildFooter() string {
 		return m.styles.Running.Render("Press 'd' again to confirm delete, Esc to cancel")
 	}
 
-	footer := theme.StyledKeybindings("e:edit r:run s:stop d:del n:new t:tpl x:eval")
+	footer := theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "r", Desc: "run"}, {Key: "s", Desc: "stop"}, {Key: "d", Desc: "del"}, {Key: "n", Desc: "new"}, {Key: "t", Desc: "tpl"}, {Key: "x", Desc: "eval"}}, keys.FooterHintWidth(m.Width)))
 	if cs := m.cacheStatus.View(); cs != "" {
 		footer += " | " + cs
 	}

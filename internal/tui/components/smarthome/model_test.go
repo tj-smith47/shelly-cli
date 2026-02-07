@@ -1138,11 +1138,11 @@ func TestModel_SetEditModalSize(t *testing.T) {
 
 	updated := m.SetEditModalSize(100, 50)
 
-	if updated.editModal.width != 100 {
-		t.Errorf("editModal width = %d, want 100", updated.editModal.width)
+	if updated.editModal.Width != 100 {
+		t.Errorf("editModal Width = %d, want 100", updated.editModal.Width)
 	}
-	if updated.editModal.height != 50 {
-		t.Errorf("editModal height = %d, want 50", updated.editModal.height)
+	if updated.editModal.Height != 50 {
+		t.Errorf("editModal Height = %d, want 50", updated.editModal.Height)
 	}
 }
 
@@ -1153,8 +1153,8 @@ func TestModel_SetEditModalSize_NotEditing(t *testing.T) {
 	updated := m.SetEditModalSize(100, 50)
 
 	// Should not set size when not editing
-	if updated.editModal.width == 100 {
-		t.Error("editModal width should not be set when not editing")
+	if updated.editModal.Width == 100 {
+		t.Error("editModal Width should not be set when not editing")
 	}
 }
 
@@ -1752,7 +1752,7 @@ func TestModel_RenderEditModal_Zigbee(t *testing.T) {
 	m := newTestModel()
 	m.zigbeeEditing = true
 	m.zigbeeModal = m.zigbeeModal.SetSize(80, 40)
-	m.zigbeeModal.visible = true
+	m.zigbeeModal, _ = m.zigbeeModal.Show(testDevice, &shelly.TUIZigbeeStatus{Enabled: true, NetworkState: zigbeeStateJoined})
 
 	view := m.RenderEditModal()
 
@@ -1768,11 +1768,11 @@ func TestModel_SetEditModalSize_Zigbee(t *testing.T) {
 
 	updated := m.SetEditModalSize(100, 50)
 
-	if updated.zigbeeModal.width != 100 {
-		t.Errorf("zigbeeModal width = %d, want 100", updated.zigbeeModal.width)
+	if updated.zigbeeModal.Width != 100 {
+		t.Errorf("zigbeeModal Width = %d, want 100", updated.zigbeeModal.Width)
 	}
-	if updated.zigbeeModal.height != 50 {
-		t.Errorf("zigbeeModal height = %d, want 50", updated.zigbeeModal.height)
+	if updated.zigbeeModal.Height != 50 {
+		t.Errorf("zigbeeModal Height = %d, want 50", updated.zigbeeModal.Height)
 	}
 }
 
@@ -1852,6 +1852,7 @@ func TestModel_HandleKey_ProtocolSelect_ZWave(t *testing.T) {
 func TestModel_BuildFooter_ZWave(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
+	m.Width = 80
 	m.focused = true
 	m.activeProtocol = ProtocolZWave
 	m.zwave = &shelly.TUIZWaveStatus{DeviceModel: "SNSW-102ZW"}
@@ -1942,7 +1943,7 @@ func TestModel_RenderEditModal_ZWave(t *testing.T) {
 	m := newTestModel()
 	m.zwaveEditing = true
 	m.zwaveModal = m.zwaveModal.SetSize(80, 40)
-	m.zwaveModal.visible = true
+	m.zwaveModal, _ = m.zwaveModal.Show(testDevice, nil)
 
 	view := m.RenderEditModal()
 
@@ -1958,11 +1959,11 @@ func TestModel_SetEditModalSize_ZWave(t *testing.T) {
 
 	updated := m.SetEditModalSize(100, 50)
 
-	if updated.zwaveModal.width != 100 {
-		t.Errorf("zwaveModal width = %d, want 100", updated.zwaveModal.width)
+	if updated.zwaveModal.Width != 100 {
+		t.Errorf("zwaveModal Width = %d, want 100", updated.zwaveModal.Width)
 	}
-	if updated.zwaveModal.height != 50 {
-		t.Errorf("zwaveModal height = %d, want 50", updated.zwaveModal.height)
+	if updated.zwaveModal.Height != 50 {
+		t.Errorf("zwaveModal Height = %d, want 50", updated.zwaveModal.Height)
 	}
 }
 
@@ -2195,6 +2196,7 @@ func TestModel_ModbusToggleResult_Error(t *testing.T) {
 func TestModel_BuildFooter_Modbus(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
+	m.Width = 80
 	m.focused = true
 	m.activeProtocol = ProtocolModbus
 	m.modbus = &shelly.TUIModbusStatus{Enabled: true}
@@ -2297,7 +2299,7 @@ func TestModel_RenderEditModal_Modbus(t *testing.T) {
 	m := newTestModel()
 	m.modbusEditing = true
 	m.modbusModal = m.modbusModal.SetSize(80, 40)
-	m.modbusModal.visible = true
+	m.modbusModal, _ = m.modbusModal.Show("test", &shelly.TUIModbusStatus{})
 
 	view := m.RenderEditModal()
 
@@ -2313,11 +2315,11 @@ func TestModel_SetEditModalSize_Modbus(t *testing.T) {
 
 	updated := m.SetEditModalSize(100, 50)
 
-	if updated.modbusModal.width != 100 {
-		t.Errorf("modbusModal width = %d, want 100", updated.modbusModal.width)
+	if updated.modbusModal.Width != 100 {
+		t.Errorf("modbusModal Width = %d, want 100", updated.modbusModal.Width)
 	}
-	if updated.modbusModal.height != 50 {
-		t.Errorf("modbusModal height = %d, want 50", updated.modbusModal.height)
+	if updated.modbusModal.Height != 50 {
+		t.Errorf("modbusModal Height = %d, want 50", updated.modbusModal.Height)
 	}
 }
 
@@ -2574,6 +2576,7 @@ func TestModel_LoRaTestSendResult_Error(t *testing.T) {
 func TestModel_BuildFooter_LoRa(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
+	m.Width = 80
 	m.focused = true
 	m.activeProtocol = ProtocolLoRa
 	m.lora = &shelly.TUILoRaStatus{Enabled: true}
@@ -2626,7 +2629,7 @@ func TestModel_RenderEditModal_LoRa(t *testing.T) {
 	m := newTestModel()
 	m.loraEditing = true
 	m.loraModal = m.loraModal.SetSize(80, 40)
-	m.loraModal.visible = true
+	m.loraModal, _ = m.loraModal.Show(testDevice, nil)
 
 	view := m.RenderEditModal()
 
@@ -2642,11 +2645,11 @@ func TestModel_SetEditModalSize_LoRa(t *testing.T) {
 
 	updated := m.SetEditModalSize(100, 50)
 
-	if updated.loraModal.width != 100 {
-		t.Errorf("loraModal width = %d, want 100", updated.loraModal.width)
+	if updated.loraModal.Width != 100 {
+		t.Errorf("loraModal Width = %d, want 100", updated.loraModal.Width)
 	}
-	if updated.loraModal.height != 50 {
-		t.Errorf("loraModal height = %d, want 50", updated.loraModal.height)
+	if updated.loraModal.Height != 50 {
+		t.Errorf("loraModal Height = %d, want 50", updated.loraModal.Height)
 	}
 }
 

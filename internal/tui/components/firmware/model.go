@@ -20,7 +20,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -93,7 +93,7 @@ type RollbackCompleteMsg struct {
 
 // Model displays firmware management.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx                context.Context
 	svc                *shelly.Service
 	fileCache          *cache.FileCache
@@ -179,7 +179,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:   helpers.NewSizable(10, panel.NewScroller(0, 10)),
+		Sizable:   panel.NewSizable(10, panel.NewScroller(0, 10)),
 		ctx:       deps.Ctx,
 		svc:       deps.Svc,
 		fileCache: deps.FileCache,
@@ -918,10 +918,19 @@ func (m Model) View() string {
 
 	// Add footer with keybindings and cache status when focused
 	if m.focused {
-		footer := "c:check u:update U:all S:staged R:rollback spc:sel a:sel-all"
-		if m.showSummary {
-			footer = "s:dismiss " + footer
+		hints := []keys.Hint{
+			{Key: "c", Desc: "check"},
+			{Key: "u", Desc: "update"},
+			{Key: "U", Desc: "all"},
+			{Key: "S", Desc: "staged"},
+			{Key: "R", Desc: "rollback"},
+			{Key: "spc", Desc: "sel"},
+			{Key: "a", Desc: "sel-all"},
 		}
+		if m.showSummary {
+			hints = append([]keys.Hint{{Key: "s", Desc: "dismiss"}}, hints...)
+		}
+		footer := theme.StyledKeybindings(keys.FormatHints(hints, keys.FooterHintWidth(m.Width)))
 		if cs := m.cacheStatus.View(); cs != "" {
 			footer += " | " + cs
 		}
@@ -1172,5 +1181,10 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:top/bottom enter:update u:update-all"
+	return keys.FormatHints([]keys.Hint{
+		{Key: "j/k", Desc: "scroll"},
+		{Key: "g/G", Desc: "top/btm"},
+		{Key: "enter", Desc: "update"},
+		{Key: "u", Desc: "update-all"},
+	}, keys.FooterHintWidth(m.Width))
 }

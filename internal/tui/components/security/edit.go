@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 	"unicode"
 
 	tea "charm.land/bubbletea/v2"
@@ -17,8 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // EditField represents a field in the edit form.
@@ -54,16 +51,7 @@ type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the auth configuration edit modal.
 type EditModel struct {
-	ctx     context.Context
-	svc     *shelly.Service
-	device  string
-	visible bool
-	cursor  EditField
-	saving  bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+	editmodal.Base
 
 	// Password strength styles (component-specific)
 	strengthStyles StrengthStyles
@@ -114,9 +102,11 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	)
 
 	return EditModel{
-		ctx:            ctx,
-		svc:            svc,
-		styles:         editmodal.DefaultStyles(),
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles(),
+		},
 		strengthStyles: DefaultStrengthStyles(),
 		passwordInput:  passwordInput,
 		confirmInput:   confirmInput,
@@ -124,12 +114,8 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 }
 
 // Show displays the edit modal with the given device and auth status.
-func (m EditModel) Show(device string, authEnabled bool) EditModel {
-	m.device = device
-	m.visible = true
-	m.cursor = EditFieldPassword
-	m.saving = false
-	m.err = nil
+func (m EditModel) Show(device string, authEnabled bool) (EditModel, tea.Cmd) {
+	m.Base.Show(device, int(EditFieldCount))
 	m.authEnabled = authEnabled
 	m.disableMode = false
 
@@ -141,12 +127,12 @@ func (m EditModel) Show(device string, authEnabled bool) EditModel {
 	m.passwordInput, _ = m.passwordInput.Focus()
 	m.confirmInput = m.confirmInput.Blur()
 
-	return m
+	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
 
 // Hide hides the edit modal.
 func (m EditModel) Hide() EditModel {
-	m.visible = false
+	m.Base.Hide()
 	m.passwordInput = m.passwordInput.Blur()
 	m.confirmInput = m.confirmInput.Blur()
 	return m
@@ -154,13 +140,12 @@ func (m EditModel) Hide() EditModel {
 
 // Visible returns whether the modal is visible.
 func (m EditModel) Visible() bool {
-	return m.visible
+	return m.Base.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m EditModel) SetSize(width, height int) EditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	return m
 }
 
@@ -171,7 +156,7 @@ func (m EditModel) Init() tea.Cmd {
 
 // Update handles messages.
 func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -181,18 +166,16 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case EditSaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
+		_, cmd := m.HandleSaveResult(msg)
+		return m, cmd
+
+	case messages.NavigationMsg:
+		if m.Saving {
 			return m, nil
 		}
-		// Success - close modal
-		m = m.Hide()
-		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+		action := m.HandleNavigation(msg)
+		return m.applyAction(action)
 
-	// Action messages from context system
-	case messages.NavigationMsg:
-		return m.handleNavigation(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -201,37 +184,61 @@ func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	return m.updateFocusedInput(msg)
 }
 
-func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
-		return m.prevField(), nil
-	case messages.NavDown:
-		return m.nextField(), nil
-	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
-		// Not applicable for this form
+func (m EditModel) applyAction(action editmodal.KeyAction) (EditModel, tea.Cmd) {
+	switch action {
+	case editmodal.ActionClose:
+		m = m.Hide()
+		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
+	case editmodal.ActionSave:
+		return m.handleSaveAction()
+	case editmodal.ActionNext, editmodal.ActionNavDown:
+		m = m.moveFocus(m.NextField())
+		return m, nil
+	case editmodal.ActionPrev, editmodal.ActionNavUp:
+		m = m.moveFocus(m.PrevField())
+		return m, nil
+	case editmodal.ActionNone:
+		// No action to take
 	}
 	return m, nil
 }
 
 func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
-	// Modal-specific keys not covered by action messages
+	// Password fields: Enter should NOT trigger save (it's Ctrl+S for save).
+	// Handle Ctrl+S for save, Esc for close, Tab/Shift+Tab for navigation.
 	switch msg.String() {
 	case keyconst.KeyEsc, "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 
+	case keyconst.KeyCtrlS:
+		if !m.Saving {
+			return m.handleSaveAction()
+		}
+		return m, nil
+
 	case keyconst.KeyEnter:
-		return m.handleEnter()
+		// Enter only triggers save in disable mode (confirmation)
+		if !m.Saving && m.disableMode {
+			return m.disableAuth()
+		}
+		return m, nil
 
 	case keyconst.KeyTab:
-		return m.nextField(), nil
+		if !m.Saving {
+			m = m.moveFocus(m.NextField())
+		}
+		return m, nil
 
 	case keyconst.KeyShiftTab:
-		return m.prevField(), nil
+		if !m.Saving {
+			m = m.moveFocus(m.PrevField())
+		}
+		return m, nil
 
 	case "d":
 		// Toggle disable mode when auth is currently enabled
-		if m.authEnabled && !m.saving {
+		if m.authEnabled && !m.Saving {
 			m.disableMode = !m.disableMode
 			if m.disableMode {
 				// Clear password fields in disable mode
@@ -246,8 +253,8 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	return m.updateFocusedInput(msg)
 }
 
-func (m EditModel) handleEnter() (EditModel, tea.Cmd) {
-	if m.saving {
+func (m EditModel) handleSaveAction() (EditModel, tea.Cmd) {
+	if m.Saving {
 		return m, nil
 	}
 
@@ -261,7 +268,7 @@ func (m EditModel) handleEnter() (EditModel, tea.Cmd) {
 func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldPassword:
 		m.passwordInput, cmd = m.passwordInput.Update(msg)
 	case EditFieldConfirm:
@@ -273,38 +280,15 @@ func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 	return m, cmd
 }
 
-func (m EditModel) nextField() EditModel {
-	// Blur current field
-	m = m.blurCurrentField()
-
-	// Move to next
-	if m.cursor < EditFieldCount-1 {
-		m.cursor++
-	}
-
-	// Focus new field
-	m = m.focusCurrentField()
-
+// moveFocus blurs the old field and focuses the new one.
+func (m EditModel) moveFocus(oldCursor, newCursor int) EditModel {
+	m = m.blurField(EditField(oldCursor))
+	m = m.focusField(EditField(newCursor))
 	return m
 }
 
-func (m EditModel) prevField() EditModel {
-	// Blur current field
-	m = m.blurCurrentField()
-
-	// Move to previous
-	if m.cursor > 0 {
-		m.cursor--
-	}
-
-	// Focus new field
-	m = m.focusCurrentField()
-
-	return m
-}
-
-func (m EditModel) blurCurrentField() EditModel {
-	switch m.cursor {
+func (m EditModel) blurField(field EditField) EditModel {
+	switch field {
 	case EditFieldPassword:
 		m.passwordInput = m.passwordInput.Blur()
 	case EditFieldConfirm:
@@ -315,8 +299,8 @@ func (m EditModel) blurCurrentField() EditModel {
 	return m
 }
 
-func (m EditModel) focusCurrentField() EditModel {
-	switch m.cursor {
+func (m EditModel) focusField(field EditField) EditModel {
+	switch field {
 	case EditFieldPassword:
 		m.passwordInput, _ = m.passwordInput.Focus()
 	case EditFieldConfirm:
@@ -333,54 +317,37 @@ func (m EditModel) save() (EditModel, tea.Cmd) {
 
 	// Validate password
 	if password == "" {
-		m.err = fmt.Errorf("password is required")
+		m.Err = fmt.Errorf("password is required")
 		return m, nil
 	}
 
 	if len(password) < 8 {
-		m.err = fmt.Errorf("password must be at least 8 characters")
+		m.Err = fmt.Errorf("password must be at least 8 characters")
 		return m, nil
 	}
 
 	if password != confirm {
-		m.err = fmt.Errorf("passwords do not match")
+		m.Err = fmt.Errorf("passwords do not match")
 		return m, nil
 	}
 
-	m.saving = true
-	m.err = nil
+	m.StartSave()
 
-	return m, m.createSaveCmd(password)
+	device := m.Device
+	cmd := m.SaveCmd(func(ctx context.Context) error {
+		return m.Svc.SetAuth(ctx, device, "admin", device, password)
+	})
+	return m, cmd
 }
 
 func (m EditModel) disableAuth() (EditModel, tea.Cmd) {
-	m.saving = true
-	m.err = nil
+	m.StartSave()
 
-	return m, func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
-
-		err := m.svc.DisableAuth(ctx, m.device)
-		if err != nil {
-			return messages.NewSaveError(nil, err)
-		}
-		return messages.NewSaveResult(nil)
-	}
-}
-
-func (m EditModel) createSaveCmd(password string) tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
-
-		// Use standard admin user and device realm
-		err := m.svc.SetAuth(ctx, m.device, "admin", m.device, password)
-		if err != nil {
-			return messages.NewSaveError(nil, err)
-		}
-		return messages.NewSaveResult(nil)
-	}
+	device := m.Device
+	cmd := m.SaveCmd(func(ctx context.Context) error {
+		return m.Svc.DisableAuth(ctx, device)
+	})
+	return m, cmd
 }
 
 // passwordCharTypes holds character type flags for password analysis.
@@ -469,26 +436,23 @@ func calculateStrength(password string) PasswordStrength {
 
 // View renders the edit modal.
 func (m EditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
 	// Build footer based on mode
-	var footer string
+	var normalFooter string
 	switch {
-	case m.saving:
-		footer = "Saving..."
 	case m.disableMode:
-		footer = "Enter: Confirm | Esc: Cancel"
+		normalFooter = "Enter: Confirm | Esc: Cancel"
 	default:
-		footer = "Enter: Save | Tab: Next | Esc: Cancel"
+		normalFooter = "Ctrl+S: Save | Tab: Next | Esc: Cancel"
 		if m.authEnabled {
-			footer += " | d: Disable auth"
+			normalFooter += " | d: Disable auth"
 		}
 	}
 
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, "Authentication Settings", footer)
+	footer := m.RenderSavingFooter(normalFooter)
 
 	// Build content
 	var content strings.Builder
@@ -503,16 +467,16 @@ func (m EditModel) View() string {
 		content.WriteString(m.renderPasswordForm())
 	}
 
-	return r.SetContent(content.String()).Render()
+	return m.RenderModal("Authentication Settings", content.String(), footer)
 }
 
 func (m EditModel) renderDisableConfirmation() string {
 	var content strings.Builder
-	content.WriteString(m.styles.ButtonDanger.Render("⚠ Disable authentication?"))
+	content.WriteString(m.Styles.ButtonDanger.Render("⚠ Disable authentication?"))
 	content.WriteString("\n")
-	content.WriteString(m.styles.Help.Render("This will allow anyone to control your device"))
+	content.WriteString(m.Styles.Help.Render("This will allow anyone to control your device"))
 	content.WriteString("\n\n")
-	content.WriteString(m.styles.Help.Render("Press Enter to confirm, Esc to cancel"))
+	content.WriteString(m.Styles.Help.Render("Press Enter to confirm, Esc to cancel"))
 	return content.String()
 }
 
@@ -520,7 +484,7 @@ func (m EditModel) renderPasswordForm() string {
 	var content strings.Builder
 
 	// Password field
-	content.WriteString(m.renderField(EditFieldPassword, "Password:", m.passwordInput.View()))
+	content.WriteString(m.RenderField(int(EditFieldPassword), "Password:", m.passwordInput.View()))
 	content.WriteString("\n")
 
 	// Password strength indicator
@@ -529,13 +493,12 @@ func (m EditModel) renderPasswordForm() string {
 	content.WriteString("\n\n")
 
 	// Confirm field
-	content.WriteString(m.renderField(EditFieldConfirm, "Confirm:", m.confirmInput.View()))
+	content.WriteString(m.RenderField(int(EditFieldConfirm), "Confirm:", m.confirmInput.View()))
 	content.WriteString("\n\n")
 
 	// Error display
-	if m.err != nil {
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+	if errStr := m.RenderError(); errStr != "" {
+		content.WriteString(errStr)
 	}
 
 	return content.String()
@@ -544,28 +507,14 @@ func (m EditModel) renderPasswordForm() string {
 func (m EditModel) renderStatus() string {
 	var content strings.Builder
 
-	content.WriteString(m.styles.Label.Render("Current status: "))
+	content.WriteString(m.Styles.Label.Render("Current status: "))
 	if m.authEnabled {
-		content.WriteString(m.styles.StatusOn.Render("● Protected"))
+		content.WriteString(m.Styles.StatusOn.Render("● Protected"))
 	} else {
-		content.WriteString(m.styles.StatusOff.Render("○ UNPROTECTED"))
+		content.WriteString(m.Styles.StatusOff.Render("○ UNPROTECTED"))
 	}
 
 	return content.String()
-}
-
-func (m EditModel) renderField(field EditField, label, input string) string {
-	var selector, labelStr string
-
-	if m.cursor == field {
-		selector = m.styles.Selector.Render("▶ ")
-		labelStr = m.styles.LabelFocus.Render(label)
-	} else {
-		selector = "  "
-		labelStr = m.styles.Label.Render(label)
-	}
-
-	return selector + labelStr + " " + input
 }
 
 func (m EditModel) renderStrength(strength PasswordStrength) string {
@@ -574,7 +523,7 @@ func (m EditModel) renderStrength(strength PasswordStrength) string {
 
 	switch strength {
 	case StrengthNone:
-		return indent + m.styles.Help.Render("Enter a password")
+		return indent + m.Styles.Help.Render("Enter a password")
 	case StrengthWeak:
 		return indent + m.strengthStyles.Weak.Render("█░░░ Weak")
 	case StrengthFair:

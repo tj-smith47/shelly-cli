@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -13,8 +12,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // ModbusToggleResultMsg signals that a Modbus enable/disable toggle completed.
@@ -35,43 +32,29 @@ const modbusFieldCount = 1
 
 // ModbusEditModel represents the Modbus configuration edit modal.
 type ModbusEditModel struct {
-	ctx    context.Context
-	svc    *shelly.Service
-	device string
-
-	visible bool
-	saving  bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+	editmodal.Base
 
 	// Modbus state
 	enabled bool
 
 	// Pending changes
 	pendingEnabled bool
-
-	// Focus
-	field modbusEditField
 }
 
 // NewModbusEditModel creates a new Modbus configuration edit modal.
 func NewModbusEditModel(ctx context.Context, svc *shelly.Service) ModbusEditModel {
 	return ModbusEditModel{
-		ctx:    ctx,
-		svc:    svc,
-		styles: editmodal.DefaultStyles().WithLabelWidth(14),
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles().WithLabelWidth(14),
+		},
 	}
 }
 
 // Show displays the edit modal with the given device and Modbus state.
 func (m ModbusEditModel) Show(device string, modbus *shelly.TUIModbusStatus) (ModbusEditModel, tea.Cmd) {
-	m.device = device
-	m.visible = true
-	m.saving = false
-	m.err = nil
-	m.field = modbusFieldEnable
+	m.Base.Show(device, modbusFieldCount)
 
 	if modbus != nil {
 		m.enabled = modbus.Enabled
@@ -83,25 +66,24 @@ func (m ModbusEditModel) Show(device string, modbus *shelly.TUIModbusStatus) (Mo
 
 // Hide hides the edit modal.
 func (m ModbusEditModel) Hide() ModbusEditModel {
-	m.visible = false
+	m.Base.Hide()
 	return m
 }
 
 // Visible returns whether the modal is visible.
 func (m ModbusEditModel) Visible() bool {
-	return m.visible
+	return m.Base.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m ModbusEditModel) SetSize(width, height int) ModbusEditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	return m
 }
 
 // Update handles messages.
 func (m ModbusEditModel) Update(msg tea.Msg) (ModbusEditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -111,70 +93,66 @@ func (m ModbusEditModel) Update(msg tea.Msg) (ModbusEditModel, tea.Cmd) {
 func (m ModbusEditModel) handleMessage(msg tea.Msg) (ModbusEditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+		saved, cmd := m.HandleSaveResult(msg)
+		if saved {
+			m.enabled = m.pendingEnabled
 		}
-		// Success - update state and close modal
-		m.enabled = m.pendingEnabled
-		m = m.Hide()
-		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+		return m, cmd
 
 	case messages.NavigationMsg:
-		return m.handleNavigation(msg)
+		action := m.HandleNavigation(msg)
+		return m.applyAction(action)
 	case messages.ToggleEnableRequestMsg:
-		if !m.saving {
+		if !m.Saving {
 			m.pendingEnabled = !m.pendingEnabled
 		}
 		return m, nil
 	case tea.KeyPressMsg:
-		return m.handleKey(msg)
+		action := m.HandleKey(msg)
+		if action != editmodal.ActionNone {
+			return m.applyAction(action)
+		}
+		return m.handleCustomKey(msg)
 	}
 
 	return m, nil
 }
 
-func (m ModbusEditModel) handleNavigation(msg messages.NavigationMsg) (ModbusEditModel, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
-		if m.field > 0 {
-			m.field--
-		}
-	case messages.NavDown:
-		if int(m.field) < modbusFieldCount-1 {
-			m.field++
-		}
-	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
-		// Not applicable for this component
-	}
-	return m, nil
-}
-
-func (m ModbusEditModel) handleKey(msg tea.KeyPressMsg) (ModbusEditModel, tea.Cmd) {
-	switch msg.String() {
-	case keyconst.KeyEsc, keyconst.KeyCtrlOpenBracket:
+func (m ModbusEditModel) applyAction(action editmodal.KeyAction) (ModbusEditModel, tea.Cmd) {
+	switch action {
+	case editmodal.ActionNone:
+		return m, nil
+	case editmodal.ActionClose:
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
-
-	case keyconst.KeyEnter, keyconst.KeyCtrlS:
+	case editmodal.ActionSave:
 		return m.save()
+	case editmodal.ActionNext, editmodal.ActionNavDown:
+		// Only 1 field, no navigation needed
+		return m, nil
+	case editmodal.ActionPrev, editmodal.ActionNavUp:
+		return m, nil
+	}
+	return m, nil
+}
 
+func (m ModbusEditModel) handleCustomKey(msg tea.KeyPressMsg) (ModbusEditModel, tea.Cmd) {
+	switch msg.String() {
 	case "t", keyconst.KeySpace:
-		if !m.saving && m.field == modbusFieldEnable {
+		if !m.Saving && modbusEditField(m.Cursor) == modbusFieldEnable {
 			m.pendingEnabled = !m.pendingEnabled
 		}
 		return m, nil
 
 	case "j", keyconst.KeyDown:
-		if int(m.field) < modbusFieldCount-1 {
-			m.field++
+		if m.Cursor < modbusFieldCount-1 {
+			m.Cursor++
 		}
 		return m, nil
 
 	case "k", keyconst.KeyUp:
-		if m.field > 0 {
-			m.field--
+		if m.Cursor > 0 {
+			m.Cursor--
 		}
 		return m, nil
 	}
@@ -183,7 +161,7 @@ func (m ModbusEditModel) handleKey(msg tea.KeyPressMsg) (ModbusEditModel, tea.Cm
 }
 
 func (m ModbusEditModel) save() (ModbusEditModel, tea.Cmd) {
-	if m.saving {
+	if m.Saving {
 		return m, nil
 	}
 
@@ -193,34 +171,22 @@ func (m ModbusEditModel) save() (ModbusEditModel, tea.Cmd) {
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 	}
 
-	m.saving = true
-	m.err = nil
-
-	return m, m.createSaveCmd()
-}
-
-func (m ModbusEditModel) createSaveCmd() tea.Cmd {
+	m.StartSave()
 	newEnabled := m.pendingEnabled
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
 
-		err := m.svc.SetModbusConfig(ctx, m.device, newEnabled)
-		if err != nil {
-			return messages.NewSaveError(nil, err)
-		}
-		return messages.NewSaveResult(nil)
-	}
+	cmd := m.SaveCmd(func(ctx context.Context) error {
+		return m.Svc.SetModbusConfig(ctx, m.Device, newEnabled)
+	})
+	return m, cmd
 }
 
 // View renders the edit modal.
 func (m ModbusEditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
-	footer := m.buildFooter()
-	r := rendering.NewModal(m.width, m.height, "Modbus Configuration", footer)
+	footer := m.RenderSavingFooter("Space/t: Toggle | Enter: Save | j/k: Navigate | Esc: Cancel")
 
 	var content strings.Builder
 
@@ -244,54 +210,46 @@ func (m ModbusEditModel) View() string {
 	}
 
 	// Error display
-	if m.err != nil {
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
-	return r.SetContent(content.String()).Render()
-}
-
-func (m ModbusEditModel) buildFooter() string {
-	if m.saving {
-		return footerSaving
-	}
-	return "Space/t: Toggle | Enter: Save | j/k: Navigate | Esc: Cancel"
+	return m.RenderModal("Modbus Configuration", content.String(), footer)
 }
 
 func (m ModbusEditModel) renderStatus() string {
 	var content strings.Builder
 
-	content.WriteString(m.styles.Label.Render("Status:"))
+	content.WriteString(m.Styles.Label.Render("Status:"))
 	content.WriteString(" ")
 	if m.enabled {
-		content.WriteString(m.styles.StatusOn.Render("● Enabled"))
+		content.WriteString(m.Styles.StatusOn.Render("● Enabled"))
 	} else {
-		content.WriteString(m.styles.StatusOff.Render("○ Disabled"))
+		content.WriteString(m.Styles.StatusOff.Render("○ Disabled"))
 	}
 
 	if m.enabled {
 		content.WriteString("\n")
-		content.WriteString(m.styles.Label.Render("Port:"))
+		content.WriteString(m.Styles.Label.Render("Port:"))
 		content.WriteString(" ")
-		content.WriteString(m.styles.Value.Render("502 (TCP)"))
+		content.WriteString(m.Styles.Value.Render("502 (TCP)"))
 	}
 
 	return content.String()
 }
 
 func (m ModbusEditModel) renderEnableToggle() string {
-	selected := m.field == modbusFieldEnable
+	selected := modbusEditField(m.Cursor) == modbusFieldEnable
 
 	var value string
 	if m.pendingEnabled {
-		value = m.styles.StatusOn.Render("[●] ON ")
+		value = m.Styles.StatusOn.Render("[●] ON ")
 	} else {
-		value = m.styles.StatusOff.Render("[ ] OFF")
+		value = m.Styles.StatusOff.Render("[ ] OFF")
 	}
 
-	return m.styles.RenderFieldRow(selected, "Enabled:", value)
+	return m.Styles.RenderFieldRow(selected, "Enabled:", value)
 }
 
 func (m ModbusEditModel) renderChangeIndicator() string {
@@ -301,22 +259,22 @@ func (m ModbusEditModel) renderChangeIndicator() string {
 	} else {
 		msg = "Will disable Modbus-TCP server"
 	}
-	return m.styles.Warning.Render(fmt.Sprintf("  ⚡ %s", msg))
+	return m.Styles.Warning.Render(fmt.Sprintf("  ⚡ %s", msg))
 }
 
 func (m ModbusEditModel) renderPortInfo() string {
 	var content strings.Builder
 
-	content.WriteString(m.styles.LabelFocus.Render("Modbus-TCP Details"))
+	content.WriteString(m.Styles.LabelFocus.Render("Modbus-TCP Details"))
 	content.WriteString("\n")
-	content.WriteString("  " + m.styles.Label.Render("Protocol:  "))
-	content.WriteString(m.styles.Value.Render("Modbus-TCP"))
+	content.WriteString("  " + m.Styles.Label.Render("Protocol:  "))
+	content.WriteString(m.Styles.Value.Render("Modbus-TCP"))
 	content.WriteString("\n")
-	content.WriteString("  " + m.styles.Label.Render("Port:      "))
-	content.WriteString(m.styles.Value.Render("502"))
+	content.WriteString("  " + m.Styles.Label.Render("Port:      "))
+	content.WriteString(m.Styles.Value.Render("502"))
 	content.WriteString("\n")
-	content.WriteString("  " + m.styles.Label.Render("Registers: "))
-	content.WriteString(m.styles.Muted.Render("Auto-exposed per component"))
+	content.WriteString("  " + m.Styles.Label.Render("Registers: "))
+	content.WriteString(m.Styles.Muted.Render("Auto-exposed per component"))
 
 	return content.String()
 }

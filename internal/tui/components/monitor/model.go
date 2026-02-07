@@ -24,7 +24,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -110,7 +110,7 @@ type ExportResultMsg struct {
 
 // Model holds the monitor state.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx             context.Context
 	svc             *shelly.Service
 	ios             *iostreams.IOStreams
@@ -271,7 +271,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:         helpers.NewSizable(11, panel.NewScroller(0, 10)),
+		Sizable:         panel.NewSizable(11, panel.NewScroller(0, 10)),
 		ctx:             deps.Ctx,
 		svc:             deps.Svc,
 		ios:             deps.IOS,
@@ -413,9 +413,9 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 	}
 
 	status.Online = true
-	aggregateStatusFromPM(&status, snapshot.PM)
-	aggregateStatusFromEM(&status, snapshot.EM)
-	aggregateStatusFromEM1(&status, snapshot.EM1)
+	aggregateMetrics(&status, snapshot.PM, false)
+	aggregateMetrics(&status, snapshot.EM, true)
+	aggregateMetrics(&status, snapshot.EM1, false)
 
 	// Fetch sensor data via full status
 	m.fetchSensorData(ctx, device.Address, &status)
@@ -487,51 +487,30 @@ func (m Model) fetchSensorData(ctx context.Context, address string, status *Devi
 	}
 }
 
-// aggregateStatusFromPM aggregates status data from PM components.
-func aggregateStatusFromPM(status *DeviceStatus, pms []model.PMStatus) {
-	for _, pm := range pms {
-		status.Power += pm.APower
-		if status.Voltage == 0 && pm.Voltage > 0 {
-			status.Voltage = pm.Voltage
+// aggregateMetrics aggregates power metrics from any meter type (PM, EM, EM1) into
+// a DeviceStatus. The accumulateCurrent flag controls whether current values are
+// summed (true, for 3-phase EM meters) or set-first-non-zero (false, for PM/EM1).
+// Uses the model.MeterReading interface already implemented by all meter status types.
+func aggregateMetrics[T any, PT interface {
+	*T
+	model.MeterReading
+}](status *DeviceStatus, items []T, accumulateCurrent bool) {
+	for i := range items {
+		m := PT(&items[i])
+		status.Power += m.GetPower()
+		if status.Voltage == 0 && m.GetVoltage() > 0 {
+			status.Voltage = m.GetVoltage()
 		}
-		if status.Current == 0 && pm.Current > 0 {
-			status.Current = pm.Current
+		if accumulateCurrent {
+			status.Current += m.GetCurrent()
+		} else if status.Current == 0 && m.GetCurrent() > 0 {
+			status.Current = m.GetCurrent()
 		}
-		if pm.Freq != nil && status.Frequency == 0 {
-			status.Frequency = *pm.Freq
+		if freq := m.GetFreq(); freq != nil && status.Frequency == 0 {
+			status.Frequency = *freq
 		}
-		if pm.AEnergy != nil {
-			status.TotalEnergy += pm.AEnergy.Total
-		}
-	}
-}
-
-// aggregateStatusFromEM aggregates status data from EM components (3-phase meters).
-func aggregateStatusFromEM(status *DeviceStatus, ems []model.EMStatus) {
-	for _, em := range ems {
-		status.Power += em.TotalActivePower
-		status.Current += em.TotalCurrent
-		if status.Voltage == 0 && em.AVoltage > 0 {
-			status.Voltage = em.AVoltage
-		}
-		if em.AFreq != nil && status.Frequency == 0 {
-			status.Frequency = *em.AFreq
-		}
-	}
-}
-
-// aggregateStatusFromEM1 aggregates status data from EM1 components (single-phase meters).
-func aggregateStatusFromEM1(status *DeviceStatus, em1s []model.EM1Status) {
-	for _, em1 := range em1s {
-		status.Power += em1.ActPower
-		if status.Voltage == 0 && em1.Voltage > 0 {
-			status.Voltage = em1.Voltage
-		}
-		if status.Current == 0 && em1.Current > 0 {
-			status.Current = em1.Current
-		}
-		if em1.Freq != nil && status.Frequency == 0 {
-			status.Frequency = *em1.Freq
+		if energy := m.GetEnergy(); energy != nil {
+			status.TotalEnergy += *energy
 		}
 	}
 }
@@ -689,9 +668,9 @@ func (m Model) parseFullStatus(status *DeviceStatus, data json.RawMessage) {
 	status.Current = 0
 	status.TotalEnergy = 0
 
-	aggregateStatusFromPM(status, fullStatus.PM)
-	aggregateStatusFromEM(status, fullStatus.EM)
-	aggregateStatusFromEM1(status, fullStatus.EM1)
+	aggregateMetrics(status, fullStatus.PM, false)
+	aggregateMetrics(status, fullStatus.EM, true)
+	aggregateMetrics(status, fullStatus.EM1, false)
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -916,7 +895,7 @@ func (m Model) exportJSON(path string) (retErr error) {
 func (m Model) SetSize(width, height int) Model {
 	m.Width = width
 	m.Height = height
-	m.Loader = m.Loader.SetSize(width-helpers.LoaderBorderOffset, height-helpers.LoaderBorderOffset)
+	m.Loader = m.Loader.SetSize(width-panel.LoaderBorderOffset, height-panel.LoaderBorderOffset)
 	// Account for: header (2), summary (4), empty line (1), footer (2), container padding (2) = 11 lines overhead
 	// Each card: 2 lines content + 1 margin + 1 separator = 4 lines
 	availableHeight := height - 11
@@ -1194,5 +1173,11 @@ func (m Model) IsLoading() bool {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:top/bottom r:refresh x:csv X:json"
+	return keys.FormatHints([]keys.Hint{
+		{Key: "j/k", Desc: "scroll"},
+		{Key: "g/G", Desc: "top/btm"},
+		{Key: "r", Desc: "refresh"},
+		{Key: "x", Desc: "csv"},
+		{Key: "X", Desc: "json"},
+	}, keys.FooterHintWidth(m.Width))
 }

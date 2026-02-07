@@ -15,7 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -43,16 +43,16 @@ type DevicesLoadedMsg struct {
 
 // DevicesModel displays cloud devices from the fleet manager.
 type DevicesModel struct {
-	helpers.Sizable // Embeds Width, Height, Loader, Scroller
-	ctx             context.Context
-	fleet           *integrator.FleetManager
-	devices         []integrator.AccountDevice
-	loading         bool
-	err             error
-	focused         bool
-	panelIndex      int
-	styles          DevicesStyles
-	lastFetch       time.Time
+	panel.Sizable // Embeds Width, Height, Loader, Scroller
+	ctx           context.Context
+	fleet         *integrator.FleetManager
+	devices       []integrator.AccountDevice
+	loading       bool
+	err           error
+	focused       bool
+	panelIndex    int
+	styles        DevicesStyles
+	lastFetch     time.Time
 }
 
 // DevicesStyles holds styles for the Devices component.
@@ -109,7 +109,7 @@ func NewDevices(deps DevicesDeps) DevicesModel {
 	}
 
 	m := DevicesModel{
-		Sizable: helpers.NewSizable(6, panel.NewScroller(0, 10)), // 6 accounts for borders, title, stats line
+		Sizable: panel.NewSizable(6, panel.NewScroller(0, 10)), // 6 accounts for borders, title, stats line
 		ctx:     deps.Ctx,
 		styles:  DefaultDevicesStyles(),
 	}
@@ -257,7 +257,7 @@ func (m DevicesModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter(theme.StyledKeybindings("j/k:nav g/G:top/btm r:refresh"))
+		r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "j/k", Desc: "nav"}, {Key: "g/G", Desc: "top/btm"}, {Key: "r", Desc: "refresh"}}, keys.FooterHintWidth(m.Width))))
 	}
 
 	// Handle early return cases

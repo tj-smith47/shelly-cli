@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -18,8 +17,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // EditField represents a field in the edit form.
@@ -47,16 +44,8 @@ type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the system settings edit modal.
 type EditModel struct {
-	ctx      context.Context
-	svc      *shelly.Service
-	device   string
-	visible  bool
-	cursor   EditField
-	saving   bool
-	err      error
-	width    int
-	height   int
-	styles   editmodal.Styles
+	editmodal.Base
+
 	original *shelly.SysConfig
 
 	// Form inputs
@@ -115,9 +104,11 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	newAliasInput.SetStyles(inputStyles)
 
 	return EditModel{
-		ctx:              ctx,
-		svc:              svc,
-		styles:           editmodal.DefaultStyles().WithLabelWidth(12),
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles().WithLabelWidth(12),
+		},
 		nameInput:        nameInput,
 		timezoneDropdown: timezoneDropdown,
 		latitudeInput:    latitudeInput,
@@ -137,11 +128,8 @@ func (m EditModel) ShowAtTimezone(device string, sysConfig *shelly.SysConfig) Ed
 }
 
 func (m EditModel) showAt(device string, sysConfig *shelly.SysConfig, initialField EditField) EditModel {
-	m.device = device
-	m.visible = true
-	m.cursor = initialField
-	m.saving = false
-	m.err = nil
+	m.Base.Show(device, int(EditFieldCount))
+	m.SetCursor(int(initialField))
 	m.original = sysConfig
 
 	// Initialize inputs with current values
@@ -164,7 +152,7 @@ func (m EditModel) showAt(device string, sysConfig *shelly.SysConfig, initialFie
 // loadAliases loads the device's aliases from config.
 func (m EditModel) loadAliases() EditModel {
 	// Try to resolve the device to get its registered name
-	if dev, err := config.ResolveDevice(m.device); err == nil {
+	if dev, err := config.ResolveDevice(m.Device); err == nil {
 		m.deviceName = dev.Name
 		m.aliases = dev.Aliases
 	} else {
@@ -179,7 +167,7 @@ func (m EditModel) loadAliases() EditModel {
 
 // Hide hides the edit modal.
 func (m EditModel) Hide() EditModel {
-	m.visible = false
+	m.Base.Hide()
 	m.nameInput.Blur()
 	m.timezoneDropdown = m.timezoneDropdown.Blur()
 	m.latitudeInput.Blur()
@@ -190,13 +178,12 @@ func (m EditModel) Hide() EditModel {
 
 // Visible returns whether the modal is visible.
 func (m EditModel) Visible() bool {
-	return m.visible
+	return m.Base.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m EditModel) SetSize(width, height int) EditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
 	return m
 }
 
@@ -207,7 +194,7 @@ func (m EditModel) Init() tea.Cmd {
 
 // Update handles messages.
 func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -217,14 +204,8 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		// Success - close modal
-		m = m.Hide()
-		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+		_, cmd := m.HandleSaveResult(msg)
+		return m, cmd
 
 	// Action messages from context system
 	case messages.NavigationMsg:
@@ -238,23 +219,29 @@ func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 }
 
 func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
+	action := m.HandleNavigation(msg)
+	switch action {
+	case editmodal.ActionNavUp:
 		return m.handleUp()
-	case messages.NavDown:
+	case editmodal.ActionNavDown:
 		return m.handleDown()
-	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
-		// Not applicable for this form
+	default:
+		return m, nil
 	}
-	return m, nil
 }
 
 func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
-	// Modal-specific keys not covered by action messages
+	if m.Saving {
+		return m, nil
+	}
+
 	switch msg.String() {
 	case keyconst.KeyEsc, "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
+
+	case keyconst.KeyCtrlS:
+		return m.save()
 
 	case keyconst.KeyEnter:
 		return m.handleEnter()
@@ -266,7 +253,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 		return m.prevField(), nil
 
 	case "d", "delete", "backspace":
-		if m.cursor == EditFieldAliases {
+		if EditField(m.Cursor) == EditFieldAliases {
 			return m.deleteSelectedAlias()
 		}
 	}
@@ -276,18 +263,19 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 }
 
 func (m EditModel) handleEnter() (EditModel, tea.Cmd) {
-	if m.saving {
+	if m.Saving {
 		return m, nil
 	}
-	if m.cursor == EditFieldNewAlias {
+	if EditField(m.Cursor) == EditFieldNewAlias {
 		return m.addAlias()
 	}
-	return m.save()
+	// Enter does NOT trigger save; use Ctrl+S for save
+	return m.updateFocusedInput(tea.KeyPressMsg{Code: tea.KeyEnter})
 }
 
 func (m EditModel) handleDown() (EditModel, tea.Cmd) {
 	// Navigate within alias list when focused
-	if m.cursor == EditFieldAliases && len(m.aliases) > 0 {
+	if EditField(m.Cursor) == EditFieldAliases && len(m.aliases) > 0 {
 		if m.aliasCursor < len(m.aliases)-1 {
 			m.aliasCursor++
 		}
@@ -298,7 +286,7 @@ func (m EditModel) handleDown() (EditModel, tea.Cmd) {
 
 func (m EditModel) handleUp() (EditModel, tea.Cmd) {
 	// Navigate within alias list when focused
-	if m.cursor == EditFieldAliases && len(m.aliases) > 0 {
+	if EditField(m.Cursor) == EditFieldAliases && len(m.aliases) > 0 {
 		if m.aliasCursor > 0 {
 			m.aliasCursor--
 		}
@@ -310,7 +298,7 @@ func (m EditModel) handleUp() (EditModel, tea.Cmd) {
 func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldName:
 		m.nameInput, cmd = m.nameInput.Update(msg)
 	case EditFieldTimezone:
@@ -334,9 +322,9 @@ func (m EditModel) nextField() EditModel {
 	// Blur current field
 	m = m.blurCurrentField()
 
-	// Move to next
-	if m.cursor < EditFieldCount-1 {
-		m.cursor++
+	// Move to next (custom navigation because of alias list)
+	if m.Cursor < int(EditFieldCount)-1 {
+		m.Cursor++
 	}
 
 	// Focus new field
@@ -350,8 +338,8 @@ func (m EditModel) prevField() EditModel {
 	m = m.blurCurrentField()
 
 	// Move to previous
-	if m.cursor > 0 {
-		m.cursor--
+	if m.Cursor > 0 {
+		m.Cursor--
 	}
 
 	// Focus new field
@@ -361,7 +349,7 @@ func (m EditModel) prevField() EditModel {
 }
 
 func (m EditModel) blurCurrentField() EditModel {
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldName:
 		m.nameInput.Blur()
 	case EditFieldTimezone:
@@ -381,7 +369,7 @@ func (m EditModel) blurCurrentField() EditModel {
 }
 
 func (m EditModel) focusCurrentField() EditModel {
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldName:
 		m.nameInput.Focus()
 	case EditFieldTimezone:
@@ -412,12 +400,11 @@ type saveFormData struct {
 func (m EditModel) save() (EditModel, tea.Cmd) {
 	data, err := m.validateAndCollectFormData()
 	if err != nil {
-		m.err = err
+		m.Err = err
 		return m, nil
 	}
 
-	m.saving = true
-	m.err = nil
+	m.StartSave()
 
 	return m, m.createSaveCmd(data)
 }
@@ -431,32 +418,32 @@ func (m EditModel) addAlias() (EditModel, tea.Cmd) {
 
 	// Device must be registered for aliases
 	if m.deviceName == "" {
-		m.err = fmt.Errorf("device not registered, cannot add aliases")
+		m.Err = fmt.Errorf("device not registered, cannot add aliases")
 		return m, nil
 	}
 
 	// Validate alias format
 	if err := config.ValidateDeviceAlias(alias); err != nil {
-		m.err = err
+		m.Err = err
 		return m, nil
 	}
 
 	// Check for conflicts
 	if err := config.CheckAliasConflict(alias, m.deviceName); err != nil {
-		m.err = err
+		m.Err = err
 		return m, nil
 	}
 
 	// Add the alias
 	if err := config.AddDeviceAlias(m.deviceName, alias); err != nil {
-		m.err = err
+		m.Err = err
 		return m, nil
 	}
 
 	// Reload aliases and clear input
 	m.aliases = append(m.aliases, alias)
 	m.newAliasInput.SetValue("")
-	m.err = nil
+	m.Err = nil
 
 	return m, nil
 }
@@ -473,7 +460,7 @@ func (m EditModel) deleteSelectedAlias() (EditModel, tea.Cmd) {
 
 	alias := m.aliases[m.aliasCursor]
 	if err := config.RemoveDeviceAlias(m.deviceName, alias); err != nil {
-		m.err = err
+		m.Err = err
 		return m, nil
 	}
 
@@ -484,7 +471,7 @@ func (m EditModel) deleteSelectedAlias() (EditModel, tea.Cmd) {
 	if m.aliasCursor >= len(m.aliases) && m.aliasCursor > 0 {
 		m.aliasCursor--
 	}
-	m.err = nil
+	m.Err = nil
 
 	return m, nil
 }
@@ -541,38 +528,36 @@ func parseLocation(latStr, lngStr string) (lat, lng float64, err error) {
 }
 
 func (m EditModel) createSaveCmd(data saveFormData) tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
+	original := m.original
+	device := m.Device
+	svc := m.Svc
 
+	return m.SaveCmd(func(ctx context.Context) error {
 		var lastErr error
 
 		// Update name if changed
-		if m.original == nil || data.name != m.original.Name {
-			if err := m.svc.SetSysName(ctx, m.device, data.name); err != nil {
+		if original == nil || data.name != original.Name {
+			if err := svc.SetSysName(ctx, device, data.name); err != nil {
 				lastErr = err
 			}
 		}
 
 		// Update timezone if changed
-		if m.original == nil || data.timezone != m.original.Timezone {
-			if err := m.svc.SetSysTimezone(ctx, m.device, data.timezone); err != nil {
+		if original == nil || data.timezone != original.Timezone {
+			if err := svc.SetSysTimezone(ctx, device, data.timezone); err != nil {
 				lastErr = err
 			}
 		}
 
 		// Update location if changed
-		if data.hasLocation && (m.original == nil || data.lat != m.original.Lat || data.lng != m.original.Lng) {
-			if err := m.svc.SetSysLocation(ctx, m.device, data.lat, data.lng); err != nil {
+		if data.hasLocation && (original == nil || data.lat != original.Lat || data.lng != original.Lng) {
+			if err := svc.SetSysLocation(ctx, device, data.lat, data.lng); err != nil {
 				lastErr = err
 			}
 		}
 
-		if lastErr != nil {
-			return messages.NewSaveError(nil, lastErr)
-		}
-		return messages.NewSaveResult(nil)
-	}
+		return lastErr
+	})
 }
 
 // formatFloat formats a float64 for display in the text input.
@@ -605,25 +590,21 @@ func formatCoord(val float64) string {
 
 // View renders the edit modal.
 func (m EditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
 	// Build footer based on context
-	var footer string
+	var normalFooter string
 	switch {
-	case m.saving:
-		footer = "Saving..."
-	case m.cursor == EditFieldAliases && len(m.aliases) > 0:
-		footer = "d: Delete | Tab: Next | Esc: Cancel"
-	case m.cursor == EditFieldNewAlias:
-		footer = "Enter: Add alias | Tab: Next | Esc: Cancel"
+	case EditField(m.Cursor) == EditFieldAliases && len(m.aliases) > 0:
+		normalFooter = "d: Delete | Tab: Next | Esc: Cancel"
+	case EditField(m.Cursor) == EditFieldNewAlias:
+		normalFooter = "Enter: Add alias | Tab: Next | Esc: Cancel"
 	default:
-		footer = "Enter: Save | Esc: Cancel | Tab: Next field"
+		normalFooter = "Ctrl+S: Save | Esc: Cancel | Tab: Next field"
 	}
-
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, "Edit System Settings", footer)
+	footer := m.RenderSavingFooter(normalFooter)
 
 	// Build content
 	var content strings.Builder
@@ -644,30 +625,29 @@ func (m EditModel) View() string {
 
 	// Alias section (only show if device is registered)
 	if m.deviceName != "" {
-		content.WriteString(m.styles.Title.Render("Device Aliases"))
+		content.WriteString(m.Styles.Title.Render("Device Aliases"))
 		content.WriteString("\n")
 		content.WriteString(m.renderAliasSection())
 		content.WriteString("\n")
 	}
 
 	// Error display
-	if m.err != nil {
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+	if errStr := m.RenderError(); errStr != "" {
+		content.WriteString(errStr)
 	}
 
-	return r.SetContent(content.String()).Render()
+	return m.RenderModal("Edit System Settings", content.String(), footer)
 }
 
 func (m EditModel) renderField(field EditField, label, input string) string {
 	var selector, labelStr string
 
-	if m.cursor == field {
-		selector = m.styles.Selector.Render("▶ ")
-		labelStr = m.styles.LabelFocus.Render(label)
+	if EditField(m.Cursor) == field {
+		selector = m.Styles.Selector.Render("▶ ")
+		labelStr = m.Styles.LabelFocus.Render(label)
 	} else {
 		selector = "  "
-		labelStr = m.styles.Label.Render(label)
+		labelStr = m.Styles.Label.Render(label)
 	}
 
 	prefix := selector + labelStr + " "
@@ -708,25 +688,25 @@ func (m EditModel) renderAliasesList() string {
 
 	if len(m.aliases) == 0 {
 		prefix := "  "
-		if m.cursor == EditFieldAliases {
-			prefix = m.styles.Selector.Render("▶ ")
+		if EditField(m.Cursor) == EditFieldAliases {
+			prefix = m.Styles.Selector.Render("▶ ")
 		}
 		content.WriteString(prefix)
-		content.WriteString(m.styles.Help.Render("(no aliases)"))
+		content.WriteString(m.Styles.Help.Render("(no aliases)"))
 		return content.String()
 	}
 
 	for i, alias := range m.aliases {
-		isSelected := m.cursor == EditFieldAliases && i == m.aliasCursor
+		isSelected := EditField(m.Cursor) == EditFieldAliases && i == m.aliasCursor
 		prefix := "  "
 		if isSelected {
-			prefix = m.styles.Selector.Render("▶ ")
+			prefix = m.Styles.Selector.Render("▶ ")
 		}
 		content.WriteString(prefix)
 		if isSelected {
-			content.WriteString(m.styles.Selected.Render(alias))
+			content.WriteString(m.Styles.Selected.Render(alias))
 		} else {
-			content.WriteString(m.styles.Value.Render(alias))
+			content.WriteString(m.Styles.Value.Render(alias))
 		}
 		if i < len(m.aliases)-1 {
 			content.WriteString("\n")

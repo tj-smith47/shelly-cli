@@ -8,7 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -69,7 +68,7 @@ func TestDeps_Validate(t *testing.T) {
 
 func TestModel_SetSize(t *testing.T) {
 	t.Parallel()
-	m := Model{Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1))}
+	m := Model{Sizable: panel.NewSizable(4, panel.NewScroller(0, 1))}
 	m = m.SetSize(100, 50)
 
 	if m.Width != 100 {
@@ -115,7 +114,7 @@ func TestModel_SetSize_VisibleRows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := Model{Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1))}
+			m := Model{Sizable: panel.NewSizable(4, panel.NewScroller(0, 1))}
 			m = m.SetSize(80, tt.height)
 			got := m.Scroller.VisibleRows()
 			if got != tt.want {
@@ -134,7 +133,7 @@ func TestModel_CursorNavigation(t *testing.T) {
 	}
 
 	m := Model{
-		Sizable:  helpers.NewSizable(4, panel.NewScroller(3, 10)),
+		Sizable:  panel.NewSizable(4, panel.NewScroller(3, 10)),
 		webhooks: webhooks,
 	}
 	m = m.SetSize(80, 20)
@@ -209,7 +208,7 @@ func TestModel_SelectedWebhook(t *testing.T) {
 	}
 
 	m := Model{
-		Sizable:  helpers.NewSizable(4, panel.NewScroller(2, 10)),
+		Sizable:  panel.NewSizable(4, panel.NewScroller(2, 10)),
 		webhooks: webhooks,
 	}
 	m.Scroller.SetCursor(1)
@@ -284,7 +283,7 @@ func TestModel_Error(t *testing.T) {
 func TestModel_View_NoDevice(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(0, 1)),
 		device:  "",
 		styles:  DefaultStyles(),
 	}
@@ -299,7 +298,7 @@ func TestModel_View_NoDevice(t *testing.T) {
 func TestModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(0, 1)),
 		device:  "192.168.1.100",
 		loading: true,
 		styles:  DefaultStyles(),
@@ -315,7 +314,7 @@ func TestModel_View_Loading(t *testing.T) {
 func TestModel_View_NoWebhooks(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		Sizable:  helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		Sizable:  panel.NewSizable(4, panel.NewScroller(0, 1)),
 		device:   "192.168.1.100",
 		loading:  false,
 		webhooks: []Webhook{},
@@ -346,7 +345,7 @@ func TestModel_View_WithWebhooks(t *testing.T) {
 		},
 	}
 	m := Model{
-		Sizable:  helpers.NewSizable(4, panel.NewScroller(len(webhooks), 10)),
+		Sizable:  panel.NewSizable(4, panel.NewScroller(len(webhooks), 10)),
 		device:   "192.168.1.100",
 		loading:  false,
 		webhooks: webhooks,
@@ -441,7 +440,7 @@ func TestModel_RenderWebhookLine(t *testing.T) {
 func TestModel_Update_LoadedMsg(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(0, 10)),
 		loading: true,
 		styles:  DefaultStyles(),
 	}
@@ -467,7 +466,7 @@ func TestModel_Update_LoadedMsg(t *testing.T) {
 func TestModel_Update_LoadedMsg_Error(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		Sizable: panel.NewSizable(4, panel.NewScroller(0, 10)),
 		loading: true,
 		styles:  DefaultStyles(),
 	}
@@ -485,7 +484,7 @@ func TestModel_Update_LoadedMsg_Error(t *testing.T) {
 func TestModel_Update_KeyPress_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		Sizable:  helpers.NewSizable(4, panel.NewScroller(1, 10)),
+		Sizable:  panel.NewSizable(4, panel.NewScroller(1, 10)),
 		focused:  false,
 		webhooks: []Webhook{{ID: 1}},
 		styles:   DefaultStyles(),

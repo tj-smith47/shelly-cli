@@ -15,8 +15,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
-	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Input type constants.
@@ -49,17 +47,10 @@ type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the input edit modal.
 type EditModel struct {
-	ctx     context.Context
-	svc     *shelly.Service
-	device  string
+	editmodal.Base
+
 	inputID int
-	visible bool
-	cursor  EditField
-	saving  bool
-	err     error
-	width   int
-	height  int
-	styles  editmodal.Styles
+	loading bool
 
 	// Original config for comparison
 	original *model.InputConfig
@@ -70,6 +61,11 @@ type EditModel struct {
 	enableToggle       form.Toggle
 	invertToggle       form.Toggle
 	factoryResetToggle form.Toggle
+}
+
+// configLoadedMsg signals that input config was fetched.
+type configLoadedMsg struct {
+	config *model.InputConfig
 }
 
 // NewEditModel creates a new input edit modal.
@@ -102,9 +98,11 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	)
 
 	return EditModel{
-		ctx:                ctx,
-		svc:                svc,
-		styles:             editmodal.DefaultStyles(),
+		Base: editmodal.Base{
+			Ctx:    ctx,
+			Svc:    svc,
+			Styles: editmodal.DefaultStyles().WithLabelWidth(12),
+		},
 		nameInput:          nameInput,
 		typeDropdown:       typeDropdown,
 		enableToggle:       enableToggle,
@@ -115,12 +113,9 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 
 // Show displays the edit modal for an existing input.
 func (m EditModel) Show(device string, inputID int) (EditModel, tea.Cmd) {
-	m.device = device
+	m.Base.Show(device, int(EditFieldCount))
 	m.inputID = inputID
-	m.visible = true
-	m.cursor = EditFieldName
-	m.saving = false
-	m.err = nil
+	m.loading = true
 	m.original = nil
 
 	// Blur all inputs first
@@ -135,10 +130,10 @@ func (m EditModel) Show(device string, inputID int) (EditModel, tea.Cmd) {
 
 func (m EditModel) fetchConfig() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		ctx, cancel := context.WithTimeout(m.Ctx, 30*time.Second)
 		defer cancel()
 
-		config, err := m.svc.InputGetConfig(ctx, m.device, m.inputID)
+		config, err := m.Svc.InputGetConfig(ctx, m.Base.Device, m.inputID)
 		if err != nil {
 			return messages.NewSaveError(m.inputID, err)
 		}
@@ -147,25 +142,27 @@ func (m EditModel) fetchConfig() tea.Cmd {
 	}
 }
 
-type configLoadedMsg struct {
-	config *model.InputConfig
-}
-
 // Hide hides the edit modal.
 func (m EditModel) Hide() EditModel {
-	m.visible = false
+	m.Base.Hide()
+	m.nameInput = m.nameInput.Blur()
+	m.typeDropdown = m.typeDropdown.Blur()
+	m.enableToggle = m.enableToggle.Blur()
+	m.invertToggle = m.invertToggle.Blur()
+	m.factoryResetToggle = m.factoryResetToggle.Blur()
 	return m
 }
 
 // Visible returns whether the modal is visible.
 func (m EditModel) Visible() bool {
-	return m.visible
+	return m.Base.Visible()
 }
 
 // SetSize sets the modal dimensions.
 func (m EditModel) SetSize(width, height int) EditModel {
-	m.width = width
-	m.height = height
+	m.Base.SetSize(width, height)
+	inputWidth := m.InputWidth()
+	m.nameInput = m.nameInput.SetWidth(inputWidth)
 	return m
 }
 
@@ -176,7 +173,7 @@ func (m EditModel) Init() tea.Cmd {
 
 // Update handles messages.
 func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
-	if !m.visible {
+	if !m.Visible() {
 		return m, nil
 	}
 
@@ -186,28 +183,24 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case configLoadedMsg:
+		m.loading = false
 		m.original = msg.config
 		m = m.populateFromConfig(msg.config)
 		return m, nil
 
 	case messages.SaveResultMsg:
-		m.saving = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		// Save successful, close the modal
-		m.visible = false
-		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+		_, cmd := m.HandleSaveResult(msg)
+		return m, cmd
 
-	// Action messages from context system
 	case messages.NavigationMsg:
-		if m.saving {
+		if m.Saving {
 			return m, nil
 		}
-		return m.handleNavigation(msg)
+		return m.applyAction(m.HandleNavigation(msg))
+
 	case messages.ToggleEnableRequestMsg:
 		return m.handleSpace()
+
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -216,14 +209,21 @@ func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 	return m.updateFocusedInput(msg)
 }
 
-func (m EditModel) handleNavigation(msg messages.NavigationMsg) (EditModel, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
-		return m.prevField(), nil
-	case messages.NavDown:
-		return m.nextField(), nil
-	case messages.NavLeft, messages.NavRight, messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd:
-		// Not applicable for this form
+func (m EditModel) applyAction(action editmodal.KeyAction) (EditModel, tea.Cmd) {
+	switch action {
+	case editmodal.ActionClose:
+		m = m.Hide()
+		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
+	case editmodal.ActionSave:
+		return m.save()
+	case editmodal.ActionNext, editmodal.ActionNavDown:
+		m = m.moveFocus(m.NextField())
+		return m, nil
+	case editmodal.ActionPrev, editmodal.ActionNavUp:
+		m = m.moveFocus(m.PrevField())
+		return m, nil
+	case editmodal.ActionNone:
+		// No action to take
 	}
 	return m, nil
 }
@@ -254,44 +254,35 @@ func (m EditModel) populateFromConfig(cfg *model.InputConfig) EditModel {
 }
 
 func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
-	// Modal-specific keys not covered by action messages
+	if m.Saving {
+		return m, nil
+	}
+
 	switch msg.String() {
-	case "esc", "ctrl+[":
-		if m.saving {
-			return m, nil
-		}
-		m.visible = false
+	case keyconst.KeyEsc, "ctrl+[":
+		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 
 	case keyconst.KeyTab:
-		if m.saving {
-			return m, nil
-		}
-		return m.nextField(), nil
+		m = m.moveFocus(m.NextField())
+		return m, nil
 
 	case keyconst.KeyShiftTab:
-		if m.saving {
-			return m, nil
-		}
-		return m.prevField(), nil
+		m = m.moveFocus(m.PrevField())
+		return m, nil
 
 	case keyconst.KeyEnter:
-		if m.saving {
-			return m, nil
-		}
-		// Handle dropdown selection or save
-		if m.cursor == EditFieldType {
+		// Enter goes to focused input (text input / select dropdown), NOT save
+		if EditField(m.Cursor) == EditFieldType {
 			if m.typeDropdown.IsExpanded() {
 				m.typeDropdown = m.typeDropdown.Collapse()
 				return m, nil
 			}
 		}
-		return m.save()
+		// Forward to focused input
+		return m.updateFocusedInput(msg)
 
 	case keyconst.KeyCtrlS:
-		if m.saving {
-			return m, nil
-		}
 		return m.save()
 	}
 
@@ -300,7 +291,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 }
 
 func (m EditModel) handleSpace() (EditModel, tea.Cmd) {
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldType:
 		if m.typeDropdown.IsExpanded() {
 			m.typeDropdown = m.typeDropdown.Collapse()
@@ -322,7 +313,7 @@ func (m EditModel) handleSpace() (EditModel, tea.Cmd) {
 func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch m.cursor {
+	switch EditField(m.Cursor) {
 	case EditFieldName:
 		m.nameInput, cmd = m.nameInput.Update(msg)
 	case EditFieldType:
@@ -340,28 +331,15 @@ func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
 	return m, cmd
 }
 
-func (m EditModel) nextField() EditModel {
-	m = m.blurCurrentField()
-	m.cursor++
-	if m.cursor >= EditFieldCount {
-		m.cursor = 0
-	}
-	m = m.focusCurrentField()
+// moveFocus blurs the old field and focuses the new one.
+func (m EditModel) moveFocus(oldCursor, newCursor int) EditModel {
+	m = m.blurField(EditField(oldCursor))
+	m = m.focusField(EditField(newCursor))
 	return m
 }
 
-func (m EditModel) prevField() EditModel {
-	m = m.blurCurrentField()
-	m.cursor--
-	if m.cursor < 0 {
-		m.cursor = EditFieldCount - 1
-	}
-	m = m.focusCurrentField()
-	return m
-}
-
-func (m EditModel) blurCurrentField() EditModel {
-	switch m.cursor {
+func (m EditModel) blurField(field EditField) EditModel {
+	switch field {
 	case EditFieldName:
 		m.nameInput = m.nameInput.Blur()
 	case EditFieldType:
@@ -378,8 +356,8 @@ func (m EditModel) blurCurrentField() EditModel {
 	return m
 }
 
-func (m EditModel) focusCurrentField() EditModel {
-	switch m.cursor {
+func (m EditModel) focusField(field EditField) EditModel {
+	switch field {
 	case EditFieldName:
 		m.nameInput, _ = m.nameInput.Focus()
 	case EditFieldType:
@@ -406,8 +384,6 @@ func (m EditModel) blurAllInputs() EditModel {
 }
 
 func (m EditModel) save() (EditModel, tea.Cmd) {
-	m.err = nil
-
 	// Build config from form values
 	name := strings.TrimSpace(m.nameInput.Value())
 	var namePtr *string
@@ -429,95 +405,67 @@ func (m EditModel) save() (EditModel, tea.Cmd) {
 		FactoryReset: m.factoryResetToggle.Value(),
 	}
 
-	m.saving = true
-	return m, m.createSaveCmd(cfg)
-}
+	m.StartSave()
 
-func (m EditModel) createSaveCmd(cfg *model.InputConfig) tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
-
-		err := m.svc.InputSetConfig(ctx, m.device, m.inputID, cfg)
-		if err != nil {
-			return messages.NewSaveError(m.inputID, err)
-		}
-		return messages.NewSaveResult(m.inputID)
-	}
+	inputID := m.inputID
+	cmd := m.SaveCmdWithID(inputID, func(ctx context.Context) error {
+		return m.Svc.InputSetConfig(ctx, m.Base.Device, inputID, cfg)
+	})
+	return m, cmd
 }
 
 // View renders the edit modal.
 func (m EditModel) View() string {
-	if !m.visible {
+	if !m.Visible() {
 		return ""
 	}
 
-	// Build footer
-	footer := "Tab: Next | Ctrl+S: Save | Esc: Cancel"
-	if m.saving {
-		footer = "Saving..."
-	}
-
-	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, "Edit Input", footer)
+	footer := m.RenderSavingFooter("Tab: Next | Ctrl+S: Save | Esc: Cancel")
 
 	// Build content
 	var content strings.Builder
 
 	// Input ID info (indented to align with form fields)
 	content.WriteString("  ")
-	content.WriteString(m.styles.Info.Render("Input ID: "))
-	content.WriteString(m.styles.Selector.Render(strconv.Itoa(m.inputID)))
+	content.WriteString(m.Styles.Info.Render("Input ID: "))
+	content.WriteString(m.Styles.Selector.Render(strconv.Itoa(m.inputID)))
 	content.WriteString("\n\n")
 
 	// Form fields
 	content.WriteString(m.renderFormFields())
 
-	// Error message
-	if m.err != nil {
+	// Error display
+	if errStr := m.RenderError(); errStr != "" {
 		content.WriteString("\n")
-		msg, _ := tuierrors.FormatError(m.err)
-		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString(errStr)
 	}
 
-	return r.SetContent(content.String()).Render()
+	return m.RenderModal("Edit Input", content.String(), footer)
 }
 
 func (m EditModel) renderFormFields() string {
 	var content strings.Builder
 
 	// Name
-	content.WriteString(m.renderField(EditFieldName, "Name:", m.nameInput.View()))
+	content.WriteString(m.RenderField(int(EditFieldName), "Name:", m.nameInput.View()))
 	content.WriteString("\n\n")
 
 	// Type
-	content.WriteString(m.renderField(EditFieldType, "Type:", m.typeDropdown.View()))
+	content.WriteString(m.RenderField(int(EditFieldType), "Type:", m.typeDropdown.View()))
 	content.WriteString("\n\n")
 
 	// Enable
-	content.WriteString(m.renderField(EditFieldEnable, "Enabled:", m.enableToggle.View()))
+	content.WriteString(m.RenderField(int(EditFieldEnable), "Enabled:", m.enableToggle.View()))
 	content.WriteString("\n\n")
 
 	// Invert
-	content.WriteString(m.renderField(EditFieldInvert, "Invert Logic:", m.invertToggle.View()))
+	content.WriteString(m.RenderField(int(EditFieldInvert), "Invert Logic:", m.invertToggle.View()))
 	content.WriteString("\n\n")
 
 	// Factory Reset
-	content.WriteString(m.renderField(EditFieldFactoryReset, "Factory Reset:", m.factoryResetToggle.View()))
+	content.WriteString(m.RenderField(int(EditFieldFactoryReset), "Factory Reset:", m.factoryResetToggle.View()))
 
 	return content.String()
-}
-
-func (m EditModel) renderField(field EditField, label, value string) string {
-	var selector, labelStr string
-	if m.cursor == field {
-		selector = m.styles.Selector.Render("▶ ")
-		labelStr = m.styles.LabelFocus.Render(label)
-	} else {
-		selector = "  "
-		labelStr = m.styles.Label.Render(label)
-	}
-	return selector + labelStr + " " + value
 }
 
 // InputID returns the current input ID being edited.
@@ -527,5 +475,5 @@ func (m EditModel) InputID() int {
 
 // Device returns the current device.
 func (m EditModel) Device() string {
-	return m.device
+	return m.Base.Device
 }

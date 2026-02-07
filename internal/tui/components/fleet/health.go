@@ -13,8 +13,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
@@ -40,16 +41,16 @@ type HealthLoadedMsg struct {
 
 // HealthModel displays fleet health and statistics.
 type HealthModel struct {
-	helpers.Sizable // Embeds Width, Height, Loader (no scroller needed)
-	ctx             context.Context
-	fleet           *integrator.FleetManager
-	stats           *integrator.FleetStats
-	loading         bool
-	err             error
-	focused         bool
-	panelIndex      int
-	styles          HealthStyles
-	lastFetch       time.Time
+	panel.Sizable // Embeds Width, Height, Loader (no scroller needed)
+	ctx           context.Context
+	fleet         *integrator.FleetManager
+	stats         *integrator.FleetStats
+	loading       bool
+	err           error
+	focused       bool
+	panelIndex    int
+	styles        HealthStyles
+	lastFetch     time.Time
 }
 
 // HealthStyles holds styles for the Health component.
@@ -103,7 +104,7 @@ func NewHealth(deps HealthDeps) HealthModel {
 	}
 
 	m := HealthModel{
-		Sizable: helpers.NewSizableLoaderOnly(),
+		Sizable: panel.NewSizableLoaderOnly(),
 		ctx:     deps.Ctx,
 		styles:  DefaultHealthStyles(),
 	}
@@ -225,7 +226,7 @@ func (m HealthModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter(theme.StyledKeybindings("r:refresh"))
+		r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "r", Desc: "refresh"}}, keys.FooterHintWidth(m.Width))))
 	}
 
 	// Calculate content area for centering (accounting for panel borders)

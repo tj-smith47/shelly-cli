@@ -16,8 +16,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -86,7 +87,7 @@ func (d EditorDeps) Validate() error {
 
 // EditorModel displays script code with syntax highlighting and status.
 type EditorModel struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx              context.Context
 	svc              *automation.Service
 	device           string
@@ -165,7 +166,7 @@ func NewEditor(deps EditorDeps) EditorModel {
 	}
 
 	m := EditorModel{
-		Sizable:     helpers.NewSizableLoaderOnly(),
+		Sizable:     panel.NewSizableLoaderOnly(),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		showNumbers: true,
@@ -435,7 +436,7 @@ func (m EditorModel) View() string {
 		SetTitle(title).
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex).
-		SetFooter(theme.StyledKeybindings("j/k:scroll g/G:top/end d:download u:upload esc:close"))
+		SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "j/k", Desc: "scroll"}, {Key: "g/G", Desc: "top/end"}, {Key: "d", Desc: "download"}, {Key: "u", Desc: "upload"}, {Key: "esc", Desc: "close"}}, keys.FooterHintWidth(m.Width))))
 
 	if m.scriptID == 0 {
 		r.SetContent(styles.EmptyStateWithBorder("No script selected", m.Width, m.Height))

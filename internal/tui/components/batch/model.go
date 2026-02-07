@@ -17,7 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
-	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -102,7 +102,7 @@ type CompleteMsg struct {
 
 // Model displays batch operations.
 type Model struct {
-	helpers.Sizable
+	panel.Sizable
 	ctx        context.Context
 	svc        *shelly.Service
 	devices    []DeviceSelection
@@ -164,7 +164,7 @@ func New(deps Deps) Model {
 	}
 
 	m := Model{
-		Sizable:   helpers.NewSizable(10, panel.NewScroller(0, 10)),
+		Sizable:   panel.NewSizable(10, panel.NewScroller(0, 10)),
 		ctx:       deps.Ctx,
 		svc:       deps.Svc,
 		operation: OpToggle,
@@ -422,7 +422,7 @@ func (m Model) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter(theme.StyledKeybindings("spc:sel a:all n:none x:exec 1-5:op"))
+		r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "spc", Desc: "sel"}, {Key: "a", Desc: "all"}, {Key: "n", Desc: "none"}, {Key: "x", Desc: "exec"}, {Key: "1-5", Desc: "op"}}, keys.FooterHintWidth(m.Width))))
 	}
 
 	var content strings.Builder
@@ -616,5 +616,11 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:top/bottom space:select enter:run a:all"
+	return keys.FormatHints([]keys.Hint{
+		{Key: "j/k", Desc: "scroll"},
+		{Key: "g/G", Desc: "top/btm"},
+		{Key: "space", Desc: "select"},
+		{Key: "enter", Desc: "run"},
+		{Key: "a", Desc: "all"},
+	}, keys.FooterHintWidth(m.Width))
 }
