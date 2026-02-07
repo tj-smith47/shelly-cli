@@ -22,9 +22,10 @@ type ComponentState struct {
 
 // QuickDeviceStatus holds status for the all-devices view.
 type QuickDeviceStatus struct {
-	Name   string
-	Model  string
-	Online bool
+	Name      string
+	Model     string
+	Online    bool
+	LinkState string // Derived state from parent link (empty if not linked or online)
 }
 
 // DisplayQuickDeviceStatus displays quick status for a single device.
@@ -57,9 +58,15 @@ func DisplayAllDevicesQuickStatus(ios *iostreams.IOStreams, statuses []QuickDevi
 
 	builder := table.NewBuilder("Device", "Model", "Status")
 	for _, ds := range statuses {
-		status := output.RenderOnline(ds.Online, output.CaseLower)
+		var status string
 		deviceModel := ds.Model
-		if !ds.Online {
+		if ds.Online {
+			status = output.RenderOnline(true, output.CaseLower)
+		} else if ds.LinkState != "" {
+			status = ds.LinkState
+			deviceModel = "-"
+		} else {
+			status = output.RenderOnline(false, output.CaseLower)
 			deviceModel = "-"
 		}
 		builder.AddRow(ds.Name, deviceModel, status)

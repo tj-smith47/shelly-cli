@@ -103,6 +103,10 @@ func run(ctx context.Context, opts *Options) error {
 			})
 			if connErr != nil {
 				ds.Online = false
+				// Try to derive state from parent link
+				if ls, linkErr := svc.ResolveLinkStatus(ctx, name); linkErr == nil && ls != nil {
+					ds.LinkState = ls.State
+				}
 			}
 
 			statuses = append(statuses, ds)

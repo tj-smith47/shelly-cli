@@ -3,12 +3,15 @@ package factories
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -106,6 +109,11 @@ func runQuick(ctx context.Context, opts *quickOptions) error {
 		return opErr
 	})
 	if err != nil {
+		// Try link fallback on connectivity errors
+		if proxyResult, proxyErr := tryLinkProxy(ctx, svc, opts.Device, opts.Config.Action, err); proxyErr == nil {
+			ios.Success(proxyResult)
+			return nil
+		}
 		return err
 	}
 
@@ -115,4 +123,33 @@ func runQuick(ctx context.Context, opts *quickOptions) error {
 		ios.Success(opts.Config.SuccessPlural, result.Count, opts.Device)
 	}
 	return nil
+}
+
+// tryLinkProxy attempts to control the parent switch when a linked child device is unreachable.
+// Returns the success message and nil error on success, or empty string and error if not applicable.
+func tryLinkProxy(ctx context.Context, svc *shelly.Service, device string, action QuickAction, originalErr error) (string, error) {
+	// Only proxy on connectivity failures, not on auth/param errors
+	if !ratelimit.IsConnectivityFailure(originalErr) {
+		return "", originalErr
+	}
+
+	link, ok := config.GetLink(device)
+	if !ok {
+		return "", originalErr
+	}
+
+	var err error
+	switch action {
+	case QuickOn:
+		err = svc.SwitchOn(ctx, link.ParentDevice, link.SwitchID)
+	case QuickOff:
+		err = svc.SwitchOff(ctx, link.ParentDevice, link.SwitchID)
+	case QuickToggle:
+		_, err = svc.SwitchToggle(ctx, link.ParentDevice, link.SwitchID)
+	}
+	if err != nil {
+		return "", fmt.Errorf("link proxy failed: %w", err)
+	}
+
+	return fmt.Sprintf("Turned %s %q switch:%d (linked from %q)", action, link.ParentDevice, link.SwitchID, device), nil
 }
