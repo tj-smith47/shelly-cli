@@ -15,45 +15,47 @@ func newTestManagerWithDevices(devices ...string) *Manager {
 	return mgr
 }
 
-func TestSetLink(t *testing.T) {
+func TestSetLinkBasic(t *testing.T) {
 	t.Parallel()
 
-	t.Run("basic link", func(t *testing.T) {
-		t.Parallel()
-		mgr := newTestManagerWithDevices("bulb-duo", "bedroom-2pm")
+	mgr := newTestManagerWithDevices("bulb-duo", "bedroom-2pm")
 
-		if err := mgr.SetLink("bulb-duo", "bedroom-2pm", 0); err != nil {
-			t.Fatalf("SetLink: %v", err)
-		}
+	if err := mgr.SetLink("bulb-duo", "bedroom-2pm", 0); err != nil {
+		t.Fatalf("SetLink: %v", err)
+	}
 
-		link, ok := mgr.GetLink("bulb-duo")
-		if !ok {
-			t.Fatal("expected link to exist")
-		}
-		if link.ParentDevice != "bedroom-2pm" {
-			t.Errorf("parent = %q, want %q", link.ParentDevice, "bedroom-2pm")
-		}
-		if link.SwitchID != 0 {
-			t.Errorf("switch_id = %d, want 0", link.SwitchID)
-		}
-	})
+	link, ok := mgr.GetLink("bulb-duo")
+	if !ok {
+		t.Fatal("expected link to exist")
+	}
+	if link.ParentDevice != "bedroom-2pm" {
+		t.Errorf("parent = %q, want %q", link.ParentDevice, "bedroom-2pm")
+	}
+	if link.SwitchID != 0 {
+		t.Errorf("switch_id = %d, want 0", link.SwitchID)
+	}
+}
 
-	t.Run("with switch ID", func(t *testing.T) {
-		t.Parallel()
-		mgr := newTestManagerWithDevices("garage-light", "garage-switch")
+func TestSetLinkWithSwitchID(t *testing.T) {
+	t.Parallel()
 
-		if err := mgr.SetLink("garage-light", "garage-switch", 1); err != nil {
-			t.Fatalf("SetLink: %v", err)
-		}
+	mgr := newTestManagerWithDevices("garage-light", "garage-switch")
 
-		link, ok := mgr.GetLink("garage-light")
-		if !ok {
-			t.Fatal("expected link to exist")
-		}
-		if link.SwitchID != 1 {
-			t.Errorf("switch_id = %d, want 1", link.SwitchID)
-		}
-	})
+	if err := mgr.SetLink("garage-light", "garage-switch", 1); err != nil {
+		t.Fatalf("SetLink: %v", err)
+	}
+
+	link, ok := mgr.GetLink("garage-light")
+	if !ok {
+		t.Fatal("expected link to exist")
+	}
+	if link.SwitchID != 1 {
+		t.Errorf("switch_id = %d, want 1", link.SwitchID)
+	}
+}
+
+func TestSetLinkValidation(t *testing.T) {
+	t.Parallel()
 
 	t.Run("reject self-link", func(t *testing.T) {
 		t.Parallel()
@@ -98,6 +100,10 @@ func TestSetLink(t *testing.T) {
 			t.Fatal("expected error for nonexistent parent")
 		}
 	})
+}
+
+func TestSetLinkUpdateAndMultiple(t *testing.T) {
+	t.Parallel()
 
 	t.Run("update existing link", func(t *testing.T) {
 		t.Parallel()

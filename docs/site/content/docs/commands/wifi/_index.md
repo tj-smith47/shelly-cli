@@ -1,7 +1,7 @@
 ---
 title: "shelly wifi"
 description: "shelly wifi"
-weight: 760
+weight: 770
 sidebar:
   collapsed: true
 ---

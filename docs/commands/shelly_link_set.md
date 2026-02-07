@@ -1,42 +1,36 @@
----
-title: "shelly log"
-description: "shelly log"
-weight: 350
-sidebar:
-  collapsed: true
----
+## shelly link set
 
-## shelly log
-
-Manage CLI logs
+Set a device power link
 
 ### Synopsis
 
-Manage Shelly CLI log files.
+Set a parent-child power link between devices.
 
-Log files are stored in the CLI config directory and contain
-debug information about CLI operations.
+The child device is powered by a switch on the parent device. When the
+child is offline, its state can be derived from the parent switch state.
+
+```
+shelly link set <child-device> <parent-device> [flags]
+```
 
 ### Examples
 
 ```
-  # Show recent log entries
-  shelly log show
+  # Link bulb to switch:0 on bedroom-2pm
+  shelly link set bulb-duo bedroom-2pm
 
-  # Follow log in real-time
-  shelly log tail
+  # Link to a specific switch ID
+  shelly link set garage-light garage-switch --switch-id 1
 
-  # Show log file path
-  shelly log path
-
-  # Clear log file
-  shelly log clear
+  # Update an existing link
+  shelly link set bulb-duo new-switch
 ```
 
 ### Options
 
 ```
-  -h, --help   help for log
+  -h, --help            help for set
+      --switch-id int   Switch component ID on the parent device
 ```
 
 ### Options inherited from parent commands
@@ -58,10 +52,5 @@ debug information about CLI operations.
 
 ### SEE ALSO
 
-* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly log clear](shelly_log_clear.md)	 - Clear log file
-* [shelly log export](shelly_log_export.md)	 - Export log file
-* [shelly log path](shelly_log_path.md)	 - Show log file path
-* [shelly log show](shelly_log_show.md)	 - Show recent log entries
-* [shelly log tail](shelly_log_tail.md)	 - Tail log file
+* [shelly link](shelly_link.md)	 - Manage device power links
 

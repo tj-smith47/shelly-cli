@@ -1,0 +1,96 @@
+.nh
+.TH "SHELLY" "1" "Feb 2026" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-link - Manage device power links
+
+
+.SH SYNOPSIS
+\fBshelly link [flags]\fP
+
+
+.SH DESCRIPTION
+Manage parent-child power relationships between devices.
+
+.PP
+Links define which switch controls the power to another device.
+When a linked child device is offline, its state is derived from
+the parent switch state. Control commands (on/off/toggle) automatically
+proxy to the parent switch when the child is unreachable.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for link
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB--offline\fP[=false]
+	Only read from cache, error on cache miss
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Link a bulb to a switch (bulb is powered by switch:0)
+  shelly link set bulb-duo bedroom-2pm
+
+  # Link with a specific switch ID
+  shelly link set garage-light garage-switch --switch-id 1
+
+  # List all links
+  shelly link list
+
+  # Show link status with derived state
+  shelly link status
+
+  # Remove a link
+  shelly link delete bulb-duo
+.EE
+
+
+.SH SEE ALSO
+\fBshelly(1)\fP, \fBshelly-link-delete(1)\fP, \fBshelly-link-list(1)\fP, \fBshelly-link-set(1)\fP, \fBshelly-link-status(1)\fP

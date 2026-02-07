@@ -1,7 +1,7 @@
 ---
 title: "shelly virtual"
 description: "shelly virtual"
-weight: 720
+weight: 730
 sidebar:
   collapsed: true
 ---

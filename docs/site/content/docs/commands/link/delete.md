@@ -1,42 +1,38 @@
 ---
-title: "shelly log"
-description: "shelly log"
-weight: 350
-sidebar:
-  collapsed: true
+title: "shelly link delete"
+description: "shelly link delete"
 ---
 
-## shelly log
+## shelly link delete
 
-Manage CLI logs
+Delete a link
 
 ### Synopsis
 
-Manage Shelly CLI log files.
+Delete a saved link permanently.
 
-Log files are stored in the CLI config directory and contain
-debug information about CLI operations.
+```
+shelly link delete <link> [flags]
+```
 
 ### Examples
 
 ```
-  # Show recent log entries
-  shelly log show
+  # Delete a link (with confirmation)
+  shelly link delete my-link
 
-  # Follow log in real-time
-  shelly log tail
+  # Delete without confirmation
+  shelly link delete my-link --yes
 
-  # Show log file path
-  shelly log path
-
-  # Clear log file
-  shelly log clear
+  # Using alias
+  shelly link rm my-link
 ```
 
 ### Options
 
 ```
-  -h, --help   help for log
+  -h, --help   help for delete
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
@@ -58,10 +54,5 @@ debug information about CLI operations.
 
 ### SEE ALSO
 
-* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly log clear](shelly_log_clear.md)	 - Clear log file
-* [shelly log export](shelly_log_export.md)	 - Export log file
-* [shelly log path](shelly_log_path.md)	 - Show log file path
-* [shelly log show](shelly_log_show.md)	 - Show recent log entries
-* [shelly log tail](shelly_log_tail.md)	 - Tail log file
+* [shelly link](shelly_link.md)	 - Manage device power links
 

@@ -1,42 +1,35 @@
----
-title: "shelly log"
-description: "shelly log"
-weight: 350
-sidebar:
-  collapsed: true
----
+## shelly link status
 
-## shelly log
-
-Manage CLI logs
+Show link status with derived device state
 
 ### Synopsis
 
-Manage Shelly CLI log files.
+Show the status of device links with resolved parent switch state.
 
-Log files are stored in the CLI config directory and contain
-debug information about CLI operations.
+When a linked child device is offline, its state is derived from the
+parent switch state. If no device is specified, shows all links.
+
+```
+shelly link status [child-device] [flags]
+```
 
 ### Examples
 
 ```
-  # Show recent log entries
-  shelly log show
+  # Show status of all links
+  shelly link status
 
-  # Follow log in real-time
-  shelly log tail
+  # Show status for a specific linked device
+  shelly link status bulb-duo
 
-  # Show log file path
-  shelly log path
-
-  # Clear log file
-  shelly log clear
+  # Output as JSON
+  shelly link status -o json
 ```
 
 ### Options
 
 ```
-  -h, --help   help for log
+  -h, --help   help for status
 ```
 
 ### Options inherited from parent commands
@@ -58,10 +51,5 @@ debug information about CLI operations.
 
 ### SEE ALSO
 
-* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly log clear](shelly_log_clear.md)	 - Clear log file
-* [shelly log export](shelly_log_export.md)	 - Export log file
-* [shelly log path](shelly_log_path.md)	 - Show log file path
-* [shelly log show](shelly_log_show.md)	 - Show recent log entries
-* [shelly log tail](shelly_log_tail.md)	 - Tail log file
+* [shelly link](shelly_link.md)	 - Manage device power links
 

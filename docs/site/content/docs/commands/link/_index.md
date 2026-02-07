@@ -1,44 +1,47 @@
 ---
-title: "shelly zigbee"
-description: "shelly zigbee"
-weight: 780
+title: "shelly link"
+description: "shelly link"
+weight: 340
 sidebar:
   collapsed: true
 ---
 
-## shelly zigbee
+## shelly link
 
-Manage Zigbee connectivity
+Manage device power links
 
 ### Synopsis
 
-Manage Zigbee connectivity on Shelly devices.
+Manage parent-child power relationships between devices.
 
-Zigbee support is available on Gen4 devices that can operate as
-Zigbee end devices, connecting to Zigbee coordinators like
-Home Assistant (ZHA), Zigbee2MQTT, or other compatible systems.
-
-When operating in Zigbee mode, the device joins a Zigbee network
-and can be controlled through the Zigbee coordinator instead of
-or in addition to WiFi/HTTP control.
+Links define which switch controls the power to another device.
+When a linked child device is offline, its state is derived from
+the parent switch state. Control commands (on/off/toggle) automatically
+proxy to the parent switch when the child is unreachable.
 
 ### Examples
 
 ```
-  # Show Zigbee status
-  shelly zigbee status living-room
+  # Link a bulb to a switch (bulb is powered by switch:0)
+  shelly link set bulb-duo bedroom-2pm
 
-  # Start pairing to join a network
-  shelly zigbee pair living-room
+  # Link with a specific switch ID
+  shelly link set garage-light garage-switch --switch-id 1
 
-  # List Zigbee-capable devices on network
-  shelly zigbee list
+  # List all links
+  shelly link list
+
+  # Show link status with derived state
+  shelly link status
+
+  # Remove a link
+  shelly link delete bulb-duo
 ```
 
 ### Options
 
 ```
-  -h, --help   help for zigbee
+  -h, --help   help for link
 ```
 
 ### Options inherited from parent commands
@@ -61,8 +64,8 @@ or in addition to WiFi/HTTP control.
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly zigbee list](shelly_zigbee_list.md)	 - List Zigbee-capable devices
-* [shelly zigbee pair](shelly_zigbee_pair.md)	 - Start Zigbee network pairing
-* [shelly zigbee remove](shelly_zigbee_remove.md)	 - Leave Zigbee network
-* [shelly zigbee status](shelly_zigbee_status.md)	 - Show Zigbee network status
+* [shelly link delete](shelly_link_delete.md)	 - Delete a link
+* [shelly link list](shelly_link_list.md)	 - List links
+* [shelly link set](shelly_link_set.md)	 - Set a device power link
+* [shelly link status](shelly_link_status.md)	 - Show link status with derived device state
 

@@ -1,0 +1,92 @@
+.nh
+.TH "SHELLY" "1" "Feb 2026" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-link-set - Set a device power link
+
+
+.SH SYNOPSIS
+\fBshelly link set   [flags]\fP
+
+
+.SH DESCRIPTION
+Set a parent-child power link between devices.
+
+.PP
+The child device is powered by a switch on the parent device. When the
+child is offline, its state can be derived from the parent switch state.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for set
+
+.PP
+\fB--switch-id\fP=0
+	Switch component ID on the parent device
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB--offline\fP[=false]
+	Only read from cache, error on cache miss
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Link bulb to switch:0 on bedroom-2pm
+  shelly link set bulb-duo bedroom-2pm
+
+  # Link to a specific switch ID
+  shelly link set garage-light garage-switch --switch-id 1
+
+  # Update an existing link
+  shelly link set bulb-duo new-switch
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-link(1)\fP

@@ -1,7 +1,7 @@
 ---
 title: "shelly sync"
 description: "shelly sync"
-weight: 650
+weight: 660
 sidebar:
   collapsed: true
 ---

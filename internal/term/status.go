@@ -60,12 +60,13 @@ func DisplayAllDevicesQuickStatus(ios *iostreams.IOStreams, statuses []QuickDevi
 	for _, ds := range statuses {
 		var status string
 		deviceModel := ds.Model
-		if ds.Online {
+		switch {
+		case ds.Online:
 			status = output.RenderOnline(true, output.CaseLower)
-		} else if ds.LinkState != "" {
+		case ds.LinkState != "":
 			status = ds.LinkState
 			deviceModel = "-"
-		} else {
+		default:
 			status = output.RenderOnline(false, output.CaseLower)
 			deviceModel = "-"
 		}

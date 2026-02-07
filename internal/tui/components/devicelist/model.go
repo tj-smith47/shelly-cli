@@ -566,6 +566,11 @@ func (m Model) renderDeviceStatus(d *cache.DeviceData) string {
 		return m.styles.Checking.Render("◐ Checking...")
 	case d.Online:
 		status = m.styles.Online.Render("● Online")
+	case d.LinkState != "":
+		// Link-derived state: show meaningful status instead of "Offline"
+		colors := theme.GetSemanticColors()
+		muted := lipgloss.NewStyle().Foreground(colors.Muted)
+		status = muted.Render("◉ " + d.LinkState)
 	default:
 		status = m.styles.Offline.Render("○ Offline")
 		if d.Error != nil {

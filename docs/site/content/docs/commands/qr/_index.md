@@ -1,7 +1,7 @@
 ---
 title: "shelly qr"
 description: "shelly qr"
-weight: 510
+weight: 520
 sidebar:
   collapsed: true
 ---

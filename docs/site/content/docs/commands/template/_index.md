@@ -1,7 +1,7 @@
 ---
 title: "shelly template"
 description: "shelly template"
-weight: 660
+weight: 670
 sidebar:
   collapsed: true
 ---

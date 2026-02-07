@@ -1,7 +1,7 @@
 ---
 title: "shelly script"
 description: "shelly script"
-weight: 580
+weight: 590
 sidebar:
   collapsed: true
 ---

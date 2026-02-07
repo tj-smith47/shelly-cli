@@ -61,18 +61,18 @@ type quickOptions struct {
 }
 
 // NewQuickCommand creates a quick on/off/toggle command with auto-detection.
-func NewQuickCommand(f *cmdutil.Factory, config QuickOpts) *cobra.Command {
+func NewQuickCommand(f *cmdutil.Factory, cfg QuickOpts) *cobra.Command {
 	opts := &quickOptions{
 		Factory: f,
-		Config:  config,
+		Config:  cfg,
 	}
 
 	cmd := &cobra.Command{
-		Use:               string(config.Action) + " <device>",
-		Aliases:           config.Aliases,
-		Short:             config.Short,
-		Long:              config.Long,
-		Example:           config.Example,
+		Use:               string(cfg.Action) + " <device>",
+		Aliases:           cfg.Aliases,
+		Short:             cfg.Short,
+		Long:              cfg.Long,
+		Example:           cfg.Example,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -111,7 +111,7 @@ func runQuick(ctx context.Context, opts *quickOptions) error {
 	if err != nil {
 		// Try link fallback on connectivity errors
 		if proxyResult, proxyErr := tryLinkProxy(ctx, svc, opts.Device, opts.Config.Action, err); proxyErr == nil {
-			ios.Success(proxyResult)
+			ios.Success("%s", proxyResult)
 			return nil
 		}
 		return err

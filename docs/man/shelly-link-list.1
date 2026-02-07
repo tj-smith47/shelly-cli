@@ -1,0 +1,88 @@
+.nh
+.TH "SHELLY" "1" "Feb 2026" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-link-list - List links
+
+
+.SH SYNOPSIS
+\fBshelly link list [flags]\fP
+
+
+.SH DESCRIPTION
+List all configured links.
+
+.PP
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for list
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB--offline\fP[=false]
+	Only read from cache, error on cache miss
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # List all links
+  shelly link list
+
+  # Output as JSON
+  shelly link list -o json
+
+  # Output as YAML
+  shelly link list -o yaml
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-link(1)\fP

@@ -65,6 +65,10 @@ type DeviceData struct {
 
 	UpdatedAt time.Time
 
+	// Link-derived state (populated when device is offline and has a parent link)
+	LinkedTo  *config.Link // Non-nil if this device has a parent link configured
+	LinkState string       // Derived state from parent switch (e.g., "Off (via bedroom-2pm:0)")
+
 	// NeedsRefresh is set when WebSocket reports a state change without power data.
 	// The cache handler should trigger an HTTP refresh to get accurate power readings.
 	NeedsRefresh bool
@@ -1113,6 +1117,7 @@ func (c *Cache) applyDeviceUpdate(msg DeviceUpdateMsg, existing *DeviceData) eve
 		existing.Error = msg.Data.Error
 		existing.UpdatedAt = msg.Data.UpdatedAt
 		existing.lastRequestID = msg.RequestID
+		c.resolveLinkState(msg.Name, existing)
 		c.devices[msg.Name] = existing
 
 		// Return synthetic offline event if device was previously online
@@ -1132,6 +1137,10 @@ func (c *Cache) applyDeviceUpdate(msg DeviceUpdateMsg, existing *DeviceData) eve
 	// Normal update - preserve snapshot and extended status if new one is nil
 	preserveSnapshotFromExisting(msg.Data, existing)
 	preserveExtendedStatusFromExisting(msg.Data, existing)
+
+	// Resolve link state for offline devices
+	c.resolveLinkState(msg.Name, msg.Data)
+
 	c.devices[msg.Name] = msg.Data
 
 	// Update MAC-to-IP mapping when device is online and has a MAC
@@ -1178,6 +1187,47 @@ func preserveExtendedStatusFromExisting(newData, existing *DeviceData) {
 	if newData.Sys == nil && existing.Sys != nil {
 		newData.Sys = existing.Sys
 	}
+}
+
+// resolveLinkState populates link-derived state for offline devices.
+// Must be called with c.mu held.
+func (c *Cache) resolveLinkState(name string, data *DeviceData) {
+	// Look up link for this device
+	link, ok := config.GetLink(name)
+	if !ok {
+		data.LinkedTo = nil
+		data.LinkState = ""
+		return
+	}
+
+	data.LinkedTo = &link
+
+	// If device is online, don't override with link state
+	if data.Online {
+		data.LinkState = ""
+		return
+	}
+
+	// Try to derive state from cached parent data
+	parentData, parentExists := c.devices[link.ParentDevice]
+	if !parentExists || parentData == nil || !parentData.Online {
+		data.LinkState = "Unknown"
+		return
+	}
+
+	// Find the switch state from parent's cached data
+	for _, sw := range parentData.Switches {
+		if sw.ID == link.SwitchID {
+			if sw.On {
+				data.LinkState = "On"
+			} else {
+				data.LinkState = "Off (switch off)"
+			}
+			return
+		}
+	}
+
+	data.LinkState = "Unknown"
 }
 
 // RefreshDebounceInterval is the delay before triggering HTTP refresh for devices

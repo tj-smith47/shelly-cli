@@ -1,42 +1,40 @@
 ---
-title: "shelly log"
-description: "shelly log"
-weight: 350
-sidebar:
-  collapsed: true
+title: "shelly link list"
+description: "shelly link list"
 ---
 
-## shelly log
+## shelly link list
 
-Manage CLI logs
+List links
 
 ### Synopsis
 
-Manage Shelly CLI log files.
+List all configured links.
 
-Log files are stored in the CLI config directory and contain
-debug information about CLI operations.
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+```
+shelly link list [flags]
+```
 
 ### Examples
 
 ```
-  # Show recent log entries
-  shelly log show
+  # List all links
+  shelly link list
 
-  # Follow log in real-time
-  shelly log tail
+  # Output as JSON
+  shelly link list -o json
 
-  # Show log file path
-  shelly log path
-
-  # Clear log file
-  shelly log clear
+  # Output as YAML
+  shelly link list -o yaml
 ```
 
 ### Options
 
 ```
-  -h, --help   help for log
+  -h, --help   help for list
 ```
 
 ### Options inherited from parent commands
@@ -58,10 +56,5 @@ debug information about CLI operations.
 
 ### SEE ALSO
 
-* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly log clear](shelly_log_clear.md)	 - Clear log file
-* [shelly log export](shelly_log_export.md)	 - Export log file
-* [shelly log path](shelly_log_path.md)	 - Show log file path
-* [shelly log show](shelly_log_show.md)	 - Show recent log entries
-* [shelly log tail](shelly_log_tail.md)	 - Tail log file
+* [shelly link](shelly_link.md)	 - Manage device power links
 

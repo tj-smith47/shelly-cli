@@ -9,13 +9,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+// ErrNoLink is returned when a device has no link configured.
+var ErrNoLink = fmt.Errorf("no link configured")
+
 // ResolveLinkStatus resolves the status of a linked child device.
-// Returns nil if the device has no link configured.
+// Returns ErrNoLink if the device has no link configured.
 // When the parent is reachable, returns the parent switch state for deriving child state.
 func (s *Service) ResolveLinkStatus(ctx context.Context, childDevice string) (*model.LinkStatus, error) {
 	link, ok := config.GetLink(childDevice)
 	if !ok {
-		return nil, nil
+		return nil, ErrNoLink
 	}
 
 	ls := &model.LinkStatus{
@@ -28,7 +31,7 @@ func (s *Service) ResolveLinkStatus(ctx context.Context, childDevice string) (*m
 	if err != nil {
 		ls.ParentOnline = false
 		ls.State = "Unknown"
-		return ls, nil
+		return ls, nil //nolint:nilerr // parent unreachable is not an error, we return Unknown state
 	}
 
 	ls.ParentOnline = true

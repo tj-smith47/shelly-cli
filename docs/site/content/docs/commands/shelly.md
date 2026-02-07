@@ -88,6 +88,7 @@ and controlling Shelly devices on your local network.
 * [shelly input](shelly_input.md)	 - Manage input components
 * [shelly kvs](shelly_kvs.md)	 - Manage device key-value storage
 * [shelly light](shelly_light.md)	 - Control light components
+* [shelly link](shelly_link.md)	 - Manage device power links
 * [shelly log](shelly_log.md)	 - Manage CLI logs
 * [shelly lora](shelly_lora.md)	 - Manage LoRa add-on
 * [shelly matter](shelly_matter.md)	 - Manage Matter connectivity

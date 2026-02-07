@@ -330,6 +330,11 @@ func (m Model) buildContent() string {
 	// Line 1: Device header with status
 	lines := []string{m.buildHeaderLine()}
 
+	// Link info (when device has a parent link)
+	if linkLine := m.buildLinkLine(); linkLine != "" {
+		lines = append(lines, linkLine)
+	}
+
 	// Power section (right after device name)
 	if powerLine := m.buildPowerLine(); powerLine != "" {
 		lines = append(lines, powerLine)
@@ -360,11 +365,24 @@ func (m Model) buildContent() string {
 
 // buildHeaderLine builds the device header with name and status.
 func (m Model) buildHeaderLine() string {
-	statusStr := m.styles.Online.Render("● Online")
-	if !m.device.Online {
+	var statusStr string
+	switch {
+	case m.device.Online:
+		statusStr = m.styles.Online.Render("● Online")
+	case m.device.LinkState != "":
+		statusStr = m.styles.Muted.Render("◉ " + m.device.LinkState)
+	default:
 		statusStr = m.styles.Offline.Render("○ Offline")
 	}
 	return m.styles.Title.Render(m.device.Device.Name) + " " + statusStr
+}
+
+// buildLinkLine builds a compact line showing the parent link relationship.
+func (m Model) buildLinkLine() string {
+	if m.device.LinkedTo == nil {
+		return ""
+	}
+	return m.inlineSection("Link", m.kv(m.device.LinkedTo.ParentDevice, fmt.Sprintf("switch:%d", m.device.LinkedTo.SwitchID)))
 }
 
 // buildIdentityLine builds a compact line with model and generation info.

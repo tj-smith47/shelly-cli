@@ -99,7 +99,7 @@ func run(ctx context.Context, opts *Options) error {
 				if switchStatus.Output {
 					ls.State = "On"
 				} else {
-					ls.State = fmt.Sprintf("Off (switch off)")
+					ls.State = "Off (switch off)"
 				}
 			}
 

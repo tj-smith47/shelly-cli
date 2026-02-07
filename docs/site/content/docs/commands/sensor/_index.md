@@ -1,7 +1,7 @@
 ---
 title: "shelly sensor"
 description: "shelly sensor"
-weight: 590
+weight: 600
 sidebar:
   collapsed: true
 ---

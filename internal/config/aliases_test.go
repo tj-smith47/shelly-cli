@@ -11,6 +11,7 @@ import (
 )
 
 const testImportFile = "/test/import.yaml"
+const testCmdSwitch = "switch"
 
 // setupAliasTest sets up an isolated Manager for alias testing.
 // It uses an in-memory filesystem to avoid touching real files.
@@ -43,7 +44,7 @@ func TestValidateAliasName(t *testing.T) {
 		{"reserved help", "help", true},
 		{"reserved version", "version", true},
 		{"reserved alias", "alias", true},
-		{"reserved switch", "switch", true},
+		{"reserved switch", testCmdSwitch, true},
 	}
 
 	for _, tt := range tests {
@@ -337,7 +338,7 @@ func TestExpandAliasArgs(t *testing.T) {
 		if len(expanded) != 3 {
 			t.Errorf("expected 3 args, got %v", expanded)
 		}
-		if expanded[0] != "switch" || expanded[1] != "status" {
+		if expanded[0] != testCmdSwitch || expanded[1] != "status" {
 			t.Errorf("expected [switch status ...], got %v", expanded)
 		}
 	})
@@ -357,7 +358,7 @@ func TestReservedCommands(t *testing.T) {
 	t.Parallel()
 
 	// Verify critical commands are reserved
-	criticalCommands := []string{"help", "version", "config", "alias", "device", "switch"}
+	criticalCommands := []string{"help", "version", "config", "alias", "device", testCmdSwitch}
 	for _, cmd := range criticalCommands {
 		if !ReservedCommands[cmd] {
 			t.Errorf("expected %q to be reserved", cmd)
