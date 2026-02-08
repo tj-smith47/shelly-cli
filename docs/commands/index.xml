@@ -129,6 +129,7 @@ and controlling Shelly devices on your local network.&lt;/p&gt;
 &lt;li&gt;&lt;a href="shelly_input.md"&gt;shelly input&lt;/a&gt;	 - Manage input components&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
+&lt;li&gt;&lt;a href="shelly_link.md"&gt;shelly link&lt;/a&gt;	 - Manage device power links&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_lora.md"&gt;shelly lora&lt;/a&gt;	 - Manage LoRa add-on&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_matter.md"&gt;shelly matter&lt;/a&gt;	 - Manage Matter connectivity&lt;/li&gt;
