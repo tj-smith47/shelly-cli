@@ -24,7 +24,8 @@ func IsActionRequest(msg tea.Msg) bool {
 		CheckRequestMsg, TimezoneRequestMsg, ActionsRequestMsg,
 		MQTTRequestMsg, AuthRequestMsg, CloudRequestMsg,
 		ResetRequestMsg, DownloadRequestMsg, UploadRequestMsg,
-		EvalRequestMsg, SnoozeRequestMsg, ModeSelectMsg:
+		EvalRequestMsg, SnoozeRequestMsg, ModeSelectMsg,
+		PlatformFilterMsg:
 		return true
 	default:
 		return false
@@ -180,6 +181,9 @@ type SnoozeRequestMsg struct {
 type ModeSelectMsg struct {
 	Mode int
 }
+
+// PlatformFilterMsg requests cycling the platform filter in the device list.
+type PlatformFilterMsg struct{}
 
 // Overlay/Modal coordination messages - used to synchronize focus state between
 // app.go and views/components when modals are opened or closed.

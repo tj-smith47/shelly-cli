@@ -1909,9 +1909,24 @@ func (m Model) dispatchDeviceKeyAction(action keys.Action) (Model, tea.Cmd, bool
 		return m.dispatchControlAction()
 	case keys.ActionDetail:
 		return m.dispatchDetailAction()
+	case keys.ActionPlatformFilter:
+		return m.dispatchPlatformFilterAction()
 	default:
 		return m, nil, false
 	}
+}
+
+// dispatchPlatformFilterAction cycles the platform filter on the device list.
+func (m Model) dispatchPlatformFilterAction() (Model, tea.Cmd, bool) {
+	if !m.hasDeviceList() {
+		return m, nil, false
+	}
+	m.deviceList, _ = m.deviceList.Update(messages.PlatformFilterMsg{})
+	pf := m.deviceList.PlatformFilter()
+	if pf != "" {
+		return m, toast.Show("Platform: "+pf, toast.LevelInfo), true
+	}
+	return m, toast.Show("Platform: all", toast.LevelInfo), true
 }
 
 // dispatchBrowserAction opens the selected device's web UI in the browser.

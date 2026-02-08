@@ -5,6 +5,7 @@ package devicelist
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -35,18 +36,20 @@ type OpenBrowserMsg struct {
 // Model holds the device list state.
 type Model struct {
 	panel.Sizable
-	cache      *cache.Cache // Shared device cache
-	filter     string       // Current filter string
-	focused    bool         // Whether this component has focus
-	listOnly   bool         // When true, only render list panel (detail rendered separately)
-	gPressed   bool         // Tracks if 'g' was just pressed (for vim-style gx, gg commands)
-	panelIndex int
-	styles     Styles
+	cache          *cache.Cache // Shared device cache
+	filter         string       // Current filter string
+	platformFilter string       // Platform filter ("" = all, "shelly", "tasmota", etc.)
+	focused        bool         // Whether this component has focus
+	listOnly       bool         // When true, only render list panel (detail rendered separately)
+	gPressed       bool         // Tracks if 'g' was just pressed (for vim-style gx, gg commands)
+	panelIndex     int
+	styles         Styles
 
 	// Cached filtered devices to avoid calling GetAllDevices on every View()
-	cachedDevices []*cache.DeviceData
-	cachedVersion uint64 // Cache version when cachedDevices was built
-	cachedFilter  string // Filter string when cachedDevices was built
+	cachedDevices        []*cache.DeviceData
+	cachedVersion        uint64 // Cache version when cachedDevices was built
+	cachedFilter         string // Filter string when cachedDevices was built
+	cachedPlatformFilter string // Platform filter when cachedDevices was built
 }
 
 // Styles for the device list component.
@@ -162,6 +165,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case messages.PlatformFilterMsg:
+		m = m.cyclePlatformFilter()
+		return m, nil
+
 	case messages.NavigationMsg:
 		// Sync item count from cache before handling navigation
 		devices := m.getFilteredDevices()
@@ -280,7 +287,8 @@ func (m Model) refreshCachedDevices() Model {
 
 	// Check if cached devices are still valid
 	currentVersion := m.cache.Version()
-	if m.cachedDevices != nil && m.cachedVersion == currentVersion && m.cachedFilter == m.filter {
+	if m.cachedDevices != nil && m.cachedVersion == currentVersion &&
+		m.cachedFilter == m.filter && m.cachedPlatformFilter == m.platformFilter {
 		return m // Cache is still valid
 	}
 
@@ -288,6 +296,18 @@ func (m Model) refreshCachedDevices() Model {
 	all := m.cache.GetAllDevices()
 	m.cachedVersion = currentVersion
 	m.cachedFilter = m.filter
+	m.cachedPlatformFilter = m.platformFilter
+
+	// Apply platform filter first
+	if m.platformFilter != "" {
+		platformFiltered := make([]*cache.DeviceData, 0, len(all))
+		for _, d := range all {
+			if d.Device.GetPlatform() == m.platformFilter {
+				platformFiltered = append(platformFiltered, d)
+			}
+		}
+		all = platformFiltered
+	}
 
 	if m.filter == "" {
 		m.cachedDevices = all
@@ -316,6 +336,65 @@ func (m Model) SetFilter(filter string) Model {
 	// Update item count for new filter
 	m.Scroller.SetItemCount(len(m.cachedDevices))
 	return m
+}
+
+// cyclePlatformFilter cycles through available platforms: "" → "shelly" → plugin platforms → "".
+func (m Model) cyclePlatformFilter() Model {
+	platforms := m.availablePlatforms()
+	if len(platforms) == 0 {
+		m.platformFilter = ""
+		return m
+	}
+
+	// Find current position in cycle
+	currentIdx := -1
+	for i, p := range platforms {
+		if p == m.platformFilter {
+			currentIdx = i
+			break
+		}
+	}
+
+	// Move to next platform (wraps to "" via modular arithmetic + 1 past end)
+	nextIdx := currentIdx + 1
+	if nextIdx >= len(platforms) {
+		m.platformFilter = ""
+	} else {
+		m.platformFilter = platforms[nextIdx]
+	}
+
+	// Refresh cached devices with new platform filter
+	m = m.refreshCachedDevices()
+	m.Scroller.SetItemCount(len(m.cachedDevices))
+	// Reset cursor to avoid out-of-bounds
+	if m.Scroller.Cursor() >= len(m.cachedDevices) {
+		m.Scroller.CursorToStart()
+	}
+	return m
+}
+
+// availablePlatforms returns the sorted list of unique platforms from all devices.
+func (m Model) availablePlatforms() []string {
+	if m.cache == nil {
+		return nil
+	}
+	all := m.cache.GetAllDevices()
+	seen := make(map[string]bool)
+	for _, d := range all {
+		seen[d.Device.GetPlatform()] = true
+	}
+
+	platforms := make([]string, 0, len(seen))
+	for p := range seen {
+		platforms = append(platforms, p)
+	}
+	sort.Strings(platforms)
+	return platforms
+}
+
+// PlatformFilter returns the current platform filter string.
+func (m Model) PlatformFilter() string {
+	return m.platformFilter
 }
 
 // SetFocused sets whether this component has focus.
@@ -500,14 +579,29 @@ func (m Model) renderListRow(d *cache.DeviceData, isSelected bool, width int) st
 		selector = "▶ "
 	}
 
-	// Name (truncate if needed)
-	maxNameWidth := width - 6 // icon, selector, padding
+	// Platform badge for plugin-managed devices (e.g., "[T]" for tasmota)
+	badge := ""
+	if d.Device.IsPluginManaged() {
+		platform := d.Device.GetPlatform()
+		if platform != "" {
+			colors := theme.GetSemanticColors()
+			muted := lipgloss.NewStyle().Foreground(colors.Muted)
+			badge = " " + muted.Render("["+strings.ToUpper(platform[:1])+"]")
+		}
+	}
+
+	// Name (truncate if needed, accounting for badge width)
+	badgeWidth := 0
+	if badge != "" {
+		badgeWidth = 4 // " [X]"
+	}
+	maxNameWidth := width - 6 - badgeWidth // icon, selector, padding, badge
 	name := d.Device.Name
 	if len(name) > maxNameWidth && maxNameWidth > 3 {
 		name = name[:maxNameWidth-1] + "…"
 	}
 
-	row := fmt.Sprintf("%s%s %s", selector, icon, name)
+	row := fmt.Sprintf("%s%s %s", selector, icon, name) + badge
 
 	if isSelected {
 		return m.styles.SelectedRow.Width(width).Render(row)
@@ -626,6 +720,10 @@ func componentTypeLabel(d *cache.DeviceData) string {
 // renderBasicInfo renders basic device info from config.
 func (m Model) renderBasicInfo(content *strings.Builder, d *cache.DeviceData) {
 	content.WriteString(m.renderDetailRow("Address", d.Device.Address))
+	if d.Device.IsPluginManaged() {
+		platform := d.Device.GetPlatform()
+		content.WriteString(m.renderDetailRow("Platform", platform+" ("+d.Device.PluginName()+")"))
+	}
 	content.WriteString(m.renderDetailRow("Type", d.Device.Type))
 	content.WriteString(m.renderDetailRow("Model", d.Device.Model))
 	content.WriteString(m.renderDetailRow("Generation", fmt.Sprintf("Gen%d", d.Device.Generation)))
@@ -776,10 +874,15 @@ func (m Model) MaxDeviceNameLen() int {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
+	platformHint := "platform"
+	if m.platformFilter != "" {
+		platformHint = "platform[" + m.platformFilter + "]"
+	}
 	return keys.FormatHints([]keys.Hint{
 		{Key: "j/k", Desc: "scroll"},
 		{Key: "g/G", Desc: "top/btm"},
 		{Key: "/", Desc: "filter"},
+		{Key: "p", Desc: platformHint},
 	}, keys.FooterHintWidth(m.Width))
 }
 

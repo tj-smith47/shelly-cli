@@ -700,6 +700,11 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 			lastRequestID: requestID,
 		}
 
+		// Plugin-managed devices use plugin hooks instead of Shelly API
+		if device.IsPluginManaged() {
+			return c.fetchPluginDevice(name, device, data, requestID)
+		}
+
 		// Mark context as polling - polling failures shouldn't trip circuit breaker (BUG-015)
 		ctx, cancel := context.WithTimeout(ratelimit.MarkAsPolling(c.ctx), c.deviceTimeout(device.Generation))
 		defer cancel()
@@ -808,6 +813,36 @@ func (c *Cache) deviceTimeout(generation int) time.Duration {
 	default:
 		return 15 * time.Second // Unknown - allow for fallback detection
 	}
+}
+
+// fetchPluginDevice fetches status for a plugin-managed device via plugin hooks.
+func (c *Cache) fetchPluginDevice(name string, device model.Device, data *DeviceData, requestID uint64) tea.Msg {
+	ctx, cancel := context.WithTimeout(ratelimit.MarkAsPolling(c.ctx), 15*time.Second)
+	defer cancel()
+
+	// Build minimal DeviceInfo from config (plugins don't have Shelly DeviceInfo)
+	data.Info = BuildPluginDeviceInfo(name, device)
+
+	// Get status via plugin hook through the service layer
+	result, err := c.svc.GetPluginDeviceStatus(ctx, device)
+	if err != nil {
+		data.Error = err
+		data.Online = false
+		c.ios.DebugErr("cache: plugin status "+name, err)
+		return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
+	}
+
+	data.Online = result.Online
+
+	// Parse plugin status into our unified format
+	parsed := ParsePluginStatus(name, result)
+	if parsed != nil {
+		ApplyParsedStatus(data, parsed)
+		debug.TraceEvent("cache: plugin %s parsed: %d switches, %d lights, %d covers, power=%.1fW",
+			name, len(data.Switches), len(data.Lights), len(data.Covers), data.Power)
+	}
+
+	return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
 }
 
 // populateDeviceInfo reconciles device info between live data and stored config.
