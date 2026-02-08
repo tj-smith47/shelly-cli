@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -57,9 +58,6 @@ parent switch state. If no device is specified, shows all links.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, 2*shelly.DefaultTimeout)
-	defer cancel()
-
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
@@ -79,32 +77,51 @@ func run(ctx context.Context, opts *Options) error {
 		links = map[string]config.Link{opts.Device: link}
 	}
 
-	var statuses []model.LinkStatus
+	// Flatten map to slice for indexed concurrent access.
+	type linkEntry struct {
+		child string
+		link  config.Link
+	}
+	entries := make([]linkEntry, 0, len(links))
+	for child, link := range links {
+		entries = append(entries, linkEntry{child: child, link: link})
+	}
+
+	statuses := make([]model.LinkStatus, len(entries))
 
 	err := cmdutil.RunWithSpinner(ctx, ios, "Resolving link states...", func(ctx context.Context) error {
-		for child, link := range links {
-			ls := model.LinkStatus{
-				ChildDevice:  child,
-				ParentDevice: link.ParentDevice,
-				SwitchID:     link.SwitchID,
-			}
+		var wg sync.WaitGroup
+		for i, entry := range entries {
+			idx := i
+			e := entry
+			wg.Go(func() {
+				devCtx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+				defer cancel()
 
-			switchStatus, switchErr := svc.SwitchStatus(ctx, link.ParentDevice, link.SwitchID)
-			if switchErr != nil {
-				ls.ParentOnline = false
-				ls.State = "Unknown"
-			} else {
-				ls.ParentOnline = true
-				ls.SwitchOutput = switchStatus.Output
-				if switchStatus.Output {
-					ls.State = "On"
-				} else {
-					ls.State = "Off (switch off)"
+				ls := model.LinkStatus{
+					ChildDevice:  e.child,
+					ParentDevice: e.link.ParentDevice,
+					SwitchID:     e.link.SwitchID,
 				}
-			}
 
-			statuses = append(statuses, ls)
+				switchStatus, switchErr := svc.SwitchStatus(devCtx, e.link.ParentDevice, e.link.SwitchID)
+				if switchErr != nil {
+					ls.ParentOnline = false
+					ls.State = "Unknown"
+				} else {
+					ls.ParentOnline = true
+					ls.SwitchOutput = switchStatus.Output
+					if switchStatus.Output {
+						ls.State = "On"
+					} else {
+						ls.State = "Off (switch off)"
+					}
+				}
+
+				statuses[idx] = ls
+			})
 		}
+		wg.Wait()
 		return nil
 	})
 	if err != nil {

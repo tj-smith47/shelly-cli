@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"sync"
+	"sync/atomic"
 
 	"github.com/spf13/afero"
 
@@ -69,36 +71,47 @@ type SyncDeviceResult struct {
 // SyncProgressCallback is called for each device during batch sync operations.
 type SyncProgressCallback func(result SyncDeviceResult)
 
-// PullDeviceConfigs pulls configurations from multiple devices.
+// PullDeviceConfigs pulls configurations from multiple devices concurrently.
 // It calls the progress callback for each device as it completes.
 func (s *Service) PullDeviceConfigs(ctx context.Context, devices []string, syncDir string, dryRun bool, progress SyncProgressCallback) (success, failed int) {
+	var successCount, failedCount atomic.Int64
+	var wg sync.WaitGroup
+
 	for _, device := range devices {
-		result := s.FetchDeviceConfig(ctx, device)
-		if result.Err != nil {
-			progress(SyncDeviceResult{Device: device, Status: fmt.Sprintf("failed (%v)", result.Err), Err: result.Err})
-			failed++
-			continue
-		}
+		d := device
+		wg.Go(func() {
+			devCtx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+			defer cancel()
 
-		if dryRun {
-			progress(SyncDeviceResult{Device: device, Status: "would save config"})
-			success++
-			continue
-		}
+			result := s.FetchDeviceConfig(devCtx, d)
+			if result.Err != nil {
+				progress(SyncDeviceResult{Device: d, Status: fmt.Sprintf("failed (%v)", result.Err), Err: result.Err})
+				failedCount.Add(1)
+				return
+			}
 
-		if err := config.SaveSyncConfig(syncDir, device, result.Config); err != nil {
-			progress(SyncDeviceResult{Device: device, Status: fmt.Sprintf("failed (%v)", err), Err: err})
-			failed++
-			continue
-		}
+			if dryRun {
+				progress(SyncDeviceResult{Device: d, Status: "would save config"})
+				successCount.Add(1)
+				return
+			}
 
-		progress(SyncDeviceResult{Device: device, Status: "saved"})
-		success++
+			if err := config.SaveSyncConfig(syncDir, d, result.Config); err != nil {
+				progress(SyncDeviceResult{Device: d, Status: fmt.Sprintf("failed (%v)", err), Err: err})
+				failedCount.Add(1)
+				return
+			}
+
+			progress(SyncDeviceResult{Device: d, Status: "saved"})
+			successCount.Add(1)
+		})
 	}
-	return success, failed
+
+	wg.Wait()
+	return int(successCount.Load()), int(failedCount.Load())
 }
 
-// PushDeviceConfigs pushes configurations to multiple devices from local files.
+// PushDeviceConfigs pushes configurations to multiple devices concurrently from local files.
 // It calls the progress callback for each device as it completes.
 func (s *Service) PushDeviceConfigs(ctx context.Context, syncDir string, deviceFilter []string, dryRun bool, progress SyncProgressCallback) (success, failed, skipped int, err error) {
 	fs := config.Fs()
@@ -115,6 +128,14 @@ func (s *Service) PushDeviceConfigs(ctx context.Context, syncDir string, deviceF
 		return 0, 0, 0, fmt.Errorf("no config files found; run 'shelly sync --pull' first")
 	}
 
+	// Collect push work items (cheap local I/O), then execute network calls concurrently.
+	type pushItem struct {
+		deviceName string
+		fileName   string
+	}
+	var items []pushItem
+	var skippedCount int
+
 	for _, file := range files {
 		if file.IsDir() || filepath.Ext(file.Name()) != ".json" {
 			continue
@@ -123,31 +144,50 @@ func (s *Service) PushDeviceConfigs(ctx context.Context, syncDir string, deviceF
 		deviceName := file.Name()[:len(file.Name())-5] // Remove .json
 
 		if len(deviceFilter) > 0 && !slices.Contains(deviceFilter, deviceName) {
-			skipped++
+			skippedCount++
 			continue
 		}
 
 		if dryRun {
 			progress(SyncDeviceResult{Device: deviceName, Status: "would push config"})
-			success++
+			items = append(items, pushItem{deviceName: deviceName}) // count as success
 			continue
 		}
 
-		configData, loadErr := config.LoadSyncConfig(syncDir, file.Name())
-		if loadErr != nil {
-			progress(SyncDeviceResult{Device: deviceName, Status: fmt.Sprintf("failed (%v)", loadErr), Err: loadErr})
-			failed++
-			continue
-		}
-
-		if pushErr := s.PushDeviceConfig(ctx, deviceName, configData); pushErr != nil {
-			progress(SyncDeviceResult{Device: deviceName, Status: fmt.Sprintf("failed (%v)", pushErr), Err: pushErr})
-			failed++
-			continue
-		}
-
-		progress(SyncDeviceResult{Device: deviceName, Status: "pushed"})
-		success++
+		items = append(items, pushItem{deviceName: deviceName, fileName: file.Name()})
 	}
-	return success, failed, skipped, nil
+
+	if dryRun {
+		return len(items), 0, skippedCount, nil
+	}
+
+	var successCount, failedCount atomic.Int64
+	var wg sync.WaitGroup
+
+	for _, item := range items {
+		it := item
+		wg.Go(func() {
+			configData, loadErr := config.LoadSyncConfig(syncDir, it.fileName)
+			if loadErr != nil {
+				progress(SyncDeviceResult{Device: it.deviceName, Status: fmt.Sprintf("failed (%v)", loadErr), Err: loadErr})
+				failedCount.Add(1)
+				return
+			}
+
+			devCtx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+			defer cancel()
+
+			if pushErr := s.PushDeviceConfig(devCtx, it.deviceName, configData); pushErr != nil {
+				progress(SyncDeviceResult{Device: it.deviceName, Status: fmt.Sprintf("failed (%v)", pushErr), Err: pushErr})
+				failedCount.Add(1)
+				return
+			}
+
+			progress(SyncDeviceResult{Device: it.deviceName, Status: "pushed"})
+			successCount.Add(1)
+		})
+	}
+
+	wg.Wait()
+	return int(successCount.Load()), int(failedCount.Load()), skippedCount, nil
 }
