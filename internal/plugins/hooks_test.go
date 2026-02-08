@@ -8,27 +8,10 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
 const testPlatformTasmota = "tasmota"
-
-// syncTestScript ensures the script file is fully written and synced to disk.
-// This prevents "text file busy" errors when executing immediately after write.
-func syncTestScript(t *testing.T, path string) {
-	t.Helper()
-	//nolint:gosec // G304: path is from test temp directory, not user input
-	f, err := os.Open(path)
-	if err != nil {
-		t.Logf("warning: could not open for sync: %v", err)
-		return
-	}
-	if err := f.Sync(); err != nil {
-		t.Logf("warning: sync failed: %v", err)
-	}
-	if err := f.Close(); err != nil {
-		t.Logf("warning: close failed: %v", err)
-	}
-}
 
 func TestNewHookExecutor(t *testing.T) {
 	t.Parallel()
@@ -141,11 +124,7 @@ func TestHookExecutor_ExecuteDetect_WithMockHook(t *testing.T) {
 echo '{"detected": true, "platform": "` + testPlatformTasmota + `", "device_id": "test123", "model": "Sonoff Basic"}'
 `
 	hookPath := filepath.Join(tmpDir, "detect")
-	//nolint:gosec // Test file needs to be executable
-	if err := os.WriteFile(hookPath, []byte(hookScript), 0o755); err != nil {
-		t.Fatalf("failed to create hook script: %v", err)
-	}
-	syncTestScript(t, hookPath)
+	testutil.WriteTestScript(t, hookPath, hookScript)
 
 	plugin := &Plugin{
 		Name: "test",
@@ -199,11 +178,7 @@ done
 echo '{"detected": true, "platform": "test"}'
 `
 	hookPath := filepath.Join(tmpDir, "detect")
-	//nolint:gosec // Test file needs to be executable
-	if err := os.WriteFile(hookPath, []byte(hookScript), 0o755); err != nil {
-		t.Fatalf("failed to create hook script: %v", err)
-	}
-	syncTestScript(t, hookPath)
+	testutil.WriteTestScript(t, hookPath, hookScript)
 
 	plugin := &Plugin{
 		Name: "test",
@@ -250,11 +225,7 @@ func TestHookExecutor_ExecuteControl_WithMockHook(t *testing.T) {
 echo '{"success": true, "state": "on"}'
 `
 	hookPath := filepath.Join(tmpDir, "control")
-	//nolint:gosec // Test file needs to be executable
-	if err := os.WriteFile(hookPath, []byte(hookScript), 0o755); err != nil {
-		t.Fatalf("failed to create hook script: %v", err)
-	}
-	syncTestScript(t, hookPath)
+	testutil.WriteTestScript(t, hookPath, hookScript)
 
 	plugin := &Plugin{
 		Name: "test",
@@ -300,11 +271,7 @@ sleep 10
 echo '{"detected": true}'
 `
 	hookPath := filepath.Join(tmpDir, "detect")
-	//nolint:gosec // Test file needs to be executable
-	if err := os.WriteFile(hookPath, []byte(hookScript), 0o755); err != nil {
-		t.Fatalf("failed to create hook script: %v", err)
-	}
-	syncTestScript(t, hookPath)
+	testutil.WriteTestScript(t, hookPath, hookScript)
 
 	plugin := &Plugin{
 		Name: "test",
@@ -347,11 +314,7 @@ echo "Error: device not found" >&2
 exit 1
 `
 	hookPath := filepath.Join(tmpDir, "detect")
-	//nolint:gosec // Test file needs to be executable
-	if err := os.WriteFile(hookPath, []byte(hookScript), 0o755); err != nil {
-		t.Fatalf("failed to create hook script: %v", err)
-	}
-	syncTestScript(t, hookPath)
+	testutil.WriteTestScript(t, hookPath, hookScript)
 
 	plugin := &Plugin{
 		Name: "test",
@@ -393,11 +356,7 @@ func TestHookExecutor_ExecuteHook_InvalidJSON(t *testing.T) {
 echo 'not valid json'
 `
 	hookPath := filepath.Join(tmpDir, "detect")
-	//nolint:gosec // Test file needs to be executable
-	if err := os.WriteFile(hookPath, []byte(hookScript), 0o755); err != nil {
-		t.Fatalf("failed to create hook script: %v", err)
-	}
-	syncTestScript(t, hookPath)
+	testutil.WriteTestScript(t, hookPath, hookScript)
 
 	plugin := &Plugin{
 		Name: "test",
@@ -435,11 +394,7 @@ func TestHookExecutor_ExecuteStatus_WithMockHook(t *testing.T) {
 echo '{"online": true, "energy": {"power": 42.5, "voltage": 230.0}}'
 `
 	hookPath := filepath.Join(tmpDir, "status")
-	//nolint:gosec // Test file needs to be executable
-	if err := os.WriteFile(hookPath, []byte(hookScript), 0o755); err != nil {
-		t.Fatalf("failed to create hook script: %v", err)
-	}
-	syncTestScript(t, hookPath)
+	testutil.WriteTestScript(t, hookPath, hookScript)
 
 	plugin := &Plugin{
 		Name: "test",
@@ -487,11 +442,7 @@ func TestHookExecutor_ExecuteCheckUpdates_WithMockHook(t *testing.T) {
 echo '{"current_version": "14.3.0", "latest_stable": "15.0.0", "has_update": true}'
 `
 	hookPath := filepath.Join(tmpDir, "check-updates")
-	//nolint:gosec // Test file needs to be executable
-	if err := os.WriteFile(hookPath, []byte(hookScript), 0o755); err != nil {
-		t.Fatalf("failed to create hook script: %v", err)
-	}
-	syncTestScript(t, hookPath)
+	testutil.WriteTestScript(t, hookPath, hookScript)
 
 	plugin := &Plugin{
 		Name: "test",
@@ -539,11 +490,7 @@ func TestHookExecutor_ExecuteApplyUpdate_WithMockHook(t *testing.T) {
 echo '{"success": true, "message": "Update initiated", "rebooting": true}'
 `
 	hookPath := filepath.Join(tmpDir, "apply-update")
-	//nolint:gosec // Test file needs to be executable
-	if err := os.WriteFile(hookPath, []byte(hookScript), 0o755); err != nil {
-		t.Fatalf("failed to create hook script: %v", err)
-	}
-	syncTestScript(t, hookPath)
+	testutil.WriteTestScript(t, hookPath, hookScript)
 
 	plugin := &Plugin{
 		Name: "test",

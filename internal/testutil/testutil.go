@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -175,4 +176,33 @@ func AssertFalse(t *testing.T, condition bool, msg string) {
 // Ptr returns a pointer to the given value. Useful for test data.
 func Ptr[T any](v T) *T {
 	return &v
+}
+
+// WriteTestScript creates an executable script file, ensuring proper file sync
+// to avoid "text file busy" errors on Linux.
+func WriteTestScript(t *testing.T, path, content string) {
+	t.Helper()
+	//nolint:gosec // Test file needs to be executable
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+	if err != nil {
+		t.Fatalf("failed to create script: %v", err)
+	}
+	if _, err := f.WriteString(content); err != nil {
+		if closeErr := f.Close(); closeErr != nil {
+			t.Logf("warning: close after write error: %v", closeErr)
+		}
+		t.Fatalf("failed to write script: %v", err)
+	}
+	if err := f.Sync(); err != nil {
+		if closeErr := f.Close(); closeErr != nil {
+			t.Logf("warning: close after sync error: %v", closeErr)
+		}
+		t.Fatalf("failed to sync script: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("failed to close script file: %v", err)
+	}
+	// Brief pause to ensure the kernel releases the file descriptor
+	// to avoid "text file busy" errors on Linux when immediately executing.
+	time.Sleep(10 * time.Millisecond)
 }

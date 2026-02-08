@@ -6,37 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-)
 
-// writeTestScript creates an executable script file, ensuring proper file sync
-// to avoid "text file busy" errors on Linux.
-func writeTestScript(t *testing.T, path, content string) {
-	t.Helper()
-	//nolint:gosec // Test file needs to be executable
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
-	if err != nil {
-		t.Fatalf("failed to create script: %v", err)
-	}
-	if _, err := f.WriteString(content); err != nil {
-		if closeErr := f.Close(); closeErr != nil {
-			t.Logf("warning: close after write error: %v", closeErr)
-		}
-		t.Fatalf("failed to write script: %v", err)
-	}
-	if err := f.Sync(); err != nil {
-		if closeErr := f.Close(); closeErr != nil {
-			t.Logf("warning: close after sync error: %v", closeErr)
-		}
-		t.Fatalf("failed to sync script: %v", err)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatalf("failed to close script file: %v", err)
-	}
-	// Brief pause to ensure the kernel releases the file descriptor
-	// to avoid "text file busy" errors on Linux when immediately executing.
-	time.Sleep(10 * time.Millisecond)
-}
+	"github.com/tj-smith47/shelly-cli/internal/testutil"
+)
 
 // TestNewExecutor tests NewExecutor function.
 func TestNewExecutor(t *testing.T) {
@@ -184,7 +156,7 @@ func TestExecutor_ExecuteContext_WithRealScript(t *testing.T) {
 	// Create a test script that exits successfully
 	scriptPath := filepath.Join(tmpDir, "shelly-test")
 	script := "#!/bin/bash\nexit 0\n"
-	writeTestScript(t, scriptPath, script)
+	testutil.WriteTestScript(t, scriptPath, script)
 
 	executor := NewExecutor()
 	plugin := &Plugin{
@@ -219,7 +191,7 @@ func TestExecutor_ExecuteCaptureContext_WithRealScript(t *testing.T) {
 	script := `#!/bin/bash
 echo "test-plugin 1.0.0"
 `
-	writeTestScript(t, scriptPath, script)
+	testutil.WriteTestScript(t, scriptPath, script)
 
 	executor := NewExecutor()
 	plugin := &Plugin{
@@ -255,7 +227,7 @@ func TestExecutor_Execute(t *testing.T) {
 
 	// Create a test script
 	scriptPath := filepath.Join(tmpDir, "shelly-test")
-	writeTestScript(t, scriptPath, "#!/bin/bash\nexit 0\n")
+	testutil.WriteTestScript(t, scriptPath, "#!/bin/bash\nexit 0\n")
 
 	executor := NewExecutor()
 	plugin := &Plugin{
@@ -286,7 +258,7 @@ func TestExecutor_ExecuteCapture(t *testing.T) {
 
 	// Create a test script
 	scriptPath := filepath.Join(tmpDir, "shelly-test")
-	writeTestScript(t, scriptPath, "#!/bin/bash\necho \"hello world\"\n")
+	testutil.WriteTestScript(t, scriptPath, "#!/bin/bash\necho \"hello world\"\n")
 
 	executor := NewExecutor()
 	plugin := &Plugin{

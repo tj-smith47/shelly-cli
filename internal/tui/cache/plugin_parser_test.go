@@ -1,13 +1,84 @@
 package cache
 
 import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
-const testInputTypeButton = "button"
+const (
+	testInputTypeButton = "button"
+	testPlatformName    = "tasmota"
+	testPluginName      = "shelly-tasmota"
+)
+
+// setupTestPlugin creates a temp directory with a mock plugin that has a status hook
+// returning the given JSON. Returns the shelly.Service with the plugin registry configured.
+func setupTestPlugin(t *testing.T, statusJSON string) *shelly.Service {
+	t.Helper()
+
+	tmpDir, err := os.MkdirTemp("", "shelly-cache-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
+
+	// Create plugin directory (must have "shelly-" prefix)
+	pluginDir := filepath.Join(tmpDir, testPluginName)
+	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
+	}
+
+	// Create status hook script that outputs the given JSON
+	hookScript := "#!/bin/sh\necho '" + statusJSON + "'\n"
+	testutil.WriteTestScript(t, filepath.Join(pluginDir, "status"), hookScript)
+
+	// Create manifest
+	manifest := plugins.Manifest{
+		SchemaVersion: "1",
+		Name:          testPlatformName,
+		Version:       "1.0.0",
+		Capabilities: &plugins.Capabilities{
+			Platform:   testPlatformName,
+			Components: []string{"switch", "light"},
+		},
+		Hooks: &plugins.Hooks{
+			Status: "./status",
+		},
+		Binary: plugins.Binary{
+			Name: testPluginName,
+		},
+	}
+	manifestData, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal manifest: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, "manifest.json"), manifestData, 0o600); err != nil {
+		t.Fatalf("failed to write manifest: %v", err)
+	}
+
+	// Create dummy binary so plugin is considered valid
+	testutil.WriteTestScript(t, filepath.Join(pluginDir, testPluginName), "#!/bin/sh\necho test\n")
+
+	// Create service with plugin registry
+	registry := plugins.NewRegistryWithDir(tmpDir)
+	svc := shelly.New(shelly.NewConfigResolver(), shelly.WithPluginRegistry(registry))
+
+	return svc
+}
 
 func TestParsePluginStatus_Nil(t *testing.T) {
 	t.Parallel()
@@ -366,5 +437,271 @@ func TestPluginParseComponentKey(t *testing.T) {
 				t.Errorf("expected id=%d, got %d", tt.wantID, compID)
 			}
 		})
+	}
+}
+
+// --- Cache Branch Tests ---
+// These test fetchPluginDevice through real plugin hook execution.
+
+func TestFetchPluginDevice_OnlineWithComponents(t *testing.T) {
+	t.Parallel()
+
+	statusJSON := `{"online":true,"components":{"switch:0":{"output":true,"name":"Relay","apower":42.5}},"energy":{"power":42.5,"voltage":230.0},"sensors":{"temperature":24.0}}`
+
+	svc := setupTestPlugin(t, statusJSON)
+	ios := iostreams.Test(nil, os.Stdout, os.Stderr)
+
+	c := &Cache{
+		ctx:                context.Background(),
+		svc:                svc,
+		ios:                ios,
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		macToIP:            make(map[string]string),
+		esManaged:          make(map[string]bool),
+		pendingRefreshes:   make(map[string]time.Time),
+		refreshConfig:      DefaultRefreshConfig(),
+		waveConfig:         DefaultWaveConfig(),
+	}
+
+	device := model.Device{
+		Name:     "test-tasmota",
+		Address:  "192.168.1.100",
+		Platform: testPlatformName,
+	}
+	data := &DeviceData{
+		Device:    device,
+		Fetched:   true,
+		UpdatedAt: time.Now(),
+	}
+
+	msg := c.fetchPluginDevice("test-tasmota", device, data, 1)
+	updateMsg, ok := msg.(DeviceUpdateMsg)
+	if !ok {
+		t.Fatalf("expected DeviceUpdateMsg, got %T", msg)
+	}
+
+	if updateMsg.Name != "test-tasmota" {
+		t.Errorf("expected name 'test-tasmota', got %q", updateMsg.Name)
+	}
+	if updateMsg.RequestID != 1 {
+		t.Errorf("expected requestID=1, got %d", updateMsg.RequestID)
+	}
+	if !updateMsg.Data.Online {
+		t.Error("expected device to be online")
+	}
+	if updateMsg.Data.Error != nil {
+		t.Errorf("expected no error, got %v", updateMsg.Data.Error)
+	}
+
+	// Verify DeviceInfo was constructed
+	if updateMsg.Data.Info == nil {
+		t.Fatal("expected DeviceInfo to be set")
+	}
+	if updateMsg.Data.Info.ID != "test-tasmota" {
+		t.Errorf("expected info ID 'test-tasmota', got %q", updateMsg.Data.Info.ID)
+	}
+	if updateMsg.Data.Info.App != testPlatformName {
+		t.Errorf("expected info App %q, got %q", testPlatformName, updateMsg.Data.Info.App)
+	}
+
+	// Verify parsed status was applied
+	if len(updateMsg.Data.Switches) != 1 {
+		t.Fatalf("expected 1 switch, got %d", len(updateMsg.Data.Switches))
+	}
+	if !updateMsg.Data.Switches[0].On {
+		t.Error("expected switch to be on")
+	}
+	if updateMsg.Data.Switches[0].Name != "Relay" {
+		t.Errorf("expected switch name 'Relay', got %q", updateMsg.Data.Switches[0].Name)
+	}
+	if updateMsg.Data.Power != 42.5 {
+		t.Errorf("expected power=42.5, got %f", updateMsg.Data.Power)
+	}
+	if updateMsg.Data.Voltage != 230.0 {
+		t.Errorf("expected voltage=230.0, got %f", updateMsg.Data.Voltage)
+	}
+	if updateMsg.Data.Temperature != 24.0 {
+		t.Errorf("expected temperature=24.0, got %f", updateMsg.Data.Temperature)
+	}
+}
+
+func TestFetchPluginDevice_Offline(t *testing.T) {
+	t.Parallel()
+
+	statusJSON := `{"online":false}`
+
+	svc := setupTestPlugin(t, statusJSON)
+	ios := iostreams.Test(nil, os.Stdout, os.Stderr)
+
+	c := &Cache{
+		ctx:                context.Background(),
+		svc:                svc,
+		ios:                ios,
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		macToIP:            make(map[string]string),
+		esManaged:          make(map[string]bool),
+		pendingRefreshes:   make(map[string]time.Time),
+		refreshConfig:      DefaultRefreshConfig(),
+		waveConfig:         DefaultWaveConfig(),
+	}
+
+	device := model.Device{
+		Name:     "offline-dev",
+		Address:  "192.168.1.200",
+		Platform: testPlatformName,
+	}
+	data := &DeviceData{
+		Device:    device,
+		Fetched:   true,
+		UpdatedAt: time.Now(),
+	}
+
+	msg := c.fetchPluginDevice("offline-dev", device, data, 2)
+	updateMsg, ok := msg.(DeviceUpdateMsg)
+	if !ok {
+		t.Fatalf("expected DeviceUpdateMsg, got %T", msg)
+	}
+
+	if updateMsg.Data.Online {
+		t.Error("expected device to be offline")
+	}
+	if updateMsg.Data.Error != nil {
+		t.Errorf("expected no error for offline device, got %v", updateMsg.Data.Error)
+	}
+	// DeviceInfo should still be set even for offline devices
+	if updateMsg.Data.Info == nil {
+		t.Fatal("expected DeviceInfo to be set even for offline device")
+	}
+}
+
+func TestFetchPluginDevice_HookError(t *testing.T) {
+	t.Parallel()
+
+	// Create a plugin whose status hook exits with error
+	tmpDir, err := os.MkdirTemp("", "shelly-cache-err-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
+
+	pluginDir := filepath.Join(tmpDir, testPluginName)
+	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
+	}
+
+	// Status hook that exits with error
+	testutil.WriteTestScript(t, filepath.Join(pluginDir, "status"), "#!/bin/sh\necho 'device unreachable' >&2\nexit 1\n")
+
+	manifest := plugins.Manifest{
+		SchemaVersion: "1",
+		Name:          testPlatformName,
+		Version:       "1.0.0",
+		Capabilities:  &plugins.Capabilities{Platform: testPlatformName},
+		Hooks:         &plugins.Hooks{Status: "./status"},
+		Binary:        plugins.Binary{Name: testPluginName},
+	}
+	manifestData, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal manifest: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, "manifest.json"), manifestData, 0o600); err != nil {
+		t.Fatalf("failed to write manifest: %v", err)
+	}
+	testutil.WriteTestScript(t, filepath.Join(pluginDir, testPluginName), "#!/bin/sh\necho test\n")
+
+	registry := plugins.NewRegistryWithDir(tmpDir)
+	svc := shelly.New(shelly.NewConfigResolver(), shelly.WithPluginRegistry(registry))
+	ios := iostreams.Test(nil, os.Stdout, os.Stderr)
+
+	c := &Cache{
+		ctx:                context.Background(),
+		svc:                svc,
+		ios:                ios,
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		macToIP:            make(map[string]string),
+		esManaged:          make(map[string]bool),
+		pendingRefreshes:   make(map[string]time.Time),
+		refreshConfig:      DefaultRefreshConfig(),
+		waveConfig:         DefaultWaveConfig(),
+	}
+
+	device := model.Device{
+		Name:     "error-dev",
+		Address:  "192.168.1.250",
+		Platform: testPlatformName,
+	}
+	data := &DeviceData{
+		Device:    device,
+		Fetched:   true,
+		UpdatedAt: time.Now(),
+	}
+
+	msg := c.fetchPluginDevice("error-dev", device, data, 3)
+	updateMsg, ok := msg.(DeviceUpdateMsg)
+	if !ok {
+		t.Fatalf("expected DeviceUpdateMsg, got %T", msg)
+	}
+
+	if updateMsg.Data.Online {
+		t.Error("expected device to be offline after hook error")
+	}
+	if updateMsg.Data.Error == nil {
+		t.Error("expected error to be set after hook failure")
+	}
+	// DeviceInfo should still be set even on error
+	if updateMsg.Data.Info == nil {
+		t.Fatal("expected DeviceInfo to be set even on error")
+	}
+}
+
+func TestFetchPluginDevice_NoPluginRegistry(t *testing.T) {
+	t.Parallel()
+
+	// Service without plugin registry
+	svc := shelly.New(shelly.NewConfigResolver())
+	ios := iostreams.Test(nil, os.Stdout, os.Stderr)
+
+	c := &Cache{
+		ctx:                context.Background(),
+		svc:                svc,
+		ios:                ios,
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		macToIP:            make(map[string]string),
+		esManaged:          make(map[string]bool),
+		pendingRefreshes:   make(map[string]time.Time),
+		refreshConfig:      DefaultRefreshConfig(),
+		waveConfig:         DefaultWaveConfig(),
+	}
+
+	device := model.Device{
+		Name:     "no-registry",
+		Address:  "192.168.1.50",
+		Platform: testPlatformName,
+	}
+	data := &DeviceData{
+		Device:    device,
+		Fetched:   true,
+		UpdatedAt: time.Now(),
+	}
+
+	msg := c.fetchPluginDevice("no-registry", device, data, 4)
+	updateMsg, ok := msg.(DeviceUpdateMsg)
+	if !ok {
+		t.Fatalf("expected DeviceUpdateMsg, got %T", msg)
+	}
+
+	if updateMsg.Data.Online {
+		t.Error("expected device to be offline when no registry")
+	}
+	if updateMsg.Data.Error == nil {
+		t.Error("expected error when no plugin registry")
 	}
 }
