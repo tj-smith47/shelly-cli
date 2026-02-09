@@ -85,6 +85,9 @@ const (
 	ActionPanel9
 	ActionControl
 	ActionDetail
+	ActionExport         // x: export data (CSV)
+	ActionExportJSON     // X: export data (JSON)
+	ActionViewJSON       // J: open JSON viewer
 	ActionPlatformFilter // p: cycle platform filter
 	ActionNextField      // Tab in modal: move to next field
 	ActionPrevField      // Shift+Tab in modal: move to previous field
@@ -347,8 +350,11 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyEnter:  ActionEnter,
 		"r":                ActionRefresh,
 		"ctrl+r":           ActionRefreshAll,
-		"b":                ActionBrowser, // Open in browser
-		keyconst.KeySpace:  ActionPause,   // Pause/resume monitoring
+		"x":                ActionExport,     // CSV export
+		"X":                ActionExportJSON, // JSON export
+		"J":                ActionViewJSON,   // Open JSON viewer
+		"b":                ActionBrowser,    // Open in browser
+		keyconst.KeySpace:  ActionPause,      // Pause/resume monitoring
 		keyconst.KeyPgDown: ActionPageDown,
 		keyconst.KeyPgUp:   ActionPageUp,
 		keyconst.KeyCtrlD:  ActionPageDown, // Half-page down
@@ -481,7 +487,8 @@ func ContextFromPanel(p focus.GlobalPanelID) Context {
 		return ContextJSON
 	case focus.PanelDashboardEnergyBars, focus.PanelDashboardEnergyHistory:
 		return ContextEnergy
-	case focus.PanelMonitorMain:
+	case focus.PanelMonitorSummary, focus.PanelMonitorPowerRanking,
+		focus.PanelMonitorEnvironment, focus.PanelMonitorAlerts, focus.PanelMonitorEventFeed:
 		return ContextMonitor
 	default:
 		return ContextGlobal
@@ -545,6 +552,9 @@ var actionDescriptions = map[Action]string{
 	ActionPanel9:         "Jump to panel 9",
 	ActionControl:        "Control panel",
 	ActionDetail:         "Device detail",
+	ActionExport:         "Export CSV",
+	ActionExportJSON:     "Export JSON",
+	ActionViewJSON:       "JSON viewer",
 	ActionPlatformFilter: "Filter by platform",
 	ActionNextField:      "Next field",
 	ActionPrevField:      "Previous field",
@@ -591,12 +601,15 @@ var contextActionDescriptions = map[Context]map[Action]string{
 		ActionRefresh: "Refresh list",
 	},
 	ContextMonitor: {
-		ActionEnter:   "Select/Enter",
-		ActionDetail:  "Device detail overlay",
-		ActionPause:   "Pause monitoring",
-		ActionRefresh: "Refresh data",
-		ActionBrowser: "Open web UI",
-		ActionControl: "Open control panel",
+		ActionEnter:      "Device detail overlay",
+		ActionDetail:     "Device detail overlay",
+		ActionPause:      "Pause monitoring",
+		ActionRefresh:    "Refresh data",
+		ActionBrowser:    "Open web UI",
+		ActionControl:    "Open control panel",
+		ActionExport:     "Export CSV",
+		ActionExportJSON: "Export JSON",
+		ActionViewJSON:   "Open JSON viewer",
 	},
 	ContextFleet: {
 		ActionToggle:  "Select device",

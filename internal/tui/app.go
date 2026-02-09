@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	devmodel "github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
@@ -32,6 +33,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/events"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/help"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/jsonviewer"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/monitor"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/search"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/statusbar"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
@@ -300,6 +302,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		Svc:         f.ShellyService(),
 		IOS:         f.IOStreams(),
 		EventStream: eventStream,
+		FocusState:  focusStateInst,
 	})
 	vm.Register(monitorView)
 
@@ -1833,7 +1836,7 @@ func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
 		prevTab := m.focusState.ActiveTab()
 		prevPanel := m.focusState.ActivePanel()
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabMonitor)
-		// Monitor tab has no device list - SetActiveTab sets first panel (PanelMonitorMain)
+		// Monitor tab has no device list - SetActiveTab sets first panel (PanelMonitorPowerRanking)
 		m.focusState.SetActiveTab(tabs.TabMonitor)
 		cmd := m.focusState.EmitChanged(prevTab, prevPanel, true, true, false)
 		return m, tea.Batch(m.viewManager.SetActive(views.ViewMonitor), cmd), true
@@ -1888,6 +1891,11 @@ func (m Model) dispatchPanelAction(action keys.Action) (Model, tea.Cmd, bool) {
 
 // dispatchDeviceKeyAction handles device control actions (toggle, on, off, reboot, enter, browser, control, detail).
 func (m Model) dispatchDeviceKeyAction(action keys.Action) (Model, tea.Cmd, bool) {
+	// Monitor tab has its own device selection (power ranking), not the device list
+	if m.isMonitorTabActive() {
+		return m.dispatchMonitorDeviceAction(action)
+	}
+
 	switch action {
 	case keys.ActionToggle:
 		// When focused on deviceInfo panel, let it handle toggle for individual component control
@@ -2724,14 +2732,171 @@ func (m Model) contentWidth() int {
 }
 
 // hasDeviceList returns true if the current tab has a device list for device actions.
-// This includes Dashboard, Monitor, Automation, and Config tabs.
+// This includes Dashboard, Automation, and Config tabs (not Monitor — it uses power ranking).
 func (m Model) hasDeviceList() bool {
 	switch m.tabBar.ActiveTabID() {
-	case tabs.TabDashboard, tabs.TabMonitor, tabs.TabAutomation, tabs.TabConfig:
+	case tabs.TabDashboard, tabs.TabAutomation, tabs.TabConfig:
 		return true
 	default:
 		return false
 	}
+}
+
+// isMonitorTabActive returns true if the Monitor tab is currently active.
+func (m Model) isMonitorTabActive() bool {
+	return m.tabBar.ActiveTabID() == tabs.TabMonitor
+}
+
+// getMonitorSelectedDevice returns the currently selected device from the Monitor view's power ranking.
+func (m Model) getMonitorSelectedDevice() *monitor.DeviceStatus {
+	v := m.viewManager.Get(views.ViewMonitor)
+	if v == nil {
+		return nil
+	}
+	monitorView, ok := v.(*views.Monitor)
+	if !ok {
+		return nil
+	}
+	return monitorView.SelectedDevice()
+}
+
+// dispatchMonitorDeviceAction handles device actions for the Monitor tab.
+// Uses the power ranking's selected device instead of the device list.
+func (m Model) dispatchMonitorDeviceAction(action keys.Action) (Model, tea.Cmd, bool) {
+	switch action {
+	case keys.ActionToggle:
+		return m.toggleMonitorDevice()
+	case keys.ActionOn:
+		return m.monitorDeviceQuickAction(actionOn)
+	case keys.ActionOff:
+		return m.monitorDeviceQuickAction(actionOff)
+	case keys.ActionControl:
+		return m.showMonitorControlPanel()
+	case keys.ActionDetail, keys.ActionEnter:
+		return m.showMonitorDeviceDetail()
+	case keys.ActionBrowser:
+		return m.openMonitorDeviceBrowser()
+	case keys.ActionExport:
+		cmd := m.viewManager.Update(messages.ExportRequestMsg{})
+		return m, cmd, true
+	case keys.ActionExportJSON:
+		cmd := m.viewManager.Update(messages.ExportRequestMsg{Format: "json"})
+		return m, cmd, true
+	case keys.ActionViewJSON:
+		return m.openMonitorJSONViewer()
+	default:
+		return m, nil, false
+	}
+}
+
+// toggleMonitorDevice toggles the selected device from the Monitor power ranking.
+func (m Model) toggleMonitorDevice() (Model, tea.Cmd, bool) {
+	dev := m.getMonitorSelectedDevice()
+	if dev == nil || !dev.Online {
+		return m, nil, false
+	}
+
+	svc := m.factory.ShellyService()
+	name := dev.Name
+	addr := dev.Address
+
+	return m, func() tea.Msg {
+		_, err := svc.QuickToggle(m.ctx, addr, nil)
+		return DeviceActionMsg{Device: name, Action: actionToggle, Err: err}
+	}, true
+}
+
+// monitorDeviceQuickAction performs a quick on/off action on the Monitor's selected device.
+func (m Model) monitorDeviceQuickAction(action string) (Model, tea.Cmd, bool) {
+	dev := m.getMonitorSelectedDevice()
+	if dev == nil || !dev.Online {
+		return m, nil, false
+	}
+
+	svc := m.factory.ShellyService()
+	name := dev.Name
+	addr := dev.Address
+
+	return m, func() tea.Msg {
+		var err error
+		switch action {
+		case actionOn:
+			_, err = svc.QuickOn(m.ctx, addr, nil)
+		case actionOff:
+			_, err = svc.QuickOff(m.ctx, addr, nil)
+		}
+		return DeviceActionMsg{Device: name, Action: action, Err: err}
+	}, true
+}
+
+// showMonitorControlPanel opens the control panel for the Monitor's selected device.
+func (m Model) showMonitorControlPanel() (Model, tea.Cmd, bool) {
+	dev := m.getMonitorSelectedDevice()
+	if dev == nil || !dev.Online {
+		return m, nil, false
+	}
+
+	data := m.cache.GetDevice(dev.Name)
+	if data == nil {
+		return m, nil, false
+	}
+
+	m.controlPanel = m.controlPanel.SetSize(m.width*2/3, m.height*2/3)
+
+	// Show first available controllable component
+	if result, ok := m.showFirstAvailableComponent(data, dev.Address); ok {
+		return result, nil, true
+	}
+
+	return m, nil, false
+}
+
+// showMonitorDeviceDetail opens the device detail overlay for the Monitor's selected device.
+func (m Model) showMonitorDeviceDetail() (Model, tea.Cmd, bool) {
+	dev := m.getMonitorSelectedDevice()
+	if dev == nil || !dev.Online {
+		return m, nil, false
+	}
+
+	m.deviceDetail = m.deviceDetail.SetSize(m.width*2/3, m.height*2/3)
+
+	var cmd tea.Cmd
+	m.deviceDetail, cmd = m.deviceDetail.Show(devmodel.Device{Name: dev.Name, Address: dev.Address})
+	m.focusState.PushOverlay(focus.OverlayDeviceDetail, focus.ModeOverlay)
+	return m, cmd, true
+}
+
+// openMonitorDeviceBrowser opens the web UI for the Monitor's selected device.
+func (m Model) openMonitorDeviceBrowser() (Model, tea.Cmd, bool) {
+	dev := m.getMonitorSelectedDevice()
+	if dev == nil || dev.Address == "" {
+		return m, nil, false
+	}
+	return m, m.openDeviceBrowser(dev.Address), true
+}
+
+// openMonitorJSONViewer opens the JSON viewer for the Monitor's selected device.
+func (m Model) openMonitorJSONViewer() (Model, tea.Cmd, bool) {
+	dev := m.getMonitorSelectedDevice()
+	if dev == nil || !dev.Online {
+		return m, nil, false
+	}
+
+	data := m.cache.GetDevice(dev.Name)
+	if data == nil {
+		return m, nil, false
+	}
+
+	methods := m.getDeviceMethods(data)
+	endpoint := "Shelly.GetStatus"
+	if data.Device.Generation == 1 {
+		endpoint = "/status"
+	}
+
+	var cmd tea.Cmd
+	m.jsonViewer, cmd = m.jsonViewer.Open(dev.Address, endpoint, methods)
+	m.focusState.PushOverlay(focus.OverlayJSONViewer, focus.ModeOverlay)
+	return m, cmd, true
 }
 
 // renderMultiPanelLayout renders panels horizontally or vertically based on width.
@@ -2817,41 +2982,14 @@ func (m Model) renderMultiPanelLayout(height int) string {
 	return content
 }
 
-// renderMonitorLayout renders the Monitor tab with energy panels.
-// Layout: Monitor component on top (60%), Energy panels on bottom (40%).
+// renderMonitorLayout renders the Monitor tab with the multi-panel layout.
+// The Monitor view handles its own layout (summary bar + 2-column panels).
 func (m Model) renderMonitorLayout(height int) string {
 	cw := m.contentWidth()
 
-	// Split height: top 60% for monitor, bottom 40% for energy panels
-	monitorHeight := height * 60 / 100
-	energyHeight := height - monitorHeight
-
-	if monitorHeight < 10 {
-		monitorHeight = 10
-	}
-	if energyHeight < 8 {
-		energyHeight = 8
-	}
-
-	// Get monitor view and wrap with rendering.New() for embedded title
-	// Content area is 2 less in each dimension to account for border
-	contentWidth := cw - 2
-	contentHeight := monitorHeight - 2
-	m.viewManager.SetSize(contentWidth, contentHeight)
-	monitorContent := m.viewManager.View()
-
-	// Wrap with rendering.New() for superfile-style embedded title
-	r := rendering.New(cw, monitorHeight).
-		SetTitle("Monitor").
-		SetContent(monitorContent).
-		SetFocused(true) // Monitor panel is always focused when on Monitor tab
-	monitorView := r.Render()
-
-	// Render energy panels at bottom
-	energyPanel := m.renderEnergyPanel(cw, energyHeight)
-
-	// Combine top and bottom sections
-	return lipgloss.JoinVertical(lipgloss.Left, monitorView, energyPanel)
+	// The monitor view handles its own multi-panel layout
+	m.viewManager.SetSize(cw, height)
+	return lipgloss.NewStyle().Width(cw).Render(m.viewManager.View())
 }
 
 // renderWithDeviceList wraps a view with the device list on the left for device persistence.

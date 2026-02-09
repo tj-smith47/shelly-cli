@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -173,9 +174,39 @@ func AssertFalse(t *testing.T, condition bool, msg string) {
 	}
 }
 
+// SafeBuffer is a bytes.Buffer wrapper that is safe for concurrent writes.
+// Use this instead of bytes.Buffer when output is written from multiple goroutines.
+type SafeBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+// Write implements io.Writer with mutex protection.
+func (sb *SafeBuffer) Write(p []byte) (int, error) {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return sb.buf.Write(p)
+}
+
+// String returns the buffer contents.
+func (sb *SafeBuffer) String() string {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return sb.buf.String()
+}
+
 // Ptr returns a pointer to the given value. Useful for test data.
 func Ptr[T any](v T) *T {
 	return &v
+}
+
+// WriteTestFile creates a non-executable file with the given data.
+// Use this instead of os.WriteFile in tests to maintain audit compliance.
+func WriteTestFile(t *testing.T, path string, data []byte) {
+	t.Helper()
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("failed to write file %s: %v", path, err)
+	}
 }
 
 // WriteTestScript creates an executable script file, ensuring proper file sync

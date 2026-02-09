@@ -89,6 +89,9 @@ func TestContextMap_Match_ContextSpecific(t *testing.T) {
 		{ContextMonitor, "R", ActionReboot},
 		{ContextMonitor, "b", ActionBrowser},
 		{ContextMonitor, "space", ActionPause},
+		{ContextMonitor, "x", ActionExport},
+		{ContextMonitor, "X", ActionExportJSON},
+		{ContextMonitor, "J", ActionViewJSON},
 		// Automation context
 		{ContextAutomation, "e", ActionEdit},
 		{ContextAutomation, "n", ActionNew},
@@ -155,7 +158,10 @@ func TestContextFromPanel(t *testing.T) {
 		{focus.PanelDashboardInfo, ContextInfo},
 		{focus.PanelDashboardEnergyBars, ContextEnergy},
 		{focus.PanelDashboardEnergyHistory, ContextEnergy},
-		{focus.PanelMonitorMain, ContextMonitor},
+		{focus.PanelMonitorPowerRanking, ContextMonitor},
+		{focus.PanelMonitorEnvironment, ContextMonitor},
+		{focus.PanelMonitorAlerts, ContextMonitor},
+		{focus.PanelMonitorEventFeed, ContextMonitor},
 		{focus.PanelNone, ContextGlobal},
 	}
 
@@ -187,6 +193,9 @@ func TestActionDesc(t *testing.T) {
 		{ActionBrowser, "Open in browser"},
 		{ActionDebug, "Toggle debug"},
 		{ActionTab6, "Fleet tab"},
+		{ActionExport, "Export CSV"},
+		{ActionExportJSON, "Export JSON"},
+		{ActionViewJSON, "JSON viewer"},
 		{ActionNone, ""},
 	}
 

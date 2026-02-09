@@ -26,15 +26,7 @@ const (
 func setupTestPlugin(t *testing.T, statusJSON string) *shelly.Service {
 	t.Helper()
 
-	tmpDir, err := os.MkdirTemp("", "shelly-cache-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
+	tmpDir := t.TempDir()
 
 	// Create plugin directory (must have "shelly-" prefix)
 	pluginDir := filepath.Join(tmpDir, testPluginName)
@@ -66,9 +58,7 @@ func setupTestPlugin(t *testing.T, statusJSON string) *shelly.Service {
 	if err != nil {
 		t.Fatalf("failed to marshal manifest: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(pluginDir, "manifest.json"), manifestData, 0o600); err != nil {
-		t.Fatalf("failed to write manifest: %v", err)
-	}
+	testutil.WriteTestFile(t, filepath.Join(pluginDir, "manifest.json"), manifestData)
 
 	// Create dummy binary so plugin is considered valid
 	testutil.WriteTestScript(t, filepath.Join(pluginDir, testPluginName), "#!/bin/sh\necho test\n")
@@ -99,7 +89,7 @@ func TestParsePluginStatus_SwitchComponent(t *testing.T) {
 				"output": true,
 				"name":   "Main Switch",
 				"source": testInputTypeButton,
-				"apower": 45.2,
+				"power":  45.2,
 			},
 			"switch:1": map[string]any{
 				"output": false,
@@ -241,13 +231,17 @@ func TestParsePluginStatus_Energy(t *testing.T) {
 	}
 }
 
-func TestParsePluginStatus_Sensors(t *testing.T) {
+func TestParsePluginStatus_Sensors_NestedMap(t *testing.T) {
 	t.Parallel()
 
+	// Plugin contract format: sensors are nested maps with "value" and "unit" fields
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Sensors: map[string]any{
-			"temperature": 23.5,
+			"temperature": map[string]any{
+				"value": 23.5,
+				"unit":  "C",
+			},
 		},
 	}
 
@@ -258,6 +252,27 @@ func TestParsePluginStatus_Sensors(t *testing.T) {
 
 	if parsed.Temperature != 23.5 {
 		t.Errorf("expected temperature=23.5, got %f", parsed.Temperature)
+	}
+}
+
+func TestParsePluginStatus_Sensors_RawFloat(t *testing.T) {
+	t.Parallel()
+
+	// Fallback: simpler plugins may return raw float values
+	result := &plugins.DeviceStatusResult{
+		Online: true,
+		Sensors: map[string]any{
+			"temperature": 19.0,
+		},
+	}
+
+	parsed := ParsePluginStatus("test", result)
+	if parsed == nil {
+		t.Fatal("expected non-nil parsed result")
+	}
+
+	if parsed.Temperature != 19.0 {
+		t.Errorf("expected temperature=19.0, got %f", parsed.Temperature)
 	}
 }
 
@@ -346,7 +361,7 @@ func TestParsePluginStatus_MixedComponents(t *testing.T) {
 		},
 		Energy: &plugins.EnergyStatus{Power: 50.0},
 		Sensors: map[string]any{
-			"temperature": 25.0,
+			"temperature": map[string]any{"value": 25.0, "unit": "C"},
 		},
 	}
 
@@ -440,13 +455,88 @@ func TestPluginParseComponentKey(t *testing.T) {
 	}
 }
 
+func TestPluginGetSensorValue(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		sensors map[string]any
+		key     string
+		want    float64
+		wantOK  bool
+	}{
+		{
+			name:    "nested map with value",
+			sensors: map[string]any{"temperature": map[string]any{"value": 23.5, "unit": "C"}},
+			key:     "temperature",
+			want:    23.5,
+			wantOK:  true,
+		},
+		{
+			name:    "raw float fallback",
+			sensors: map[string]any{"temperature": 19.0},
+			key:     "temperature",
+			want:    19.0,
+			wantOK:  true,
+		},
+		{
+			name:    "raw int fallback",
+			sensors: map[string]any{"temperature": 20},
+			key:     "temperature",
+			want:    20.0,
+			wantOK:  true,
+		},
+		{
+			name:    "missing key",
+			sensors: map[string]any{"humidity": 50.0},
+			key:     "temperature",
+			want:    0,
+			wantOK:  false,
+		},
+		{
+			name:    "nil sensors",
+			sensors: nil,
+			key:     "temperature",
+			want:    0,
+			wantOK:  false,
+		},
+		{
+			name:    "nested map without value field",
+			sensors: map[string]any{"temperature": map[string]any{"unit": "C"}},
+			key:     "temperature",
+			want:    0,
+			wantOK:  false,
+		},
+		{
+			name:    "unsupported type",
+			sensors: map[string]any{"temperature": "warm"},
+			key:     "temperature",
+			want:    0,
+			wantOK:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := pluginGetSensorValue(tt.sensors, tt.key)
+			if ok != tt.wantOK {
+				t.Errorf("expected ok=%v, got %v", tt.wantOK, ok)
+			}
+			if got != tt.want {
+				t.Errorf("expected value=%v, got %v", tt.want, got)
+			}
+		})
+	}
+}
+
 // --- Cache Branch Tests ---
 // These test fetchPluginDevice through real plugin hook execution.
 
 func TestFetchPluginDevice_OnlineWithComponents(t *testing.T) {
 	t.Parallel()
 
-	statusJSON := `{"online":true,"components":{"switch:0":{"output":true,"name":"Relay","apower":42.5}},"energy":{"power":42.5,"voltage":230.0},"sensors":{"temperature":24.0}}`
+	statusJSON := `{"online":true,"components":{"switch:0":{"output":true,"name":"Relay","power":42.5}},"energy":{"power":42.5,"voltage":230.0},"sensors":{"temperature":{"value":24.0,"unit":"C"}}}`
 
 	svc := setupTestPlugin(t, statusJSON)
 	ios := iostreams.Test(nil, os.Stdout, os.Stderr)
@@ -580,15 +670,7 @@ func TestFetchPluginDevice_HookError(t *testing.T) {
 	t.Parallel()
 
 	// Create a plugin whose status hook exits with error
-	tmpDir, err := os.MkdirTemp("", "shelly-cache-err-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
+	tmpDir := t.TempDir()
 
 	pluginDir := filepath.Join(tmpDir, testPluginName)
 	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
@@ -610,9 +692,7 @@ func TestFetchPluginDevice_HookError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal manifest: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(pluginDir, "manifest.json"), manifestData, 0o600); err != nil {
-		t.Fatalf("failed to write manifest: %v", err)
-	}
+	testutil.WriteTestFile(t, filepath.Join(pluginDir, "manifest.json"), manifestData)
 	testutil.WriteTestScript(t, filepath.Join(pluginDir, testPluginName), "#!/bin/sh\necho test\n")
 
 	registry := plugins.NewRegistryWithDir(tmpDir)

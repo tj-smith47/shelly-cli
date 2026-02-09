@@ -414,9 +414,12 @@ search_test() {
 }
 
 # Check for t.TempDir() usage (should use afero instead)
-# Exclude: migrate/validate/validate_test.go:508 - TestRun_PermissionDenied requires real fs for permission testing
+# Legitimate exclusions (need real filesystem for process execution):
+# - migrate/validate/validate_test.go: TestRun_PermissionDenied requires real fs for permission testing
+# - tui/cache/plugin_parser_test.go: executes plugin hook scripts via OS
 TEMP_DIR=$(search_test "t\.TempDir()" "internal/" | \
-    grep -v "internal/cmd/migrate/validate/validate_test.go" || true)
+    grep -v "internal/cmd/migrate/validate/validate_test.go" | \
+    grep -v "internal/tui/cache/plugin_parser_test.go" || true)
 TEMP_DIR_COUNT=$(count_matches "$TEMP_DIR")
 if [[ "$TEMP_DIR_COUNT" -gt 0 ]]; then
     warn "Found $TEMP_DIR_COUNT uses of t.TempDir() (prefer afero.NewMemMapFs with SetFs):"

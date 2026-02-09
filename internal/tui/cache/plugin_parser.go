@@ -26,7 +26,9 @@ func ParsePluginStatus(name string, result *plugins.DeviceStatusResult) *ParsedS
 		CoverPowers:  make(map[int]float64),
 	}
 
-	// Parse components
+	// Parse components using the plugin contract's generic field names.
+	// Plugins translate their native format into the contract format (e.g., "output", "state", "power").
+	// Supported component types: switch, light, cover, input (per plugin contract).
 	for key, value := range result.Components {
 		compType, compID, ok := pluginParseComponentKey(key)
 		if !ok {
@@ -44,13 +46,13 @@ func ParsePluginStatus(name string, result *plugins.DeviceStatusResult) *ParsedS
 		case ComponentSwitch:
 			sw := pluginParseSwitchMap(compID, compMap)
 			parsed.Switches = append(parsed.Switches, sw)
-			if power, ok := pluginGetFloat(compMap, "apower"); ok {
+			if power, ok := pluginGetFloat(compMap, "power"); ok {
 				parsed.SwitchPowers[compID] = power
 			}
 		case ComponentLight:
 			lt := pluginParseLightMap(compID, compMap)
 			parsed.Lights = append(parsed.Lights, lt)
-			if power, ok := pluginGetFloat(compMap, "apower"); ok {
+			if power, ok := pluginGetFloat(compMap, "power"); ok {
 				parsed.LightPowers[compID] = power
 			}
 		case ComponentCover:
@@ -70,8 +72,8 @@ func ParsePluginStatus(name string, result *plugins.DeviceStatusResult) *ParsedS
 		parsed.TotalEnergy = result.Energy.Total
 	}
 
-	// Parse sensors
-	if temp, ok := pluginGetFloat(result.Sensors, "temperature"); ok {
+	// Parse sensors — plugin contract uses nested maps: {"value": float64, "unit": string}
+	if temp, ok := pluginGetSensorValue(result.Sensors, "temperature"); ok {
 		parsed.Temperature = temp
 	}
 
@@ -167,6 +169,32 @@ func pluginGetFloat(m map[string]any, key string) (float64, bool) {
 	case string:
 		f, err := strconv.ParseFloat(n, 64)
 		return f, err == nil
+	default:
+		return 0, false
+	}
+}
+
+// pluginGetSensorValue extracts a float64 from a plugin sensor map.
+// Plugin sensors use nested maps: {"value": 23.5, "unit": "C"}.
+// Falls back to reading the value directly as a float for simpler plugins.
+func pluginGetSensorValue(sensors map[string]any, key string) (float64, bool) {
+	if sensors == nil {
+		return 0, false
+	}
+	v, ok := sensors[key]
+	if !ok {
+		return 0, false
+	}
+	// Plugin contract format: nested map with "value" field
+	if m, ok := v.(map[string]any); ok {
+		return pluginGetFloat(m, "value")
+	}
+	// Fallback: raw numeric value
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
 	default:
 		return 0, false
 	}

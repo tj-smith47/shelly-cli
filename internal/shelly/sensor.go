@@ -38,7 +38,8 @@ func CollectSensorsByPrefixSilent[T any](status map[string]json.RawMessage, pref
 }
 
 // CollectSensorData collects all sensor readings from a device status map.
-// It scans for temperature, humidity, flood, smoke, illuminance, and voltmeter components.
+// It scans for temperature, humidity, flood, smoke, illuminance, voltmeter,
+// devicepower, and bthomesensor components.
 func CollectSensorData(status map[string]json.RawMessage) *model.SensorData {
 	return &model.SensorData{
 		Temperature: CollectSensorsByPrefixSilent[model.TemperatureReading](status, "temperature:"),
@@ -47,5 +48,7 @@ func CollectSensorData(status map[string]json.RawMessage) *model.SensorData {
 		Smoke:       CollectSensorsByPrefixSilent[model.AlarmSensorReading](status, "smoke:"),
 		Illuminance: CollectSensorsByPrefixSilent[model.IlluminanceReading](status, "illuminance:"),
 		Voltmeter:   CollectSensorsByPrefixSilent[model.VoltmeterReading](status, "voltmeter:"),
+		DevicePower: CollectSensorsByPrefixSilent[model.DevicePowerReading](status, "devicepower:"),
+		BTHome:      CollectSensorsByPrefixSilent[model.BTHomeSensorReading](status, "bthomesensor:"),
 	}
 }

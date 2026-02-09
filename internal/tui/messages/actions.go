@@ -101,7 +101,10 @@ type TestRequestMsg struct{}
 type ScanRequestMsg struct{}
 
 // ExportRequestMsg requests exporting data.
-type ExportRequestMsg struct{}
+// Format specifies the export format ("json" for JSON, empty for CSV).
+type ExportRequestMsg struct {
+	Format string
+}
 
 // ImportRequestMsg requests importing data.
 type ImportRequestMsg struct{}

@@ -65,9 +65,10 @@ func (h HumidityReading) GetErrors() []string { return h.Errors }
 
 // IlluminanceReading represents an illuminance sensor reading.
 type IlluminanceReading struct {
-	ID     int      `json:"id"`
-	Lux    *float64 `json:"lux"`
-	Errors []string `json:"errors,omitempty"`
+	ID           int      `json:"id"`
+	Lux          *float64 `json:"lux"`
+	Illumination *string  `json:"illumination,omitempty"` // Interpreted level: "dark", "twilight", "bright"
+	Errors       []string `json:"errors,omitempty"`
 }
 
 // GetID implements Sensor.
@@ -114,12 +115,27 @@ type DevicePowerExternalStatus struct {
 	Present bool `json:"present"`
 }
 
+// BTHomeSensorReading represents a BTHome Bluetooth sensor reading.
+type BTHomeSensorReading struct {
+	ID           int     `json:"id"`
+	Value        any     `json:"value"`
+	LastUpdateTS float64 `json:"last_updated_ts"`
+}
+
+// GetID implements Sensor.
+func (b BTHomeSensorReading) GetID() int { return b.ID }
+
+// GetErrors implements Sensor.
+func (b BTHomeSensorReading) GetErrors() []string { return nil }
+
 // SensorData holds aggregated sensor readings from a device.
 type SensorData struct {
-	Temperature []TemperatureReading `json:"temperature,omitempty"`
-	Humidity    []HumidityReading    `json:"humidity,omitempty"`
-	Flood       []AlarmSensorReading `json:"flood,omitempty"`
-	Smoke       []AlarmSensorReading `json:"smoke,omitempty"`
-	Illuminance []IlluminanceReading `json:"illuminance,omitempty"`
-	Voltmeter   []VoltmeterReading   `json:"voltmeter,omitempty"`
+	Temperature []TemperatureReading  `json:"temperature,omitempty"`
+	Humidity    []HumidityReading     `json:"humidity,omitempty"`
+	Flood       []AlarmSensorReading  `json:"flood,omitempty"`
+	Smoke       []AlarmSensorReading  `json:"smoke,omitempty"`
+	Illuminance []IlluminanceReading  `json:"illuminance,omitempty"`
+	Voltmeter   []VoltmeterReading    `json:"voltmeter,omitempty"`
+	DevicePower []DevicePowerReading  `json:"devicepower,omitempty"`
+	BTHome      []BTHomeSensorReading `json:"bthomesensor,omitempty"`
 }

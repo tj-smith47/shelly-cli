@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/term"
+	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
 const testFalseValue = "false"
@@ -220,7 +221,7 @@ func TestRun_NoPushOrPull(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr testutil.SafeBuffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
@@ -247,7 +248,7 @@ func TestRun_BothPushAndPull(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr testutil.SafeBuffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
@@ -274,7 +275,7 @@ func TestRun_PullNoDevices(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr testutil.SafeBuffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
@@ -298,7 +299,7 @@ func TestRun_PushNoSyncDir(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr testutil.SafeBuffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
@@ -324,7 +325,7 @@ func TestRun_PullWithDryRun(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr testutil.SafeBuffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
@@ -352,7 +353,7 @@ func TestRun_PushWithDryRun(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr testutil.SafeBuffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
@@ -376,7 +377,8 @@ func TestRun_PullSpecificDevices(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
-	var stdout, stderr bytes.Buffer
+	// Use SafeBuffer for concurrent-safe writes from PullDeviceConfigs goroutines
+	var stdout, stderr testutil.SafeBuffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
@@ -404,7 +406,7 @@ func TestRun_PushSpecificDevices(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr testutil.SafeBuffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 

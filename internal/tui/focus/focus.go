@@ -198,9 +198,13 @@ func (s *State) initTabPanels() {
 		PanelManageBatch,
 	}
 
-	// Monitor: Just the main monitor panel
+	// Monitor: PowerRanking -> Environment -> Alerts -> EventFeed
+	// (Summary is non-focusable, so not included in cycle order)
 	s.tabPanels[tabs.TabMonitor] = []GlobalPanelID{
-		PanelMonitorMain,
+		PanelMonitorPowerRanking,
+		PanelMonitorEnvironment,
+		PanelMonitorAlerts,
+		PanelMonitorEventFeed,
 	}
 
 	// Fleet: Devices -> Groups -> Health -> Operations

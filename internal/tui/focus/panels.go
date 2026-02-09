@@ -67,8 +67,16 @@ const (
 	PanelManageProvisioning
 	// PanelManageMigration is the migration wizard overlay on the Manage tab.
 	PanelManageMigration
-	// PanelMonitorMain is the main monitor view on the Monitor tab.
-	PanelMonitorMain
+	// PanelMonitorSummary is the summary bar on the Monitor tab (non-focusable).
+	PanelMonitorSummary
+	// PanelMonitorPowerRanking is the power ranking panel on the Monitor tab.
+	PanelMonitorPowerRanking
+	// PanelMonitorEnvironment is the environment sensors panel on the Monitor tab.
+	PanelMonitorEnvironment
+	// PanelMonitorAlerts is the alerts panel on the Monitor tab.
+	PanelMonitorAlerts
+	// PanelMonitorEventFeed is the event feed panel on the Monitor tab.
+	PanelMonitorEventFeed
 	// PanelFleetDevices is the cloud device list panel on the Fleet tab.
 	PanelFleetDevices
 	// PanelFleetGroups is the device groups panel on the Fleet tab.
@@ -110,7 +118,11 @@ var panelNames = map[GlobalPanelID]string{
 	PanelManageBatch:            "manage.batch",
 	PanelManageProvisioning:     "manage.provisioning",
 	PanelManageMigration:        "manage.migration",
-	PanelMonitorMain:            "monitor.main",
+	PanelMonitorSummary:         "monitor.summary",
+	PanelMonitorPowerRanking:    "monitor.powerRanking",
+	PanelMonitorEnvironment:     "monitor.environment",
+	PanelMonitorAlerts:          "monitor.alerts",
+	PanelMonitorEventFeed:       "monitor.eventFeed",
 	PanelFleetDevices:           "fleet.devices",
 	PanelFleetGroups:            "fleet.groups",
 	PanelFleetHealth:            "fleet.health",
@@ -153,8 +165,11 @@ var panelIndexes = map[GlobalPanelID]int{
 	PanelFleetGroups:     2,
 	PanelFleetHealth:     3,
 	PanelFleetOperations: 4,
-	// Monitor
-	PanelMonitorMain: 1,
+	// Monitor (Summary is non-focusable, so starts at 1 with PowerRanking)
+	PanelMonitorPowerRanking: 1,
+	PanelMonitorEnvironment:  2,
+	PanelMonitorAlerts:       3,
+	PanelMonitorEventFeed:    4,
 }
 
 // String returns the panel name for debugging.
@@ -184,7 +199,8 @@ func (p GlobalPanelID) TabFor() tabs.TabID {
 		PanelManageScenes, PanelManageTemplates, PanelManageBatch,
 		PanelManageProvisioning, PanelManageMigration:
 		return tabs.TabManage
-	case PanelMonitorMain:
+	case PanelMonitorSummary, PanelMonitorPowerRanking, PanelMonitorEnvironment,
+		PanelMonitorAlerts, PanelMonitorEventFeed:
 		return tabs.TabMonitor
 	case PanelFleetDevices, PanelFleetGroups, PanelFleetHealth,
 		PanelFleetOperations:

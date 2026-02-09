@@ -311,7 +311,10 @@ func TestGlobalPanelID_TabFor(t *testing.T) {
 		{PanelAutoScripts, tabs.TabAutomation},
 		{PanelConfigWiFi, tabs.TabConfig},
 		{PanelManageDiscovery, tabs.TabManage},
-		{PanelMonitorMain, tabs.TabMonitor},
+		{PanelMonitorPowerRanking, tabs.TabMonitor},
+		{PanelMonitorEnvironment, tabs.TabMonitor},
+		{PanelMonitorAlerts, tabs.TabMonitor},
+		{PanelMonitorEventFeed, tabs.TabMonitor},
 		{PanelFleetDevices, tabs.TabFleet},
 	}
 
@@ -322,6 +325,56 @@ func TestGlobalPanelID_TabFor(t *testing.T) {
 				t.Errorf("TabFor() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestState_MonitorPanelCycling(t *testing.T) {
+	t.Parallel()
+	s := NewState()
+
+	// Switch to Monitor tab
+	s.SetActiveTab(tabs.TabMonitor)
+
+	// First panel should be PowerRanking (Summary is non-focusable)
+	if s.ActivePanel() != PanelMonitorPowerRanking {
+		t.Errorf("Initial Monitor panel = %v, want %v", s.ActivePanel(), PanelMonitorPowerRanking)
+	}
+
+	// Cycle: PowerRanking -> Environment -> Alerts -> EventFeed -> PowerRanking
+	s.NextPanel()
+	if s.ActivePanel() != PanelMonitorEnvironment {
+		t.Errorf("After NextPanel(), ActivePanel() = %v, want %v", s.ActivePanel(), PanelMonitorEnvironment)
+	}
+
+	s.NextPanel()
+	if s.ActivePanel() != PanelMonitorAlerts {
+		t.Errorf("After NextPanel(), ActivePanel() = %v, want %v", s.ActivePanel(), PanelMonitorAlerts)
+	}
+
+	s.NextPanel()
+	if s.ActivePanel() != PanelMonitorEventFeed {
+		t.Errorf("After NextPanel(), ActivePanel() = %v, want %v", s.ActivePanel(), PanelMonitorEventFeed)
+	}
+
+	// Wrap around
+	s.NextPanel()
+	if s.ActivePanel() != PanelMonitorPowerRanking {
+		t.Errorf("After wrap NextPanel(), ActivePanel() = %v, want %v", s.ActivePanel(), PanelMonitorPowerRanking)
+	}
+
+	// PrevPanel should wrap to EventFeed
+	s.PrevPanel()
+	if s.ActivePanel() != PanelMonitorEventFeed {
+		t.Errorf("After PrevPanel(), ActivePanel() = %v, want %v", s.ActivePanel(), PanelMonitorEventFeed)
+	}
+
+	// Jump to panel 3 (Alerts)
+	ok := s.JumpToPanel(3)
+	if !ok {
+		t.Error("JumpToPanel(3) should succeed on Monitor tab")
+	}
+	if s.ActivePanel() != PanelMonitorAlerts {
+		t.Errorf("After JumpToPanel(3), ActivePanel() = %v, want %v", s.ActivePanel(), PanelMonitorAlerts)
 	}
 }
 
@@ -337,6 +390,10 @@ func TestGlobalPanelID_PanelIndex(t *testing.T) {
 		{PanelAutoScripts, 2},
 		{PanelConfigWiFi, 2},
 		{PanelManageDiscovery, 1},
+		{PanelMonitorPowerRanking, 1},
+		{PanelMonitorEnvironment, 2},
+		{PanelMonitorAlerts, 3},
+		{PanelMonitorEventFeed, 4},
 		{PanelFleetDevices, 1},
 		{PanelNone, 0},
 	}

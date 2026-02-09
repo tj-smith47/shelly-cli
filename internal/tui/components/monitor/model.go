@@ -67,11 +67,14 @@ type DeviceStatus struct {
 	UpdatedAt   time.Time
 	Error       error
 
-	// Sensor data
+	// Sensor data (first-value shortcuts for metrics line)
 	Temperature *float64 // Temperature in Celsius
 	Humidity    *float64 // Relative humidity percentage
 	Illuminance *float64 // Illuminance in lux
 	Battery     *int     // Battery percentage (if applicable)
+
+	// Full sensor data (all readings from all sensors for Environment panel)
+	Sensors *model.SensorData
 
 	// Connection info
 	ConnectionType string // "ws" for WebSocket, "poll" for HTTP polling
@@ -451,33 +454,22 @@ func (m Model) fetchSensorData(ctx context.Context, address string, status *Devi
 			return err
 		}
 
-		// Collect sensor data
+		// Collect all sensor data
 		sensorData := shelly.CollectSensorData(statusMap)
+		status.Sensors = sensorData
 
-		// Extract first temperature reading if available
+		// Extract first readings as shortcuts for the power ranking metrics line
 		if len(sensorData.Temperature) > 0 && sensorData.Temperature[0].TC != nil {
 			status.Temperature = sensorData.Temperature[0].TC
 		}
-
-		// Extract first humidity reading if available
 		if len(sensorData.Humidity) > 0 && sensorData.Humidity[0].RH != nil {
 			status.Humidity = sensorData.Humidity[0].RH
 		}
-
-		// Extract first illuminance reading if available
 		if len(sensorData.Illuminance) > 0 && sensorData.Illuminance[0].Lux != nil {
 			status.Illuminance = sensorData.Illuminance[0].Lux
 		}
-
-		// Check for devicepower (battery) component
-		for key, raw := range statusMap {
-			if strings.HasPrefix(key, "devicepower:") {
-				var dp model.DevicePowerReading
-				if err := json.Unmarshal(raw, &dp); err == nil {
-					status.Battery = &dp.Battery.Percent
-				}
-				break
-			}
+		if len(sensorData.DevicePower) > 0 {
+			status.Battery = &sensorData.DevicePower[0].Battery.Percent
 		}
 
 		return nil
@@ -570,7 +562,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.refreshing = true
 		return m, m.fetchStatuses()
 	case messages.ExportRequestMsg:
-		return m, m.exportData(ExportCSV)
+		return m, m.exportData(m.resolveExportFormat(msg.Format))
 
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
@@ -681,6 +673,14 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// resolveExportFormat converts a string format to ExportFormat.
+func (m Model) resolveExportFormat(format string) ExportFormat {
+	if format == "json" {
+		return ExportJSON
+	}
+	return ExportCSV
 }
 
 func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
@@ -952,8 +952,8 @@ func (m Model) View() string {
 
 	// Summary cards row
 	summaryCards := []string{
-		m.renderSummaryCard("Power", m.formatPower(totalPower)),
-		m.renderSummaryCard("Energy", m.formatEnergy(totalEnergy)),
+		m.renderSummaryCard("Power", formatPower(totalPower)),
+		m.renderSummaryCard("Energy", formatEnergy(totalEnergy)),
 		m.renderSummaryCard("Devices", fmt.Sprintf("%d/%d online", onlineCount, len(m.statuses))),
 	}
 	if costStr != "" {
@@ -1005,7 +1005,7 @@ func (m Model) renderSummaryCard(label, value string) string {
 }
 
 // formatPower formats watts for display.
-func (m Model) formatPower(watts float64) string {
+func formatPower(watts float64) string {
 	if watts >= 1000 || watts <= -1000 {
 		return fmt.Sprintf("%.2f kW", watts/1000)
 	}
@@ -1013,7 +1013,7 @@ func (m Model) formatPower(watts float64) string {
 }
 
 // formatEnergy formats watt-hours for display.
-func (m Model) formatEnergy(wh float64) string {
+func formatEnergy(wh float64) string {
 	if wh >= 1000000 {
 		return fmt.Sprintf("%.2f MWh", wh/1000000)
 	}
@@ -1111,7 +1111,7 @@ func (m Model) collectMetrics(s DeviceStatus) []string {
 		metrics = append(metrics, m.styles.Value.Render(fmt.Sprintf("%.1fHz", s.Frequency)))
 	}
 	if s.TotalEnergy > 0 {
-		metrics = append(metrics, m.styles.Energy.Render(m.formatEnergy(s.TotalEnergy)))
+		metrics = append(metrics, m.styles.Energy.Render(formatEnergy(s.TotalEnergy)))
 	}
 
 	// Sensor metrics
@@ -1133,6 +1133,11 @@ func (m Model) collectMetrics(s DeviceStatus) []string {
 	}
 
 	return metrics
+}
+
+// Statuses returns the current device statuses.
+func (m Model) Statuses() []DeviceStatus {
+	return m.statuses
 }
 
 // StatusCount returns the count of online/offline devices.
