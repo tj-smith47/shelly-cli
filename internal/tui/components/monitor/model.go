@@ -82,6 +82,9 @@ type DeviceStatus struct {
 
 	// Connection info
 	ConnectionType string // "ws" for WebSocket, "poll" for HTTP polling
+
+	// Link info (for devices linked to a parent switch)
+	LinkState string // Derived state from parent switch (e.g., "Off", "On", "Unknown")
 }
 
 // StatusUpdateMsg is sent when device status is updated.
@@ -298,7 +301,7 @@ func (m Model) fetchStatuses() tea.Cmd {
 // checkDeviceStatus fetches the real-time status of a single device.
 func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) DeviceStatus {
 	status := DeviceStatus{
-		Name:           device.Name,
+		Name:           device.DisplayName(),
 		Address:        device.Address,
 		Type:           device.Type,
 		Online:         false,
@@ -313,6 +316,11 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 	snapshot, err := m.svc.GetMonitoringSnapshotAuto(ctx, device.Address)
 	if err != nil {
 		status.Error = err
+		// For linked devices, resolve parent switch state instead of showing "offline"
+		if ls, linkErr := m.svc.ResolveLinkStatus(ctx, device.Name); linkErr == nil {
+			status.LinkState = ls.State
+			status.Error = nil // Clear the connectivity error — link state is authoritative
+		}
 		return status
 	}
 

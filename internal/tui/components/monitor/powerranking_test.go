@@ -62,6 +62,7 @@ func TestPowerRankingModel_SortOrder(t *testing.T) {
 		{Name: "offline-a", Online: false},
 		{Name: "zero-power", Online: true, Power: 0},
 		{Name: "high-power", Online: true, Power: 500},
+		{Name: "linked-off", Online: false, LinkState: "Off (via parent:0)"},
 		{Name: "offline-b", Online: false},
 		{Name: "mid-power", Online: true, Power: 100},
 	}
@@ -69,26 +70,40 @@ func TestPowerRankingModel_SortOrder(t *testing.T) {
 	m = m.SetDevices(statuses)
 
 	devices := m.Devices()
-	// First: online devices with power (desc)
-	if devices[0].Name != "high-power" {
-		t.Errorf("expected high-power first, got %q", devices[0].Name)
+	// Order: powered (desc) > zero-power > linked-offline > truly offline (by name)
+	expected := []string{"high-power", "mid-power", "low-power", "zero-power", "linked-off", "offline-a", "offline-b"}
+	for i, d := range devices {
+		if d.Name != expected[i] {
+			t.Errorf("device[%d] = %q, want %q", i, d.Name, expected[i])
+		}
 	}
-	if devices[1].Name != "mid-power" {
-		t.Errorf("expected mid-power second, got %q", devices[1].Name)
+}
+
+func TestPowerRankingModel_LinkedDeviceRendering(t *testing.T) {
+	t.Parallel()
+
+	m := NewPowerRanking()
+	m = m.SetSize(80, 20)
+
+	statuses := []DeviceStatus{
+		{Name: "online-dev", Online: true, Power: 50},
+		{Name: "linked-dev", Online: false, LinkState: "Off (via parent:0)"},
+		{Name: "offline-dev", Online: false},
 	}
-	if devices[2].Name != "low-power" {
-		t.Errorf("expected low-power third, got %q", devices[2].Name)
+	m = m.SetDevices(statuses)
+
+	view := m.View()
+
+	// Linked device should show link indicator and "Off" state (may be truncated)
+	if !strings.Contains(view, "⤴") {
+		t.Errorf("linked device should show link indicator ⤴, view:\n%s", view)
 	}
-	// Then: zero power
-	if devices[3].Name != "zero-power" {
-		t.Errorf("expected zero-power fourth, got %q", devices[3].Name)
+	if !strings.Contains(view, "Off") {
+		t.Errorf("linked device should show 'Off' state, view:\n%s", view)
 	}
-	// Then: offline (sorted by name)
-	if devices[4].Name != "offline-a" {
-		t.Errorf("expected offline-a fifth, got %q", devices[4].Name)
-	}
-	if devices[5].Name != "offline-b" {
-		t.Errorf("expected offline-b sixth, got %q", devices[5].Name)
+	// Offline device should show "offline"
+	if !strings.Contains(view, "offline") {
+		t.Errorf("truly offline device should show 'offline', view:\n%s", view)
 	}
 }
 

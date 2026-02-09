@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -38,6 +39,7 @@ type RankedDevice struct {
 	Trend          TrendDirection
 	Error          error
 	ConnectionType string
+	LinkState      string // Derived state from parent switch (e.g., "Off", "On")
 
 	// Health badges
 	ChipTemp  *float64 // Component temperature (°C)
@@ -194,6 +196,7 @@ func (m PowerRankingModel) SetDevices(statuses []DeviceStatus) PowerRankingModel
 			Trend:          trend,
 			Error:          s.Error,
 			ConnectionType: s.ConnectionType,
+			LinkState:      s.LinkState,
 			ChipTemp:       s.ChipTemp,
 			WiFiRSSI:       s.WiFiRSSI,
 			FSFree:         s.FSFree,
@@ -206,11 +209,11 @@ func (m PowerRankingModel) SetDevices(statuses []DeviceStatus) PowerRankingModel
 		}
 	}
 
-	// Sort: online devices by power (desc), zero-power at bottom, offline at very bottom
+	// Sort: online > zero-power > linked-offline > truly-offline, then by name
 	sort.Slice(ranked, func(i, j int) bool {
 		di, dj := ranked[i], ranked[j]
 
-		// Offline devices always last
+		// Online devices first
 		if di.Online != dj.Online {
 			return di.Online
 		}
@@ -224,7 +227,14 @@ func (m PowerRankingModel) SetDevices(statuses []DeviceStatus) PowerRankingModel
 			return di.Power > dj.Power
 		}
 
-		// Among offline: sort by name
+		// Among offline: linked devices above truly offline
+		diLinked := di.LinkState != ""
+		djLinked := dj.LinkState != ""
+		if diLinked != djLinked {
+			return diLinked
+		}
+
+		// Same category: sort by name
 		return di.Name < dj.Name
 	})
 
@@ -341,6 +351,9 @@ func (m PowerRankingModel) renderDeviceRow(d RankedDevice, rank int, isSelected 
 	}
 
 	if !d.Online {
+		if d.LinkState != "" {
+			return m.renderLinkedRow(d, sel, maxWidth)
+		}
 		return m.renderOfflineRow(d, sel, maxWidth)
 	}
 
@@ -350,6 +363,17 @@ func (m PowerRankingModel) renderDeviceRow(d RankedDevice, rank int, isSelected 
 
 	return m.renderPoweredRow(d, rank, sel, maxWidth)
 }
+
+// justifyRow pads between left and right parts to fill maxWidth.
+func justifyRow(left, right string, maxWidth int) string {
+	leftW := ansi.StringWidth(left)
+	rightW := ansi.StringWidth(right)
+	gap := max(1, maxWidth-leftW-rightW)
+	return left + strings.Repeat(" ", gap) + right
+}
+
+// maxNameWidth caps name width at 30 to prevent excessive padding.
+const maxNameWidthCap = 30
 
 // renderPoweredRow renders a device with active power consumption.
 func (m PowerRankingModel) renderPoweredRow(d RankedDevice, rank int, sel string, maxWidth int) string {
@@ -363,56 +387,62 @@ func (m PowerRankingModel) renderPoweredRow(d RankedDevice, rank int, sel string
 		connStr = m.styles.Connection.Render(" [ws]")
 	}
 
-	// Truncate name to fit
-	nameWidth := maxWidth - 20 // rank(4) + power(10) + trend(2) + sel(2) + spacing(2)
+	nameWidth := min(maxWidth-20, maxNameWidthCap)
 	if nameWidth < 8 {
 		nameWidth = 8
 	}
 	name := output.Truncate(d.Name, nameWidth)
 	nameStr := m.styles.DeviceName.Render(name)
 
-	// Pad name to alignment
-	namePad := strings.Repeat(" ", max(0, nameWidth-len(name)))
-
 	badges := m.healthBadges(d)
-	line := sel + rankStr + " " + nameStr + namePad + " " + powerStr + " " + trendStr + connStr + badges
-	return line
+	left := sel + rankStr + " " + nameStr
+	right := powerStr + " " + trendStr + connStr + badges
+	return justifyRow(left, right, maxWidth)
 }
 
 // renderZeroPowerRow renders a device with zero power.
 func (m PowerRankingModel) renderZeroPowerRow(d RankedDevice, sel string, maxWidth int) string {
-	nameWidth := maxWidth - 16
+	nameWidth := min(maxWidth-16, maxNameWidthCap)
 	if nameWidth < 8 {
 		nameWidth = 8
 	}
 	name := output.Truncate(d.Name, nameWidth)
-	namePad := strings.Repeat(" ", max(0, nameWidth-len(name)))
 
 	badges := m.healthBadges(d)
-	line := sel + m.styles.Muted.Render("─") + "  " +
-		m.styles.Muted.Render(name) + namePad + " " +
-		m.styles.PowerZero.Render("0W") + badges
-	return line
+	left := sel + m.styles.Muted.Render("─") + "  " + m.styles.Muted.Render(name)
+	right := m.styles.PowerZero.Render("0W") + badges
+	return justifyRow(left, right, maxWidth)
+}
+
+// renderLinkedRow renders a linked device that's offline but has parent switch state.
+func (m PowerRankingModel) renderLinkedRow(d RankedDevice, sel string, maxWidth int) string {
+	nameWidth := min(maxWidth-20, maxNameWidthCap)
+	if nameWidth < 8 {
+		nameWidth = 8
+	}
+	name := output.Truncate(d.Name, nameWidth)
+
+	left := sel + m.styles.Muted.Render("⤴") + "  " + m.styles.Muted.Render(name)
+	right := m.styles.Muted.Render(d.LinkState)
+	return justifyRow(left, right, maxWidth)
 }
 
 // renderOfflineRow renders an offline device.
 func (m PowerRankingModel) renderOfflineRow(d RankedDevice, sel string, maxWidth int) string {
-	nameWidth := maxWidth - 20
+	nameWidth := min(maxWidth-20, maxNameWidthCap)
 	if nameWidth < 8 {
 		nameWidth = 8
 	}
 	name := output.Truncate(d.Name, nameWidth)
-	namePad := strings.Repeat(" ", max(0, nameWidth-len(name)))
 
 	errMsg := "offline"
 	if d.Error != nil {
 		errMsg = output.Truncate(d.Error.Error(), 20)
 	}
 
-	line := sel + m.styles.Offline.Render("✗") + "  " +
-		m.styles.Offline.Render(name) + namePad + " " +
-		m.styles.ErrorText.Render(errMsg)
-	return line
+	left := sel + m.styles.Offline.Render("✗") + "  " + m.styles.Offline.Render(name)
+	right := m.styles.ErrorText.Render(errMsg)
+	return justifyRow(left, right, maxWidth)
 }
 
 // trendIndicator returns the styled trend arrow.

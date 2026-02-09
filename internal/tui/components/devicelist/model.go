@@ -250,7 +250,7 @@ func (m Model) emitSelection() tea.Cmd {
 	d := devices[cursor]
 	return func() tea.Msg {
 		return DeviceSelectedMsg{
-			Name:    d.Device.Name,
+			Name:    d.Device.DisplayName(),
 			Address: d.Device.Address,
 		}
 	}
@@ -302,7 +302,7 @@ func (m Model) refreshCachedDevices() Model {
 	filterLower := strings.ToLower(m.filter)
 	filtered := make([]*cache.DeviceData, 0, len(all))
 	for _, d := range all {
-		if strings.Contains(strings.ToLower(d.Device.Name), filterLower) ||
+		if strings.Contains(strings.ToLower(d.Device.DisplayName()), filterLower) ||
 			strings.Contains(strings.ToLower(d.Device.Address), filterLower) ||
 			strings.Contains(strings.ToLower(d.Device.Type), filterLower) ||
 			strings.Contains(strings.ToLower(d.Device.Model), filterLower) {
@@ -581,7 +581,7 @@ func (m Model) renderListRow(d *cache.DeviceData, isSelected bool, width int) st
 		badgeWidth = 4 // " [X]"
 	}
 	maxNameWidth := width - 6 - badgeWidth // icon, selector, padding, badge
-	name := d.Device.Name
+	name := d.Device.DisplayName()
 	if len(name) > maxNameWidth && maxNameWidth > 3 {
 		name = name[:maxNameWidth-1] + "…"
 	}
@@ -617,7 +617,7 @@ func (m Model) renderDetailPanel(devices []*cache.DeviceData, width int) string 
 	var content strings.Builder
 
 	// Header with device name
-	content.WriteString(m.styles.DetailHeader.Render(d.Device.Name) + "\n\n")
+	content.WriteString(m.styles.DetailHeader.Render(d.Device.DisplayName()) + "\n\n")
 
 	// Status
 	content.WriteString(m.renderDeviceStatus(d) + "\n\n")
@@ -822,8 +822,8 @@ func (m Model) OptimalWidth() int {
 
 	maxLen := 0
 	for _, d := range devices {
-		if len(d.Device.Name) > maxLen {
-			maxLen = len(d.Device.Name)
+		if len(d.Device.DisplayName()) > maxLen {
+			maxLen = len(d.Device.DisplayName())
 		}
 	}
 
@@ -850,8 +850,8 @@ func (m Model) MaxDeviceNameLen() int {
 	devices := m.getFilteredDevices()
 	maxLen := 0
 	for _, d := range devices {
-		if len(d.Device.Name) > maxLen {
-			maxLen = len(d.Device.Name)
+		if len(d.Device.DisplayName()) > maxLen {
+			maxLen = len(d.Device.DisplayName())
 		}
 	}
 	return maxLen

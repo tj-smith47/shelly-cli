@@ -565,14 +565,15 @@ func (c *Cache) loadDevicesWave() tea.Cmd {
 
 		c.mu.Lock()
 		// Initialize all devices with "fetching" state
-		// Use Device.Name as key for consistent lookup (not config key)
+		// Use Device.DisplayName() as key for consistent lookup (not config key)
 		c.order = make([]string, 0, len(deviceMap))
 		for _, dev := range deviceMap {
-			c.devices[dev.Name] = &DeviceData{
+			displayName := dev.DisplayName()
+			c.devices[displayName] = &DeviceData{
 				Device:  dev,
 				Fetched: false,
 			}
-			c.order = append(c.order, dev.Name)
+			c.order = append(c.order, displayName)
 		}
 		// Sort for consistent display
 		sortStrings(c.order)
@@ -604,10 +605,10 @@ func (c *Cache) createWaves(devices map[string]model.Device) [][]deviceFetch {
 	}
 
 	// Convert to slice for sorting
-	// Use Device.Name for consistent lookup (not config key)
+	// Use Device.DisplayName() for consistent lookup (not config key)
 	fetches := make([]deviceFetch, 0, len(devices))
 	for _, dev := range devices {
-		fetches = append(fetches, deviceFetch{Name: dev.Name, Device: dev})
+		fetches = append(fetches, deviceFetch{Name: dev.DisplayName(), Device: dev})
 	}
 
 	// Sort: Gen2 first (generation > 1 or unknown), then Gen1, then by name
@@ -1761,7 +1762,7 @@ func (c *Cache) SetDeviceForTesting(device model.Device, online bool) {
 		UpdatedAt: time.Now(),
 	}
 
-	c.devices[device.Name] = data
+	c.devices[device.DisplayName()] = data
 
 	// Maintain sorted order
 	c.order = make([]string, 0, len(c.devices))
