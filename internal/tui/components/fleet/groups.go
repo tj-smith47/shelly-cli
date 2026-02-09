@@ -225,22 +225,7 @@ func (m GroupsModel) handleMessage(msg tea.Msg) (GroupsModel, tea.Cmd) {
 }
 
 func (m GroupsModel) handleNavigation(msg messages.NavigationMsg) (GroupsModel, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
-		m.Scroller.CursorUp()
-	case messages.NavDown:
-		m.Scroller.CursorDown()
-	case messages.NavPageUp:
-		m.Scroller.PageUp()
-	case messages.NavPageDown:
-		m.Scroller.PageDown()
-	case messages.NavHome:
-		m.Scroller.CursorToStart()
-	case messages.NavEnd:
-		m.Scroller.CursorToEnd()
-	case messages.NavLeft, messages.NavRight:
-		// Not applicable for this component
-	}
+	m.Scroller.HandleNavigation(msg)
 	return m, nil
 }
 

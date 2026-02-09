@@ -93,6 +93,8 @@ const (
 	ActionPrevField      // Shift+Tab in modal: move to previous field
 	ActionConfirm        // Enter in modal: confirm selection/submit
 	ActionSave           // Ctrl+S: save changes
+	ActionHistory        // h: show energy history overlay
+	ActionPhaseDetail    // p: show 3-phase detail overlay
 )
 
 // KeyBinding represents a key and its description.
@@ -337,16 +339,18 @@ func (m *ContextMap) initDefaults() {
 		"k":                ActionUp,
 		keyconst.KeyDown:   ActionDown,
 		keyconst.KeyUp:     ActionUp,
-		"h":                ActionLeft,
-		"l":                ActionRight,
 		"left":             ActionLeft,
 		"right":            ActionRight,
 		"t":                ActionToggle,
 		"o":                ActionOn,
 		"O":                ActionOff,
 		"R":                ActionReboot,
-		"c":                ActionControl, // Open control panel
-		"d":                ActionDetail,  // Device detail overlay
+		"c":                ActionControl,     // Open control panel
+		"d":                ActionDetail,      // Device detail overlay
+		"h":                ActionHistory,     // Energy history overlay
+		"p":                ActionPhaseDetail, // 3-phase detail overlay
+		"n":                ActionNew,         // Create new alert
+		"e":                ActionEdit,        // Edit / toggle enable
 		keyconst.KeyEnter:  ActionEnter,
 		"r":                ActionRefresh,
 		"ctrl+r":           ActionRefreshAll,
@@ -560,6 +564,8 @@ var actionDescriptions = map[Action]string{
 	ActionPrevField:      "Previous field",
 	ActionConfirm:        "Confirm",
 	ActionSave:           "Save",
+	ActionHistory:        "Energy history",
+	ActionPhaseDetail:    "3-phase detail",
 }
 
 // contextActionDescriptions overrides action descriptions for specific contexts.
@@ -601,15 +607,19 @@ var contextActionDescriptions = map[Context]map[Action]string{
 		ActionRefresh: "Refresh list",
 	},
 	ContextMonitor: {
-		ActionEnter:      "Device detail overlay",
-		ActionDetail:     "Device detail overlay",
-		ActionPause:      "Pause monitoring",
-		ActionRefresh:    "Refresh data",
-		ActionBrowser:    "Open web UI",
-		ActionControl:    "Open control panel",
-		ActionExport:     "Export CSV",
-		ActionExportJSON: "Export JSON",
-		ActionViewJSON:   "Open JSON viewer",
+		ActionEnter:       "Device detail overlay",
+		ActionDetail:      "Device detail overlay",
+		ActionPause:       "Pause monitoring",
+		ActionRefresh:     "Refresh data",
+		ActionBrowser:     "Open web UI",
+		ActionControl:     "Open control panel",
+		ActionExport:      "Export CSV",
+		ActionExportJSON:  "Export JSON",
+		ActionViewJSON:    "Open JSON viewer",
+		ActionHistory:     "Energy history overlay",
+		ActionPhaseDetail: "3-phase detail overlay",
+		ActionNew:         "Create new alert",
+		ActionEdit:        "Edit / toggle enable",
 	},
 	ContextFleet: {
 		ActionToggle:  "Select device",

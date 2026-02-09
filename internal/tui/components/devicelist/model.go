@@ -201,22 +201,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 // handleNavigation handles NavigationMsg for cursor movement.
 func (m Model) handleNavigation(msg messages.NavigationMsg) Model {
-	switch msg.Direction {
-	case messages.NavDown:
-		m.Scroller.CursorDown()
-	case messages.NavUp:
-		m.Scroller.CursorUp()
-	case messages.NavPageDown:
-		m.Scroller.PageDown()
-	case messages.NavPageUp:
-		m.Scroller.PageUp()
-	case messages.NavHome:
-		m.Scroller.CursorToStart()
-	case messages.NavEnd:
-		m.Scroller.CursorToEnd()
-	case messages.NavLeft, messages.NavRight:
-		// Horizontal navigation not applicable for device list
-	}
+	m.Scroller.HandleNavigation(msg)
 	return m
 }
 

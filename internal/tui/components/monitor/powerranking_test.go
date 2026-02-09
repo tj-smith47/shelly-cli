@@ -274,3 +274,160 @@ func TestTrendIndicator(t *testing.T) {
 		t.Errorf("expected stable trend to contain ─, got %q", flat)
 	}
 }
+
+func TestHealthBadges(t *testing.T) {
+	t.Parallel()
+
+	m := NewPowerRanking()
+
+	t.Run("no badges when healthy", func(t *testing.T) {
+		t.Parallel()
+		rssi := -50.0
+		chipTemp := 60.0
+		d := RankedDevice{
+			Online:   true,
+			Power:    100,
+			ChipTemp: &chipTemp,
+			WiFiRSSI: &rssi,
+			FSFree:   50000,
+			FSSize:   100000,
+		}
+		badges := m.healthBadges(d)
+		if badges != "" {
+			t.Errorf("expected no badges for healthy device, got %q", badges)
+		}
+	})
+
+	t.Run("chip temp warning", func(t *testing.T) {
+		t.Parallel()
+		chipTemp := 85.0
+		d := RankedDevice{Online: true, Power: 100, ChipTemp: &chipTemp}
+		badges := m.healthBadges(d)
+		if !strings.Contains(badges, "🌡") {
+			t.Errorf("expected chip temp badge, got %q", badges)
+		}
+	})
+
+	t.Run("wifi rssi warning", func(t *testing.T) {
+		t.Parallel()
+		rssi := -80.0
+		d := RankedDevice{Online: true, Power: 100, WiFiRSSI: &rssi}
+		badges := m.healthBadges(d)
+		if !strings.Contains(badges, "📶") {
+			t.Errorf("expected wifi badge, got %q", badges)
+		}
+	})
+
+	t.Run("flash usage warning", func(t *testing.T) {
+		t.Parallel()
+		d := RankedDevice{Online: true, Power: 100, FSFree: 5000, FSSize: 100000}
+		badges := m.healthBadges(d)
+		if !strings.Contains(badges, "💾") {
+			t.Errorf("expected flash badge, got %q", badges)
+		}
+	})
+
+	t.Run("firmware update badge", func(t *testing.T) {
+		t.Parallel()
+		d := RankedDevice{Online: true, Power: 100, HasUpdate: true}
+		badges := m.healthBadges(d)
+		if !strings.Contains(badges, "⬆") {
+			t.Errorf("expected update badge, got %q", badges)
+		}
+	})
+
+	t.Run("solar return badge", func(t *testing.T) {
+		t.Parallel()
+		d := RankedDevice{Online: true, Power: -50}
+		badges := m.healthBadges(d)
+		if !strings.Contains(badges, "☀") {
+			t.Errorf("expected solar badge, got %q", badges)
+		}
+	})
+
+	t.Run("multiple badges", func(t *testing.T) {
+		t.Parallel()
+		chipTemp := 90.0
+		rssi := -80.0
+		d := RankedDevice{
+			Online:    true,
+			Power:     100,
+			ChipTemp:  &chipTemp,
+			WiFiRSSI:  &rssi,
+			HasUpdate: true,
+		}
+		badges := m.healthBadges(d)
+		if !strings.Contains(badges, "🌡") {
+			t.Error("expected chip temp badge")
+		}
+		if !strings.Contains(badges, "📶") {
+			t.Error("expected wifi badge")
+		}
+		if !strings.Contains(badges, "⬆") {
+			t.Error("expected update badge")
+		}
+	})
+
+	t.Run("nil fields no panic", func(t *testing.T) {
+		t.Parallel()
+		d := RankedDevice{Online: true, Power: 100}
+		badges := m.healthBadges(d)
+		if badges != "" {
+			t.Errorf("expected no badges for device with nil health, got %q", badges)
+		}
+	})
+}
+
+func TestHealthBadges_InView(t *testing.T) {
+	t.Parallel()
+
+	m := NewPowerRanking()
+	m = m.SetSize(100, 20)
+
+	chipTemp := 85.0
+	m = m.SetDevices([]DeviceStatus{
+		{Name: "hot-device", Online: true, Power: 200, ChipTemp: &chipTemp},
+		{Name: "normal", Online: true, Power: 100},
+	})
+
+	view := m.View()
+	if !strings.Contains(view, "🌡") {
+		t.Error("expected chip temp badge in view for hot device")
+	}
+}
+
+func TestSetDevices_CarriesHealthData(t *testing.T) {
+	t.Parallel()
+
+	m := NewPowerRanking()
+	m = m.SetSize(80, 20)
+
+	chipTemp := 90.0
+	rssi := -80.0
+	m = m.SetDevices([]DeviceStatus{
+		{
+			Name:      "test",
+			Online:    true,
+			Power:     100,
+			ChipTemp:  &chipTemp,
+			WiFiRSSI:  &rssi,
+			FSFree:    5000,
+			FSSize:    100000,
+			HasUpdate: true,
+		},
+	})
+
+	d := m.Devices()[0]
+	if d.ChipTemp == nil || *d.ChipTemp != 90.0 {
+		t.Errorf("ChipTemp = %v, want 90.0", d.ChipTemp)
+	}
+	if d.WiFiRSSI == nil || *d.WiFiRSSI != -80.0 {
+		t.Errorf("WiFiRSSI = %v, want -80.0", d.WiFiRSSI)
+	}
+	if d.FSFree != 5000 || d.FSSize != 100000 {
+		t.Errorf("FS = %d/%d, want 5000/100000", d.FSFree, d.FSSize)
+	}
+	if !d.HasUpdate {
+		t.Error("expected HasUpdate true")
+	}
+}

@@ -119,12 +119,15 @@ func FormatPower(watts float64) string {
 	return FormatPowerValue(watts, PowerValueOptions{})
 }
 
-// FormatEnergy returns a human-readable energy string (Wh or kWh).
+// FormatEnergy returns a human-readable energy string (Wh, kWh, or MWh).
 func FormatEnergy(wh float64) string {
+	if wh >= 1000000 {
+		return fmt.Sprintf("%.2f MWh", wh/1000000)
+	}
 	if wh >= 1000 {
 		return fmt.Sprintf("%.2f kWh", wh/1000)
 	}
-	return fmt.Sprintf("%.0f Wh", wh)
+	return fmt.Sprintf("%.1f Wh", wh)
 }
 
 // FormatPowerColored returns a themed power string based on usage level.

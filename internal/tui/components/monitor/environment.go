@@ -155,22 +155,7 @@ func (m EnvironmentModel) Update(msg tea.Msg) (EnvironmentModel, tea.Cmd) {
 
 // handleNavigation handles scrolling.
 func (m EnvironmentModel) handleNavigation(msg messages.NavigationMsg) EnvironmentModel {
-	switch msg.Direction {
-	case messages.NavUp:
-		m.Scroller.CursorUp()
-	case messages.NavDown:
-		m.Scroller.CursorDown()
-	case messages.NavPageUp:
-		m.Scroller.PageUp()
-	case messages.NavPageDown:
-		m.Scroller.PageDown()
-	case messages.NavHome:
-		m.Scroller.CursorToStart()
-	case messages.NavEnd:
-		m.Scroller.CursorToEnd()
-	case messages.NavLeft, messages.NavRight:
-		// Not applicable
-	}
+	m.Scroller.HandleNavigation(msg)
 	return m
 }
 
@@ -336,61 +321,46 @@ type sensorEntry[T any] struct {
 	Reading    T
 }
 
-// collectTemperatures gathers all temperature readings sorted by device name.
-func (m EnvironmentModel) collectTemperatures() []sensorEntry[model.TemperatureReading] {
-	var entries []sensorEntry[model.TemperatureReading]
-	for _, d := range m.devices {
-		for _, t := range d.SensorData.Temperature {
-			if t.TC != nil {
-				entries = append(entries, sensorEntry[model.TemperatureReading]{
-					DeviceName: d.DeviceName,
-					Reading:    t,
-				})
+// collectSensors gathers sensor readings from all devices, sorted by device name.
+// getSensors extracts the sensor slice; include filters readings (nil means include all).
+func collectSensors[T any](devices []DeviceSensorData, getSensors func(*model.SensorData) []T, include func(T) bool) []sensorEntry[T] {
+	var entries []sensorEntry[T]
+	for _, d := range devices {
+		for _, s := range getSensors(d.SensorData) {
+			if include != nil && !include(s) {
+				continue
 			}
+			entries = append(entries, sensorEntry[T]{
+				DeviceName: d.DeviceName,
+				Reading:    s,
+			})
 		}
 	}
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].DeviceName < entries[j].DeviceName
 	})
 	return entries
+}
+
+// collectTemperatures gathers all temperature readings sorted by device name.
+func (m EnvironmentModel) collectTemperatures() []sensorEntry[model.TemperatureReading] {
+	return collectSensors(m.devices,
+		func(s *model.SensorData) []model.TemperatureReading { return s.Temperature },
+		func(t model.TemperatureReading) bool { return t.TC != nil })
 }
 
 // collectHumidities gathers all humidity readings sorted by device name.
 func (m EnvironmentModel) collectHumidities() []sensorEntry[model.HumidityReading] {
-	var entries []sensorEntry[model.HumidityReading]
-	for _, d := range m.devices {
-		for _, h := range d.SensorData.Humidity {
-			if h.RH != nil {
-				entries = append(entries, sensorEntry[model.HumidityReading]{
-					DeviceName: d.DeviceName,
-					Reading:    h,
-				})
-			}
-		}
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].DeviceName < entries[j].DeviceName
-	})
-	return entries
+	return collectSensors(m.devices,
+		func(s *model.SensorData) []model.HumidityReading { return s.Humidity },
+		func(h model.HumidityReading) bool { return h.RH != nil })
 }
 
 // collectIlluminances gathers all illuminance readings sorted by device name.
 func (m EnvironmentModel) collectIlluminances() []sensorEntry[model.IlluminanceReading] {
-	var entries []sensorEntry[model.IlluminanceReading]
-	for _, d := range m.devices {
-		for _, il := range d.SensorData.Illuminance {
-			if il.Lux != nil {
-				entries = append(entries, sensorEntry[model.IlluminanceReading]{
-					DeviceName: d.DeviceName,
-					Reading:    il,
-				})
-			}
-		}
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].DeviceName < entries[j].DeviceName
-	})
-	return entries
+	return collectSensors(m.devices,
+		func(s *model.SensorData) []model.IlluminanceReading { return s.Illuminance },
+		func(il model.IlluminanceReading) bool { return il.Lux != nil })
 }
 
 // batteryEntry holds a battery reading with device context.
@@ -421,38 +391,16 @@ func (m EnvironmentModel) collectBatteries() []batteryEntry {
 
 // collectVoltmeters gathers all voltmeter readings sorted by device name.
 func (m EnvironmentModel) collectVoltmeters() []sensorEntry[model.VoltmeterReading] {
-	var entries []sensorEntry[model.VoltmeterReading]
-	for _, d := range m.devices {
-		for _, v := range d.SensorData.Voltmeter {
-			if v.Voltage != nil {
-				entries = append(entries, sensorEntry[model.VoltmeterReading]{
-					DeviceName: d.DeviceName,
-					Reading:    v,
-				})
-			}
-		}
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].DeviceName < entries[j].DeviceName
-	})
-	return entries
+	return collectSensors(m.devices,
+		func(s *model.SensorData) []model.VoltmeterReading { return s.Voltmeter },
+		func(v model.VoltmeterReading) bool { return v.Voltage != nil })
 }
 
 // collectBTHome gathers all BTHome sensor readings sorted by device name.
 func (m EnvironmentModel) collectBTHome() []sensorEntry[model.BTHomeSensorReading] {
-	entries := make([]sensorEntry[model.BTHomeSensorReading], 0, len(m.devices))
-	for _, d := range m.devices {
-		for _, b := range d.SensorData.BTHome {
-			entries = append(entries, sensorEntry[model.BTHomeSensorReading]{
-				DeviceName: d.DeviceName,
-				Reading:    b,
-			})
-		}
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].DeviceName < entries[j].DeviceName
-	})
-	return entries
+	return collectSensors[model.BTHomeSensorReading](m.devices,
+		func(s *model.SensorData) []model.BTHomeSensorReading { return s.BTHome },
+		nil)
 }
 
 // alarmEntry holds an alarm sensor reading with device and type context.
@@ -461,18 +409,17 @@ type alarmEntry struct {
 	Reading    model.AlarmSensorReading
 }
 
-// collectFloodSensors gathers all flood sensor readings.
-func (m EnvironmentModel) collectFloodSensors() []alarmEntry {
-	entries := make([]alarmEntry, 0, len(m.devices))
-	for _, d := range m.devices {
-		for _, f := range d.SensorData.Flood {
+// collectAlarmEntries gathers alarm sensor readings, sorted alarms-first then by device name.
+func collectAlarmEntries(devices []DeviceSensorData, getSensors func(*model.SensorData) []model.AlarmSensorReading) []alarmEntry {
+	entries := make([]alarmEntry, 0, len(devices))
+	for _, d := range devices {
+		for _, s := range getSensors(d.SensorData) {
 			entries = append(entries, alarmEntry{
 				DeviceName: d.DeviceName,
-				Reading:    f,
+				Reading:    s,
 			})
 		}
 	}
-	// Sort alarms first, then by device name
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].Reading.Alarm != entries[j].Reading.Alarm {
 			return entries[i].Reading.Alarm
@@ -482,25 +429,14 @@ func (m EnvironmentModel) collectFloodSensors() []alarmEntry {
 	return entries
 }
 
+// collectFloodSensors gathers all flood sensor readings.
+func (m EnvironmentModel) collectFloodSensors() []alarmEntry {
+	return collectAlarmEntries(m.devices, func(s *model.SensorData) []model.AlarmSensorReading { return s.Flood })
+}
+
 // collectSmokeSensors gathers all smoke sensor readings.
 func (m EnvironmentModel) collectSmokeSensors() []alarmEntry {
-	entries := make([]alarmEntry, 0, len(m.devices))
-	for _, d := range m.devices {
-		for _, s := range d.SensorData.Smoke {
-			entries = append(entries, alarmEntry{
-				DeviceName: d.DeviceName,
-				Reading:    s,
-			})
-		}
-	}
-	// Sort alarms first, then by device name
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].Reading.Alarm != entries[j].Reading.Alarm {
-			return entries[i].Reading.Alarm
-		}
-		return entries[i].DeviceName < entries[j].DeviceName
-	})
-	return entries
+	return collectAlarmEntries(m.devices, func(s *model.SensorData) []model.AlarmSensorReading { return s.Smoke })
 }
 
 // renderSectionHeader renders a section divider.
@@ -508,19 +444,27 @@ func (m EnvironmentModel) renderSectionHeader(name string) string {
 	return m.styles.SectionHeader.Render("  " + name)
 }
 
-// renderTemperatures renders all temperature readings.
-func (m EnvironmentModel) renderTemperatures(entries []sensorEntry[model.TemperatureReading], maxWidth int) []string {
+// renderSensorLines renders sensor entries with a consistent format: "    name padding value".
+// formatFn returns the fully-styled value string for each reading.
+func renderSensorLines[T any](entries []sensorEntry[T], maxWidth, padding int,
+	formatFn func(T) string, nameStyle lipgloss.Style) []string {
 	lines := make([]string, 0, len(entries))
 	for _, e := range entries {
-		tc := *e.Reading.TC
-		valueStr := fmt.Sprintf("%.1f°C", tc)
-		style := m.tempStyle(tc)
-		name := output.Truncate(e.DeviceName, maxWidth-16)
-		namePad := strings.Repeat(" ", max(0, maxWidth-16-len(name)))
+		valueStr := formatFn(e.Reading)
+		name := output.Truncate(e.DeviceName, maxWidth-padding)
+		namePad := strings.Repeat(" ", max(0, maxWidth-padding-len(name)))
 		lines = append(lines, fmt.Sprintf("    %s%s %s",
-			m.styles.DeviceName.Render(name), namePad, style.Render(valueStr)))
+			nameStyle.Render(name), namePad, valueStr))
 	}
 	return lines
+}
+
+// renderTemperatures renders all temperature readings.
+func (m EnvironmentModel) renderTemperatures(entries []sensorEntry[model.TemperatureReading], maxWidth int) []string {
+	return renderSensorLines(entries, maxWidth, 16, func(t model.TemperatureReading) string {
+		tc := *t.TC
+		return m.tempStyle(tc).Render(fmt.Sprintf("%.1f°C", tc))
+	}, m.styles.DeviceName)
 }
 
 // tempStyle returns the appropriate style for a temperature value.
@@ -539,17 +483,10 @@ func (m EnvironmentModel) tempStyle(tc float64) lipgloss.Style {
 
 // renderHumidities renders all humidity readings.
 func (m EnvironmentModel) renderHumidities(entries []sensorEntry[model.HumidityReading], maxWidth int) []string {
-	lines := make([]string, 0, len(entries))
-	for _, e := range entries {
-		rh := *e.Reading.RH
-		valueStr := fmt.Sprintf("%.0f%%", rh)
-		style := m.humidStyle(rh)
-		name := output.Truncate(e.DeviceName, maxWidth-16)
-		namePad := strings.Repeat(" ", max(0, maxWidth-16-len(name)))
-		lines = append(lines, fmt.Sprintf("    %s%s %s",
-			m.styles.DeviceName.Render(name), namePad, style.Render(valueStr)))
-	}
-	return lines
+	return renderSensorLines(entries, maxWidth, 16, func(h model.HumidityReading) string {
+		rh := *h.RH
+		return m.humidStyle(rh).Render(fmt.Sprintf("%.0f%%", rh))
+	}, m.styles.DeviceName)
 }
 
 // humidStyle returns the appropriate style for a humidity value.
@@ -566,21 +503,16 @@ func (m EnvironmentModel) humidStyle(rh float64) lipgloss.Style {
 
 // renderIlluminances renders all illuminance readings.
 func (m EnvironmentModel) renderIlluminances(entries []sensorEntry[model.IlluminanceReading], maxWidth int) []string {
-	lines := make([]string, 0, len(entries))
-	for _, e := range entries {
-		lux := *e.Reading.Lux
+	return renderSensorLines(entries, maxWidth, 20, func(il model.IlluminanceReading) string {
+		lux := *il.Lux
 		var valueStr string
-		if e.Reading.Illumination != nil {
-			valueStr = fmt.Sprintf("%.0f lux (%s)", lux, *e.Reading.Illumination)
+		if il.Illumination != nil {
+			valueStr = fmt.Sprintf("%.0f lux (%s)", lux, *il.Illumination)
 		} else {
 			valueStr = fmt.Sprintf("%.0f lux", lux)
 		}
-		name := output.Truncate(e.DeviceName, maxWidth-20)
-		namePad := strings.Repeat(" ", max(0, maxWidth-20-len(name)))
-		lines = append(lines, fmt.Sprintf("    %s%s %s",
-			m.styles.DeviceName.Render(name), namePad, m.styles.Value.Render(valueStr)))
-	}
-	return lines
+		return m.styles.Value.Render(valueStr)
+	}, m.styles.DeviceName)
 }
 
 // renderBatteries renders all battery readings.
@@ -618,29 +550,16 @@ func (m EnvironmentModel) batteryStyle(pct int) lipgloss.Style {
 
 // renderVoltmeters renders all voltmeter readings.
 func (m EnvironmentModel) renderVoltmeters(entries []sensorEntry[model.VoltmeterReading], maxWidth int) []string {
-	lines := make([]string, 0, len(entries))
-	for _, e := range entries {
-		voltage := *e.Reading.Voltage
-		valueStr := fmt.Sprintf("%.2fV", voltage)
-		name := output.Truncate(e.DeviceName, maxWidth-16)
-		namePad := strings.Repeat(" ", max(0, maxWidth-16-len(name)))
-		lines = append(lines, fmt.Sprintf("    %s%s %s",
-			m.styles.DeviceName.Render(name), namePad, m.styles.Value.Render(valueStr)))
-	}
-	return lines
+	return renderSensorLines(entries, maxWidth, 16, func(v model.VoltmeterReading) string {
+		return m.styles.Value.Render(fmt.Sprintf("%.2fV", *v.Voltage))
+	}, m.styles.DeviceName)
 }
 
 // renderBTHome renders all BTHome sensor readings.
 func (m EnvironmentModel) renderBTHome(entries []sensorEntry[model.BTHomeSensorReading], maxWidth int) []string {
-	lines := make([]string, 0, len(entries))
-	for _, e := range entries {
-		valueStr := formatBTHomeValue(e.Reading.Value)
-		name := output.Truncate(e.DeviceName, maxWidth-20)
-		namePad := strings.Repeat(" ", max(0, maxWidth-20-len(name)))
-		lines = append(lines, fmt.Sprintf("    %s%s %s",
-			m.styles.DeviceName.Render(name), namePad, m.styles.Value.Render(valueStr)))
-	}
-	return lines
+	return renderSensorLines(entries, maxWidth, 20, func(b model.BTHomeSensorReading) string {
+		return m.styles.Value.Render(formatBTHomeValue(b.Value))
+	}, m.styles.DeviceName)
 }
 
 // formatBTHomeValue formats a BTHome sensor value for display.
@@ -686,48 +605,71 @@ func (m EnvironmentModel) renderAlarmSensors(sensorType string, entries []alarmE
 	return lines
 }
 
+// countSensorEntries counts matching sensor entries without allocating/sorting.
+func countSensorEntries[T any](devices []DeviceSensorData, getSensors func(*model.SensorData) []T, include func(T) bool) int {
+	count := 0
+	for _, d := range devices {
+		for _, s := range getSensors(d.SensorData) {
+			if include == nil || include(s) {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+// countAlarmEntries counts alarm sensor entries without allocating.
+func countAlarmEntries(devices []DeviceSensorData, getSensors func(*model.SensorData) []model.AlarmSensorReading) int {
+	count := 0
+	for _, d := range devices {
+		count += len(getSensors(d.SensorData))
+	}
+	return count
+}
+
 // countDisplayLines counts the total number of display lines for scrolling.
+// Uses counting helpers to avoid allocating/sorting slices just to count them.
 func (m EnvironmentModel) countDisplayLines() int {
 	count := 0
 
-	temps := m.collectTemperatures()
-	if len(temps) > 0 {
-		count += 1 + len(temps) // header + entries
+	addSection := func(n int) {
+		if n > 0 {
+			count += 1 + n // header + entries
+		}
 	}
 
-	humids := m.collectHumidities()
-	if len(humids) > 0 {
-		count += 1 + len(humids)
-	}
+	addSection(countSensorEntries(m.devices,
+		func(s *model.SensorData) []model.TemperatureReading { return s.Temperature },
+		func(t model.TemperatureReading) bool { return t.TC != nil }))
+	addSection(countSensorEntries(m.devices,
+		func(s *model.SensorData) []model.HumidityReading { return s.Humidity },
+		func(h model.HumidityReading) bool { return h.RH != nil }))
+	addSection(countSensorEntries(m.devices,
+		func(s *model.SensorData) []model.IlluminanceReading { return s.Illuminance },
+		func(il model.IlluminanceReading) bool { return il.Lux != nil }))
 
-	illums := m.collectIlluminances()
-	if len(illums) > 0 {
-		count += 1 + len(illums)
+	// Battery: count DevicePower entries
+	battCount := 0
+	for _, d := range m.devices {
+		battCount += len(d.SensorData.DevicePower)
 	}
+	addSection(battCount)
 
-	batts := m.collectBatteries()
-	if len(batts) > 0 {
-		count += 1 + len(batts)
-	}
-
-	volts := m.collectVoltmeters()
-	if len(volts) > 0 {
-		count += 1 + len(volts)
-	}
-
-	bthome := m.collectBTHome()
-	if len(bthome) > 0 {
-		count += 1 + len(bthome)
-	}
+	addSection(countSensorEntries(m.devices,
+		func(s *model.SensorData) []model.VoltmeterReading { return s.Voltmeter },
+		func(v model.VoltmeterReading) bool { return v.Voltage != nil }))
+	addSection(countSensorEntries[model.BTHomeSensorReading](m.devices,
+		func(s *model.SensorData) []model.BTHomeSensorReading { return s.BTHome },
+		nil))
 
 	// Safety section is always present
-	floods := m.collectFloodSensors()
-	smokes := m.collectSmokeSensors()
+	floodCount := countAlarmEntries(m.devices, func(s *model.SensorData) []model.AlarmSensorReading { return s.Flood })
+	smokeCount := countAlarmEntries(m.devices, func(s *model.SensorData) []model.AlarmSensorReading { return s.Smoke })
 	count++ // "Safety" header
-	if len(floods) == 0 && len(smokes) == 0 {
+	if floodCount == 0 && smokeCount == 0 {
 		count++ // "No safety sensors configured"
 	} else {
-		count += len(floods) + len(smokes)
+		count += floodCount + smokeCount
 	}
 
 	return count

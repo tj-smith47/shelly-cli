@@ -69,8 +69,13 @@ func formatWithChange(s string, current, previous float64, colored bool) string 
 }
 
 // formatPowerBase formats power as W or kW without any styling.
+// Handles both positive and negative values (e.g., solar return energy).
 func formatPowerBase(watts float64) string {
-	if watts >= 1000 {
+	absVal := watts
+	if absVal < 0 {
+		absVal = -absVal
+	}
+	if absVal >= 1000 {
 		return fmt.Sprintf("%.2f kW", watts/1000)
 	}
 	return fmt.Sprintf("%.1f W", watts)

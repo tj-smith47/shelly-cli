@@ -40,6 +40,13 @@ var (
 	errNilFocusState  = errors.New("focus state is required")
 )
 
+// Action string constants (shared across views).
+const (
+	actionToggle = "toggle"
+	actionSnooze = "snooze"
+	actionSave   = "save"
+)
+
 // automationLoadPhase tracks which component is being loaded.
 type automationLoadPhase int
 
@@ -918,13 +925,13 @@ func handleAlertActionResult(msg alerts.AlertActionResultMsg) tea.Cmd {
 		return toast.Error("Alert " + msg.Action + " failed: " + msg.Err.Error())
 	}
 	switch msg.Action {
-	case "toggle":
+	case actionToggle:
 		return toast.Success("Alert toggled")
-	case "delete":
+	case actionDelete:
 		return toast.Success("Alert deleted")
-	case "snooze":
+	case actionSnooze:
 		return toast.Success("Alert snoozed")
-	case "save":
+	case actionSave:
 		return toast.Success("Alert saved")
 	}
 	return nil
@@ -1231,7 +1238,7 @@ func handleVirtualAction(msg virtuals.ActionMsg) tea.Cmd {
 		return toast.Error("Action failed: " + msg.Err.Error())
 	}
 	switch msg.Action {
-	case "toggle":
+	case actionToggle:
 		return toast.Success("Value toggled")
 	case "trigger":
 		return toast.Success("Button triggered")

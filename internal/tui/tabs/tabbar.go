@@ -90,6 +90,7 @@ type Model struct {
 	width     int
 	styles    Styles
 	showIcons bool
+	badges    map[TabID]string // Optional badges per tab (e.g., triggered alert count)
 }
 
 // Styles for the tab bar.
@@ -230,6 +231,11 @@ func (m Model) View() string {
 			tabContent = tab.Label
 		}
 
+		// Append badge if present (e.g., triggered alert count)
+		if badge, ok := m.badges[tab.ID]; ok && badge != "" {
+			tabContent += " " + badge
+		}
+
 		// Add number prefix for keyboard shortcut
 		numPrefix := lipgloss.NewStyle().Foreground(theme.Purple()).Render(intToStr(i+1) + ":")
 		content := numPrefix + style.Render(tabContent)
@@ -329,6 +335,19 @@ func (m Model) SetTabEnabled(id TabID, enabled bool) Model {
 // ShowIcons toggles icon visibility.
 func (m Model) ShowIcons(show bool) Model {
 	m.showIcons = show
+	return m
+}
+
+// SetBadge sets a badge for a specific tab by ID. Pass empty string to clear.
+func (m Model) SetBadge(id TabID, badge string) Model {
+	if m.badges == nil {
+		m.badges = make(map[TabID]string)
+	}
+	if badge == "" {
+		delete(m.badges, id)
+	} else {
+		m.badges[id] = badge
+	}
 	return m
 }
 

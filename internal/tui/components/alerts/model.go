@@ -547,6 +547,17 @@ func (m *Model) SetPanelIndex(index int) Model {
 	return *m
 }
 
+// TriggeredCount returns the number of currently triggered alerts.
+func (m *Model) TriggeredCount() int {
+	count := 0
+	for _, a := range m.alerts {
+		if a.IsTriggered {
+			count++
+		}
+	}
+	return count
+}
+
 // SelectedAlert returns the currently selected alert name.
 func (m *Model) SelectedAlert() string {
 	if len(m.alerts) == 0 || m.cursor >= len(m.alerts) {

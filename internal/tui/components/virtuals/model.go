@@ -556,22 +556,12 @@ func (m Model) handleKey(_ tea.KeyPressMsg) (Model, tea.Cmd) {
 
 func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
 	switch msg.Direction {
-	case messages.NavUp:
-		m.Scroller.CursorUp()
-	case messages.NavDown:
-		m.Scroller.CursorDown()
-	case messages.NavPageUp:
-		m.Scroller.PageUp()
-	case messages.NavPageDown:
-		m.Scroller.PageDown()
-	case messages.NavHome:
-		m.Scroller.CursorToStart()
-	case messages.NavEnd:
-		m.Scroller.CursorToEnd()
 	case messages.NavLeft:
 		return m, m.adjustValue(-1)
 	case messages.NavRight:
 		return m, m.adjustValue(1)
+	default:
+		m.Scroller.HandleNavigation(msg)
 	}
 	return m, nil
 }

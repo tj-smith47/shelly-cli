@@ -338,22 +338,7 @@ func (m ListModel) handleImport(msg ImportSceneMsg) (ListModel, tea.Cmd) {
 
 func (m ListModel) handleNavigation(msg messages.NavigationMsg) (ListModel, tea.Cmd) {
 	m.pendingDelete = "" // Clear pending delete on navigation
-	switch msg.Direction {
-	case messages.NavUp:
-		m.Scroller.CursorUp()
-	case messages.NavDown:
-		m.Scroller.CursorDown()
-	case messages.NavPageUp:
-		m.Scroller.PageUp()
-	case messages.NavPageDown:
-		m.Scroller.PageDown()
-	case messages.NavHome:
-		m.Scroller.CursorToStart()
-	case messages.NavEnd:
-		m.Scroller.CursorToEnd()
-	case messages.NavLeft, messages.NavRight:
-		// Not applicable for this component
-	}
+	m.Scroller.HandleNavigation(msg)
 	return m, nil
 }
 

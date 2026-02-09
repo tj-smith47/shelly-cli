@@ -92,6 +92,14 @@ func TestContextMap_Match_ContextSpecific(t *testing.T) {
 		{ContextMonitor, "x", ActionExport},
 		{ContextMonitor, "X", ActionExportJSON},
 		{ContextMonitor, "J", ActionViewJSON},
+		{ContextMonitor, "h", ActionHistory},
+		{ContextMonitor, "p", ActionPhaseDetail},
+		{ContextMonitor, "n", ActionNew},
+		{ContextMonitor, "e", ActionEdit},
+		{ContextMonitor, "c", ActionControl},
+		{ContextMonitor, "d", ActionDetail},
+		{ContextMonitor, "r", ActionRefresh},
+		{ContextMonitor, "ctrl+r", ActionRefreshAll},
 		// Automation context
 		{ContextAutomation, "e", ActionEdit},
 		{ContextAutomation, "n", ActionNew},
@@ -196,6 +204,8 @@ func TestActionDesc(t *testing.T) {
 		{ActionExport, "Export CSV"},
 		{ActionExportJSON, "Export JSON"},
 		{ActionViewJSON, "JSON viewer"},
+		{ActionHistory, "Energy history"},
+		{ActionPhaseDetail, "3-phase detail"},
 		{ActionNone, ""},
 	}
 
@@ -278,6 +288,13 @@ func TestContextActionDesc(t *testing.T) {
 		{ContextDevices, ActionBrowser, "Open web UI"},
 		{ContextMonitor, ActionPause, "Pause monitoring"},
 		{ContextMonitor, ActionBrowser, "Open web UI"},
+		{ContextMonitor, ActionHistory, "Energy history overlay"},
+		{ContextMonitor, ActionPhaseDetail, "3-phase detail overlay"},
+		{ContextMonitor, ActionNew, "Create new alert"},
+		{ContextMonitor, ActionEdit, "Edit / toggle enable"},
+		{ContextMonitor, ActionExport, "Export CSV"},
+		{ContextMonitor, ActionExportJSON, "Export JSON"},
+		{ContextMonitor, ActionViewJSON, "Open JSON viewer"},
 		{ContextConfig, ActionEdit, "Edit configuration"},
 		// Falls back to generic description
 		{ContextGlobal, ActionToggle, "Toggle"},

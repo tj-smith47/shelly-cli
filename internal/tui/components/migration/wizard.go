@@ -362,22 +362,7 @@ func (w Wizard) handleNavigation(msg messages.NavigationMsg) (Wizard, tea.Cmd) {
 }
 
 func (w Wizard) applyNavToScroller(msg messages.NavigationMsg, scroller *panel.Scroller) {
-	switch msg.Direction {
-	case messages.NavUp:
-		scroller.CursorUp()
-	case messages.NavDown:
-		scroller.CursorDown()
-	case messages.NavPageUp:
-		scroller.PageUp()
-	case messages.NavPageDown:
-		scroller.PageDown()
-	case messages.NavHome:
-		scroller.CursorToStart()
-	case messages.NavEnd:
-		scroller.CursorToEnd()
-	case messages.NavLeft, messages.NavRight:
-		// Not applicable for migration wizard
-	}
+	scroller.HandleNavigation(msg)
 }
 
 func (w Wizard) handleActionKey(key string) (Wizard, tea.Cmd) {

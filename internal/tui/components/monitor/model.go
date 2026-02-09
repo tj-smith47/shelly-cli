@@ -5,14 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"github.com/spf13/afero"
 	"github.com/tj-smith47/shelly-go/events"
 	"golang.org/x/sync/errgroup"
 
@@ -23,11 +22,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
-	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // Deps holds the dependencies for the monitor component.
@@ -75,6 +72,13 @@ type DeviceStatus struct {
 
 	// Full sensor data (all readings from all sensors for Environment panel)
 	Sensors *model.SensorData
+
+	// Health indicators (from sys/wifi/component status)
+	ChipTemp  *float64 // Component temperature in °C (from switch/cover/light)
+	WiFiRSSI  *float64 // WiFi signal strength in dBm
+	FSFree    int      // Filesystem free space in bytes
+	FSSize    int      // Filesystem total size in bytes
+	HasUpdate bool     // Firmware update available
 
 	// Connection info
 	ConnectionType string // "ws" for WebSocket, "poll" for HTTP polling
@@ -126,113 +130,11 @@ type Model struct {
 	ownsEventStream bool                     // True if we created the event stream (so we should stop it)
 	eventChan       chan events.Event        // Channel for WebSocket events
 	err             error
-	styles          Styles
 	refreshInterval time.Duration
 
 	// Energy settings
 	costRate float64 // Cost per kWh
 	currency string  // Currency symbol
-}
-
-// Styles for the monitor component.
-type Styles struct {
-	Container      lipgloss.Style
-	Header         lipgloss.Style
-	Row            lipgloss.Style
-	SelectedRow    lipgloss.Style
-	OnlineIcon     lipgloss.Style
-	OfflineIcon    lipgloss.Style
-	UpdatingIcon   lipgloss.Style
-	DeviceName     lipgloss.Style
-	Address        lipgloss.Style
-	Power          lipgloss.Style
-	Voltage        lipgloss.Style
-	Current        lipgloss.Style
-	Label          lipgloss.Style
-	Value          lipgloss.Style
-	LastUpdated    lipgloss.Style
-	Timestamp      lipgloss.Style // Yellow timestamp for device updates
-	Separator      lipgloss.Style
-	SummaryCard    lipgloss.Style
-	SummaryValue   lipgloss.Style
-	Energy         lipgloss.Style
-	Temperature    lipgloss.Style
-	Humidity       lipgloss.Style
-	Battery        lipgloss.Style
-	ConnectionType lipgloss.Style
-	Cost           lipgloss.Style
-}
-
-// DefaultStyles returns default styles for the monitor.
-// Uses semantic colors for consistent theming.
-func DefaultStyles() Styles {
-	colors := theme.GetSemanticColors()
-	return Styles{
-		Container: lipgloss.NewStyle().
-			Padding(0, 1), // No border - wrapper adds border with title
-		Header: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(colors.Highlight).
-			MarginBottom(1),
-		Row: lipgloss.NewStyle().
-			MarginBottom(1),
-		SelectedRow: lipgloss.NewStyle().
-			Background(colors.AltBackground).
-			Foreground(colors.Highlight).
-			Bold(true).
-			MarginBottom(1),
-		OnlineIcon: lipgloss.NewStyle().
-			Foreground(colors.Online),
-		OfflineIcon: lipgloss.NewStyle().
-			Foreground(colors.Offline),
-		UpdatingIcon: lipgloss.NewStyle().
-			Foreground(colors.Updating),
-		DeviceName: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(colors.Text),
-		Address: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Italic(true),
-		Power: lipgloss.NewStyle().
-			Foreground(colors.Warning).
-			Bold(true),
-		Voltage: lipgloss.NewStyle().
-			Foreground(colors.Highlight),
-		Current: lipgloss.NewStyle().
-			Foreground(colors.Primary),
-		Label: lipgloss.NewStyle().
-			Foreground(colors.Text).
-			Width(8),
-		Value: lipgloss.NewStyle().
-			Foreground(colors.Text),
-		LastUpdated: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Italic(true),
-		Timestamp: lipgloss.NewStyle().
-			Foreground(colors.Warning),
-		Separator: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		SummaryCard: styles.PanelBorder().
-			Padding(0, 1).
-			MarginRight(1),
-		SummaryValue: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(colors.Highlight),
-		Energy: lipgloss.NewStyle().
-			Foreground(colors.Success),
-		Temperature: lipgloss.NewStyle().
-			Foreground(colors.Warning),
-		Humidity: lipgloss.NewStyle().
-			Foreground(colors.Primary),
-		Battery: lipgloss.NewStyle().
-			Foreground(colors.Success),
-		ConnectionType: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Italic(true),
-		Cost: lipgloss.NewStyle().
-			Foreground(colors.Success).
-			Bold(true),
-	}
 }
 
 // New creates a new monitor model.
@@ -286,7 +188,6 @@ func New(deps Deps) Model {
 		eventStream:     eventStream,
 		ownsEventStream: ownsEventStream,
 		eventChan:       eventChan,
-		styles:          DefaultStyles(),
 		refreshInterval: refreshInterval,
 		costRate:        energyCfg.CostRate,
 		currency:        energyCfg.Currency,
@@ -472,11 +373,82 @@ func (m Model) fetchSensorData(ctx context.Context, address string, status *Devi
 			status.Battery = &sensorData.DevicePower[0].Battery.Percent
 		}
 
+		// Extract health indicators
+		extractHealthData(statusMap, status)
+
 		return nil
 	})
 	if err != nil {
 		m.ios.DebugErr("fetch sensor data", err)
 	}
+}
+
+// Health data extraction structs — minimal shapes for JSON parsing.
+type sysHealthData struct {
+	FSFree           int  `json:"fs_free"`
+	FSSize           int  `json:"fs_size"`
+	RestartRequired  bool `json:"restart_required"`
+	AvailableUpdates *struct {
+		Stable *struct {
+			Version string `json:"version"`
+		} `json:"stable,omitempty"`
+	} `json:"available_updates,omitempty"`
+}
+
+type wifiHealthData struct {
+	RSSI *float64 `json:"rssi,omitempty"`
+}
+
+type componentTempData struct {
+	Temperature *struct {
+		TC *float64 `json:"tC,omitempty"`
+	} `json:"temperature,omitempty"`
+}
+
+// extractHealthData extracts sys/wifi/component health indicators from a Shelly.GetStatus response.
+func extractHealthData(statusMap map[string]json.RawMessage, status *DeviceStatus) {
+	// Extract sys health
+	if raw, ok := statusMap["sys"]; ok {
+		var sys sysHealthData
+		if json.Unmarshal(raw, &sys) == nil {
+			status.FSFree = sys.FSFree
+			status.FSSize = sys.FSSize
+			status.HasUpdate = sys.AvailableUpdates != nil && sys.AvailableUpdates.Stable != nil
+		}
+	}
+
+	// Extract WiFi RSSI
+	if raw, ok := statusMap["wifi"]; ok {
+		var wifi wifiHealthData
+		if json.Unmarshal(raw, &wifi) == nil {
+			status.WiFiRSSI = wifi.RSSI
+		}
+	}
+
+	// Extract highest chip temp from power components (switch, cover, light, rgb, rgbw)
+	for key, raw := range statusMap {
+		if !isComponentKey(key) {
+			continue
+		}
+		var comp componentTempData
+		if json.Unmarshal(raw, &comp) != nil || comp.Temperature == nil || comp.Temperature.TC == nil {
+			continue
+		}
+		tc := *comp.Temperature.TC
+		if status.ChipTemp == nil || tc > *status.ChipTemp {
+			status.ChipTemp = &tc
+		}
+	}
+}
+
+// isComponentKey returns true if the key is a power component that may have chip temperature.
+func isComponentKey(key string) bool {
+	for _, prefix := range []string{"switch:", "cover:", "light:", "rgb:", "rgbw:"} {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // aggregateMetrics aggregates power metrics from any meter type (PM, EM, EM1) into
@@ -684,22 +656,7 @@ func (m Model) resolveExportFormat(format string) ExportFormat {
 }
 
 func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
-	switch msg.Direction {
-	case messages.NavUp:
-		m.Scroller.CursorUp()
-	case messages.NavDown:
-		m.Scroller.CursorDown()
-	case messages.NavPageUp:
-		m.Scroller.PageUp()
-	case messages.NavPageDown:
-		m.Scroller.PageDown()
-	case messages.NavHome:
-		m.Scroller.CursorToStart()
-	case messages.NavEnd:
-		m.Scroller.CursorToEnd()
-	case messages.NavLeft, messages.NavRight:
-		// Not applicable for this component
-	}
+	m.Scroller.HandleNavigation(msg)
 	return m, nil
 }
 
@@ -716,7 +673,8 @@ func (m Model) exportData(format ExportFormat) tea.Cmd {
 			return ExportResultMsg{Err: fmt.Errorf("get config dir: %w", err)}
 		}
 		exportDir := filepath.Join(configDir, "exports", "monitor")
-		if err := os.MkdirAll(exportDir, 0o750); err != nil {
+		fs := config.Fs()
+		if err := fs.MkdirAll(exportDir, 0o750); err != nil {
 			return ExportResultMsg{Err: fmt.Errorf("create export dir: %w", err)}
 		}
 
@@ -732,9 +690,9 @@ func (m Model) exportData(format ExportFormat) tea.Cmd {
 		// Export based on format
 		switch format {
 		case ExportCSV:
-			err = m.exportCSV(path)
+			err = m.exportCSV(fs, path)
 		case ExportJSON:
-			err = m.exportJSON(path)
+			err = m.exportJSON(fs, path)
 		}
 
 		if err != nil {
@@ -745,8 +703,24 @@ func (m Model) exportData(format ExportFormat) tea.Cmd {
 	}
 }
 
-func (m Model) exportCSV(path string) (retErr error) {
-	f, err := os.Create(path) // #nosec G304 -- path is constructed from config dir
+// optionalFloat formats a *float64 for CSV, returning "" if nil.
+func optionalFloat(v *float64, format string) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf(format, *v)
+}
+
+// optionalInt formats a *int for CSV, returning "" if nil.
+func optionalInt(v *int) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d", *v)
+}
+
+func (m Model) exportCSV(fs afero.Fs, path string) (retErr error) {
+	f, err := fs.Create(path)
 	if err != nil {
 		return fmt.Errorf("create file: %w", err)
 	}
@@ -757,33 +731,32 @@ func (m Model) exportCSV(path string) (retErr error) {
 	}()
 
 	// Write header
-	if _, err := fmt.Fprintln(f, "device,address,type,online,power_w,voltage_v,current_a,frequency_hz,energy_wh,temperature_c,humidity_pct,illuminance_lux,battery_pct,connection,updated"); err != nil {
+	header := "device,address,type,online,power_w,voltage_v,current_a,frequency_hz,energy_wh," +
+		"temperature_c,humidity_pct,illuminance_lux,battery_pct," +
+		"chip_temp_c,wifi_rssi_dbm,fs_used_pct,has_update," +
+		"connection,updated"
+	if _, err := fmt.Fprintln(f, header); err != nil {
 		return err
 	}
 
 	// Write device data
 	for _, s := range m.statuses {
-		temp := ""
-		if s.Temperature != nil {
-			temp = fmt.Sprintf("%.1f", *s.Temperature)
-		}
-		humidity := ""
-		if s.Humidity != nil {
-			humidity = fmt.Sprintf("%.0f", *s.Humidity)
-		}
-		lux := ""
-		if s.Illuminance != nil {
-			lux = fmt.Sprintf("%.0f", *s.Illuminance)
-		}
-		battery := ""
-		if s.Battery != nil {
-			battery = fmt.Sprintf("%d", *s.Battery)
+		// Health indicators
+		chipTemp := optionalFloat(s.ChipTemp, "%.1f")
+		wifiRSSI := optionalFloat(s.WiFiRSSI, "%.0f")
+		fsUsed := ""
+		if s.FSSize > 0 {
+			fsUsed = fmt.Sprintf("%d", 100-s.FSFree*100/s.FSSize)
 		}
 
-		if _, err := fmt.Fprintf(f, "%s,%s,%s,%t,%.2f,%.2f,%.3f,%.1f,%.2f,%s,%s,%s,%s,%s,%s\n",
+		if _, err := fmt.Fprintf(f, "%s,%s,%s,%t,%.2f,%.2f,%.3f,%.1f,%.2f,%s,%s,%s,%s,%s,%s,%s,%t,%s,%s\n",
 			s.Name, s.Address, s.Type, s.Online,
 			s.Power, s.Voltage, s.Current, s.Frequency, s.TotalEnergy,
-			temp, humidity, lux, battery,
+			optionalFloat(s.Temperature, "%.1f"),
+			optionalFloat(s.Humidity, "%.0f"),
+			optionalFloat(s.Illuminance, "%.0f"),
+			optionalInt(s.Battery),
+			chipTemp, wifiRSSI, fsUsed, s.HasUpdate,
 			s.ConnectionType, s.UpdatedAt.Format(time.RFC3339),
 		); err != nil {
 			return err
@@ -793,25 +766,51 @@ func (m Model) exportCSV(path string) (retErr error) {
 	return nil
 }
 
-func (m Model) exportJSON(path string) (retErr error) {
+// exportHealth holds health indicators for JSON export.
+type exportHealth struct {
+	ChipTemp  *float64 `json:"chip_temp_c,omitempty"`
+	WiFiRSSI  *float64 `json:"wifi_rssi_dbm,omitempty"`
+	FSUsedPct *int     `json:"fs_used_pct,omitempty"`
+	HasUpdate bool     `json:"has_update,omitempty"`
+}
+
+// buildExportHealth builds health data for export, returning nil if no health indicators present.
+func buildExportHealth(s DeviceStatus) *exportHealth {
+	if s.ChipTemp == nil && s.WiFiRSSI == nil && s.FSSize == 0 && !s.HasUpdate {
+		return nil
+	}
+	h := &exportHealth{
+		ChipTemp:  s.ChipTemp,
+		WiFiRSSI:  s.WiFiRSSI,
+		HasUpdate: s.HasUpdate,
+	}
+	if s.FSSize > 0 {
+		pct := 100 - s.FSFree*100/s.FSSize
+		h.FSUsedPct = &pct
+	}
+	return h
+}
+
+func (m Model) exportJSON(fs afero.Fs, path string) (retErr error) {
 	// Build export structure
 	type exportDevice struct {
-		Name        string   `json:"name"`
-		Address     string   `json:"address"`
-		Type        string   `json:"type"`
-		Online      bool     `json:"online"`
-		Power       float64  `json:"power_w"`
-		Voltage     float64  `json:"voltage_v"`
-		Current     float64  `json:"current_a"`
-		Frequency   float64  `json:"frequency_hz"`
-		TotalEnergy float64  `json:"energy_wh"`
-		Temperature *float64 `json:"temperature_c,omitempty"`
-		Humidity    *float64 `json:"humidity_pct,omitempty"`
-		Illuminance *float64 `json:"illuminance_lux,omitempty"`
-		Battery     *int     `json:"battery_pct,omitempty"`
-		Connection  string   `json:"connection"`
-		UpdatedAt   string   `json:"updated_at"`
-		Error       string   `json:"error,omitempty"`
+		Name        string        `json:"name"`
+		Address     string        `json:"address"`
+		Type        string        `json:"type"`
+		Online      bool          `json:"online"`
+		Power       float64       `json:"power_w"`
+		Voltage     float64       `json:"voltage_v"`
+		Current     float64       `json:"current_a"`
+		Frequency   float64       `json:"frequency_hz"`
+		TotalEnergy float64       `json:"energy_wh"`
+		Temperature *float64      `json:"temperature_c,omitempty"`
+		Humidity    *float64      `json:"humidity_pct,omitempty"`
+		Illuminance *float64      `json:"illuminance_lux,omitempty"`
+		Battery     *int          `json:"battery_pct,omitempty"`
+		Health      *exportHealth `json:"health,omitempty"`
+		Connection  string        `json:"connection"`
+		UpdatedAt   string        `json:"updated_at"`
+		Error       string        `json:"error,omitempty"`
 	}
 
 	type exportData struct {
@@ -868,11 +867,13 @@ func (m Model) exportJSON(path string) (retErr error) {
 		if s.Error != nil {
 			d.Error = s.Error.Error()
 		}
+
+		d.Health = buildExportHealth(s)
 		export.Devices = append(export.Devices, d)
 	}
 
 	// Write JSON
-	f, err := os.Create(path) // #nosec G304 -- path is constructed from config dir
+	f, err := fs.Create(path)
 	if err != nil {
 		return fmt.Errorf("create file: %w", err)
 	}
@@ -907,232 +908,14 @@ func (m Model) SetSize(width, height int) Model {
 	return m
 }
 
-// View renders the monitor.
-func (m Model) View() string {
-	if m.initialLoad {
-		return m.styles.Container.
-			Width(m.Width).
-			Height(m.Height).
-			Render(m.Loader.SetSize(m.Width, m.Height).View())
-	}
-
-	if m.err != nil {
-		return m.styles.Container.
-			Width(m.Width).
-			Render(theme.StatusError().Render("Error: " + m.err.Error()))
-	}
-
-	if len(m.statuses) == 0 {
-		return m.styles.Container.
-			Width(m.Width).
-			Height(m.Height).
-			Align(lipgloss.Center, lipgloss.Center).
-			Render("No devices to monitor.\nUse 'shelly device add' to add devices.")
-	}
-
-	// Calculate totals for summary
-	var totalPower, totalEnergy float64
-	var onlineCount, offlineCount int
-	for _, s := range m.statuses {
-		if s.Online {
-			onlineCount++
-			totalPower += s.Power
-			totalEnergy += s.TotalEnergy
-		} else {
-			offlineCount++
-		}
-	}
-
-	// Calculate cost
-	costStr := ""
-	if m.costRate > 0 && totalEnergy > 0 {
-		cost := (totalEnergy / 1000) * m.costRate // Convert Wh to kWh
-		costStr = fmt.Sprintf("%s%.2f", m.currency, cost)
-	}
-
-	// Summary cards row
-	summaryCards := []string{
-		m.renderSummaryCard("Power", formatPower(totalPower)),
-		m.renderSummaryCard("Energy", formatEnergy(totalEnergy)),
-		m.renderSummaryCard("Devices", fmt.Sprintf("%d/%d online", onlineCount, len(m.statuses))),
-	}
-	if costStr != "" {
-		summaryCards = append(summaryCards, m.renderSummaryCard("Cost", costStr))
-	}
-	summary := lipgloss.JoinHorizontal(lipgloss.Top, summaryCards...)
-
-	// Get visible range from scroller
-	startIdx, endIdx := m.Scroller.VisibleRange()
-	if endIdx > len(m.statuses) {
-		endIdx = len(m.statuses)
-	}
-
-	// Calculate content width (container width minus padding)
-	contentWidth := m.Width - 6 // 2 padding + 2 border on each side
-
-	var rows string
-	for i := startIdx; i < endIdx; i++ {
-		s := m.statuses[i]
-		isSelected := m.Scroller.IsCursorAt(i)
-		rows += m.renderDeviceCard(s, isSelected)
-		if i < endIdx-1 {
-			separator := m.styles.Separator.Render(strings.Repeat("─", contentWidth))
-			rows += separator + "\n"
-		}
-	}
-
-	// Scroll indicator
-	scrollInfo := ""
-	if info := m.Scroller.ScrollInfo(); info != "" {
-		scrollInfo = m.styles.LastUpdated.Render(" " + info + " ")
-	}
-
-	footer := m.styles.LastUpdated.Render(
-		fmt.Sprintf("Last updated: %s", time.Now().Format("15:04:05")),
-	) + scrollInfo
-
-	content := lipgloss.JoinVertical(lipgloss.Left, summary, "", rows, footer)
-	return m.styles.Container.Width(m.Width).Height(m.Height).Render(content)
-}
-
-// renderSummaryCard renders a summary card with label and value.
-func (m Model) renderSummaryCard(label, value string) string {
-	content := lipgloss.JoinVertical(lipgloss.Center,
-		m.styles.Label.Render(label),
-		m.styles.SummaryValue.Render(value),
-	)
-	return m.styles.SummaryCard.Width(20).Render(content)
-}
-
-// formatPower formats watts for display.
+// formatPower delegates to the shared output.FormatPower formatter.
 func formatPower(watts float64) string {
-	if watts >= 1000 || watts <= -1000 {
-		return fmt.Sprintf("%.2f kW", watts/1000)
-	}
-	return fmt.Sprintf("%.1f W", watts)
+	return output.FormatPower(watts)
 }
 
-// formatEnergy formats watt-hours for display.
+// formatEnergy delegates to the shared output.FormatEnergy formatter.
 func formatEnergy(wh float64) string {
-	if wh >= 1000000 {
-		return fmt.Sprintf("%.2f MWh", wh/1000000)
-	}
-	if wh >= 1000 {
-		return fmt.Sprintf("%.2f kWh", wh/1000)
-	}
-	return fmt.Sprintf("%.1f Wh", wh)
-}
-
-// renderDeviceCard renders a single device status card.
-func (m Model) renderDeviceCard(s DeviceStatus, isSelected bool) string {
-	// Choose row style based on selection
-	rowStyle := m.styles.Row
-	if isSelected {
-		rowStyle = m.styles.SelectedRow
-	}
-
-	// Selection indicator
-	selIndicator := "  "
-	if isSelected {
-		selIndicator = "▶ "
-	}
-
-	statusIcon := m.styles.OfflineIcon.Render("○")
-	if s.Online {
-		statusIcon = m.styles.OnlineIcon.Render("●")
-	}
-
-	// Yellow timestamp showing last update time
-	timestamp := m.styles.Timestamp.Render(s.UpdatedAt.Format("15:04:05"))
-
-	// Connection type indicator
-	connIndicator := ""
-	if s.ConnectionType == "ws" {
-		connIndicator = m.styles.ConnectionType.Render(" [ws]")
-	}
-
-	// First line: selection indicator, icon, name, address, type, timestamp, connection
-	line1 := fmt.Sprintf("%s%s %s  %s  %s  %s%s",
-		selIndicator,
-		statusIcon,
-		m.styles.DeviceName.Render(s.Name),
-		m.styles.Address.Render(s.Address),
-		m.styles.Address.Render(s.Type),
-		timestamp,
-		connIndicator,
-	)
-
-	if !s.Online {
-		errMsg := "unreachable"
-		if s.Error != nil {
-			errMsg = output.Truncate(s.Error.Error(), 40)
-		}
-		line2 := "    " + theme.StatusError().Render(errMsg)
-		return rowStyle.Render(line1+"\n"+line2) + "\n"
-	}
-
-	// Second line: metrics
-	line2 := "    " + m.buildMetricsLine(s)
-
-	return rowStyle.Render(line1+"\n"+line2) + "\n"
-}
-
-// buildMetricsLine builds the metrics display line for a device.
-func (m Model) buildMetricsLine(s DeviceStatus) string {
-	metrics := m.collectMetrics(s)
-	if len(metrics) == 0 {
-		return m.styles.LastUpdated.Render("no power data")
-	}
-
-	result := ""
-	for i, metric := range metrics {
-		if i > 0 {
-			result += m.styles.Separator.Render(" │ ")
-		}
-		result += metric
-	}
-	return result
-}
-
-// collectMetrics collects all available metrics for a device.
-func (m Model) collectMetrics(s DeviceStatus) []string {
-	metrics := []string{}
-
-	if s.Power > 0 || s.Power < 0 {
-		metrics = append(metrics, m.styles.Power.Render(fmt.Sprintf("%.1fW", s.Power)))
-	}
-	if s.Voltage > 0 {
-		metrics = append(metrics, m.styles.Voltage.Render(fmt.Sprintf("%.1fV", s.Voltage)))
-	}
-	if s.Current > 0 {
-		metrics = append(metrics, m.styles.Current.Render(fmt.Sprintf("%.2fA", s.Current)))
-	}
-	if s.Frequency > 0 {
-		metrics = append(metrics, m.styles.Value.Render(fmt.Sprintf("%.1fHz", s.Frequency)))
-	}
-	if s.TotalEnergy > 0 {
-		metrics = append(metrics, m.styles.Energy.Render(formatEnergy(s.TotalEnergy)))
-	}
-
-	// Sensor metrics
-	if s.Temperature != nil {
-		metrics = append(metrics, m.styles.Temperature.Render(fmt.Sprintf("%.1f°C", *s.Temperature)))
-	}
-	if s.Humidity != nil {
-		metrics = append(metrics, m.styles.Humidity.Render(fmt.Sprintf("%.0f%%", *s.Humidity)))
-	}
-	if s.Illuminance != nil {
-		metrics = append(metrics, m.styles.Value.Render(fmt.Sprintf("%.0flux", *s.Illuminance)))
-	}
-	if s.Battery != nil {
-		style := m.styles.Battery
-		if *s.Battery < 20 {
-			style = theme.StatusError() // Low battery warning
-		}
-		metrics = append(metrics, style.Render(fmt.Sprintf("🔋%d%%", *s.Battery)))
-	}
-
-	return metrics
+	return output.FormatEnergy(wh)
 }
 
 // Statuses returns the current device statuses.

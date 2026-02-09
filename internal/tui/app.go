@@ -2525,6 +2525,9 @@ func (m Model) View() tea.View {
 		return v
 	}
 
+	// Update Monitor tab badge with triggered alert count
+	m.tabBar = m.updateMonitorTabBadge()
+
 	// Render all view components
 	headerBanner := m.renderHeader()
 	tabBarView := m.tabBar.View()
@@ -2742,6 +2745,23 @@ func (m Model) hasDeviceList() bool {
 	}
 }
 
+// updateMonitorTabBadge updates the Monitor tab badge with the triggered alert count.
+func (m Model) updateMonitorTabBadge() tabs.Model {
+	v := m.viewManager.Get(views.ViewMonitor)
+	if v == nil {
+		return m.tabBar
+	}
+	monitorView, ok := v.(*views.Monitor)
+	if !ok {
+		return m.tabBar
+	}
+	count := monitorView.TriggeredAlertCount()
+	if count > 0 {
+		return m.tabBar.SetBadge(tabs.TabMonitor, fmt.Sprintf("(%d)", count))
+	}
+	return m.tabBar.SetBadge(tabs.TabMonitor, "")
+}
+
 // isMonitorTabActive returns true if the Monitor tab is currently active.
 func (m Model) isMonitorTabActive() bool {
 	return m.tabBar.ActiveTabID() == tabs.TabMonitor
@@ -2762,20 +2782,36 @@ func (m Model) getMonitorSelectedDevice() *monitor.DeviceStatus {
 
 // dispatchMonitorDeviceAction handles device actions for the Monitor tab.
 // Uses the power ranking's selected device instead of the device list.
+// Device-specific actions only apply when Power Ranking panel is focused.
 func (m Model) dispatchMonitorDeviceAction(action keys.Action) (Model, tea.Cmd, bool) {
+	isPowerRankingFocused := m.focusState.IsPanelFocused(focus.PanelMonitorPowerRanking)
+
+	// Device-specific actions: only when Power Ranking panel is focused
+	if isPowerRankingFocused {
+		switch action {
+		case keys.ActionToggle:
+			return m.toggleMonitorDevice()
+		case keys.ActionOn:
+			return m.monitorDeviceQuickAction(actionOn)
+		case keys.ActionOff:
+			return m.monitorDeviceQuickAction(actionOff)
+		case keys.ActionControl:
+			return m.showMonitorControlPanel()
+		case keys.ActionDetail, keys.ActionEnter:
+			return m.showMonitorDeviceDetail()
+		case keys.ActionBrowser:
+			return m.openMonitorDeviceBrowser()
+		case keys.ActionHistory:
+			return m.showMonitorEnergyHistory()
+		case keys.ActionPhaseDetail:
+			return m.showMonitorPhaseDetail()
+		default:
+			// Not a power-ranking action; fall through to global actions
+		}
+	}
+
+	// Global monitor actions: work from any panel
 	switch action {
-	case keys.ActionToggle:
-		return m.toggleMonitorDevice()
-	case keys.ActionOn:
-		return m.monitorDeviceQuickAction(actionOn)
-	case keys.ActionOff:
-		return m.monitorDeviceQuickAction(actionOff)
-	case keys.ActionControl:
-		return m.showMonitorControlPanel()
-	case keys.ActionDetail, keys.ActionEnter:
-		return m.showMonitorDeviceDetail()
-	case keys.ActionBrowser:
-		return m.openMonitorDeviceBrowser()
 	case keys.ActionExport:
 		cmd := m.viewManager.Update(messages.ExportRequestMsg{})
 		return m, cmd, true
@@ -2873,6 +2909,26 @@ func (m Model) openMonitorDeviceBrowser() (Model, tea.Cmd, bool) {
 		return m, nil, false
 	}
 	return m, m.openDeviceBrowser(dev.Address), true
+}
+
+// showMonitorEnergyHistory opens the energy history overlay for the selected device.
+func (m Model) showMonitorEnergyHistory() (Model, tea.Cmd, bool) {
+	dev := m.getMonitorSelectedDevice()
+	if dev == nil || !dev.Online {
+		return m, nil, false
+	}
+	cmd := m.viewManager.Update(views.EnergyHistoryRequestMsg{DeviceName: dev.Name, Address: dev.Address, Type: dev.Type})
+	return m, cmd, true
+}
+
+// showMonitorPhaseDetail opens the 3-phase detail overlay for the selected device.
+func (m Model) showMonitorPhaseDetail() (Model, tea.Cmd, bool) {
+	dev := m.getMonitorSelectedDevice()
+	if dev == nil || !dev.Online {
+		return m, nil, false
+	}
+	cmd := m.viewManager.Update(views.PhaseDetailRequestMsg{DeviceName: dev.Name, Address: dev.Address})
+	return m, cmd, true
 }
 
 // openMonitorJSONViewer opens the JSON viewer for the Monitor's selected device.

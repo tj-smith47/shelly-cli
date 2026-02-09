@@ -1,6 +1,8 @@
 // Package panel provides shared utilities for TUI panel components.
 package panel
 
+import "github.com/tj-smith47/shelly-cli/internal/tui/messages"
+
 // Scroller provides cursor and scroll management for list-based panels.
 // It handles navigation, visible range calculation, and scroll indicators.
 type Scroller struct {
@@ -213,6 +215,27 @@ func (s *Scroller) clamp(val int) int {
 		return s.itemCount - 1
 	}
 	return val
+}
+
+// HandleNavigation dispatches a NavigationMsg to the appropriate scroll action.
+// This eliminates the repeated navigation switch statement across panel components.
+func (s *Scroller) HandleNavigation(msg messages.NavigationMsg) {
+	switch msg.Direction {
+	case messages.NavUp:
+		s.CursorUp()
+	case messages.NavDown:
+		s.CursorDown()
+	case messages.NavPageUp:
+		s.PageUp()
+	case messages.NavPageDown:
+		s.PageDown()
+	case messages.NavHome:
+		s.CursorToStart()
+	case messages.NavEnd:
+		s.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for single-column panels
+	}
 }
 
 // itoa converts an int to a string without importing strconv.

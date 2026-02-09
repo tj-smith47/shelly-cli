@@ -97,9 +97,9 @@ func TestFormatEnergy(t *testing.T) {
 		wh   float64
 		want string
 	}{
-		{0, "0 Wh"},
-		{500, "500 Wh"},
-		{999, "999 Wh"},
+		{0, "0.0 Wh"},
+		{500, "500.0 Wh"},
+		{999, "999.0 Wh"},
 		{1000, "1.00 kWh"},
 		{2500, "2.50 kWh"},
 	}

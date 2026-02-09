@@ -1,7 +1,12 @@
 package monitor
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
@@ -12,7 +17,6 @@ func createTestModel(statusCount int) Model {
 	m := Model{
 		Sizable:  panel.NewSizable(11, panel.NewScroller(0, 10)),
 		statuses: make([]DeviceStatus, statusCount),
-		styles:   DefaultStyles(),
 	}
 	m = m.SetSize(100, 100)
 	for i := range statusCount {
@@ -365,5 +369,377 @@ func TestAggregateMetrics_MultipleTypes(t *testing.T) {
 	// Energy from PM only
 	if status.TotalEnergy != 500 {
 		t.Errorf("expected total energy 500, got %f", status.TotalEnergy)
+	}
+}
+
+func TestExtractHealthData(t *testing.T) {
+	t.Parallel()
+
+	t.Run("extracts sys data", func(t *testing.T) {
+		t.Parallel()
+		statusMap := map[string]json.RawMessage{
+			"sys": json.RawMessage(`{
+				"mac": "AABBCCDDEEFF",
+				"fs_size": 458752,
+				"fs_free": 229376,
+				"ram_size": 262144,
+				"ram_free": 131072,
+				"uptime": 1000,
+				"restart_required": false,
+				"available_updates": {"stable": {"version": "1.2.3"}}
+			}`),
+		}
+		var status DeviceStatus
+		extractHealthData(statusMap, &status)
+
+		if status.FSSize != 458752 {
+			t.Errorf("FSSize = %d, want 458752", status.FSSize)
+		}
+		if status.FSFree != 229376 {
+			t.Errorf("FSFree = %d, want 229376", status.FSFree)
+		}
+		if !status.HasUpdate {
+			t.Error("expected HasUpdate true")
+		}
+	})
+
+	t.Run("extracts wifi rssi", func(t *testing.T) {
+		t.Parallel()
+		statusMap := map[string]json.RawMessage{
+			"wifi": json.RawMessage(`{"rssi": -65.0, "ssid": "MyNetwork", "status": "got ip"}`),
+		}
+		var status DeviceStatus
+		extractHealthData(statusMap, &status)
+
+		if status.WiFiRSSI == nil || *status.WiFiRSSI != -65.0 {
+			t.Errorf("WiFiRSSI = %v, want -65.0", status.WiFiRSSI)
+		}
+	})
+
+	t.Run("extracts chip temp from switch", func(t *testing.T) {
+		t.Parallel()
+		statusMap := map[string]json.RawMessage{
+			"switch:0": json.RawMessage(`{"id": 0, "output": true, "temperature": {"tC": 72.5, "tF": 162.5}}`),
+		}
+		var status DeviceStatus
+		extractHealthData(statusMap, &status)
+
+		if status.ChipTemp == nil || *status.ChipTemp != 72.5 {
+			t.Errorf("ChipTemp = %v, want 72.5", status.ChipTemp)
+		}
+	})
+
+	t.Run("takes highest chip temp across components", func(t *testing.T) {
+		t.Parallel()
+		statusMap := map[string]json.RawMessage{
+			"switch:0": json.RawMessage(`{"id": 0, "temperature": {"tC": 60.0}}`),
+			"switch:1": json.RawMessage(`{"id": 1, "temperature": {"tC": 85.0}}`),
+			"cover:0":  json.RawMessage(`{"id": 0, "temperature": {"tC": 70.0}}`),
+		}
+		var status DeviceStatus
+		extractHealthData(statusMap, &status)
+
+		if status.ChipTemp == nil || *status.ChipTemp != 85.0 {
+			t.Errorf("ChipTemp = %v, want 85.0 (highest)", status.ChipTemp)
+		}
+	})
+
+	t.Run("no update when stable missing", func(t *testing.T) {
+		t.Parallel()
+		statusMap := map[string]json.RawMessage{
+			"sys": json.RawMessage(`{"fs_size": 100, "fs_free": 50}`),
+		}
+		var status DeviceStatus
+		extractHealthData(statusMap, &status)
+
+		if status.HasUpdate {
+			t.Error("expected HasUpdate false when no updates available")
+		}
+	})
+
+	t.Run("empty status map", func(t *testing.T) {
+		t.Parallel()
+		var status DeviceStatus
+		extractHealthData(map[string]json.RawMessage{}, &status)
+
+		if status.ChipTemp != nil {
+			t.Error("expected nil ChipTemp")
+		}
+		if status.WiFiRSSI != nil {
+			t.Error("expected nil WiFiRSSI")
+		}
+		if status.FSSize != 0 {
+			t.Error("expected zero FSSize")
+		}
+	})
+
+	t.Run("ignores non-component keys", func(t *testing.T) {
+		t.Parallel()
+		statusMap := map[string]json.RawMessage{
+			"cloud":         json.RawMessage(`{"connected": true}`),
+			"temperature:0": json.RawMessage(`{"tC": 25.0}`),
+			"input:0":       json.RawMessage(`{"id": 0}`),
+		}
+		var status DeviceStatus
+		extractHealthData(statusMap, &status)
+
+		if status.ChipTemp != nil {
+			t.Error("should not extract chip temp from non-component keys")
+		}
+	})
+}
+
+func TestIsComponentKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		key  string
+		want bool
+	}{
+		{"switch:0", true},
+		{"switch:1", true},
+		{"cover:0", true},
+		{"light:0", true},
+		{"rgb:0", true},
+		{"rgbw:0", true},
+		{"temperature:0", false},
+		{"humidity:0", false},
+		{"cloud", false},
+		{"sys", false},
+		{"wifi", false},
+		{"em:0", false},
+		{"input:0", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			t.Parallel()
+			got := isComponentKey(tt.key)
+			if got != tt.want {
+				t.Errorf("isComponentKey(%q) = %v, want %v", tt.key, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOptionalFloat(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil returns empty", func(t *testing.T) {
+		t.Parallel()
+		if got := optionalFloat(nil, "%.1f"); got != "" {
+			t.Errorf("optionalFloat(nil) = %q, want empty", got)
+		}
+	})
+
+	t.Run("formats value", func(t *testing.T) {
+		t.Parallel()
+		v := 72.5
+		if got := optionalFloat(&v, "%.1f"); got != "72.5" {
+			t.Errorf("optionalFloat(72.5) = %q, want %q", got, "72.5")
+		}
+	})
+
+	t.Run("respects format", func(t *testing.T) {
+		t.Parallel()
+		v := 42.0
+		if got := optionalFloat(&v, "%.0f"); got != "42" {
+			t.Errorf("optionalFloat(42.0, %%.0f) = %q, want %q", got, "42")
+		}
+	})
+}
+
+func TestOptionalInt(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil returns empty", func(t *testing.T) {
+		t.Parallel()
+		if got := optionalInt(nil); got != "" {
+			t.Errorf("optionalInt(nil) = %q, want empty", got)
+		}
+	})
+
+	t.Run("formats value", func(t *testing.T) {
+		t.Parallel()
+		v := 42
+		if got := optionalInt(&v); got != "42" {
+			t.Errorf("optionalInt(42) = %q, want %q", got, "42")
+		}
+	})
+}
+
+func TestExportCSV_IncludesHealthData(t *testing.T) {
+	t.Parallel()
+
+	memFs := afero.NewMemMapFs()
+	path := "/tmp/test.csv"
+
+	chipTemp := 85.0
+	rssi := -80.0
+	temp := 22.5
+	m := Model{
+		statuses: []DeviceStatus{
+			{
+				Name:        "test-device",
+				Address:     "192.168.1.100",
+				Type:        "switch",
+				Online:      true,
+				Power:       100.5,
+				Temperature: &temp,
+				ChipTemp:    &chipTemp,
+				WiFiRSSI:    &rssi,
+				FSFree:      10000,
+				FSSize:      100000,
+				HasUpdate:   true,
+				UpdatedAt:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
+	err := m.exportCSV(memFs, path)
+	if err != nil {
+		t.Fatalf("exportCSV failed: %v", err)
+	}
+
+	data, err := afero.ReadFile(memFs, path)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	content := string(data)
+
+	// Check header includes health columns
+	if !strings.Contains(content, "chip_temp_c") {
+		t.Error("CSV header missing chip_temp_c")
+	}
+	if !strings.Contains(content, "wifi_rssi_dbm") {
+		t.Error("CSV header missing wifi_rssi_dbm")
+	}
+	if !strings.Contains(content, "fs_used_pct") {
+		t.Error("CSV header missing fs_used_pct")
+	}
+	if !strings.Contains(content, "has_update") {
+		t.Error("CSV header missing has_update")
+	}
+
+	// Check data row includes health values
+	lines := strings.Split(strings.TrimSpace(content), "\n")
+	if len(lines) < 2 {
+		t.Fatal("expected at least 2 lines (header + data)")
+	}
+	dataLine := lines[1]
+	if !strings.Contains(dataLine, "85.0") {
+		t.Error("CSV data missing chip temp value")
+	}
+	if !strings.Contains(dataLine, "-80") {
+		t.Error("CSV data missing WiFi RSSI value")
+	}
+	if !strings.Contains(dataLine, "true") {
+		t.Error("CSV data missing has_update flag")
+	}
+}
+
+func TestExportJSON_IncludesHealthData(t *testing.T) {
+	t.Parallel()
+
+	memFs := afero.NewMemMapFs()
+	path := "/tmp/test.json"
+
+	chipTemp := 85.0
+	rssi := -80.0
+	m := Model{
+		statuses: []DeviceStatus{
+			{
+				Name:     "test-device",
+				Address:  "192.168.1.100",
+				Online:   true,
+				Power:    100.5,
+				ChipTemp: &chipTemp,
+				WiFiRSSI: &rssi,
+				FSFree:   10000,
+				FSSize:   100000,
+			},
+		},
+	}
+
+	err := m.exportJSON(memFs, path)
+	if err != nil {
+		t.Fatalf("exportJSON failed: %v", err)
+	}
+
+	data, err := afero.ReadFile(memFs, path)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	content := string(data)
+
+	// Check JSON includes health section
+	if !strings.Contains(content, `"health"`) {
+		t.Error("JSON missing health section")
+	}
+	if !strings.Contains(content, `"chip_temp_c"`) {
+		t.Error("JSON missing chip_temp_c field")
+	}
+	if !strings.Contains(content, `"wifi_rssi_dbm"`) {
+		t.Error("JSON missing wifi_rssi_dbm field")
+	}
+	if !strings.Contains(content, `"fs_used_pct"`) {
+		t.Error("JSON missing fs_used_pct field")
+	}
+
+	// Verify JSON is valid and can be decoded
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	devices, ok := result["devices"].([]any)
+	if !ok || len(devices) == 0 {
+		t.Fatal("expected devices array")
+	}
+
+	device, ok := devices[0].(map[string]any)
+	if !ok {
+		t.Fatal("expected device map")
+	}
+	health, ok := device["health"].(map[string]any)
+	if !ok {
+		t.Fatal("expected health object in device")
+	}
+	chipTemp, ctOK := health["chip_temp_c"].(float64)
+	if !ctOK || chipTemp != 85.0 {
+		t.Errorf("chip_temp_c = %v, want 85.0", health["chip_temp_c"])
+	}
+}
+
+func TestExportJSON_NoHealthWhenEmpty(t *testing.T) {
+	t.Parallel()
+
+	memFs := afero.NewMemMapFs()
+	path := "/tmp/test.json"
+
+	m := Model{
+		statuses: []DeviceStatus{
+			{
+				Name:    "basic-device",
+				Address: "192.168.1.100",
+				Online:  true,
+				Power:   50,
+			},
+		},
+	}
+
+	err := m.exportJSON(memFs, path)
+	if err != nil {
+		t.Fatalf("exportJSON failed: %v", err)
+	}
+
+	data, err := afero.ReadFile(memFs, path)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+
+	// Health section should be omitted for devices without health data
+	if strings.Contains(string(data), `"health"`) {
+		t.Error("JSON should not include health section when no health data")
 	}
 }

@@ -271,6 +271,9 @@ func (m Model) renderPowerMonitoring() string {
 		content += m.styles.Section.Render("Energy Meter (EM)") + "\n"
 		for i, em := range m.status.EM {
 			content += m.renderRow(fmt.Sprintf("EM[%d] Power", i), fmt.Sprintf("%.2f W", em.TotalActivePower))
+			if csvURL := m.getEMDataCSVURL(em.ID); csvURL != "" {
+				content += m.renderRow(fmt.Sprintf("EM[%d] CSV URL", i), csvURL)
+			}
 		}
 	}
 
@@ -278,6 +281,9 @@ func (m Model) renderPowerMonitoring() string {
 		content += m.styles.Section.Render("Energy Meter (EM1)") + "\n"
 		for i, em1 := range m.status.EM1 {
 			content += m.renderRow(fmt.Sprintf("EM1[%d] Power", i), fmt.Sprintf("%.2f W", em1.ActPower))
+			if csvURL := m.getEM1DataCSVURL(em1.ID); csvURL != "" {
+				content += m.renderRow(fmt.Sprintf("EM1[%d] CSV URL", i), csvURL)
+			}
 		}
 	}
 
@@ -346,6 +352,32 @@ func (m Model) fetchDeviceDetails(device model.Device) tea.Cmd {
 			Config: deviceConfig,
 		}
 	}
+}
+
+// getEMDataCSVURL returns the CSV download URL for an EM component, or empty string on error.
+func (m Model) getEMDataCSVURL(id int) string {
+	if m.device == nil {
+		return ""
+	}
+	monSvc := m.svc.Monitoring()
+	url, err := monSvc.GetEMDataCSVURL(m.device.Address, id, nil, nil, true)
+	if err != nil {
+		return ""
+	}
+	return url
+}
+
+// getEM1DataCSVURL returns the CSV download URL for an EM1 component, or empty string on error.
+func (m Model) getEM1DataCSVURL(id int) string {
+	if m.device == nil {
+		return ""
+	}
+	monSvc := m.svc.Monitoring()
+	url, err := monSvc.GetEM1DataCSVURL(m.device.Address, id, nil, nil, true)
+	if err != nil {
+		return ""
+	}
+	return url
 }
 
 // FormatJSON formats any value as indented JSON.

@@ -38,6 +38,13 @@ type RankedDevice struct {
 	Trend          TrendDirection
 	Error          error
 	ConnectionType string
+
+	// Health badges
+	ChipTemp  *float64 // Component temperature (°C)
+	WiFiRSSI  *float64 // WiFi signal strength (dBm)
+	FSFree    int      // Filesystem free bytes
+	FSSize    int      // Filesystem total bytes
+	HasUpdate bool     // Firmware update available
 }
 
 // PowerRankingModel displays devices sorted by power consumption.
@@ -75,6 +82,13 @@ const powerThresholdHigh = 500.0
 
 // powerThresholdMed is the threshold for "medium" power coloring.
 const powerThresholdMed = 100.0
+
+// Health badge thresholds.
+const (
+	chipTempWarn = 80.0  // °C - warn above this
+	rssiWeak     = -75.0 // dBm - weak signal
+	fsUsageWarn  = 90    // percent - warn above this
+)
 
 // defaultPowerRankingStyles returns default styles.
 func defaultPowerRankingStyles() PowerRankingStyles {
@@ -149,22 +163,7 @@ func (m PowerRankingModel) Update(msg tea.Msg) (PowerRankingModel, tea.Cmd) {
 
 // handleNavigation handles scrolling/navigation.
 func (m PowerRankingModel) handleNavigation(msg messages.NavigationMsg) PowerRankingModel {
-	switch msg.Direction {
-	case messages.NavUp:
-		m.Scroller.CursorUp()
-	case messages.NavDown:
-		m.Scroller.CursorDown()
-	case messages.NavPageUp:
-		m.Scroller.PageUp()
-	case messages.NavPageDown:
-		m.Scroller.PageDown()
-	case messages.NavHome:
-		m.Scroller.CursorToStart()
-	case messages.NavEnd:
-		m.Scroller.CursorToEnd()
-	case messages.NavLeft, messages.NavRight:
-		// Not applicable for single-column panel
-	}
+	m.Scroller.HandleNavigation(msg)
 	return m
 }
 
@@ -195,6 +194,11 @@ func (m PowerRankingModel) SetDevices(statuses []DeviceStatus) PowerRankingModel
 			Trend:          trend,
 			Error:          s.Error,
 			ConnectionType: s.ConnectionType,
+			ChipTemp:       s.ChipTemp,
+			WiFiRSSI:       s.WiFiRSSI,
+			FSFree:         s.FSFree,
+			FSSize:         s.FSSize,
+			HasUpdate:      s.HasUpdate,
 		})
 
 		if s.Online {
@@ -370,7 +374,8 @@ func (m PowerRankingModel) renderPoweredRow(d RankedDevice, rank int, sel string
 	// Pad name to alignment
 	namePad := strings.Repeat(" ", max(0, nameWidth-len(name)))
 
-	line := sel + rankStr + " " + nameStr + namePad + " " + powerStr + " " + trendStr + connStr
+	badges := m.healthBadges(d)
+	line := sel + rankStr + " " + nameStr + namePad + " " + powerStr + " " + trendStr + connStr + badges
 	return line
 }
 
@@ -383,9 +388,10 @@ func (m PowerRankingModel) renderZeroPowerRow(d RankedDevice, sel string, maxWid
 	name := output.Truncate(d.Name, nameWidth)
 	namePad := strings.Repeat(" ", max(0, nameWidth-len(name)))
 
+	badges := m.healthBadges(d)
 	line := sel + m.styles.Muted.Render("─") + "  " +
 		m.styles.Muted.Render(name) + namePad + " " +
-		m.styles.PowerZero.Render("0W")
+		m.styles.PowerZero.Render("0W") + badges
 	return line
 }
 
@@ -432,6 +438,45 @@ func (m PowerRankingModel) powerStyled(watts float64) string {
 	default:
 		return m.styles.PowerLow.Render(text)
 	}
+}
+
+// healthBadges returns compact badge icons for device health warnings.
+// Returns empty string if all health metrics are normal.
+func (m PowerRankingModel) healthBadges(d RankedDevice) string {
+	var badges []string
+
+	// Chip temperature warning: >80°C
+	if d.ChipTemp != nil && *d.ChipTemp >= chipTempWarn {
+		badges = append(badges, m.styles.PowerHigh.Render("🌡"))
+	}
+
+	// WiFi RSSI warning: <-75dBm
+	if d.WiFiRSSI != nil && *d.WiFiRSSI <= rssiWeak {
+		badges = append(badges, m.styles.TrendUp.Render("📶"))
+	}
+
+	// Flash usage warning: >90%
+	if d.FSSize > 0 {
+		usedPct := 100 - (d.FSFree * 100 / d.FSSize)
+		if usedPct >= fsUsageWarn {
+			badges = append(badges, m.styles.TrendUp.Render("💾"))
+		}
+	}
+
+	// Firmware update available
+	if d.HasUpdate {
+		badges = append(badges, m.styles.Muted.Render("⬆"))
+	}
+
+	// Solar return (negative power)
+	if d.Power < 0 {
+		badges = append(badges, m.styles.TrendDown.Render("☀"))
+	}
+
+	if len(badges) == 0 {
+		return ""
+	}
+	return " " + strings.Join(badges, "")
 }
 
 // FooterText returns keybinding hints for the footer.
