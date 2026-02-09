@@ -11,10 +11,10 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/errorview"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // OperationsDeps holds the dependencies for the Operations component.
@@ -337,10 +337,7 @@ func (m OperationsModel) View() string {
 	case m.executing:
 		content.WriteString(m.styles.Muted.Render("Executing operation..."))
 	case m.lastErr != nil:
-		msg, hint := tuierrors.FormatError(m.lastErr)
-		content.WriteString(m.styles.Error.Render(msg))
-		content.WriteString("\n")
-		content.WriteString(m.styles.Muted.Render("  " + hint))
+		content.WriteString(errorview.RenderInline(m.lastErr))
 		content.WriteString("\n")
 		content.WriteString(m.styles.Muted.Render("  Press 'r' to retry"))
 	case len(m.lastResults) > 0:

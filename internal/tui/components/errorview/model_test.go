@@ -250,6 +250,86 @@ func TestDefaultStyles(t *testing.T) {
 	}
 }
 
+func TestWithHint(t *testing.T) {
+	t.Parallel()
+	err := errors.New("network error")
+	m := New(err, WithHint("Check connectivity"))
+
+	if m.Hint() != "Check connectivity" {
+		t.Errorf("expected hint 'Check connectivity', got %q", m.Hint())
+	}
+	view := m.View()
+	if !strings.Contains(view, "Check connectivity") {
+		t.Error("expected hint in inline view")
+	}
+}
+
+func TestHintInBanner(t *testing.T) {
+	t.Parallel()
+	m := New(errors.New("test"), WithMode(ModeBanner), WithHint("Helpful hint"))
+	view := m.View()
+	if !strings.Contains(view, "Helpful hint") {
+		t.Error("expected hint in banner view")
+	}
+}
+
+func TestSetHint(t *testing.T) {
+	t.Parallel()
+	m := New(errors.New("test"))
+	m = m.SetHint("new hint")
+	if m.Hint() != "new hint" {
+		t.Errorf("SetHint failed, got %q", m.Hint())
+	}
+}
+
+func TestClearResetsHint(t *testing.T) {
+	t.Parallel()
+	m := New(errors.New("test"), WithHint("some hint"))
+	m = m.Clear()
+	if m.Hint() != "" {
+		t.Error("expected empty hint after Clear")
+	}
+}
+
+func TestNewCategorized(t *testing.T) {
+	t.Parallel()
+	// Use a generic error — categorizer will produce "Error: ..." message
+	err := errors.New("something broke")
+	m := NewCategorized(err)
+
+	if m.Message() == "" {
+		t.Error("expected non-empty categorized message")
+	}
+	if m.Hint() == "" {
+		t.Error("expected non-empty categorized hint")
+	}
+	if !errors.Is(m.Error(), err) {
+		t.Error("expected original error preserved")
+	}
+}
+
+func TestRenderInline(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil error returns empty", func(t *testing.T) {
+		t.Parallel()
+		if RenderInline(nil) != "" {
+			t.Error("expected empty for nil error")
+		}
+	})
+
+	t.Run("renders error with icon", func(t *testing.T) {
+		t.Parallel()
+		result := RenderInline(errors.New("test failure"))
+		if !strings.Contains(result, "✗") {
+			t.Error("expected error icon in render")
+		}
+		if result == "" {
+			t.Error("expected non-empty render")
+		}
+	})
+}
+
 func TestDetailedViewWithDetails(t *testing.T) {
 	t.Parallel()
 	err := errors.New("main error")

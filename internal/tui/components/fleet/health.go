@@ -12,12 +12,12 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/errorview"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // HealthDeps holds the dependencies for the Health component.
@@ -251,8 +251,7 @@ func (m HealthModel) View() string {
 	}
 
 	if m.err != nil {
-		errMsg, _ := tuierrors.FormatError(m.err)
-		msg := m.styles.Error.Render(errMsg)
+		msg := errorview.RenderInline(m.err)
 		r.SetContent(lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg))
 		return r.Render()
 	}

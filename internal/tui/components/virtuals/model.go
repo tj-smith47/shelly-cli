@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/errorview"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
@@ -726,8 +727,7 @@ func (m Model) View() string {
 		if tuierrors.IsUnsupportedFeature(m.err) {
 			r.SetContent(styles.EmptyStateWithBorder(tuierrors.UnsupportedMessage("Virtual components"), m.Width, m.Height))
 		} else {
-			msg, _ := tuierrors.FormatError(m.err)
-			r.SetContent(m.styles.Error.Render(msg))
+			r.SetContent(errorview.RenderInline(m.err))
 		}
 		return r.Render()
 	}

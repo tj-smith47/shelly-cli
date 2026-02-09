@@ -1,8 +1,8 @@
 package editmodal
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/errorview"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // RenderField renders a single field row with cursor indicator.
@@ -24,8 +24,7 @@ func (b *Base) RenderError() string {
 	if b.Err == nil {
 		return ""
 	}
-	msg, _ := tuierrors.FormatError(b.Err)
-	return b.Styles.Error.Render(msg)
+	return errorview.RenderInline(b.Err)
 }
 
 // RenderSavingFooter returns "Saving..." if a save is in progress,

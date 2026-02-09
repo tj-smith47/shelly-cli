@@ -14,12 +14,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/errorview"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // DevicesDeps holds the dependencies for the Devices component.
@@ -273,9 +273,7 @@ func (m DevicesModel) getStatusMessage() string {
 	case m.loading:
 		return m.Loader.View()
 	case m.err != nil:
-		msg, hint := tuierrors.FormatError(m.err)
-		errMsg := m.styles.Error.Render(msg) + "\n" +
-			m.styles.Muted.Render("  "+hint) + "\n" +
+		errMsg := errorview.RenderInline(m.err) + "\n" +
 			m.styles.Muted.Render("  Press 'r' to retry")
 		return lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, errMsg)
 	case len(m.devices) == 0:

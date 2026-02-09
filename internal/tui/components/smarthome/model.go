@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/errorview"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
@@ -24,7 +25,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Deps holds the dependencies for the SmartHome component.
@@ -1208,8 +1208,7 @@ func (m Model) View() string {
 	}
 
 	if m.err != nil {
-		msg, _ := tuierrors.FormatError(m.err)
-		r.SetContent(m.styles.Error.Render(msg))
+		r.SetContent(errorview.RenderInline(m.err))
 		return r.Render()
 	}
 

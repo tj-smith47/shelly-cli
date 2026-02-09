@@ -14,10 +14,10 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/errorview"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
-	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Deps holds the dependencies for the device detail component.
@@ -174,8 +174,7 @@ func (m Model) View() string {
 	case m.loading:
 		content = m.Loader.View()
 	case m.err != nil:
-		msg, _ := tuierrors.FormatError(m.err)
-		content = m.styles.Error.Render(msg)
+		content = errorview.RenderInline(m.err)
 	default:
 		content = m.viewport.View()
 	}

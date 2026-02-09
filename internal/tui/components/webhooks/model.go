@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/errorview"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
@@ -784,8 +785,7 @@ func (m Model) getErrorContent() string {
 	if tuierrors.IsUnsupportedFeature(m.err) {
 		return styles.EmptyStateWithBorder(tuierrors.UnsupportedMessage("Webhooks"), m.Width, m.Height)
 	}
-	msg, _ := tuierrors.FormatError(m.err)
-	return m.styles.Error.Render(msg)
+	return errorview.RenderInline(m.err)
 }
 
 // renderWebhookList renders the list of webhooks.

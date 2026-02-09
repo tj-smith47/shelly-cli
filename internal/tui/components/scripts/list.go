@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/errorview"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
@@ -666,8 +667,7 @@ func (m ListModel) renderError() string {
 	if tuierrors.IsUnsupportedFeature(m.err) {
 		return styles.EmptyStateWithBorder(tuierrors.UnsupportedMessage("Scripts"), m.Width, m.Height)
 	}
-	msg, _ := tuierrors.FormatError(m.err)
-	return m.styles.Error.Render(msg)
+	return errorview.RenderInline(m.err)
 }
 
 func (m ListModel) renderScriptsList() string {

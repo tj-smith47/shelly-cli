@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // DisplayMode determines how errors are displayed.
@@ -53,6 +54,7 @@ type Styles struct {
 	Critical     lipgloss.Style
 	CriticalIcon lipgloss.Style
 	Dismissible  lipgloss.Style
+	Hint         lipgloss.Style
 }
 
 // DefaultStyles returns the default styles for error display.
@@ -102,6 +104,9 @@ func DefaultStyles() Styles {
 		Dismissible: lipgloss.NewStyle().
 			Foreground(colors.Muted).
 			Italic(true),
+		Hint: lipgloss.NewStyle().
+			Foreground(colors.Muted).
+			Italic(true),
 	}
 }
 
@@ -126,6 +131,13 @@ func WithSeverity(severity Severity) Option {
 func WithDismissible(dismissible bool) Option {
 	return func(m *Model) {
 		m.dismissible = dismissible
+	}
+}
+
+// WithHint sets a hint message shown below the error.
+func WithHint(hint string) Option {
+	return func(m *Model) {
+		m.hint = hint
 	}
 }
 
@@ -154,6 +166,7 @@ func WithWidth(width int) Option {
 type Model struct {
 	err         error
 	message     string
+	hint        string
 	details     string
 	mode        DisplayMode
 	severity    Severity
@@ -247,6 +260,9 @@ func (m Model) viewBanner() string {
 	iconStyle := m.getIconStyle()
 
 	content := iconStyle.Render(icon+" ") + m.styles.BannerText.Render(m.message)
+	if m.hint != "" {
+		content += "\n" + m.styles.Hint.Render(m.hint)
+	}
 	if m.dismissible {
 		content += "\n" + m.styles.Dismissible.Render("Press Esc to dismiss")
 	}
@@ -259,7 +275,11 @@ func (m Model) viewInline() string {
 	style := m.getInlineStyle()
 	iconStyle := m.getIconStyle()
 
-	return iconStyle.Render(icon+" ") + style.Render(m.message)
+	result := iconStyle.Render(icon+" ") + style.Render(m.message)
+	if m.hint != "" {
+		result += "\n  " + m.styles.Hint.Render(m.hint)
+	}
+	return result
 }
 
 func (m Model) viewCompact() string {
@@ -402,11 +422,53 @@ func (m Model) Message() string {
 	return m.message
 }
 
+// SetHint sets the hint message.
+func (m Model) SetHint(hint string) Model {
+	m.hint = hint
+	return m
+}
+
+// Hint returns the hint message.
+func (m Model) Hint() string {
+	return m.hint
+}
+
 // Clear clears the error.
 func (m Model) Clear() Model {
 	m.err = nil
 	m.message = ""
+	m.hint = ""
 	m.details = ""
 	m.dismissed = false
 	return m
+}
+
+// NewCategorized creates an error view using tuierrors categorization.
+// It automatically extracts a user-friendly message and hint from the error.
+func NewCategorized(err error, opts ...Option) Model {
+	cat := tuierrors.Categorize(err)
+	m := Model{
+		err:      err,
+		message:  cat.Message,
+		hint:     cat.Hint,
+		mode:     ModeInline,
+		severity: SeverityError,
+		width:    80,
+		styles:   DefaultStyles(),
+	}
+
+	for _, opt := range opts {
+		opt(&m)
+	}
+
+	return m
+}
+
+// RenderInline formats and renders an error inline using tuierrors categorization.
+// This is a convenience function for the most common error rendering pattern.
+func RenderInline(err error) string {
+	if err == nil {
+		return ""
+	}
+	return NewCategorized(err).View()
 }
