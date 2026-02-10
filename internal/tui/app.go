@@ -259,7 +259,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 
 	// Create control panel overlay component
 	controlSvc := control.NewServiceAdapter(f.ShellyService())
-	controlPanelModel := control.NewPanel(ctx, controlSvc)
+	controlPanelModel := control.NewPanel(ctx, controlSvc, controlSvc)
 
 	// Create view manager and register all views
 	vm := views.New()
@@ -728,14 +728,19 @@ func (m Model) handleRequestToggle(msg deviceinfo.RequestToggleMsg) (tea.Model, 
 		var err error
 		ctx := m.ctx
 
-		switch msg.ComponentType {
-		case "switch":
-			_, err = svc.SwitchToggle(ctx, data.Device.Address, compID)
-		case "light":
-			_, err = svc.LightToggle(ctx, data.Device.Address, compID)
-		case "cover":
-			// Cover toggle uses stop/open logic
-			_, err = svc.QuickToggle(ctx, data.Device.Address, &compID)
+		// Plugin devices use PluginControl for all component types
+		if data.Device.IsPluginManaged() {
+			_, err = svc.PluginControl(ctx, data.Device.Address, "toggle", msg.ComponentType, compID)
+		} else {
+			switch msg.ComponentType {
+			case "switch":
+				_, err = svc.SwitchToggle(ctx, data.Device.Address, compID)
+			case "light":
+				_, err = svc.LightToggle(ctx, data.Device.Address, compID)
+			case "cover":
+				// Cover toggle uses stop/open logic
+				_, err = svc.QuickToggle(ctx, data.Device.Address, &compID)
+			}
 		}
 
 		return DeviceActionMsg{
@@ -2332,6 +2337,12 @@ func (m Model) showControlPanel() (Model, tea.Cmd, bool) {
 	}
 
 	m.controlPanel = m.controlPanel.SetSize(m.width*2/3, m.height*2/3)
+
+	// Plugin devices use the generic plugin control panel
+	if selected.Device.IsPluginManaged() {
+		return m.showPluginControlPanel(data, selected.Device)
+	}
+
 	selectedIdx := m.deviceInfo.SelectedComponent()
 
 	// Try to show component at selected index
@@ -2471,6 +2482,50 @@ func (m Model) activateThermostatControl(address string, th cache.ThermostatStat
 	m.controlPanel = m.controlPanel.ShowThermostat(address, state)
 	m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
 	return m
+}
+
+// showPluginControlPanel shows the plugin-specific control panel.
+func (m Model) showPluginControlPanel(data *cache.DeviceData, device devmodel.Device) (Model, tea.Cmd, bool) {
+	components := buildPluginComponents(data)
+	if len(components) == 0 {
+		return m, nil, false
+	}
+
+	m.controlPanel = m.controlPanel.ShowPlugin(device.Address, device.GetPlatform(), components)
+	m.focusState.PushOverlay(focus.OverlayControlPanel, focus.ModeOverlay)
+	return m, nil, true
+}
+
+// buildPluginComponents converts cache data into plugin control components.
+func buildPluginComponents(data *cache.DeviceData) []control.PluginComponent {
+	components := make([]control.PluginComponent, 0, len(data.Switches)+len(data.Lights)+len(data.Covers))
+
+	for _, sw := range data.Switches {
+		components = append(components, control.PluginComponent{
+			Type: "switch",
+			ID:   sw.ID,
+			Name: sw.Name,
+			On:   sw.On,
+		})
+	}
+	for _, lt := range data.Lights {
+		components = append(components, control.PluginComponent{
+			Type: "light",
+			ID:   lt.ID,
+			Name: lt.Name,
+			On:   lt.On,
+		})
+	}
+	for _, cv := range data.Covers {
+		components = append(components, control.PluginComponent{
+			Type:  "cover",
+			ID:    cv.ID,
+			Name:  cv.Name,
+			State: cv.State,
+		})
+	}
+
+	return components
 }
 
 // executeDeviceAction executes a device action on the selected device.

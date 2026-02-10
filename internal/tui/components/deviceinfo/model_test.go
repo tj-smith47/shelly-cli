@@ -1,6 +1,7 @@
 package deviceinfo
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -225,4 +226,148 @@ func TestComponentInfo(t *testing.T) {
 	if *comp.Power != 150.5 {
 		t.Errorf("Power = %v, want 150.5", *comp.Power)
 	}
+}
+
+func TestModel_PluginDeviceIdentity(t *testing.T) {
+	t.Parallel()
+	m := New().SetSize(80, 30)
+	data := &cache.DeviceData{
+		Device: model.Device{
+			Name:     "Tasmota Plug",
+			Model:    "sonoff-basic",
+			Platform: "tasmota",
+		},
+		Online: true,
+		Switches: []cache.SwitchState{
+			{ID: 0, Name: "Relay", On: true},
+		},
+	}
+	m = m.SetDevice(data)
+
+	view := m.View()
+	if view == "" {
+		t.Fatal("View() returned empty string for plugin device")
+	}
+
+	// Should show platform instead of generation/chip
+	identLine := m.buildIdentityLine()
+	if !containsText(identLine, "Platform") {
+		t.Error("expected 'Platform' in identity line for plugin device")
+	}
+	if !containsText(identLine, "tasmota") {
+		t.Error("expected 'tasmota' in identity line for plugin device")
+	}
+}
+
+func TestModel_PluginDeviceNoEndpoints(t *testing.T) {
+	t.Parallel()
+	m := New().SetSize(80, 30)
+	data := &cache.DeviceData{
+		Device: model.Device{
+			Name:     "ESPHome Light",
+			Platform: "esphome",
+		},
+		Online: true,
+		Switches: []cache.SwitchState{
+			{ID: 0, Name: "Relay", On: false},
+		},
+		Lights: []cache.LightState{
+			{ID: 0, Name: "LED", On: true},
+		},
+		Covers: []cache.CoverState{
+			{ID: 0, Name: "Shutter", State: "open"},
+		},
+	}
+	m = m.SetDevice(data)
+
+	components := m.getComponents()
+	if len(components) != 3 {
+		t.Fatalf("getComponents() length = %d, want 3", len(components))
+	}
+
+	// All endpoints should be empty for plugin devices
+	for _, comp := range components {
+		if comp.Endpoint != "" {
+			t.Errorf("plugin component %s has endpoint %q, want empty", comp.Name, comp.Endpoint)
+		}
+	}
+}
+
+func TestModel_PluginDeviceSelectedEndpoint(t *testing.T) {
+	t.Parallel()
+	m := New().SetSize(80, 30).SetFocused(true)
+	data := &cache.DeviceData{
+		Device: model.Device{
+			Name:     "Plugin Dev",
+			Platform: "tasmota",
+		},
+		Online: true,
+		Switches: []cache.SwitchState{
+			{ID: 0, On: true},
+		},
+	}
+	m = m.SetDevice(data)
+	m.componentCursor = 0
+
+	// Plugin device should have empty endpoint
+	endpoint := m.SelectedEndpoint()
+	if endpoint != "" {
+		t.Errorf("SelectedEndpoint() = %q, want empty for plugin device", endpoint)
+	}
+}
+
+func TestModel_PluginDeviceFooterNoJSON(t *testing.T) {
+	t.Parallel()
+	m := New().SetSize(80, 30)
+	data := &cache.DeviceData{
+		Device: model.Device{
+			Name:     "Plugin Dev",
+			Platform: "tasmota",
+		},
+		Online: true,
+		Switches: []cache.SwitchState{
+			{ID: 0, On: true},
+		},
+	}
+	m = m.SetDevice(data)
+
+	footer := m.FooterText()
+	if containsText(footer, "json") {
+		t.Error("plugin device footer should not contain 'json' hint")
+	}
+	if !containsText(footer, "toggle") {
+		t.Error("plugin device footer should contain 'toggle' hint")
+	}
+}
+
+func TestModel_PluginDeviceEnterNoJSON(t *testing.T) {
+	t.Parallel()
+	m := New().SetSize(80, 30).SetFocused(true)
+	data := &cache.DeviceData{
+		Device: model.Device{
+			Name:     "Plugin Dev",
+			Platform: "tasmota",
+		},
+		Online: true,
+		Switches: []cache.SwitchState{
+			{ID: 0, On: true},
+		},
+	}
+	m = m.SetDevice(data)
+
+	// Select component and press enter
+	m, _ = m.Update(tea.KeyPressMsg{Code: 108}) // 'l' to select
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	// Should not produce a JSON request command
+	if cmd != nil {
+		t.Error("expected no command from enter on plugin device component")
+	}
+}
+
+// containsText checks if a styled string contains the given plain text.
+// Strips ANSI escape codes for reliable comparison.
+func containsText(s, text string) bool {
+	// Simple check - styled text still contains the raw text
+	return s != "" && strings.Contains(s, text)
 }

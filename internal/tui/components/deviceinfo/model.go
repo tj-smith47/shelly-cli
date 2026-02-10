@@ -394,8 +394,10 @@ func (m Model) buildIdentityLine() string {
 		parts = append(parts, m.kv("Model", m.device.Device.Model))
 	}
 
-	// Generation with chip
-	if m.device.Info != nil && m.device.Info.Generation > 0 {
+	// Plugin devices show platform instead of generation/chip
+	if m.device.Device.IsPluginManaged() {
+		parts = append(parts, m.kv("Platform", m.device.Device.GetPlatform()))
+	} else if m.device.Info != nil && m.device.Info.Generation > 0 {
 		gen := m.device.Info.Generation
 		chip := chipTypeForGeneration(gen)
 		parts = append(parts, m.kv("Gen", fmt.Sprintf("%d (%s)", gen, chip)))
@@ -639,13 +641,16 @@ func (m Model) appendSwitchComponents(components []ComponentInfo) []ComponentInf
 		if name == "" {
 			name = fmt.Sprintf("Sw%d", sw.ID)
 		}
-		components = append(components, ComponentInfo{
-			ID:       sw.ID,
-			Name:     name,
-			Type:     "Switch",
-			State:    state,
-			Endpoint: fmt.Sprintf("Switch.GetStatus?id=%d", sw.ID),
-		})
+		comp := ComponentInfo{
+			ID:    sw.ID,
+			Name:  name,
+			Type:  "Switch",
+			State: state,
+		}
+		if !m.device.Device.IsPluginManaged() {
+			comp.Endpoint = fmt.Sprintf("Switch.GetStatus?id=%d", sw.ID)
+		}
+		components = append(components, comp)
 	}
 	return components
 }
@@ -660,13 +665,16 @@ func (m Model) appendLightComponents(components []ComponentInfo) []ComponentInfo
 		if name == "" {
 			name = fmt.Sprintf("Lt%d", lt.ID)
 		}
-		components = append(components, ComponentInfo{
-			ID:       lt.ID,
-			Name:     name,
-			Type:     "Light",
-			State:    state,
-			Endpoint: fmt.Sprintf("Light.GetStatus?id=%d", lt.ID),
-		})
+		comp := ComponentInfo{
+			ID:    lt.ID,
+			Name:  name,
+			Type:  "Light",
+			State: state,
+		}
+		if !m.device.Device.IsPluginManaged() {
+			comp.Endpoint = fmt.Sprintf("Light.GetStatus?id=%d", lt.ID)
+		}
+		components = append(components, comp)
 	}
 	return components
 }
@@ -684,13 +692,16 @@ func (m Model) appendCoverComponents(components []ComponentInfo) []ComponentInfo
 		if name == "" {
 			name = fmt.Sprintf("Cv%d", cv.ID)
 		}
-		components = append(components, ComponentInfo{
-			ID:       cv.ID,
-			Name:     name,
-			Type:     "Cover",
-			State:    state,
-			Endpoint: fmt.Sprintf("Cover.GetStatus?id=%d", cv.ID),
-		})
+		comp := ComponentInfo{
+			ID:    cv.ID,
+			Name:  name,
+			Type:  "Cover",
+			State: state,
+		}
+		if !m.device.Device.IsPluginManaged() {
+			comp.Endpoint = fmt.Sprintf("Cover.GetStatus?id=%d", cv.ID)
+		}
+		components = append(components, comp)
 	}
 	return components
 }
@@ -709,13 +720,16 @@ func (m Model) appendInputComponents(components []ComponentInfo) []ComponentInfo
 		if name == "" {
 			name = fmt.Sprintf("In%d", inp.ID)
 		}
-		components = append(components, ComponentInfo{
-			ID:       inp.ID,
-			Name:     name,
-			Type:     inputType,
-			State:    state,
-			Endpoint: fmt.Sprintf("Input.GetStatus?id=%d", inp.ID),
-		})
+		comp := ComponentInfo{
+			ID:    inp.ID,
+			Name:  name,
+			Type:  inputType,
+			State: state,
+		}
+		if !m.device.Device.IsPluginManaged() {
+			comp.Endpoint = fmt.Sprintf("Input.GetStatus?id=%d", inp.ID)
+		}
+		components = append(components, comp)
 	}
 	return components
 }
@@ -853,10 +867,18 @@ func (m Model) FooterText() string {
 	if len(components) == 0 {
 		return ""
 	}
-	if len(components) == 1 {
-		return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "space", Desc: "toggle"}, {Key: "enter", Desc: "json"}}, keys.FooterHintWidth(m.width)))
+
+	isPlugin := m.device.Device.IsPluginManaged()
+	hints := []keys.Hint{{Key: "space", Desc: "toggle"}}
+
+	if len(components) > 1 {
+		hints = append([]keys.Hint{{Key: "h/l", Desc: "select"}, {Key: "a", Desc: "all"}}, hints...)
 	}
-	return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "h/l", Desc: "select"}, {Key: "a", Desc: "all"}, {Key: "space", Desc: "toggle"}, {Key: "enter", Desc: "json"}}, keys.FooterHintWidth(m.width)))
+	if !isPlugin {
+		hints = append(hints, keys.Hint{Key: "enter", Desc: "json"})
+	}
+
+	return theme.StyledKeybindings(keys.FormatHints(hints, keys.FooterHintWidth(m.width)))
 }
 
 // formatPower formats a power value with appropriate units.

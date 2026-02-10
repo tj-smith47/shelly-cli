@@ -143,5 +143,14 @@ func (s *ServiceAdapter) ThermostatCancelBoost(ctx context.Context, device strin
 	})
 }
 
-// Ensure ServiceAdapter implements Service.
-var _ Service = (*ServiceAdapter)(nil)
+// PluginControl dispatches a control action to a plugin-managed device.
+func (s *ServiceAdapter) PluginControl(ctx context.Context, device, action, comp string, id int) error {
+	_, err := s.svc.PluginControl(ctx, device, action, comp, id)
+	return err
+}
+
+// Ensure ServiceAdapter implements Service and PluginService.
+var (
+	_ Service       = (*ServiceAdapter)(nil)
+	_ PluginService = (*ServiceAdapter)(nil)
+)

@@ -21,6 +21,14 @@ const (
 	TypeRGB        ComponentType = "rgb"
 	TypeCover      ComponentType = "cover"
 	TypeThermostat ComponentType = "thermostat"
+	TypePlugin     ComponentType = "plugin"
+)
+
+// Cover state constants.
+const (
+	coverStateOpening = "opening"
+	coverStateClosing = "closing"
+	coverStateStopped = "stopped"
 )
 
 // Action name constants.
@@ -163,6 +171,12 @@ type Service interface {
 	ThermostatSetMode(ctx context.Context, device string, thermostatID int, mode string) error
 	ThermostatBoost(ctx context.Context, device string, thermostatID int, durationSec int) error
 	ThermostatCancelBoost(ctx context.Context, device string, thermostatID int) error
+}
+
+// PluginService defines the interface for plugin device control operations.
+type PluginService interface {
+	// PluginControl dispatches a control action to a plugin-managed device.
+	PluginControl(ctx context.Context, device, action, component string, id int) error
 }
 
 // PresetColor represents a preset color option.

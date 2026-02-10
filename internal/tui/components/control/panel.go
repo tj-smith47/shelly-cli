@@ -16,6 +16,7 @@ type PanelCloseMsg struct{}
 type Panel struct {
 	ctx        context.Context
 	svc        Service
+	pluginSvc  PluginService
 	device     string
 	compType   ComponentType
 	compID     int
@@ -24,6 +25,7 @@ type Panel struct {
 	rgbCtrl    *RGBModel
 	coverCtrl  *CoverModel
 	thermoCtrl *ThermostatModel
+	pluginCtrl *PluginModel
 	visible    bool
 	width      int
 	height     int
@@ -49,11 +51,12 @@ func defaultPanelStyles() panelStyles {
 }
 
 // NewPanel creates a new control panel.
-func NewPanel(ctx context.Context, svc Service) Panel {
+func NewPanel(ctx context.Context, svc Service, pluginSvc PluginService) Panel {
 	return Panel{
-		ctx:    ctx,
-		svc:    svc,
-		styles: defaultPanelStyles(),
+		ctx:       ctx,
+		svc:       svc,
+		pluginSvc: pluginSvc,
+		styles:    defaultPanelStyles(),
 	}
 }
 
@@ -112,6 +115,17 @@ func (p Panel) ShowThermostat(device string, state ThermostatState) Panel {
 	return p.clearOthers(TypeThermostat)
 }
 
+// ShowPlugin displays the plugin control panel.
+func (p Panel) ShowPlugin(device, platform string, components []PluginComponent) Panel {
+	ctrl := NewPlugin(p.ctx, p.pluginSvc, device, platform, components)
+	p.pluginCtrl = &ctrl
+	p.device = device
+	p.compType = TypePlugin
+	p.compID = 0
+	p.visible = true
+	return p.clearOthers(TypePlugin)
+}
+
 func (p Panel) clearOthers(keep ComponentType) Panel {
 	if keep != TypeSwitch {
 		p.switchCtrl = nil
@@ -127,6 +141,9 @@ func (p Panel) clearOthers(keep ComponentType) Panel {
 	}
 	if keep != TypeThermostat {
 		p.thermoCtrl = nil
+	}
+	if keep != TypePlugin {
+		p.pluginCtrl = nil
 	}
 	return p
 }
@@ -177,41 +194,50 @@ func (p Panel) Update(msg tea.Msg) (Panel, tea.Cmd) {
 	}
 
 	// Delegate to active control
-	var cmd tea.Cmd
+	p, cmd := p.updateActiveControl(msg)
+	return p, cmd
+}
+
+func (p Panel) updateActiveControl(msg tea.Msg) (Panel, tea.Cmd) {
 	switch p.compType {
 	case TypeSwitch:
 		if p.switchCtrl != nil {
 			ctrl, c := p.switchCtrl.Update(msg)
 			p.switchCtrl = &ctrl
-			cmd = c
+			return p, c
 		}
 	case TypeLight:
 		if p.lightCtrl != nil {
 			ctrl, c := p.lightCtrl.Update(msg)
 			p.lightCtrl = &ctrl
-			cmd = c
+			return p, c
 		}
 	case TypeRGB:
 		if p.rgbCtrl != nil {
 			ctrl, c := p.rgbCtrl.Update(msg)
 			p.rgbCtrl = &ctrl
-			cmd = c
+			return p, c
 		}
 	case TypeCover:
 		if p.coverCtrl != nil {
 			ctrl, c := p.coverCtrl.Update(msg)
 			p.coverCtrl = &ctrl
-			cmd = c
+			return p, c
 		}
 	case TypeThermostat:
 		if p.thermoCtrl != nil {
 			ctrl, c := p.thermoCtrl.Update(msg)
 			p.thermoCtrl = &ctrl
-			cmd = c
+			return p, c
+		}
+	case TypePlugin:
+		if p.pluginCtrl != nil {
+			ctrl, c := p.pluginCtrl.Update(msg)
+			p.pluginCtrl = &ctrl
+			return p, c
 		}
 	}
-
-	return p, cmd
+	return p, nil
 }
 
 // View renders the panel.
@@ -220,30 +246,7 @@ func (p Panel) View() string {
 		return ""
 	}
 
-	var content string
-	switch p.compType {
-	case TypeSwitch:
-		if p.switchCtrl != nil {
-			content = p.switchCtrl.View()
-		}
-	case TypeLight:
-		if p.lightCtrl != nil {
-			content = p.lightCtrl.View()
-		}
-	case TypeRGB:
-		if p.rgbCtrl != nil {
-			content = p.rgbCtrl.View()
-		}
-	case TypeCover:
-		if p.coverCtrl != nil {
-			content = p.coverCtrl.View()
-		}
-	case TypeThermostat:
-		if p.thermoCtrl != nil {
-			content = p.thermoCtrl.View()
-		}
-	}
-
+	content := p.renderActiveControl()
 	if content == "" {
 		return ""
 	}
@@ -255,6 +258,36 @@ func (p Panel) View() string {
 	}
 
 	return p.styles.Panel.Width(panelWidth).Render(content)
+}
+
+func (p Panel) renderActiveControl() string {
+	switch p.compType {
+	case TypeSwitch:
+		if p.switchCtrl != nil {
+			return p.switchCtrl.View()
+		}
+	case TypeLight:
+		if p.lightCtrl != nil {
+			return p.lightCtrl.View()
+		}
+	case TypeRGB:
+		if p.rgbCtrl != nil {
+			return p.rgbCtrl.View()
+		}
+	case TypeCover:
+		if p.coverCtrl != nil {
+			return p.coverCtrl.View()
+		}
+	case TypeThermostat:
+		if p.thermoCtrl != nil {
+			return p.thermoCtrl.View()
+		}
+	case TypePlugin:
+		if p.pluginCtrl != nil {
+			return p.pluginCtrl.View()
+		}
+	}
+	return ""
 }
 
 // SetSize sets the panel dimensions.
@@ -291,6 +324,10 @@ func (p Panel) SetSize(width, height int) Panel {
 	if p.thermoCtrl != nil {
 		ctrl := p.thermoCtrl.SetSize(innerWidth, innerHeight)
 		p.thermoCtrl = &ctrl
+	}
+	if p.pluginCtrl != nil {
+		ctrl := p.pluginCtrl.SetSize(innerWidth, innerHeight)
+		p.pluginCtrl = &ctrl
 	}
 
 	return p

@@ -123,11 +123,11 @@ func (m CoverModel) Update(msg tea.Msg) (CoverModel, tea.Cmd) {
 func (m CoverModel) handleActionResult(msg ActionMsg) CoverModel {
 	switch msg.Action {
 	case actionOpen:
-		m.state.State = "opening"
+		m.state.State = coverStateOpening
 	case actionClose:
-		m.state.State = "closing"
+		m.state.State = coverStateClosing
 	case actionStop:
-		m.state.State = "stopped"
+		m.state.State = coverStateStopped
 	case actionPosition:
 		if val, ok := msg.Value.(int); ok {
 			m.state.Position = val
@@ -331,13 +331,13 @@ func (m CoverModel) renderState() string {
 	case "closed":
 		stateStr = "▼ CLOSED"
 		stateStyle = m.styles.OffState
-	case "opening":
+	case coverStateOpening:
 		stateStr = "⋯ OPENING"
 		stateStyle = m.styles.Value
-	case "closing":
+	case coverStateClosing:
 		stateStr = "⋯ CLOSING"
 		stateStyle = m.styles.Value
-	case "stopped":
+	case coverStateStopped:
 		stateStr = "◼ STOPPED"
 		stateStyle = m.styles.Muted
 	case "calibrating":

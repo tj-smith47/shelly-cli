@@ -3,6 +3,7 @@ package shelly
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
@@ -88,6 +89,20 @@ func (s *Service) GetPluginDeviceStatus(ctx context.Context, device model.Device
 	// Execute the status hook
 	executor := plugins.NewHookExecutor(plugin)
 	return executor.ExecuteStatus(ctx, device.Address, device.Auth)
+}
+
+// PluginControl dispatches a control action to a plugin-managed device.
+// This is the public API for fine-grained plugin component control,
+// allowing callers to specify the exact component type and ID.
+func (s *Service) PluginControl(ctx context.Context, identifier, action, component string, id int) (*PluginQuickResult, error) {
+	device, err := s.resolver.Resolve(identifier)
+	if err != nil {
+		return nil, err
+	}
+	if !device.IsPluginManaged() {
+		return nil, fmt.Errorf("device %s is not plugin-managed", identifier)
+	}
+	return s.dispatchToPlugin(ctx, device, action, component, &id)
 }
 
 // SupportsPluginCommand checks if a plugin supports a specific command.
