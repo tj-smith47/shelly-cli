@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
@@ -50,6 +51,7 @@ func (d Deps) Validate() error {
 type DeviceFirmware struct {
 	Name        string
 	Address     string
+	Platform    string // "shelly", "tasmota", "esphome", etc.
 	Current     string
 	Available   string
 	HasUpdate   bool
@@ -59,6 +61,11 @@ type DeviceFirmware struct {
 	Selected    bool
 	Checked     bool
 	Err         error
+}
+
+// IsPluginManaged returns true if this device is managed by a plugin (non-Shelly platform).
+func (d *DeviceFirmware) IsPluginManaged() bool {
+	return d.Platform != "" && d.Platform != "shelly"
 }
 
 // IsSelected implements generics.Selectable.
@@ -212,8 +219,9 @@ func (m Model) LoadDevices() Model {
 
 	for name, dev := range cfg.Devices {
 		df := DeviceFirmware{
-			Name:    name,
-			Address: dev.Address,
+			Name:     name,
+			Address:  dev.Address,
+			Platform: dev.GetPlatform(),
 		}
 
 		// Try to load cached firmware status
@@ -301,6 +309,13 @@ func (m Model) CheckAll() (Model, tea.Cmd) {
 }
 
 func (m Model) checkAllDevices() tea.Cmd {
+	// Build device config map for plugin firmware checks
+	cfg := config.Get()
+	var deviceConfigs map[string]model.Device
+	if cfg != nil {
+		deviceConfigs = cfg.Devices
+	}
+
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 120*time.Second)
 		defer cancel()
@@ -321,13 +336,29 @@ func (m Model) checkAllDevices() tea.Cmd {
 				deviceCtx, deviceCancel := context.WithTimeout(ctx, 15*time.Second)
 				defer deviceCancel()
 
-				info, checkErr := m.svc.CheckFirmware(deviceCtx, device.Name)
+				var (
+					info     *shelly.FirmwareInfo
+					checkErr error
+				)
+
+				// Plugin devices use plugin firmware check
+				if device.IsPluginManaged() {
+					if cfgDev, ok := deviceConfigs[device.Name]; ok {
+						info, checkErr = m.svc.CheckPluginFirmware(deviceCtx, cfgDev)
+					} else {
+						checkErr = fmt.Errorf("device %q not found in config", device.Name)
+					}
+				} else {
+					info, checkErr = m.svc.CheckFirmware(deviceCtx, device.Name)
+				}
+
 				mu.Lock()
 				result := DeviceFirmware{
-					Name:    device.Name,
-					Address: device.Address,
-					Checked: true,
-					Err:     checkErr,
+					Name:     device.Name,
+					Address:  device.Address,
+					Platform: device.Platform,
+					Checked:  true,
+					Err:      checkErr,
 				}
 				if info != nil {
 					result.Current = info.Current
@@ -375,6 +406,13 @@ func (m Model) UpdateSelected() (Model, tea.Cmd) {
 }
 
 func (m Model) updateDevices(devices []DeviceFirmware) tea.Cmd {
+	// Build device config map for plugin firmware updates
+	cfg := config.Get()
+	var deviceConfigs map[string]model.Device
+	if cfg != nil {
+		deviceConfigs = cfg.Devices
+	}
+
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 300*time.Second)
 		defer cancel()
@@ -390,7 +428,17 @@ func (m Model) updateDevices(devices []DeviceFirmware) tea.Cmd {
 			// Per-device timeout to avoid blocking on unreachable devices
 			// Firmware updates can take longer, so use 60 seconds
 			deviceCtx, deviceCancel := context.WithTimeout(ctx, 60*time.Second)
-			err := m.svc.UpdateFirmwareStable(deviceCtx, dev.Name)
+
+			var err error
+			if dev.IsPluginManaged() {
+				if cfgDev, ok := deviceConfigs[dev.Name]; ok {
+					err = m.svc.UpdatePluginFirmware(deviceCtx, cfgDev, "stable", "")
+				} else {
+					err = fmt.Errorf("device %q not found in config", dev.Name)
+				}
+			} else {
+				err = m.svc.UpdateFirmwareStable(deviceCtx, dev.Name)
+			}
 			deviceCancel()
 
 			result := UpdateResult{Name: dev.Name, Success: err == nil, Err: err}
@@ -437,9 +485,17 @@ func (m Model) RollbackCurrent() (Model, tea.Cmd) {
 		return m, nil
 	}
 
+	device := m.devices[cursor]
+
+	// Plugin devices don't support rollback
+	if device.IsPluginManaged() {
+		m.err = fmt.Errorf("rollback not supported for %s devices", device.Platform)
+		return m, nil
+	}
+
 	// Start rollback confirmation
 	m.confirmingRollback = true
-	m.rollbackDevice = m.devices[cursor].Name
+	m.rollbackDevice = device.Name
 	return m, nil
 }
 
@@ -834,6 +890,13 @@ func (m Model) UpdateSelectedStaged(percentPerStage int) (Model, tea.Cmd) {
 }
 
 func (m Model) updateDevicesStaged(allDevices []DeviceFirmware, startIdx, batchSize int) tea.Cmd {
+	// Build device config map for plugin firmware updates
+	cfg := config.Get()
+	var deviceConfigs map[string]model.Device
+	if cfg != nil {
+		deviceConfigs = cfg.Devices
+	}
+
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 300*time.Second)
 		defer cancel()
@@ -849,7 +912,17 @@ func (m Model) updateDevicesStaged(allDevices []DeviceFirmware, startIdx, batchS
 			}
 
 			deviceCtx, deviceCancel := context.WithTimeout(ctx, 60*time.Second)
-			err := m.svc.UpdateFirmwareStable(deviceCtx, dev.Name)
+
+			var err error
+			if dev.IsPluginManaged() {
+				if cfgDev, ok := deviceConfigs[dev.Name]; ok {
+					err = m.svc.UpdatePluginFirmware(deviceCtx, cfgDev, "stable", "")
+				} else {
+					err = fmt.Errorf("device %q not found in config", dev.Name)
+				}
+			} else {
+				err = m.svc.UpdateFirmwareStable(deviceCtx, dev.Name)
+			}
 			deviceCancel()
 
 			result := UpdateResult{Name: dev.Name, Success: err == nil, Err: err}
@@ -1091,22 +1164,13 @@ func (m Model) renderDeviceLine(device DeviceFirmware, isCursor bool) string {
 		status = m.styles.UpToDate.Render("✓")
 	}
 
-	// Name
+	// Name with optional platform badge
 	nameStr := device.Name
-
-	// Version info
-	var versionStr string
-	if device.Checked && device.Err == nil {
-		if device.HasUpdate {
-			versionStr = m.styles.Version.Render(device.Current) +
-				m.styles.Muted.Render(" → ") +
-				m.styles.HasUpdate.Render(device.Available)
-		} else if device.Current != "" {
-			versionStr = m.styles.UpToDate.Render(device.Current)
-		}
-	} else if device.Err != nil {
-		versionStr = m.styles.Error.Render("error")
+	if device.IsPluginManaged() {
+		nameStr += " " + m.styles.Muted.Render("["+strings.ToUpper(device.Platform[:1])+"]")
 	}
+
+	versionStr := m.renderVersionStr(device)
 
 	line := fmt.Sprintf("%s%s %s %s", cursor, checkbox, status, nameStr)
 	if versionStr != "" {
@@ -1117,6 +1181,22 @@ func (m Model) renderDeviceLine(device DeviceFirmware, isCursor bool) string {
 		return m.styles.Cursor.Render(line)
 	}
 	return line
+}
+
+func (m Model) renderVersionStr(device DeviceFirmware) string {
+	if device.Checked && device.Err == nil {
+		if device.HasUpdate {
+			return m.styles.Version.Render(device.Current) +
+				m.styles.Muted.Render(" → ") +
+				m.styles.HasUpdate.Render(device.Available)
+		}
+		if device.Current != "" {
+			return m.styles.UpToDate.Render(device.Current)
+		}
+	} else if device.Err != nil {
+		return m.styles.Error.Render("error")
+	}
+	return ""
 }
 
 // Devices returns the device list.

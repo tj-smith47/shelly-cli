@@ -3,6 +3,7 @@ package firmware
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -921,6 +922,141 @@ func TestModel_UpdateSelectedStaged_StartsUpdate(t *testing.T) {
 	}
 	if updated.currentStage != 1 {
 		t.Errorf("currentStage = %d, want 1", updated.currentStage)
+	}
+}
+
+func TestDeviceFirmware_IsPluginManaged(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		platform string
+		want     bool
+	}{
+		{"empty platform", "", false},
+		{"shelly platform", "shelly", false},
+		{"tasmota platform", "tasmota", true},
+		{"esphome platform", "esphome", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			d := &DeviceFirmware{Platform: tt.platform}
+			if got := d.IsPluginManaged(); got != tt.want {
+				t.Errorf("IsPluginManaged() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestModel_RenderDeviceLine_PluginBadge(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m = m.SetSize(80, 30)
+
+	// Shelly device should not have a badge
+	shellyDev := DeviceFirmware{Name: "Kitchen Plug", Platform: "shelly", Checked: true}
+	line := m.renderDeviceLine(shellyDev, false)
+	if strings.Contains(line, "[S]") {
+		t.Error("shelly device should not have platform badge")
+	}
+
+	// Plugin device should show platform badge
+	tasmotaDev := DeviceFirmware{Name: "Tasmota Plug", Platform: "tasmota", Checked: true}
+	line = m.renderDeviceLine(tasmotaDev, false)
+	if !strings.Contains(line, "[T]") {
+		t.Error("tasmota device should show [T] badge")
+	}
+
+	// ESPHome device should show [E] badge
+	esphomeDev := DeviceFirmware{Name: "ESPHome Light", Platform: "esphome", Checked: true}
+	line = m.renderDeviceLine(esphomeDev, false)
+	if !strings.Contains(line, "[E]") {
+		t.Error("esphome device should show [E] badge")
+	}
+}
+
+func TestModel_RenderVersionStr(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	// Unchecked device
+	d := DeviceFirmware{Name: "dev", Checked: false}
+	if got := m.renderVersionStr(d); got != "" {
+		t.Errorf("unchecked device version = %q, want empty", got)
+	}
+
+	// Checked with error
+	d = DeviceFirmware{Name: "dev", Checked: true, Err: errors.New("fail")}
+	if got := m.renderVersionStr(d); !strings.Contains(got, "error") {
+		t.Errorf("error device version = %q, want to contain 'error'", got)
+	}
+
+	// Checked, no update, with current version
+	d = DeviceFirmware{Name: "dev", Checked: true, Current: "1.0.0"}
+	if got := m.renderVersionStr(d); !strings.Contains(got, "1.0.0") {
+		t.Errorf("up-to-date device version = %q, want to contain '1.0.0'", got)
+	}
+
+	// Checked, has update
+	d = DeviceFirmware{Name: "dev", Checked: true, HasUpdate: true, Current: "1.0.0", Available: "1.1.0"}
+	got := m.renderVersionStr(d)
+	if !strings.Contains(got, "1.0.0") || !strings.Contains(got, "1.1.0") {
+		t.Errorf("update device version = %q, want to contain both versions", got)
+	}
+}
+
+func TestModel_RollbackCurrent_PluginDevice(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.devices = []DeviceFirmware{
+		{Name: "Tasmota Plug", Platform: "tasmota"},
+	}
+	m.Scroller.SetItemCount(len(m.devices))
+
+	updated, cmd := m.RollbackCurrent()
+
+	if cmd != nil {
+		t.Error("rollback of plugin device should not return command")
+	}
+	if updated.err == nil {
+		t.Error("rollback of plugin device should set error")
+	}
+	if !strings.Contains(updated.err.Error(), "tasmota") {
+		t.Errorf("error should mention platform, got: %v", updated.err)
+	}
+	if updated.confirmingRollback {
+		t.Error("should not enter confirmation for plugin device")
+	}
+}
+
+func TestModel_CheckComplete_PreservesPlatform(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.checking = true
+	m.devices = []DeviceFirmware{
+		{Name: "tasmota-plug", Address: "192.168.1.50", Platform: "tasmota"},
+		{Name: "shelly-plug", Address: "192.168.1.51", Platform: "shelly"},
+	}
+
+	results := []DeviceFirmware{
+		{Name: "tasmota-plug", Address: "192.168.1.50", Platform: "tasmota", Current: "12.4.0", Checked: true},
+		{Name: "shelly-plug", Address: "192.168.1.51", Platform: "shelly", Current: "1.0.8", Checked: true},
+	}
+	updated, _ := m.Update(CheckCompleteMsg{Results: results})
+
+	for _, dev := range updated.devices {
+		switch dev.Name {
+		case "tasmota-plug":
+			if dev.Platform != "tasmota" {
+				t.Errorf("tasmota device platform = %q, want 'tasmota'", dev.Platform)
+			}
+		case "shelly-plug":
+			if dev.Platform != "shelly" {
+				t.Errorf("shelly device platform = %q, want 'shelly'", dev.Platform)
+			}
+		}
 	}
 }
 
