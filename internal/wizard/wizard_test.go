@@ -34,6 +34,11 @@ func setupTestConfig(t *testing.T) {
 	t.Helper()
 	factory.SetupTestFs(t)
 	config.ResetDefaultManagerForTesting()
+
+	// Safety check: ensure we're on a test filesystem so tests never write to real config.
+	if !config.IsTestFs() {
+		t.Fatal("setupTestConfig: filesystem isolation failed — refusing to run with real filesystem")
+	}
 }
 
 func TestOptions_IsNonInteractive(t *testing.T) {

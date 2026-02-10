@@ -258,18 +258,24 @@ func (m Model) fetchStatuses() tea.Cmd {
 			return StatusUpdateMsg{Statuses: nil}
 		}
 
-		// Add timeout to prevent slow/offline devices from blocking UI
-		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		// Global timeout for the full polling cycle. With a concurrency limit of 4
+		// and per-device timeout of 5s, 18 devices take ~25s worst case.
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
-		// Use errgroup for concurrent status fetching
-		// Rate limiting is handled at the service layer
+		// Use errgroup for concurrent status fetching with concurrency limit.
+		// Without a limit, all devices are polled simultaneously which saturates
+		// the home network and causes false "offline" results.
 		g, gctx := errgroup.WithContext(ctx)
+		g.SetLimit(4)
 
 		results := make(chan DeviceStatus, len(deviceMap))
 
 		for _, d := range deviceMap {
 			device := d
+			if device.DisplayName() == "" || device.Address == "" {
+				continue // Skip devices with no name or address
+			}
 			g.Go(func() error {
 				status := m.checkDeviceStatus(gctx, device)
 				results <- status
@@ -310,14 +316,18 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 	}
 
 	// Per-device timeout to prevent single slow device from blocking others
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
+	pollCtx, pollCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer pollCancel()
 
-	snapshot, err := m.svc.GetMonitoringSnapshotAuto(ctx, device.Address)
+	snapshot, err := m.svc.GetMonitoringSnapshotAuto(pollCtx, device.Address)
 	if err != nil {
 		status.Error = err
-		// For linked devices, resolve parent switch state instead of showing "offline"
-		if ls, linkErr := m.svc.ResolveLinkStatus(ctx, device.Name); linkErr == nil {
+		// For linked devices, resolve parent switch state instead of showing "offline".
+		// Use a fresh timeout — the poll timeout may have expired reaching this device,
+		// but the parent device may still be reachable.
+		linkCtx, linkCancel := context.WithTimeout(ctx, 5*time.Second)
+		defer linkCancel()
+		if ls, linkErr := m.svc.ResolveLinkStatus(linkCtx, device.Name); linkErr == nil {
 			status.LinkState = ls.State
 			status.Error = nil // Clear the connectivity error — link state is authoritative
 		}
@@ -330,7 +340,7 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 	aggregateMetrics(&status, snapshot.EM1, false)
 
 	// Fetch sensor data via full status
-	m.fetchSensorData(ctx, device.Address, &status)
+	m.fetchSensorData(pollCtx, device.Address, &status)
 
 	// Check WebSocket connection status
 	if m.eventStream != nil {

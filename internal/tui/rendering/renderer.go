@@ -262,7 +262,7 @@ func (r *Renderer) padOrTruncate(line string, width int) string {
 		return line + strings.Repeat(" ", width-lineWidth)
 	}
 	if lineWidth > width {
-		return ansi.Truncate(line, width-3, "...")
+		return ansi.Truncate(line, width, "...")
 	}
 	return line
 }
@@ -278,7 +278,7 @@ func (r *Renderer) wrapAndTruncate(content string, width int) []string {
 			result = append(result, line)
 		} else {
 			// Truncate with ellipsis
-			result = append(result, ansi.Truncate(line, width-3, "...")+"...")
+			result = append(result, ansi.Truncate(line, width, "..."))
 		}
 	}
 

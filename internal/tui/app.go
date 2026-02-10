@@ -562,6 +562,12 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		m.tabBar, _ = m.tabBar.SetActive(msg.Current)
 		return m, nil, true
 	}
+	// Route non-key messages to visible overlays (e.g., spinner ticks for device detail)
+	if _, isKey := msg.(tea.KeyPressMsg); !isKey {
+		if model, cmd, handled := m.routeToVisibleOverlay(msg); handled {
+			return model, cmd, true
+		}
+	}
 	return m, nil, false
 }
 

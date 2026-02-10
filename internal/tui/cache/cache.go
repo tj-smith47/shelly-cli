@@ -569,6 +569,9 @@ func (c *Cache) loadDevicesWave() tea.Cmd {
 		c.order = make([]string, 0, len(deviceMap))
 		for _, dev := range deviceMap {
 			displayName := dev.DisplayName()
+			if displayName == "" || dev.Address == "" {
+				continue // Skip devices with no name or address
+			}
 			c.devices[displayName] = &DeviceData{
 				Device:  dev,
 				Fetched: false,

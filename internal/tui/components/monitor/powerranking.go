@@ -318,7 +318,7 @@ func (m PowerRankingModel) renderContent() string {
 		return m.styles.Muted.Render("No devices to rank")
 	}
 
-	contentWidth := m.Width - 6 // borders (2) + padding (2) + margin (2)
+	contentWidth := m.Width - 4 // borders (2) + padding (2)
 	if contentWidth < 10 {
 		contentWidth = 10
 	}

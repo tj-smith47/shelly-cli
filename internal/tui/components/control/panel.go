@@ -2,6 +2,7 @@ package control
 
 import (
 	"context"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -251,8 +252,16 @@ func (p Panel) View() string {
 		return ""
 	}
 
-	// Center the panel
-	panelWidth := 50
+	// Measure content width and shrink panel to fit
+	maxLineWidth := 0
+	for _, line := range strings.Split(content, "\n") {
+		if w := lipgloss.Width(line); w > maxLineWidth {
+			maxLineWidth = w
+		}
+	}
+
+	// Content width + padding, capped at available space
+	panelWidth := max(30, min(maxLineWidth+4, 80))
 	if p.width > 0 && panelWidth > p.width-4 {
 		panelWidth = p.width - 4
 	}

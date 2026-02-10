@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
@@ -37,19 +38,23 @@ type Msg struct {
 // ClosedMsg signals that the detail view was closed.
 type ClosedMsg struct{}
 
+// containerOverhead is the total horizontal overhead from the container border (2) + padding (4).
+const containerOverhead = 6
+
 // Model holds the device detail state.
 type Model struct {
 	panel.Sizable
-	ctx      context.Context
-	svc      *shelly.Service
-	device   *model.Device
-	status   *model.MonitoringSnapshot
-	config   map[string]any
-	viewport viewport.Model
-	visible  bool
-	loading  bool
-	err      error
-	styles   Styles
+	ctx          context.Context
+	svc          *shelly.Service
+	device       *model.Device
+	status       *model.MonitoringSnapshot
+	config       map[string]any
+	viewport     viewport.Model
+	visible      bool
+	loading      bool
+	err          error
+	overlayWidth int // content-driven overlay width (0 = use default)
+	styles       Styles
 }
 
 // Styles for the device detail component.
@@ -152,7 +157,19 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.device = &detailMsg.Device
 		m.status = detailMsg.Status
 		m.config = detailMsg.Config
-		m.viewport.SetContent(m.renderContent())
+
+		rawContent := m.renderContent()
+
+		// Measure content width and shrink overlay to fit
+		maxLineWidth := 0
+		for _, line := range strings.Split(rawContent, "\n") {
+			if w := lipgloss.Width(line); w > maxLineWidth {
+				maxLineWidth = w
+			}
+		}
+		m.overlayWidth = max(40, min(maxLineWidth+containerOverhead, m.Width))
+		m.viewport.SetWidth(m.overlayWidth - containerOverhead)
+		m.viewport.SetContent(rawContent)
 		return m, nil
 	}
 
@@ -182,8 +199,14 @@ func (m Model) View() string {
 	footer := m.styles.Label.Render("j/k scroll") + " " +
 		m.styles.Label.Render("q/Esc close")
 
+	// Use content-driven width if measured, otherwise fall back to default
+	renderWidth := m.Width - 4
+	if m.overlayWidth > 0 {
+		renderWidth = m.overlayWidth - containerOverhead
+	}
+
 	return m.styles.Container.
-		Width(m.Width - 4).
+		Width(renderWidth).
 		Height(m.Height - 2).
 		Render(content + "\n" + footer)
 }
@@ -289,12 +312,16 @@ func (m Model) renderPowerMonitoring() string {
 	return content
 }
 
-// SetSize sets the component dimensions.
+// SetSize sets the maximum overlay dimensions.
+// Actual width is determined by content (see Update).
 func (m Model) SetSize(width, height int) Model {
 	m.ApplySize(width, height)
-	// Account for container borders and padding
-	m.viewport.SetWidth(width - 8)
 	m.viewport.SetHeight(height - 6)
+	// Viewport width is set dynamically when content loads.
+	// Set a default so the spinner/error states render correctly.
+	if m.overlayWidth == 0 {
+		m.viewport.SetWidth(width - containerOverhead)
+	}
 	return m
 }
 

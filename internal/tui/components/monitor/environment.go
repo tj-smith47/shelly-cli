@@ -252,7 +252,7 @@ func (m EnvironmentModel) renderContent() string {
 	floods := m.collectFloodSensors()
 	smokes := m.collectSmokeSensors()
 
-	contentWidth := m.Width - 6 // borders (2) + padding (2) + margin (2)
+	contentWidth := m.Width - 4 // borders (2) + padding (2)
 	if contentWidth < 10 {
 		contentWidth = 10
 	}
@@ -444,15 +444,22 @@ func (m EnvironmentModel) renderSectionHeader(name string) string {
 	return m.styles.SectionHeader.Render("  " + name)
 }
 
+// sensorLineOverhead accounts for the "    " indent (4) + " " separator (1) in sensor lines.
+const sensorLineOverhead = 5
+
 // renderSensorLines renders sensor entries with a consistent format: "    name padding value".
 // formatFn returns the fully-styled value string for each reading.
 func renderSensorLines[T any](entries []sensorEntry[T], maxWidth, padding int,
 	formatFn func(T) string, nameStyle lipgloss.Style) []string {
 	lines := make([]string, 0, len(entries))
+	nameCol := maxWidth - padding - sensorLineOverhead
+	if nameCol < 5 {
+		nameCol = 5
+	}
 	for _, e := range entries {
 		valueStr := formatFn(e.Reading)
-		name := output.Truncate(e.DeviceName, maxWidth-padding)
-		namePad := strings.Repeat(" ", max(0, maxWidth-padding-len(name)))
+		name := output.Truncate(e.DeviceName, nameCol)
+		namePad := strings.Repeat(" ", max(0, nameCol-len(name)))
 		lines = append(lines, fmt.Sprintf("    %s%s %s",
 			nameStyle.Render(name), namePad, valueStr))
 	}
@@ -528,8 +535,12 @@ func (m EnvironmentModel) renderBatteries(entries []batteryEntry, maxWidth int) 
 			extStr = " " + m.styles.ExtPower.Render("[ext]")
 		}
 
-		name := output.Truncate(e.DeviceName, maxWidth-20)
-		namePad := strings.Repeat(" ", max(0, maxWidth-20-len(name)))
+		nameCol := maxWidth - 20 - sensorLineOverhead
+		if nameCol < 5 {
+			nameCol = 5
+		}
+		name := output.Truncate(e.DeviceName, nameCol)
+		namePad := strings.Repeat(" ", max(0, nameCol-len(name)))
 		lines = append(lines, fmt.Sprintf("    %s%s %s%s",
 			m.styles.DeviceName.Render(name), namePad, style.Render(valueStr), extStr))
 	}
