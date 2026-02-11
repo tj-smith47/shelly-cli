@@ -96,6 +96,14 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
+	// Force refresh metadata from hardware if requested
+	if opts.Refresh {
+		svc := opts.Factory.ShellyService()
+		svc.RefreshAllDeviceMetadata(ctx, ios, devices)
+		// Re-read devices after refresh (metadata may have changed)
+		devices = mgr.ListDevices()
+	}
+
 	// Apply filters and build sorted list
 	filterOpts := shelly.DeviceListFilterOptions{
 		Generation: opts.Generation,

@@ -68,11 +68,11 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	// Standard Shelly device status
+	// Standard Shelly device status (auto-detects Gen1 vs Gen2)
 	return cmdutil.RunDeviceStatus(ctx, ios, svc, opts.Device,
 		"Getting device status...",
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.DeviceStatus, error) {
-			return svc.DeviceStatus(ctx, device)
+			return svc.DeviceStatusAuto(ctx, device)
 		},
 		term.DisplayDeviceStatus)
 }

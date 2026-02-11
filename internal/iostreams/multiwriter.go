@@ -4,11 +4,23 @@ package iostreams
 import (
 	"fmt"
 	"io"
+	"os"
+	"strings"
 	"sync"
+	"time"
 
-	"charm.land/lipgloss/v2"
+	"golang.org/x/term"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams/render"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+)
+
+const (
+	// tickerInterval is the animation frame interval, aligned with Docker BuildKit's TTY_DISPLAY_RATE.
+	tickerInterval = 150 * time.Millisecond
+
+	// minRenderInterval prevents excessive redraws during rapid concurrent updates.
+	minRenderInterval = 50 * time.Millisecond
 )
 
 // Status represents the status of a line in the multi-writer output.
@@ -45,6 +57,42 @@ func (s Status) String() string {
 	}
 }
 
+// statusToRender maps the public Status enum to render package status strings.
+func statusToRender(s Status) string {
+	switch s {
+	case StatusPending:
+		return render.StatusPending
+	case StatusRunning:
+		return render.StatusRunning
+	case StatusSuccess:
+		return render.StatusSuccess
+	case StatusError:
+		return render.StatusError
+	case StatusSkipped:
+		return render.StatusSkipped
+	default:
+		return render.StatusPending
+	}
+}
+
+// renderToStatus maps render package status strings back to the public Status enum.
+func renderToStatus(s string) Status {
+	switch s {
+	case render.StatusPending:
+		return StatusPending
+	case render.StatusRunning:
+		return StatusRunning
+	case render.StatusSuccess:
+		return StatusSuccess
+	case render.StatusError:
+		return StatusError
+	case render.StatusSkipped:
+		return StatusSkipped
+	default:
+		return StatusPending
+	}
+}
+
 // Line represents a single output line that can be updated.
 type Line struct {
 	ID      string
@@ -53,24 +101,58 @@ type Line struct {
 }
 
 // MultiWriter manages multiple concurrent output lines.
-// It provides Docker-style multi-line progress output where each target
+// It provides Docker BuildKit-style multi-line progress output where each target
 // gets its own line that updates in place (for TTY) or prints sequentially
-// (for non-TTY).
+// (for non-TTY). Uses animated spinners, dirty-line tracking, and rate-limited
+// rendering adapted from mc-cli's render engine.
 type MultiWriter struct {
-	mu    sync.Mutex
-	out   io.Writer
-	lines map[string]*Line
-	order []string // Preserve insertion order
-	isTTY bool
+	mu        sync.Mutex
+	out       io.Writer
+	regions   []*render.LineRegion
+	regionMap map[string]*render.LineRegion
+	order     []string // preserve insertion order
+	isTTY     bool
+	colorFn   render.ColorFuncs
+
+	// Render state (TTY only)
+	lastHeight int
+	lastLines  []string
+	lastRender time.Time
+	finalized  bool
+
+	// Terminal size
+	termWidth int
+	getSizeFn func() (int, int) // nil disables polling
+
+	// Ticker for spinner animation
+	ticker  *time.Ticker
+	stopCh  chan struct{}
+	stopped bool
+
+	// Plain mode state (non-TTY)
+	plainState map[string]string // last printed status per ID
 }
 
 // NewMultiWriter creates a multi-line writer.
 func NewMultiWriter(out io.Writer, isTTY bool) *MultiWriter {
-	return &MultiWriter{
-		out:   out,
-		lines: make(map[string]*Line),
-		isTTY: isTTY,
+	m := &MultiWriter{
+		out:        out,
+		regionMap:  make(map[string]*render.LineRegion),
+		isTTY:      isTTY,
+		plainState: make(map[string]string),
 	}
+
+	if isTTY {
+		m.colorFn = buildColorFuncs()
+		m.getSizeFn = getTerminalSize
+		if w, _ := getTerminalSize(); w > 0 {
+			m.termWidth = w
+		}
+	} else {
+		m.colorFn = render.NoColor()
+	}
+
+	return m
 }
 
 // AddLine adds a new tracked line.
@@ -78,16 +160,20 @@ func (m *MultiWriter) AddLine(id, message string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.lines[id] = &Line{
+	r := &render.LineRegion{
 		ID:      id,
-		Status:  StatusPending,
+		Status:  render.StatusPending,
 		Message: message,
 	}
+	m.regions = append(m.regions, r)
+	m.regionMap[id] = r
 	m.order = append(m.order, id)
 
-	// For TTY, print the initial line
+	// Start ticker on first line (TTY only)
+	m.startTickerLocked()
+
 	if m.isTTY {
-		m.printLine(m.lines[id])
+		m.forceRenderLocked()
 	}
 }
 
@@ -96,16 +182,28 @@ func (m *MultiWriter) UpdateLine(id string, status Status, message string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	line, ok := m.lines[id]
-	if !ok {
+	r := m.regionMap[id]
+	if r == nil {
 		return
 	}
 
-	line.Status = status
-	line.Message = message
+	newStatus := statusToRender(status)
+
+	// Track timing on status transitions
+	if newStatus == render.StatusRunning && r.Status != render.StatusRunning {
+		r.StartTime = time.Now()
+	}
+	if newStatus != render.StatusRunning && r.Status == render.StatusRunning && !r.StartTime.IsZero() {
+		r.Duration = render.FormatElapsed(time.Since(r.StartTime))
+	}
+
+	r.Status = newStatus
+	r.Message = message
 
 	if m.isTTY {
-		m.render()
+		m.forceRenderLocked()
+	} else {
+		m.renderPlainLocked(id)
 	}
 }
 
@@ -114,116 +212,51 @@ func (m *MultiWriter) GetLine(id string) (Line, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	line, ok := m.lines[id]
-	if !ok {
+	r := m.regionMap[id]
+	if r == nil {
 		return Line{}, false
 	}
-	return *line, true
+	return Line{
+		ID:      r.ID,
+		Status:  renderToStatus(r.Status),
+		Message: r.Message,
+	}, true
 }
 
 // LineCount returns the number of tracked lines.
 func (m *MultiWriter) LineCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return len(m.lines)
+	return len(m.regions)
 }
 
-// render redraws all lines (TTY only).
-func (m *MultiWriter) render() {
-	if !m.isTTY {
-		return
-	}
-
-	// Move cursor up to start of our output
-	if len(m.order) > 1 {
-		writeQuietly(m.out, "\033[%dA", len(m.order))
-	} else if len(m.order) == 1 {
-		writeQuietly(m.out, "\033[1A")
-	}
-
-	for _, id := range m.order {
-		line := m.lines[id]
-		writeQuietly(m.out, "\033[2K") // Clear line
-		m.printLine(line)
-	}
-}
-
-// printLine prints a single line with status icon and styling.
-func (m *MultiWriter) printLine(line *Line) {
-	icon := m.statusIcon(line.Status)
-	style := m.statusStyle(line.Status)
-	idStyle := m.idStyle(line.Status)
-
-	writeQuietly(m.out, "%s %s: %s\n",
-		icon,
-		idStyle.Render(line.ID),
-		style.Render(line.Message),
-	)
-}
-
-// statusIcon returns the appropriate icon for a status.
-func (m *MultiWriter) statusIcon(s Status) string {
-	switch s {
-	case StatusPending:
-		return theme.Dim().Render("○")
-	case StatusRunning:
-		return theme.StatusWarn().Render("◐")
-	case StatusSuccess:
-		return theme.StatusOK().Render("✓")
-	case StatusError:
-		return theme.StatusError().Render("✗")
-	case StatusSkipped:
-		return theme.Dim().Render("⊘")
-	default:
-		return "?"
-	}
-}
-
-// statusStyle returns the appropriate lipgloss style for message text.
-func (m *MultiWriter) statusStyle(s Status) lipgloss.Style {
-	switch s {
-	case StatusSuccess:
-		return theme.Dim()
-	case StatusError:
-		return theme.StatusError()
-	case StatusRunning:
-		return lipgloss.NewStyle()
-	case StatusSkipped:
-		return theme.Dim()
-	default:
-		return theme.Dim()
-	}
-}
-
-// idStyle returns the appropriate style for the ID/name.
-func (m *MultiWriter) idStyle(s Status) lipgloss.Style {
-	switch s {
-	case StatusSuccess:
-		return theme.StatusOK()
-	case StatusError:
-		return theme.StatusError()
-	case StatusRunning:
-		return theme.Bold()
-	default:
-		return lipgloss.NewStyle()
-	}
-}
-
-// Finalize prints final state (for non-TTY or completion).
-// For non-TTY outputs, this prints all lines since they weren't printed during updates.
-// For TTY outputs, this is a no-op since lines are already visible.
+// Finalize writes the final state and cleans up.
 func (m *MultiWriter) Finalize() {
+	// Stop ticker first (outside lock to avoid deadlock with tick loop)
+	m.stopTicker()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if !m.isTTY {
-		// Non-TTY: print each line once at the end
+	if m.finalized {
+		return
+	}
+	m.finalized = true
+
+	if m.isTTY {
+		m.forceRenderLocked()
+		writeQuietly(m.out, "%s", render.ShowCursor())
+	} else {
+		// Non-TTY: print any remaining lines not yet printed
 		for _, id := range m.order {
-			line := m.lines[id]
-			m.printLine(line)
+			r := m.regionMap[id]
+			if m.plainState[id] != r.Status {
+				line := render.FormatLine(r, m.colorFn)
+				writelnQuietly(m.out, line)
+				m.plainState[id] = r.Status
+			}
 		}
 	}
-	// For TTY, lines are already rendered - nothing to do
 }
 
 // Summary returns a summary of the operation results.
@@ -231,16 +264,14 @@ func (m *MultiWriter) Summary() (success, failed, skipped int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, line := range m.lines {
-		switch line.Status {
-		case StatusSuccess:
+	for _, r := range m.regions {
+		switch r.Status {
+		case render.StatusSuccess:
 			success++
-		case StatusError:
+		case render.StatusError:
 			failed++
-		case StatusSkipped:
+		case render.StatusSkipped:
 			skipped++
-		case StatusPending, StatusRunning:
-			// Not counted in summary - operation still in progress
 		}
 	}
 	return
@@ -249,7 +280,7 @@ func (m *MultiWriter) Summary() (success, failed, skipped int) {
 // PrintSummary prints a summary line with counts.
 func (m *MultiWriter) PrintSummary() {
 	success, failed, skipped := m.Summary()
-	total := len(m.lines)
+	total := m.LineCount()
 
 	parts := make([]string, 0, 3)
 	if success > 0 {
@@ -267,14 +298,7 @@ func (m *MultiWriter) PrintSummary() {
 		return
 	}
 
-	summary := ""
-	for i, part := range parts {
-		if i > 0 {
-			summary += ", "
-		}
-		summary += part
-	}
-	writelnQuietly(m.out, summary)
+	writelnQuietly(m.out, strings.Join(parts, ", "))
 }
 
 // HasErrors returns true if any line has an error status.
@@ -282,8 +306,8 @@ func (m *MultiWriter) HasErrors() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, line := range m.lines {
-		if line.Status == StatusError {
+	for _, r := range m.regions {
+		if r.Status == render.StatusError {
 			return true
 		}
 	}
@@ -295,10 +319,196 @@ func (m *MultiWriter) AllSucceeded() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, line := range m.lines {
-		if line.Status != StatusSuccess && line.Status != StatusSkipped {
+	for _, r := range m.regions {
+		if r.Status != render.StatusSuccess && r.Status != render.StatusSkipped {
 			return false
 		}
 	}
 	return true
+}
+
+// startTickerLocked starts the background animation ticker. Must be called with m.mu held.
+func (m *MultiWriter) startTickerLocked() {
+	if !m.isTTY || m.ticker != nil {
+		return
+	}
+	m.stopCh = make(chan struct{})
+	m.ticker = time.NewTicker(tickerInterval)
+	go m.tickLoop()
+}
+
+// stopTicker stops the background animation ticker. Idempotent.
+func (m *MultiWriter) stopTicker() {
+	m.mu.Lock()
+	if m.stopped || m.ticker == nil {
+		m.mu.Unlock()
+		return
+	}
+	m.stopped = true
+	m.mu.Unlock()
+
+	m.ticker.Stop()
+	close(m.stopCh)
+}
+
+// tickLoop is the background goroutine that drives spinner animation.
+func (m *MultiWriter) tickLoop() {
+	for {
+		select {
+		case <-m.stopCh:
+			return
+		case <-m.ticker.C:
+			m.mu.Lock()
+			if m.finalized {
+				m.mu.Unlock()
+				return
+			}
+			m.advanceSpinners()
+			m.renderLocked()
+			m.mu.Unlock()
+		}
+	}
+}
+
+// advanceSpinners increments SpinnerFrame on all running regions.
+func (m *MultiWriter) advanceSpinners() {
+	for _, r := range m.regions {
+		if r.Status == render.StatusRunning {
+			r.SpinnerFrame++
+		}
+	}
+}
+
+// renderLocked performs a rate-limited render. Must be called with m.mu held.
+func (m *MultiWriter) renderLocked() {
+	if m.finalized || !m.isTTY {
+		return
+	}
+	if time.Since(m.lastRender) < minRenderInterval {
+		return
+	}
+	m.doRender()
+}
+
+// forceRenderLocked renders regardless of rate limiting. Must be called with m.mu held.
+func (m *MultiWriter) forceRenderLocked() {
+	if m.finalized && !m.isTTY {
+		return
+	}
+	m.doRender()
+}
+
+// doRender performs the actual TTY render with dirty-line tracking. Must be called with m.mu held.
+func (m *MultiWriter) doRender() {
+	m.pollSize()
+	lines := m.buildLines()
+
+	// Apply terminal width truncation
+	truncated := make([]string, len(lines))
+	for i, line := range lines {
+		if m.termWidth > 0 {
+			line = render.TruncateLine(line, m.termWidth)
+		}
+		truncated[i] = line
+	}
+
+	var buf strings.Builder
+
+	// Hide cursor during redraw to prevent flicker
+	buf.WriteString(render.HideCursor())
+
+	// Move cursor back to start of previous output
+	if m.lastHeight > 0 {
+		buf.WriteString(render.MoveUp(m.lastHeight))
+	}
+
+	// Write lines, skipping unchanged ones (dirty-line tracking)
+	for i, line := range truncated {
+		if i < len(m.lastLines) && line == m.lastLines[i] {
+			buf.WriteString(render.MoveDown(1))
+		} else {
+			buf.WriteString("\r")
+			buf.WriteString(render.ClearLine())
+			buf.WriteString(line)
+			buf.WriteString("\n")
+		}
+	}
+
+	// Clear leftover lines from previous render
+	if len(truncated) < m.lastHeight {
+		extra := m.lastHeight - len(truncated)
+		for range extra {
+			buf.WriteString(render.ClearLine())
+			buf.WriteString("\n")
+		}
+		buf.WriteString(render.MoveUp(extra))
+	}
+
+	// Show cursor after redraw
+	buf.WriteString(render.ShowCursor())
+
+	writeQuietly(m.out, "%s", buf.String())
+	m.lastHeight = len(truncated)
+	m.lastLines = truncated
+	m.lastRender = time.Now()
+}
+
+// buildLines collects formatted lines from all regions.
+func (m *MultiWriter) buildLines() []string {
+	lines := make([]string, 0, len(m.regions))
+	for _, r := range m.regions {
+		lines = append(lines, render.FormatLine(r, m.colorFn))
+	}
+	return lines
+}
+
+// pollSize re-queries terminal dimensions.
+func (m *MultiWriter) pollSize() {
+	if m.getSizeFn == nil {
+		return
+	}
+	w, _ := m.getSizeFn()
+	if w > 0 {
+		m.termWidth = w
+	}
+}
+
+// renderPlainLocked prints a status line for non-TTY output when status changes.
+// Must be called with m.mu held.
+func (m *MultiWriter) renderPlainLocked(id string) {
+	r := m.regionMap[id]
+	if r == nil {
+		return
+	}
+	if m.plainState[id] == r.Status {
+		return // Status unchanged, skip
+	}
+	line := render.FormatLine(r, m.colorFn)
+	writelnQuietly(m.out, line)
+	m.plainState[id] = r.Status
+}
+
+// buildColorFuncs creates ColorFuncs from the shelly-cli theme package.
+func buildColorFuncs() render.ColorFuncs {
+	wrap := func(style func(...string) string) func(string) string {
+		return func(s string) string { return style(s) }
+	}
+	return render.ColorFuncs{
+		Primary:   wrap(theme.Highlight().Render),
+		Secondary: wrap(theme.Dim().Render),
+		Tertiary:  wrap(theme.Subtitle().Render),
+		Faint:     wrap(theme.Dim().Render),
+		Error:     wrap(theme.StatusError().Render),
+		Yellow:    wrap(theme.StatusWarn().Render),
+		Green:     wrap(theme.StatusOK().Render),
+	}
+}
+
+// getTerminalSize returns the current terminal width and height.
+func getTerminalSize() (width, height int) {
+	w, h, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		return 0, 0
+	}
+	return w, h
 }

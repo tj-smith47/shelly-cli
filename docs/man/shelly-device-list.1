@@ -38,6 +38,10 @@ Columns: Name, Address, Platform, Type, Model, Generation, Auth
 	Filter by platform (e.g., shelly, tasmota)
 
 .PP
+\fB--refresh\fP[=false]
+	Force refresh device metadata from hardware
+
+.PP
 \fB-t\fP, \fB--type\fP=""
 	Filter by device type
 
@@ -85,10 +89,6 @@ Columns: Name, Address, Platform, Type, Model, Generation, Auth
 .PP
 \fB-q\fP, \fB--quiet\fP[=false]
 	Suppress non-essential output
-
-.PP
-\fB--refresh\fP[=false]
-	Bypass cache and fetch fresh data from device
 
 .PP
 \fB--template\fP=""

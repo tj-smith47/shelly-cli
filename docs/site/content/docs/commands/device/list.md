@@ -69,6 +69,7 @@ shelly device list [flags]
   -g, --generation int    Filter by generation (1, 2, or 3)
   -h, --help              help for list
   -p, --platform string   Filter by platform (e.g., shelly, tasmota)
+      --refresh           Force refresh device metadata from hardware
   -t, --type string       Filter by device type
   -u, --updates-first     Sort devices with available updates first
   -V, --version           Show firmware version information
@@ -86,7 +87,6 @@ shelly device list [flags]
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
-      --refresh                 Bypass cache and fetch fresh data from device
       --template string         Go template string for output (use with -o template)
   -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
 ```

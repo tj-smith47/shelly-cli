@@ -15,19 +15,27 @@ import (
 
 // NewCommand creates the device config command and its subcommands.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	getCmd := get.NewCommand(f)
+
 	cmd := &cobra.Command{
-		Use:     "config",
+		Use:     "config [device] [component]",
 		Aliases: []string{"cfg"},
 		Short:   "Manage device configuration",
 		Long: `Manage device configuration settings.
 
+When called with a device argument (and optional component), delegates to
+"config get" to show the device configuration.
+
 Get, set, export, and import device configurations. Configuration includes
 component settings, system parameters, and feature configurations.`,
-		Example: `  # Get full device configuration
-  shelly device config get living-room
+		Example: `  # Get full device configuration (shorthand)
+  shelly device config living-room
 
-  # Get specific component configuration
-  shelly device config get living-room switch:0
+  # Get specific component configuration (shorthand)
+  shelly device config living-room switch:0
+
+  # Get full device configuration (explicit)
+  shelly device config get living-room
 
   # Set configuration values
   shelly device config set living-room switch:0 name="Main Light"
@@ -43,11 +51,21 @@ component settings, system parameters, and feature configurations.`,
 
   # Reset configuration to defaults
   shelly device config reset living-room switch:0`,
+		Args: cobra.MaximumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return cmd.Help()
+			}
+			// Delegate to "get" subcommand
+			getCmd.SetArgs(args)
+			getCmd.SetContext(cmd.Context())
+			return getCmd.Execute()
+		},
 	}
 
 	cmd.AddCommand(diff.NewCommand(f))
 	cmd.AddCommand(configexport.NewCommand(f))
-	cmd.AddCommand(get.NewCommand(f))
+	cmd.AddCommand(getCmd)
 	cmd.AddCommand(configimport.NewCommand(f))
 	cmd.AddCommand(reset.NewCommand(f))
 	cmd.AddCommand(set.NewCommand(f))

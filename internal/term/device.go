@@ -212,6 +212,9 @@ func DisplayDeviceInfo(ios *iostreams.IOStreams, info *shelly.DeviceInfo) {
 	builder.AddRow("Firmware", info.Firmware)
 	builder.AddRow("Application", info.App)
 	builder.AddRow("Auth Enabled", output.RenderAuthRequired(info.AuthEn))
+	if info.Address != "" {
+		builder.AddRow("Address", info.Address)
+	}
 
 	tbl := builder.WithModeStyle(ios).Build()
 	if err := tbl.PrintTo(ios.Out); err != nil {

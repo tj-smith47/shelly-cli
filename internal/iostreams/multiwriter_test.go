@@ -82,7 +82,9 @@ func TestMultiWriter_AddLine_TTY(t *testing.T) {
 
 	mw.AddLine("device1", "pending")
 
-	// In TTY mode, line should be printed immediately
+	// Finalize stops the ticker goroutine so we can safely read the buffer.
+	mw.Finalize()
+
 	output := buf.String()
 	if !strings.Contains(output, "device1") {
 		t.Errorf("TTY AddLine should print immediately, got %q", output)
@@ -143,15 +145,16 @@ func TestMultiWriter_Finalize_NonTTY(t *testing.T) {
 	mw.AddLine("device2", "pending")
 	mw.UpdateLine("device2", iostreams.StatusError, "failed")
 
-	buf.Reset() // Clear any output
+	// Non-TTY prints on status transitions, so output accumulates during UpdateLine calls.
+	// Finalize ensures any remaining unprinted lines are flushed.
 	mw.Finalize()
 
 	output := buf.String()
 	if !strings.Contains(output, "device1") {
-		t.Errorf("Finalize should print device1, got %q", output)
+		t.Errorf("output should contain device1, got %q", output)
 	}
 	if !strings.Contains(output, "device2") {
-		t.Errorf("Finalize should print device2, got %q", output)
+		t.Errorf("output should contain device2, got %q", output)
 	}
 }
 
@@ -164,12 +167,20 @@ func TestMultiWriter_Finalize_TTY(t *testing.T) {
 	mw.AddLine("device1", "pending")
 	mw.UpdateLine("device1", iostreams.StatusSuccess, "done")
 
-	initialLen := buf.Len()
 	mw.Finalize()
 
-	// For TTY, Finalize should not add anything
-	if buf.Len() != initialLen {
-		t.Error("TTY Finalize should not add output")
+	// Finalize does a final render and emits ShowCursor. Verify it contains the
+	// cursor-show escape sequence and that double-Finalize is safe.
+	output := buf.String()
+	if !strings.Contains(output, "\033[?25h") {
+		t.Errorf("TTY Finalize should emit ShowCursor, got %q", output)
+	}
+
+	// Second Finalize should be a no-op (idempotent)
+	lenAfterFirst := buf.Len()
+	mw.Finalize()
+	if buf.Len() != lenAfterFirst {
+		t.Error("double Finalize should not add more output")
 	}
 }
 
@@ -386,6 +397,9 @@ func TestMultiWriter_Render_TTY(t *testing.T) {
 
 	// Update triggers render
 	mw.UpdateLine("device1", iostreams.StatusRunning, "working")
+
+	// Finalize stops the ticker goroutine so we can safely read the buffer.
+	mw.Finalize()
 
 	output := buf.String()
 	// Should contain ANSI escape codes for cursor movement

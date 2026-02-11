@@ -41,8 +41,8 @@ func NewSpinnerWithWriter(message string, w io.Writer, opts ...SpinnerOption) *S
 		writer: w,
 	}
 
-	// Apply blue color for spinners
-	setSpinnerColorQuietly(s.s, "blue")
+	// Apply shelly blue (bright cyan) for spinners
+	setSpinnerColorQuietly(s.s, "fgHiCyan")
 
 	// Set message
 	s.s.Suffix = " " + message

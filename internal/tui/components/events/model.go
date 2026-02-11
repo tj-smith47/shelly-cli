@@ -1391,18 +1391,10 @@ func (m Model) renderUserEventWrapped(e Event, timeW, deviceW, compW, levelW, de
 	timeStr := timeStyle.Width(timeW).Render(e.Timestamp.Format("15:04:05"))
 
 	// Device column - truncate if needed
-	device := e.Device
-	if len(device) > deviceW {
-		device = device[:deviceW-1] + "…"
-	}
-	deviceStr := deviceStyle.Width(deviceW).Render(device)
+	deviceStr := deviceStyle.Width(deviceW).Render(output.Truncate(e.Device, deviceW))
 
 	// Component column
-	comp := m.formatComponent(e)
-	if len(comp) > compW {
-		comp = comp[:compW-1] + "…"
-	}
-	compStr := compStyle.Width(compW).Render(comp)
+	compStr := compStyle.Width(compW).Render(output.Truncate(m.formatComponent(e), compW))
 
 	// Level column - sanitize to prevent rendering issues
 	levelVal := sanitizeLevel(e.Type, levelW)
@@ -1472,8 +1464,8 @@ func (m Model) renderSystemEvent(e Event, timeW, deviceW int, selected bool) str
 	// Time column - fixed width
 	timeStr := timeStyle.Width(timeW).Render(e.Timestamp.Format("15:04:05"))
 
-	// Device column - pad to fixed width for alignment
-	deviceStr := deviceStyle.Width(deviceW).Render(e.Device)
+	// Device column - truncate and pad to fixed width for alignment
+	deviceStr := deviceStyle.Width(deviceW).Render(output.Truncate(e.Device, deviceW))
 
 	return timeStr + " " + deviceStr
 }

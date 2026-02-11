@@ -12,7 +12,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
@@ -98,7 +97,7 @@ func run(ctx context.Context, opts *Options) error {
 		if err != nil {
 			return fmt.Errorf("failed to detect subnet: %w", err)
 		}
-		ios.Info("Detected subnet: %s", subnet)
+		ios.Success("Detected subnet: %s", subnet)
 	}
 
 	_, ipNet, err := net.ParseCIDR(subnet)
@@ -112,32 +111,26 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("no addresses to scan in subnet %s", subnet)
 	}
 
-	ios.Info("Scanning %d addresses in %s...", len(addresses), ipNet)
-
-	// Create MultiWriter for progress tracking
-	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
-
-	// Add progress line
-	mw.AddLine("scan", fmt.Sprintf("0/%d addresses probed", len(addresses)))
+	ios.Success("Scanning %d addresses in %s", len(addresses), ipNet)
 
 	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
-	// Use progress callback to update MultiWriter
+	// Use animated spinner for scan progress
+	ios.StartProgress(fmt.Sprintf("0/%d addresses probed", len(addresses)))
+
 	devices := discovery.ProbeAddressesWithProgress(ctx, addresses, func(p discovery.ProbeProgress) bool {
-		status := iostreams.StatusRunning
 		msg := fmt.Sprintf("%d/%d addresses probed", p.Done, p.Total)
 		if p.Found && p.Device != nil {
 			msg = fmt.Sprintf("%d/%d - found %s (%s)", p.Done, p.Total, p.Device.Name, p.Device.Model)
 		}
-		mw.UpdateLine("scan", status, msg)
+		ios.UpdateProgress(msg)
 		return ctx.Err() == nil // Continue unless context canceled
 	})
 
-	// Mark scan complete
-	mw.UpdateLine("scan", iostreams.StatusSuccess, fmt.Sprintf("%d/%d addresses probed, %d devices found",
+	// Stop spinner with success summary
+	ios.StopProgressWithSuccess(fmt.Sprintf("%d/%d addresses probed, %d devices found",
 		len(addresses), len(addresses), len(devices)))
-	mw.Finalize()
 
 	if len(devices) == 0 {
 		ios.NoResults("devices", "Ensure devices are powered on and accessible on the network")

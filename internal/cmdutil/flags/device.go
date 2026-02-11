@@ -89,6 +89,7 @@ type DeviceListFlags struct {
 	DeviceFilterFlags
 	UpdatesFirst bool // Sort devices with available updates first
 	ShowVersion  bool // Show firmware version information
+	Refresh      bool // Force refresh device metadata from hardware
 }
 
 // AddDeviceListFlags adds device listing flags to a command.
@@ -96,4 +97,5 @@ func AddDeviceListFlags(cmd *cobra.Command, flags *DeviceListFlags) {
 	AddDeviceFilterFlags(cmd, &flags.DeviceFilterFlags)
 	cmd.Flags().BoolVarP(&flags.UpdatesFirst, "updates-first", "u", false, "Sort devices with available updates first")
 	cmd.Flags().BoolVarP(&flags.ShowVersion, "version", "V", false, "Show firmware version information")
+	cmd.Flags().BoolVar(&flags.Refresh, "refresh", false, "Force refresh device metadata from hardware")
 }

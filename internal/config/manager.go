@@ -271,7 +271,54 @@ func (m *Manager) saveWithoutLock() error {
 	if err := afero.WriteFile(fs, m.path, fullData, 0o600); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
+
+	// Sync device registry to Viper so `config get devices` reflects changes
+	m.syncDevicesToViper()
+
 	return nil
+}
+
+// syncDevicesToViper syncs the Manager's device registry to Viper's in-memory state.
+// This ensures `config get devices` reflects changes made via the Manager.
+// Caller must hold m.mu.Lock().
+func (m *Manager) syncDevicesToViper() {
+	if m.config == nil {
+		return
+	}
+
+	// Convert device map to mapstructure-compatible format for Viper
+	deviceMap := make(map[string]any, len(m.config.Devices))
+	for k, dev := range m.config.Devices {
+		devMap := map[string]any{
+			"address": dev.Address,
+		}
+		if dev.Name != "" {
+			devMap["name"] = dev.Name
+		}
+		if dev.Generation > 0 {
+			devMap["generation"] = dev.Generation
+		}
+		if dev.Type != "" {
+			devMap["type"] = dev.Type
+		}
+		if dev.Model != "" {
+			devMap["model"] = dev.Model
+		}
+		if dev.MAC != "" {
+			devMap["mac"] = dev.MAC
+		}
+		if dev.Platform != "" {
+			devMap["platform"] = dev.Platform
+		}
+		if dev.Auth != nil {
+			devMap["auth"] = map[string]any{
+				"username": dev.Auth.Username,
+				"password": dev.Auth.Password,
+			}
+		}
+		deviceMap[k] = devMap
+	}
+	viper.Set("devices", deviceMap)
 }
 
 // stripDerivedModels returns a copy of the config with Model fields removed

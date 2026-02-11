@@ -11,17 +11,27 @@ Manage device configuration
 
 Manage device configuration settings.
 
+When called with a device argument (and optional component), delegates to
+"config get" to show the device configuration.
+
 Get, set, export, and import device configurations. Configuration includes
 component settings, system parameters, and feature configurations.
+
+```
+shelly device config [device] [component] [flags]
+```
 
 ### Examples
 
 ```
-  # Get full device configuration
-  shelly device config get living-room
+  # Get full device configuration (shorthand)
+  shelly device config living-room
 
-  # Get specific component configuration
-  shelly device config get living-room switch:0
+  # Get specific component configuration (shorthand)
+  shelly device config living-room switch:0
+
+  # Get full device configuration (explicit)
+  shelly device config get living-room
 
   # Set configuration values
   shelly device config set living-room switch:0 name="Main Light"

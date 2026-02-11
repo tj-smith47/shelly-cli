@@ -2,7 +2,9 @@
 package output
 
 import (
+	"bytes"
 	"fmt"
+	"sort"
 
 	"github.com/tj-smith47/shelly-go/discovery"
 
@@ -42,11 +44,17 @@ type MeterReading interface {
 }
 
 // FormatDiscoveredDevices builds a table builder of discovered devices with themed formatting.
+// Devices are sorted by IP address for consistent, readable output.
 // Returns nil if devices slice is empty.
 func FormatDiscoveredDevices(devices []discovery.DiscoveredDevice) *table.Builder {
 	if len(devices) == 0 {
 		return nil
 	}
+
+	// Sort by IP address (numeric comparison via byte comparison)
+	sort.Slice(devices, func(i, j int) bool {
+		return bytes.Compare(devices[i].Address, devices[j].Address) < 0
+	})
 
 	builder := table.NewBuilder("Name", "ID", "Address", "Model", "Generation", "Protocol", "Auth")
 
