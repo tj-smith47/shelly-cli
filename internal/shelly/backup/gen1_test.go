@@ -283,30 +283,3 @@ func TestAddWarning(t *testing.T) {
 		t.Fatalf("got %d warnings, want 2", len(result.Warnings))
 	}
 }
-
-func TestSanitizeForPath(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"simple", "simple"},
-		{"Living Room", "Living_Room"},
-		{"path/to/thing", "path_to_thing"},
-		{"back\\slash", "back_slash"},
-		{"colon:name", "colon_name"},
-		{"", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			t.Parallel()
-
-			got := sanitizeForPath(tt.input)
-			if got != tt.want {
-				t.Errorf("sanitizeForPath(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}

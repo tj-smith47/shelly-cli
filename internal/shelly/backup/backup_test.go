@@ -811,34 +811,44 @@ func TestAutoSavePath(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 
 	tests := []struct {
-		name   string
-		device DeviceInfo
-		format string
-		// We just check the path contains these substrings
+		name         string
+		identifier   string
+		mac          string
+		deviceID     string
+		format       string
 		wantContains []string
 	}{
 		{
-			name: "with device name",
-			device: DeviceInfo{
-				Name: "Living Room",
-				ID:   "shelly1-123",
-			},
+			name:         "config name with mac",
+			identifier:   "back-porch",
+			mac:          "7C87CE557FA0",
+			deviceID:     "shellyplus1-7c87ce557fa0",
 			format:       "json",
-			wantContains: []string{"backups", "Living_Room", ".json"},
+			wantContains: []string{"backups", "back-porch-7c87ce557fa0-", ".json"},
 		},
 		{
-			name: "falls back to ID",
-			device: DeviceInfo{
-				ID: "shelly1-456",
-			},
+			name:         "short name gen1",
+			identifier:   "fl",
+			mac:          "C82B961166C0",
+			deviceID:     "C82B961166C0",
+			format:       "json",
+			wantContains: []string{"backups", "fl-c82b961166c0-", ".json"},
+		},
+		{
+			name:         "falls back to device ID",
+			identifier:   "",
+			mac:          "AABBCCDD",
+			deviceID:     "shellyplus1-123",
 			format:       "yaml",
-			wantContains: []string{"backups", "shelly1-456", ".yaml"},
+			wantContains: []string{"backups", "shellyplus1-123-aabbccdd-", ".yaml"},
 		},
 		{
-			name:         "empty device info",
-			device:       DeviceInfo{},
+			name:         "empty everything",
+			identifier:   "",
+			mac:          "",
+			deviceID:     "",
 			format:       "json",
-			wantContains: []string{"backups", "backup", ".json"},
+			wantContains: []string{"backups", "backup-", ".json"},
 		},
 	}
 
@@ -846,13 +856,13 @@ func TestAutoSavePath(t *testing.T) {
 		bkp := &DeviceBackup{
 			Backup: &shellybackup.Backup{
 				DeviceInfo: &shellybackup.DeviceInfo{
-					Name: tt.device.Name,
-					ID:   tt.device.ID,
+					ID:  tt.deviceID,
+					MAC: tt.mac,
 				},
 			},
 		}
 
-		path, err := AutoSavePath(bkp, tt.format)
+		path, err := AutoSavePath(tt.identifier, bkp, tt.format)
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", tt.name, err)
 		}

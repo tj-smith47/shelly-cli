@@ -122,7 +122,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Auto-generate file path if not specified
 	if opts.FilePath == "" {
-		autoPath, pathErr := backup.AutoSavePath(bkp, opts.Format)
+		autoPath, pathErr := backup.AutoSavePath(opts.Device, bkp, opts.Format)
 		if pathErr != nil {
 			return pathErr
 		}

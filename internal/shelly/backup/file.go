@@ -76,9 +76,11 @@ func GenerateFilename(deviceName, deviceID string, encrypted bool) string {
 	return fmt.Sprintf("backup-%s-%s%s", safeName, timestamp, suffix)
 }
 
-// AutoSavePath returns the auto-generated file path for a backup based on
-// device info and format. It creates the backups directory if needed.
-func AutoSavePath(bkp *DeviceBackup, format string) (string, error) {
+// AutoSavePath returns the auto-generated file path for a backup.
+// Format: {identifier}-{mac}-{date}.{format} (e.g. fl-C82B961166C0-2026-02-11.json).
+// The identifier is the config name the user used (e.g. "fl", "back-porch").
+// It creates the backups directory if needed.
+func AutoSavePath(identifier string, bkp *DeviceBackup, format string) (string, error) {
 	dir, err := config.BackupsDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to determine backups directory: %w", err)
@@ -87,21 +89,50 @@ func AutoSavePath(bkp *DeviceBackup, format string) (string, error) {
 		return "", fmt.Errorf("failed to create backups directory: %w", err)
 	}
 
-	name := sanitizeForPath(bkp.Device().Name)
+	name := strings.ToLower(identifier)
 	if name == "" {
-		name = sanitizeForPath(bkp.Device().ID)
+		name = strings.ToLower(bkp.Device().ID)
 	}
 	if name == "" {
 		name = "backup"
 	}
+
+	mac := strings.ToLower(strings.ReplaceAll(bkp.Device().MAC, ":", ""))
 	date := time.Now().Format("2006-01-02")
-	return filepath.Join(dir, fmt.Sprintf("%s-%s.%s", name, date, format)), nil
+
+	var filename string
+	if mac != "" {
+		filename = fmt.Sprintf("%s-%s-%s.%s", name, mac, date, format)
+	} else {
+		filename = fmt.Sprintf("%s-%s.%s", name, date, format)
+	}
+
+	return filepath.Join(dir, filename), nil
 }
 
-// sanitizeForPath replaces filesystem-unsafe characters with underscores.
-func sanitizeForPath(s string) string {
-	r := strings.NewReplacer("/", "_", "\\", "_", ":", "_", " ", "_")
-	return r.Replace(s)
+// ResolveFilePath resolves a backup file path. If the path exists as-is, it's
+// returned unchanged. Otherwise, the backups directory is checked for a match.
+// This allows users to pass just a filename (e.g. "fl-c82b-2026-02-11.json")
+// and have it resolved from ~/.config/shelly/backups/.
+func ResolveFilePath(path string) string {
+	// If the path exists as given, use it
+	if _, err := config.Fs().Stat(path); err == nil {
+		return path
+	}
+
+	// Try the backups directory
+	dir, err := config.BackupsDir()
+	if err != nil {
+		return path
+	}
+
+	candidate := filepath.Join(dir, path)
+	if _, err := config.Fs().Stat(candidate); err == nil {
+		return candidate
+	}
+
+	// Return original path — the caller will report the error
+	return path
 }
 
 // IsFile checks if the path looks like a backup file (exists and is a file).

@@ -84,6 +84,9 @@ func run(ctx context.Context, opts *Options) error {
 
 	ios := opts.Factory.IOStreams()
 
+	// Resolve file path (check backups dir if not found as-is)
+	opts.FilePath = backup.ResolveFilePath(opts.FilePath)
+
 	// Read backup file
 	data, err := afero.ReadFile(config.Fs(), opts.FilePath)
 	if err != nil {

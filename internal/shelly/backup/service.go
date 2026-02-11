@@ -292,8 +292,9 @@ func (s *Service) compareGen2Backup(ctx context.Context, identifier string, devi
 // LoadMigrationSource loads a backup from either a file or device.
 // Returns the backup, source type, and any error.
 func (s *Service) LoadMigrationSource(ctx context.Context, source string) (bkp *DeviceBackup, sourceType MigrationSource, err error) {
-	if IsFile(source) {
-		bkp, err = LoadAndValidate(source)
+	resolved := ResolveFilePath(source)
+	if IsFile(resolved) {
+		bkp, err = LoadAndValidate(resolved)
 		if err != nil {
 			return nil, "", err
 		}
