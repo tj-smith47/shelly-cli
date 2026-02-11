@@ -2,12 +2,17 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/spf13/afero"
+	"github.com/spf13/viper"
+	"github.com/tj-smith47/shelly-go/types"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -144,12 +149,38 @@ func (m *Manager) Load() error {
 
 	// Read config file directly (not via viper) to enable parallel tests
 	if data, err := afero.ReadFile(m.Fs(), m.path); err == nil {
+		data = m.migrateSchemaURL(data)
 		if err := yaml.Unmarshal(data, c); err != nil {
 			return fmt.Errorf("unmarshal config: %w", err)
 		}
 	}
 
-	// Initialize maps if nil
+	initConfigMaps(c)
+	populateDerivedModels(c)
+
+	m.config = c
+	m.loaded = true
+	return nil
+}
+
+// migrateSchemaURL fixes the schema URL from main→master in existing config files.
+// Returns the (possibly modified) data. Persists the fix to disk if changed.
+func (m *Manager) migrateSchemaURL(data []byte) []byte {
+	if !bytes.Contains(data, []byte(oldSchemaURLFragment)) {
+		return data
+	}
+	data = bytes.ReplaceAll(data,
+		[]byte(oldSchemaURLFragment),
+		[]byte("shelly-cli/master/cfg/config.schema.json"))
+	// Persist the fix so editors pick it up immediately
+	if err := afero.WriteFile(m.Fs(), m.path, data, 0o600); err != nil && viper.GetInt("verbosity") >= 1 {
+		log.Printf("[debug] migrate schema URL: %v", err)
+	}
+	return data
+}
+
+// initConfigMaps initializes nil maps in a freshly-loaded config.
+func initConfigMaps(c *Config) {
 	if c.Devices == nil {
 		c.Devices = make(map[string]model.Device)
 	}
@@ -174,10 +205,18 @@ func (m *Manager) Load() error {
 	if c.Alerts == nil {
 		c.Alerts = make(map[string]Alert)
 	}
+}
 
-	m.config = c
-	m.loaded = true
-	return nil
+// populateDerivedModels fills in empty Model fields from Type using shelly-go lookup.
+func populateDerivedModels(c *Config) {
+	for key, dev := range c.Devices {
+		if dev.Model == "" && dev.Type != "" {
+			if displayName := types.ModelDisplayName(dev.Type); displayName != dev.Type {
+				dev.Model = displayName
+				c.Devices[key] = dev
+			}
+		}
+	}
 }
 
 // Get returns the current config.
@@ -196,7 +235,10 @@ func (m *Manager) Save() error {
 
 // yamlSchemaHeader is prepended to the config file for YAML language server support.
 // This provides autocomplete and validation in editors like VS Code.
-const yamlSchemaHeader = "# yaml-language-server: $schema=https://raw.githubusercontent.com/tj-smith47/shelly-cli/main/cfg/config.schema.json\n"
+const yamlSchemaHeader = "# yaml-language-server: $schema=https://raw.githubusercontent.com/tj-smith47/shelly-cli/master/cfg/config.schema.json\n"
+
+// oldSchemaURLFragment is the old schema URL fragment that needs to be auto-fixed in existing configs.
+const oldSchemaURLFragment = "shelly-cli/main/cfg/config.schema.json"
 
 // saveWithoutLock writes config to file. Caller must hold m.mu.Lock().
 // For test managers (path is empty), this is a no-op.
@@ -215,7 +257,10 @@ func (m *Manager) saveWithoutLock() error {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
-	data, err := yaml.Marshal(m.config)
+	// Strip redundant Model fields before save (derivable from Type via shelly-go lookup)
+	saveCfg := m.stripDerivedModels()
+
+	data, err := marshalSorted(saveCfg)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
@@ -227,6 +272,73 @@ func (m *Manager) saveWithoutLock() error {
 		return fmt.Errorf("write config: %w", err)
 	}
 	return nil
+}
+
+// stripDerivedModels returns a copy of the config with Model fields removed
+// where they can be derived from Type. The in-memory config is not modified.
+func (m *Manager) stripDerivedModels() *Config {
+	cfg := *m.config
+	cfg.Devices = make(map[string]model.Device, len(m.config.Devices))
+	for k, dev := range m.config.Devices {
+		if dev.Type != "" && dev.Model != "" {
+			if derived := types.ModelDisplayName(dev.Type); derived == dev.Model {
+				dev.Model = "" // Don't persist — derivable from Type
+			}
+		}
+		cfg.Devices[k] = dev
+	}
+	return &cfg
+}
+
+// marshalSorted marshals a value to YAML with top-level keys sorted alphabetically.
+// Sub-keys in maps are already sorted by yaml.v3; struct field order is preserved
+// for nested objects but the root-level mapping gets alphabetical sorting.
+func marshalSorted(v any) ([]byte, error) {
+	var node yaml.Node
+	if err := node.Encode(v); err != nil {
+		return nil, err
+	}
+
+	// node is a DocumentNode containing a MappingNode — sort the mapping keys
+	if node.Kind == yaml.DocumentNode && len(node.Content) > 0 {
+		sortMappingKeys(node.Content[0])
+	}
+
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&node); err != nil {
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// sortMappingKeys sorts a YAML mapping node's keys alphabetically.
+func sortMappingKeys(node *yaml.Node) {
+	if node.Kind != yaml.MappingNode || len(node.Content) < 4 {
+		return
+	}
+
+	type kvPair struct {
+		key   *yaml.Node
+		value *yaml.Node
+	}
+	pairs := make([]kvPair, 0, len(node.Content)/2)
+	for i := 0; i < len(node.Content)-1; i += 2 {
+		pairs = append(pairs, kvPair{key: node.Content[i], value: node.Content[i+1]})
+	}
+
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i].key.Value < pairs[j].key.Value
+	})
+
+	node.Content = make([]*yaml.Node, 0, len(pairs)*2)
+	for _, p := range pairs {
+		node.Content = append(node.Content, p.key, p.value)
+	}
 }
 
 // Reload forces a fresh load from file.

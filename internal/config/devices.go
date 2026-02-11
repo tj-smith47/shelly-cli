@@ -244,9 +244,9 @@ func (m *Manager) UpdateDeviceInfo(name string, updates DeviceUpdates) error {
 		changed = true
 	}
 	if updates.MAC != "" {
-		// Normalize MAC address before storing
 		normalizedMAC := model.NormalizeMAC(updates.MAC)
 		if normalizedMAC != "" && dev.MAC != normalizedMAC {
+			m.deduplicateByMAC(key, normalizedMAC)
 			dev.MAC = normalizedMAC
 			changed = true
 		}
@@ -387,7 +387,29 @@ func (m *Manager) RenameDevice(oldName, newName string) error {
 	device.Name = newName
 	delete(m.config.Devices, oldKey)
 	m.config.Devices[newKey] = device
+	m.remapDeviceReferences(oldKey, newKey)
 
+	return m.saveWithoutLock()
+}
+
+// deduplicateByMAC removes any other device with the same MAC address, remapping
+// references to the surviving device key. Caller must hold m.mu.Lock().
+func (m *Manager) deduplicateByMAC(survivingKey, normalizedMAC string) {
+	for otherKey, otherDev := range m.config.Devices {
+		if otherKey == survivingKey {
+			continue
+		}
+		if model.NormalizeMAC(otherDev.MAC) == normalizedMAC {
+			delete(m.config.Devices, otherKey)
+			m.remapDeviceReferences(otherKey, survivingKey)
+			return
+		}
+	}
+}
+
+// remapDeviceReferences updates all group and link references from oldKey to newKey.
+// Caller must hold m.mu.Lock().
+func (m *Manager) remapDeviceReferences(oldKey, newKey string) {
 	// Update group references
 	for groupName, group := range m.config.Groups {
 		for i, d := range group.Devices {
@@ -399,21 +421,18 @@ func (m *Manager) RenameDevice(oldName, newName string) error {
 		}
 	}
 
-	// Update link references
-	// If old device was a child, re-key the link
+	// Update link references: re-key child link
 	if link, ok := m.config.Links[oldKey]; ok {
 		delete(m.config.Links, oldKey)
 		m.config.Links[newKey] = link
 	}
-	// If old device was a parent, update parent_device references
+	// Update parent_device references
 	for childKey, link := range m.config.Links {
 		if link.ParentDevice == oldKey {
 			link.ParentDevice = newKey
 			m.config.Links[childKey] = link
 		}
 	}
-
-	return m.saveWithoutLock()
 }
 
 // CheckAliasConflict checks if an alias conflicts with existing device names, keys, or aliases.

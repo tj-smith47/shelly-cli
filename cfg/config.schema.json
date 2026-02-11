@@ -66,6 +66,11 @@
       "description": "Suppress non-essential output",
       "default": false
     },
+    "verbose": {
+      "type": "boolean",
+      "description": "Enable verbose output",
+      "default": false
+    },
     "editor": {
       "type": "string",
       "description": "Preferred editor command for 'shelly config edit'. Falls back to $EDITOR, $VISUAL, then nano.",
@@ -152,6 +157,10 @@
           "description": "Shelly Cloud server URL",
           "format": "uri",
           "default": "https://shelly-api.shelly.cloud"
+        },
+        "auth_key": {
+          "type": "string",
+          "description": "Shelly Cloud auth key (do not edit manually)"
         }
       },
       "additionalProperties": false
@@ -175,6 +184,13 @@
       "description": "Device groups",
       "additionalProperties": {
         "$ref": "#/$defs/group"
+      }
+    },
+    "links": {
+      "type": "object",
+      "description": "Parent-child power relationships between devices",
+      "additionalProperties": {
+        "$ref": "#/$defs/link"
       }
     },
     "scenes": {
@@ -286,6 +302,25 @@
         }
       },
       "additionalProperties": false
+    },
+    "energy": {
+      "type": "object",
+      "description": "Energy monitoring and cost calculation settings",
+      "properties": {
+        "cost_rate": {
+          "type": "number",
+          "description": "Cost per kWh in local currency",
+          "minimum": 0,
+          "default": 0.12
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency symbol",
+          "examples": ["$", "\u20ac", "\u00a3"],
+          "default": "$"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,
@@ -304,6 +339,25 @@
           "description": "Device IP address or hostname",
           "examples": ["192.168.1.50", "shelly-plus-1pm.local"]
         },
+        "mac": {
+          "type": "string",
+          "description": "Device MAC address (unique identifier, colon-separated uppercase)",
+          "pattern": "^([0-9A-F]{2}:){5}[0-9A-F]{2}$",
+          "examples": ["AA:BB:CC:DD:EE:FF"]
+        },
+        "aliases": {
+          "type": "array",
+          "description": "Device aliases for quick access",
+          "items": {
+            "type": "string"
+          }
+        },
+        "platform": {
+          "type": "string",
+          "description": "Device platform (empty or 'shelly' for native, other values for plugins)",
+          "examples": ["shelly", "tasmota", "esphome"],
+          "default": "shelly"
+        },
         "generation": {
           "type": "integer",
           "description": "Device generation (1, 2, or 3)",
@@ -311,13 +365,13 @@
         },
         "type": {
           "type": "string",
-          "description": "Device type",
-          "examples": ["switch", "plug", "light", "dimmer", "cover", "sensor"]
+          "description": "Device type/SKU code",
+          "examples": ["SNSW-001P16EU", "SPSW-001PE16EU", "SHSW-PM", "SHPLG-S"]
         },
         "model": {
           "type": "string",
-          "description": "Device model identifier",
-          "examples": ["SHSW-PM", "SHPLG-S", "SHSW-1", "SHDM-2", "SHBDUO-1"]
+          "description": "Device display name (derived from type if omitted)",
+          "examples": ["Shelly Plus 1PM", "Shelly Pro 1PM", "Shelly 1PM"]
         },
         "auth": {
           "type": "object",
@@ -335,6 +389,16 @@
           },
           "required": ["password"],
           "additionalProperties": false
+        },
+        "components": {
+          "type": "object",
+          "description": "Cached component names (type to id to name mapping)",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
         }
       },
       "additionalProperties": false
@@ -377,6 +441,23 @@
             "type": "string"
           },
           "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "link": {
+      "type": "object",
+      "description": "A parent-child power relationship (key = child device)",
+      "required": ["parent_device", "switch_id"],
+      "properties": {
+        "parent_device": {
+          "type": "string",
+          "description": "Parent device key that powers this child"
+        },
+        "switch_id": {
+          "type": "integer",
+          "description": "Switch component ID on the parent device",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -723,6 +804,21 @@
           "type": "array",
           "items": { "type": "string" },
           "default": ["4"]
+        },
+        "view5": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["5"]
+        },
+        "view6": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["6"]
+        },
+        "refresh_all": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["ctrl+r"]
         }
       },
       "additionalProperties": false
