@@ -1,7 +1,11 @@
 // Package theme provides theme-to-semantic color mappings.
 package theme
 
-import "charm.land/lipgloss/v2"
+import (
+	"image/color"
+
+	"charm.land/lipgloss/v2"
+)
 
 // themeMappings maps theme names to their semantic color mapping functions.
 var themeMappings = map[string]func() SemanticColors{
@@ -50,6 +54,21 @@ func MappingFromTheme() SemanticColors {
 		TableCell:     Yellow(),
 		TableAltCell:  Orange(),
 		TableBorder:   Pink(), // Pink border
+		Gradient:      defaultGradient(),
+	}
+}
+
+// defaultGradient returns the default cool-to-warm gradient (blue→red, 8 levels).
+func defaultGradient() [8]color.Color {
+	return [8]color.Color{
+		lipgloss.Color("#5c7cfa"), // 0: Blue (lowest)
+		lipgloss.Color("#22b8cf"), // 1: Cyan
+		lipgloss.Color("#20c997"), // 2: Teal
+		lipgloss.Color("#51cf66"), // 3: Green
+		lipgloss.Color("#94d82d"), // 4: Lime
+		lipgloss.Color("#fcc419"), // 5: Yellow
+		lipgloss.Color("#ff922b"), // 6: Orange
+		lipgloss.Color("#ff6b6b"), // 7: Red (highest)
 	}
 }
 
@@ -76,6 +95,7 @@ func DraculaSemanticMapping() SemanticColors {
 		TableCell:     lipgloss.Color("#f1fa8c"), // Yellow
 		TableAltCell:  lipgloss.Color("#ffb86c"), // Orange
 		TableBorder:   lipgloss.Color("#ff79c6"), // Pink
+		Gradient:      defaultGradient(),
 	}
 }
 
@@ -102,6 +122,16 @@ func NordSemanticMapping() SemanticColors {
 		TableCell:     lipgloss.Color("#ebcb8b"), // Nord13 - aurora yellow
 		TableAltCell:  lipgloss.Color("#d08770"), // Nord12 - aurora orange
 		TableBorder:   lipgloss.Color("#81a1c1"), // Nord9 - frost blue
+		Gradient: [8]color.Color{
+			lipgloss.Color("#5e81ac"), // 0: Nord10 - frost deep blue
+			lipgloss.Color("#88c0d0"), // 1: Nord8 - frost cyan
+			lipgloss.Color("#8fbcbb"), // 2: Nord7 - frost teal
+			lipgloss.Color("#a3be8c"), // 3: Nord14 - aurora green
+			lipgloss.Color("#a3be8c"), // 4: Nord14 - aurora green (light)
+			lipgloss.Color("#ebcb8b"), // 5: Nord13 - aurora yellow
+			lipgloss.Color("#d08770"), // 6: Nord12 - aurora orange
+			lipgloss.Color("#bf616a"), // 7: Nord11 - aurora red
+		},
 	}
 }
 
@@ -128,6 +158,16 @@ func TokyoNightSemanticMapping() SemanticColors {
 		TableCell:     lipgloss.Color("#e0af68"), // Yellow
 		TableAltCell:  lipgloss.Color("#ff9e64"), // Orange
 		TableBorder:   lipgloss.Color("#bb9af7"), // Purple
+		Gradient: [8]color.Color{
+			lipgloss.Color("#7aa2f7"), // 0: Blue
+			lipgloss.Color("#7dcfff"), // 1: Cyan
+			lipgloss.Color("#2ac3de"), // 2: Teal
+			lipgloss.Color("#9ece6a"), // 3: Green
+			lipgloss.Color("#73daca"), // 4: Mint
+			lipgloss.Color("#e0af68"), // 5: Yellow
+			lipgloss.Color("#ff9e64"), // 6: Orange
+			lipgloss.Color("#f7768e"), // 7: Red
+		},
 	}
 }
 
@@ -154,6 +194,16 @@ func GruvboxSemanticMapping() SemanticColors {
 		TableCell:     lipgloss.Color("#fabd2f"), // Yellow bright
 		TableAltCell:  lipgloss.Color("#fe8019"), // Orange
 		TableBorder:   lipgloss.Color("#d3869b"), // Purple
+		Gradient: [8]color.Color{
+			lipgloss.Color("#458588"), // 0: Blue
+			lipgloss.Color("#689d6a"), // 1: Aqua
+			lipgloss.Color("#689d6a"), // 2: Aqua (light)
+			lipgloss.Color("#b8bb26"), // 3: Green
+			lipgloss.Color("#98971a"), // 4: Green (dark)
+			lipgloss.Color("#fabd2f"), // 5: Yellow
+			lipgloss.Color("#fe8019"), // 6: Orange
+			lipgloss.Color("#fb4934"), // 7: Red
+		},
 	}
 }
 
@@ -180,5 +230,15 @@ func CatppuccinSemanticMapping() SemanticColors {
 		TableCell:     lipgloss.Color("#f9e2af"), // Yellow
 		TableAltCell:  lipgloss.Color("#fab387"), // Peach
 		TableBorder:   lipgloss.Color("#cba6f7"), // Mauve
+		Gradient: [8]color.Color{
+			lipgloss.Color("#89b4fa"), // 0: Blue
+			lipgloss.Color("#89dceb"), // 1: Sky
+			lipgloss.Color("#94e2d5"), // 2: Teal
+			lipgloss.Color("#a6e3a1"), // 3: Green
+			lipgloss.Color("#a6e3a1"), // 4: Green (light)
+			lipgloss.Color("#f9e2af"), // 5: Yellow
+			lipgloss.Color("#fab387"), // 6: Peach
+			lipgloss.Color("#f38ba8"), // 7: Red
+		},
 	}
 }

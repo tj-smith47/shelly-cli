@@ -101,17 +101,7 @@ type Styles struct {
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 
-	// Gradient from cool (low) to warm (high): blue -> cyan -> green -> yellow -> orange -> red
-	gradient := [8]lipgloss.Style{
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#5c7cfa")), // 0: Blue (lowest)
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#22b8cf")), // 1: Cyan
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#20c997")), // 2: Teal
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#51cf66")), // 3: Green
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#94d82d")), // 4: Lime
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#fcc419")), // 5: Yellow
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#ff922b")), // 6: Orange
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#ff6b6b")), // 7: Red (highest)
-	}
+	gradient := theme.SemanticGradientStyles()
 
 	return Styles{
 		Container: styles.PanelBorder().Padding(1, 2),
@@ -422,15 +412,16 @@ func (m *Model) renderVisibleEntries(entries []historyEntry, labelWidth, sparkWi
 
 // buildPanel creates the final rendered panel with badge.
 func (m *Model) buildPanel(content string, entryCount int) string {
-	borderStyle := lipgloss.NewStyle().Foreground(theme.Yellow())
+	colors := theme.GetSemanticColors()
+	badgeStyle := lipgloss.NewStyle().Foreground(colors.TableCell)
 	countInfo := fmt.Sprintf("%d switches", entryCount)
 	if m.scroller.HasMore() || m.scroller.HasPrevious() {
 		countInfo = m.scroller.ScrollInfoRange()
 	}
-	legend := borderStyle.Render(countInfo+" │ ") +
-		m.styles.SparkGradient[0].Render("▁") + borderStyle.Render(" low ") +
-		m.styles.SparkGradient[3].Render("▄") + borderStyle.Render(" mid ") +
-		m.styles.SparkGradient[7].Render("█") + borderStyle.Render(" high")
+	legend := badgeStyle.Render(countInfo+" │ ") +
+		m.styles.SparkGradient[0].Render("▁") + badgeStyle.Render(" low ") +
+		m.styles.SparkGradient[3].Render("▄") + badgeStyle.Render(" mid ") +
+		m.styles.SparkGradient[7].Render("█") + badgeStyle.Render(" high")
 
 	r := rendering.New(m.Width, m.Height).
 		SetTitle("Energy History").
@@ -439,14 +430,7 @@ func (m *Model) buildPanel(content string, entryCount int) string {
 		SetPanelIndex(m.panelIndex).
 		SetFooter("5m·····now")
 
-	m.applyBorderColor(r)
 	return r.SetContent(content).Render()
-}
-
-// applyBorderColor sets the appropriate border color for the panel.
-// Uses the default blue focus color (from renderer) and yellow blur color.
-func (m *Model) applyBorderColor(r *rendering.Renderer) {
-	r.SetBlurColor(theme.Yellow())
 }
 
 // collectCurrentPower records power data per-switch from online devices with PM capability.
@@ -735,9 +719,6 @@ func (m *Model) renderLoading() string {
 		SetBadge("5 min").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
-
-	// Use yellow blur border for energy panels (focus uses default blue)
-	r.SetBlurColor(theme.Yellow())
 
 	return r.SetContent(m.Loader.View()).Render()
 }

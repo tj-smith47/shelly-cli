@@ -74,7 +74,7 @@ func DefaultStyles() Styles {
 		BarFill: lipgloss.NewStyle().
 			Foreground(colors.Warning),
 		BarEmpty: lipgloss.NewStyle().
-			Foreground(theme.Orange()), // Orange for empty bars, not black
+			Foreground(colors.Muted),
 		Total: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
 			Bold(true),
@@ -218,15 +218,16 @@ func (m Model) renderVisibleBars(labelWidth, barWidth int) (renderedContent stri
 
 // buildPanel creates the final rendered panel with badge and footer.
 func (m Model) buildPanel(content string, totalPower float64) string {
-	borderStyle := lipgloss.NewStyle().Foreground(theme.Yellow())
-	barFillStyle := lipgloss.NewStyle().Foreground(theme.Orange())
+	colors := theme.GetSemanticColors()
+	badgeStyle := lipgloss.NewStyle().Foreground(colors.TableCell)
+	fillStyle := lipgloss.NewStyle().Foreground(colors.Warning)
 	countInfo := fmt.Sprintf("%d switches", len(m.bars))
 	if m.scroller.HasMore() || m.scroller.HasPrevious() {
 		countInfo = m.scroller.ScrollInfoRange()
 	}
-	badge := borderStyle.Render(countInfo+" │ ") +
-		barFillStyle.Render("██") + borderStyle.Render(" high ") +
-		barFillStyle.Render("░░") + borderStyle.Render(" low")
+	badge := badgeStyle.Render(countInfo+" │ ") +
+		fillStyle.Render("██") + badgeStyle.Render(" high ") +
+		fillStyle.Render("░░") + badgeStyle.Render(" low")
 
 	r := rendering.New(m.Width, m.Height).
 		SetTitle("Power Consumption").
@@ -234,18 +235,10 @@ func (m Model) buildPanel(content string, totalPower float64) string {
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
 
-	m.applyBorderColor(r)
-
 	if m.showTotal && len(m.bars) > 1 {
 		r.SetFooter(fmt.Sprintf("Total: %s", formatValue(totalPower, "W")))
 	}
 	return r.SetContent(content).Render()
-}
-
-// applyBorderColor sets the appropriate border color for the panel.
-// Uses the default blue focus color (from renderer) and yellow blur color.
-func (m Model) applyBorderColor(r *rendering.Renderer) {
-	r.SetBlurColor(theme.Yellow())
 }
 
 func (m Model) collectBars(devices []*cache.DeviceData) []Bar {
@@ -288,7 +281,7 @@ func collectDeviceBars(d *cache.DeviceData) []Bar {
 			Value:      d.Power,
 			MaxVal:     0,
 			Unit:       "W",
-			Color:      theme.Orange(),
+			Color:      theme.GetSemanticColors().Warning,
 		}}
 	}
 }
@@ -311,7 +304,7 @@ func collectSwitchBars(deviceName string, d *cache.DeviceData) []Bar {
 			Value:      power,
 			MaxVal:     0,
 			Unit:       "W",
-			Color:      theme.Orange(),
+			Color:      theme.GetSemanticColors().Warning,
 		})
 	}
 	return bars
@@ -332,7 +325,7 @@ func collectPMBars(deviceName string, pmPowers map[int]float64) []Bar {
 			Value:      power,
 			MaxVal:     0,
 			Unit:       "W",
-			Color:      theme.Orange(),
+			Color:      theme.GetSemanticColors().Warning,
 		})
 	}
 	return bars
@@ -353,7 +346,7 @@ func collectEMBars(deviceName string, emPowers, em1Powers map[int]float64) []Bar
 			Value:      power,
 			MaxVal:     0,
 			Unit:       "W",
-			Color:      theme.Orange(),
+			Color:      theme.GetSemanticColors().Warning,
 		})
 	}
 	for em1ID, power := range em1Powers {
@@ -368,7 +361,7 @@ func collectEMBars(deviceName string, emPowers, em1Powers map[int]float64) []Bar
 			Value:      power,
 			MaxVal:     0,
 			Unit:       "W",
-			Color:      theme.Orange(),
+			Color:      theme.GetSemanticColors().Warning,
 		})
 	}
 	return bars
@@ -521,13 +514,6 @@ func (m Model) renderLoading() string {
 		SetTitle("Power Consumption").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
-
-	// Use yellow borders for energy panels
-	if m.focused {
-		r.SetFocusColor(theme.Yellow())
-	} else {
-		r.SetBlurColor(theme.Yellow())
-	}
 
 	return r.SetContent(m.Loader.View()).Render()
 }

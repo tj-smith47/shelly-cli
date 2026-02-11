@@ -3307,7 +3307,6 @@ func (m Model) buildDeviceListFooter() string {
 
 // renderEventsColumn renders the events column with embedded title.
 func (m Model) renderEventsColumn(width, height int) string {
-	orangeBorder := theme.Orange()
 	focused := m.focusState.IsPanelFocused(focus.PanelDashboardEvents)
 
 	// Build badge with status info (count, paused, filtered)
@@ -3325,8 +3324,7 @@ func (m Model) renderEventsColumn(width, height int) string {
 		SetFooter(footer).
 		SetFooterBadge(scrollInfo).
 		SetFocused(focused).
-		SetPanelIndex(3).
-		SetBlurColor(orangeBorder)
+		SetPanelIndex(3)
 
 	// Resize events model to fit inside the border box
 	// Footer is embedded in border, not a separate line
@@ -3339,10 +3337,9 @@ func (m Model) renderEventsColumn(width, height int) string {
 func (m Model) renderHeader() string {
 	colors := theme.GetSemanticColors()
 
-	// Banner on the right - using Cyan (bright blue in Dracula theme)
-	// theme.Blue() is actually the muted comment color, Cyan is the vibrant blue
+	// Banner on the right - using Highlight color (cyan in Dracula theme)
 	bannerStyle := lipgloss.NewStyle().
-		Foreground(theme.Cyan()).
+		Foreground(colors.Highlight).
 		Bold(true)
 	bannerLines := branding.BannerLines()
 	bannerWidth := branding.BannerWidth()

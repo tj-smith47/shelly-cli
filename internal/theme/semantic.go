@@ -44,6 +44,9 @@ type SemanticColors struct {
 	TableCell    color.Color
 	TableAltCell color.Color
 	TableBorder  color.Color
+
+	// Visualization gradient (cool-to-warm, 8 levels for sparklines/heatmaps)
+	Gradient [8]color.Color
 }
 
 // SemanticOverrides allows users to override semantic colors via config.
@@ -281,7 +284,18 @@ func SemanticTableBorder() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(GetSemanticColors().TableBorder)
 }
 
-// StyledKeybindings applies Yellow color to keybinding text (e.g., "j/k:nav").
+// StyledKeybindings applies the TableCell semantic color to keybinding text (e.g., "j/k:nav").
 func StyledKeybindings(text string) string {
-	return lipgloss.NewStyle().Foreground(Yellow()).Render(text)
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().TableCell).Render(text)
+}
+
+// SemanticGradientStyles returns 8 lipgloss styles for the heat map gradient.
+// Levels go from cool (0=lowest) to warm (7=highest).
+func SemanticGradientStyles() [8]lipgloss.Style {
+	colors := GetSemanticColors()
+	var styles [8]lipgloss.Style
+	for i, c := range colors.Gradient {
+		styles[i] = lipgloss.NewStyle().Foreground(c)
+	}
+	return styles
 }

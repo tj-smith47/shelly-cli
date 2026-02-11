@@ -237,7 +237,7 @@ func (m Model) View() string {
 		}
 
 		// Add number prefix for keyboard shortcut
-		numPrefix := lipgloss.NewStyle().Foreground(theme.Purple()).Render(intToStr(i+1) + ":")
+		numPrefix := lipgloss.NewStyle().Foreground(theme.GetSemanticColors().Primary).Render(intToStr(i+1) + ":")
 		content := numPrefix + style.Render(tabContent)
 
 		tabs = append(tabs, content)

@@ -1141,20 +1141,7 @@ func renderOverlaySparkline(data []float64, width int) string {
 	}
 
 	valRange := maxVal - minVal
-	colors := theme.GetSemanticColors()
-
-	// Gradient styles
-	gradient := [8]lipgloss.Style{
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#5c7cfa")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#22b8cf")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#20c997")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#51cf66")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#94d82d")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#fcc419")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#ff922b")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#ff6b6b")),
-	}
-	_ = colors // gradient is self-contained
+	gradient := theme.SemanticGradientStyles()
 
 	var spark strings.Builder
 	for _, v := range scaled {

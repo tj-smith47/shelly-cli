@@ -42,7 +42,7 @@ func defaultPanelStyles() panelStyles {
 	colors := theme.GetSemanticColors()
 	return panelStyles{
 		Overlay: lipgloss.NewStyle().
-			Background(lipgloss.Color("#000000")).
+			Background(colors.Background).
 			Foreground(colors.Text),
 		Panel: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).

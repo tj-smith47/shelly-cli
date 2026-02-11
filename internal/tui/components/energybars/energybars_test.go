@@ -60,8 +60,8 @@ func TestModel_View_Empty(t *testing.T) {
 func TestModel_View_WithBars(t *testing.T) {
 	t.Parallel()
 	bars := []Bar{
-		{Label: "Device 1", Value: 100, Unit: "W", Color: theme.Orange()},
-		{Label: "Device 2", Value: 200, Unit: "W", Color: theme.Orange()},
+		{Label: "Device 1", Value: 100, Unit: "W", Color: theme.GetSemanticColors().Warning},
+		{Label: "Device 2", Value: 200, Unit: "W", Color: theme.GetSemanticColors().Warning},
 	}
 	m := New(nil).SetSize(80, 20).SetBars(bars)
 	view := m.View()
@@ -100,7 +100,7 @@ func TestFormatValue(t *testing.T) {
 func TestModel_renderBar(t *testing.T) {
 	t.Parallel()
 	m := New(nil).SetSize(80, 20)
-	bar := Bar{Label: "Test Device", Value: 50, Unit: "W", Color: theme.Orange()}
+	bar := Bar{Label: "Test Device", Value: 50, Unit: "W", Color: theme.GetSemanticColors().Warning}
 
 	result := m.renderBar(bar, 100, 20, 16)
 	if result == "" {

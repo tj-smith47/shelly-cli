@@ -181,7 +181,7 @@ func DefaultStyles() Styles {
 			Background(colors.AltBackground).
 			Bold(true),
 		Time: lipgloss.NewStyle().
-			Foreground(theme.Yellow()).
+			Foreground(colors.TableCell).
 			Width(10),
 		Device: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
@@ -218,18 +218,18 @@ func New(deps Deps) Model {
 	}
 
 	// Create paginators with Dots style (filled/empty dots)
-	// Use bright colors for visibility
+	colors := theme.GetSemanticColors()
 	userPag := paginator.New()
 	userPag.Type = paginator.Dots
 	userPag.PerPage = 10 // Will be updated by SetSize
-	userPag.ActiveDot = lipgloss.NewStyle().Foreground(theme.Purple()).Bold(true).Render("●")
-	userPag.InactiveDot = lipgloss.NewStyle().Foreground(theme.Purple()).Render("○")
+	userPag.ActiveDot = lipgloss.NewStyle().Foreground(colors.Primary).Bold(true).Render("●")
+	userPag.InactiveDot = lipgloss.NewStyle().Foreground(colors.Primary).Render("○")
 
 	sysPag := paginator.New()
 	sysPag.Type = paginator.Dots
 	sysPag.PerPage = 10
-	sysPag.ActiveDot = lipgloss.NewStyle().Foreground(theme.Red()).Bold(true).Render("●")
-	sysPag.InactiveDot = lipgloss.NewStyle().Foreground(theme.Red()).Render("○")
+	sysPag.ActiveDot = lipgloss.NewStyle().Foreground(colors.Secondary).Bold(true).Render("●")
+	sysPag.InactiveDot = lipgloss.NewStyle().Foreground(colors.Secondary).Render("○")
 
 	// Apply config values with defaults
 	maxItems := deps.MaxItems
@@ -1257,8 +1257,8 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 func (m Model) buildDualColumnHeader(layout columnLayout, separator string) []string {
 	colors := theme.GetSemanticColors()
 
-	userTitleStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple())
-	sysTitleStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Red())
+	userTitleStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.Primary)
+	sysTitleStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.Secondary)
 	if m.focused && m.focusedColumn == ColumnUser {
 		userTitleStyle = userTitleStyle.Underline(true)
 	} else if m.focused {
@@ -1268,14 +1268,14 @@ func (m Model) buildDualColumnHeader(layout columnLayout, separator string) []st
 	leftTitle := output.PadRight(userTitleStyle.Render("Device Events"), layout.colWidth)
 	rightTitle := output.PadRight(sysTitleStyle.Render("Cache Updates"), layout.sysColW)
 
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple())
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.Primary)
 	leftColHeader := headerStyle.Render(output.PadRight("TIME", layout.timeW)) + " " +
 		headerStyle.Render(output.PadRight("ENTITY", layout.userDevW)) + " " +
 		headerStyle.Render(output.PadRight("COMP", layout.userCompW)) + " " +
 		headerStyle.Render(output.PadRight("LEVEL", layout.levelW)) + " " +
 		headerStyle.Render("DESC")
 
-	sysHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Red())
+	sysHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.Secondary)
 	rightColHeader := sysHeaderStyle.Render(output.PadRight("TIME", layout.timeW)) + " " +
 		sysHeaderStyle.Render("ENTITY")
 

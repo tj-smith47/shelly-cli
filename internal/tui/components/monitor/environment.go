@@ -124,7 +124,7 @@ func defaultEnvironmentStyles() EnvironmentStyles {
 		AlarmOK: lipgloss.NewStyle().Foreground(colors.Success),
 		AlarmFire: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#ffffff")).
+			Foreground(colors.Text).
 			Background(colors.Error),
 		AlarmMuted: lipgloss.NewStyle().
 			Bold(true).
