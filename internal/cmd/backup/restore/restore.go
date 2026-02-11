@@ -22,6 +22,7 @@ type Options struct {
 	Device        string
 	DryRun        bool
 	FilePath      string
+	SkipAuth      bool
 	SkipNetwork   bool
 	SkipScripts   bool
 	SkipSchedules bool
@@ -30,10 +31,7 @@ type Options struct {
 
 // NewCommand creates the backup restore command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{
-		Factory:     f,
-		SkipNetwork: true,
-	}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "restore <device> <file>",
@@ -41,19 +39,20 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Restore a device from backup",
 		Long: `Restore a Shelly device from a backup file.
 
-By default, all data from the backup is restored. Use --skip-* flags
-to exclude specific sections.
-
-Network configuration (WiFi, Ethernet) is skipped by default with
---skip-network to prevent losing connectivity.`,
-		Example: `  # Restore from backup (skip network config)
+By default, everything from the backup is restored including network
+and authentication settings. Use --skip-* flags to exclude specific
+sections.`,
+		Example: `  # Full restore from backup
   shelly backup restore living-room backup.json
 
   # Dry run - show what would change
   shelly backup restore living-room backup.json --dry-run
 
-  # Restore everything including network config
-  shelly backup restore living-room backup.json --skip-network=false
+  # Restore without network config (keep current WiFi)
+  shelly backup restore living-room backup.json --skip-network
+
+  # Restore without auth config
+  shelly backup restore living-room backup.json --skip-auth
 
   # Restore encrypted backup
   shelly backup restore living-room backup.json --decrypt mysecret
@@ -69,7 +68,8 @@ Network configuration (WiFi, Ethernet) is skipped by default with
 	}
 
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would be restored without applying")
-	cmd.Flags().BoolVar(&opts.SkipNetwork, "skip-network", true, "Skip network configuration (WiFi, Ethernet)")
+	cmd.Flags().BoolVar(&opts.SkipAuth, "skip-auth", false, "Skip authentication configuration")
+	cmd.Flags().BoolVar(&opts.SkipNetwork, "skip-network", false, "Skip network configuration (WiFi, Ethernet)")
 	cmd.Flags().BoolVar(&opts.SkipScripts, "skip-scripts", false, "Skip script restoration")
 	cmd.Flags().BoolVar(&opts.SkipSchedules, "skip-schedules", false, "Skip schedule restoration")
 	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Skip webhook restoration")
@@ -103,6 +103,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	restoreOpts := backup.RestoreOptions{
 		DryRun:        opts.DryRun,
+		SkipAuth:      opts.SkipAuth,
 		SkipNetwork:   opts.SkipNetwork,
 		SkipScripts:   opts.SkipScripts,
 		SkipSchedules: opts.SkipSchedules,

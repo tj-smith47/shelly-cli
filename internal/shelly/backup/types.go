@@ -59,19 +59,15 @@ type Options struct {
 }
 
 // ToExportOptions converts Options to shelly-go ExportOptions.
+// Builds on library defaults and overrides only CLI-controlled fields.
 func (o *Options) ToExportOptions() *shellybackup.ExportOptions {
-	return &shellybackup.ExportOptions{
-		IncludeWiFi:       !o.SkipWiFi,
-		IncludeCloud:      true,
-		IncludeAuth:       true, // Auth metadata only, no passwords
-		IncludeBLE:        true,
-		IncludeMQTT:       true,
-		IncludeWebhooks:   !o.SkipWebhooks,
-		IncludeSchedules:  !o.SkipSchedules,
-		IncludeScripts:    !o.SkipScripts,
-		IncludeKVS:        !o.SkipKVS,
-		IncludeComponents: true,
-	}
+	opts := shellybackup.DefaultExportOptions()
+	opts.IncludeWiFi = !o.SkipWiFi
+	opts.IncludeWebhooks = !o.SkipWebhooks
+	opts.IncludeSchedules = !o.SkipSchedules
+	opts.IncludeScripts = !o.SkipScripts
+	opts.IncludeKVS = !o.SkipKVS
+	return opts
 }
 
 // RestoreOptions configures backup restoration.
@@ -80,6 +76,8 @@ type RestoreOptions struct {
 	DryRun bool
 	// SkipNetwork skips WiFi/Ethernet configuration.
 	SkipNetwork bool
+	// SkipAuth skips authentication configuration.
+	SkipAuth bool
 	// SkipScripts skips script restoration.
 	SkipScripts bool
 	// SkipSchedules skips schedule restoration.
@@ -93,21 +91,17 @@ type RestoreOptions struct {
 }
 
 // ToRestoreOptions converts RestoreOptions to shelly-go RestoreOptions.
+// Builds on library defaults and overrides only CLI-controlled fields.
 func (o *RestoreOptions) ToRestoreOptions() *shellybackup.RestoreOptions {
-	return &shellybackup.RestoreOptions{
-		RestoreWiFi:       !o.SkipNetwork,
-		RestoreCloud:      true,
-		RestoreAuth:       false, // Never auto-restore auth for security
-		RestoreBLE:        true,
-		RestoreMQTT:       true,
-		RestoreWebhooks:   !o.SkipWebhooks,
-		RestoreSchedules:  !o.SkipSchedules,
-		RestoreScripts:    !o.SkipScripts,
-		RestoreKVS:        !o.SkipKVS,
-		RestoreComponents: true,
-		DryRun:            o.DryRun,
-		StopScripts:       true,
-	}
+	opts := shellybackup.DefaultRestoreOptions()
+	opts.RestoreWiFi = !o.SkipNetwork
+	opts.RestoreAuth = !o.SkipAuth
+	opts.RestoreWebhooks = !o.SkipWebhooks
+	opts.RestoreSchedules = !o.SkipSchedules
+	opts.RestoreScripts = !o.SkipScripts
+	opts.RestoreKVS = !o.SkipKVS
+	opts.DryRun = o.DryRun
+	return opts
 }
 
 // RestoreResult contains the result of a restore operation.

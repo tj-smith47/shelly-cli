@@ -729,6 +729,15 @@ func PluginsDir() (string, error) {
 	return filepath.Join(configDir, "plugins"), nil
 }
 
+// BackupsDir returns the backups directory path.
+func BackupsDir() (string, error) {
+	configDir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, "backups"), nil
+}
+
 // GetAllDeviceCredentials returns credentials for all devices that have auth configured.
 func (c *Config) GetAllDeviceCredentials() map[string]struct{ Username, Password string } {
 	return getDefaultManager().GetAllDeviceCredentials()

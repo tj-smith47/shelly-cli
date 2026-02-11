@@ -1,6 +1,8 @@
 package term
 
 import (
+	"strings"
+
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -11,20 +13,23 @@ import (
 // DisplayBackupSummary prints a summary of a created backup.
 func DisplayBackupSummary(ios *iostreams.IOStreams, bkp *backup.DeviceBackup) {
 	ios.Println()
-	ios.Printf("  Device:    %s (%s)\n", bkp.Device().ID, bkp.Device().Model)
-	ios.Printf("  Firmware:  %s\n", bkp.Device().FWVersion)
-	ios.Printf("  Config:    %d keys\n", len(bkp.Config))
+	ios.Printf("  Device:     %s (%s, Gen%d)\n", bkp.Device().ID, bkp.Device().Model, bkp.Device().Generation)
+	ios.Printf("  Firmware:   %s\n", bkp.Device().FWVersion)
+	ios.Printf("  Config:     %d keys\n", len(bkp.Config))
+	if len(bkp.Components) > 0 {
+		ios.Printf("  Components: %d\n", len(bkp.Components))
+	}
 	if len(bkp.Scripts) > 0 {
-		ios.Printf("  Scripts:   %d\n", len(bkp.Scripts))
+		ios.Printf("  Scripts:    %d\n", len(bkp.Scripts))
 	}
 	if len(bkp.Schedules) > 0 {
-		ios.Printf("  Schedules: %d\n", len(bkp.Schedules))
+		ios.Printf("  Schedules:  included\n")
 	}
 	if len(bkp.Webhooks) > 0 {
-		ios.Printf("  Webhooks:  %d\n", len(bkp.Webhooks))
+		ios.Printf("  Webhooks:   included\n")
 	}
 	if bkp.Encrypted() {
-		ios.Printf("  Encrypted: yes\n")
+		ios.Printf("  Encrypted:  yes\n")
 	}
 }
 
@@ -42,19 +47,30 @@ func DisplayRestorePreview(ios *iostreams.IOStreams, bkp *backup.DeviceBackup, o
 func DisplayBackupSource(ios *iostreams.IOStreams, bkp *backup.DeviceBackup) {
 	device := bkp.Device()
 	ios.Printf("Backup source:\n")
-	ios.Printf("  Device:    %s (%s)\n", device.ID, device.Model)
+	ios.Printf("  Device:    %s (%s, Gen%d)\n", device.ID, device.Model, device.Generation)
 	ios.Printf("  Firmware:  %s\n", device.FWVersion)
 	ios.Printf("  Created:   %s\n", bkp.CreatedAt.Format("2006-01-02 15:04:05"))
 	ios.Println()
 }
 
 func displayConfigPreview(ios *iostreams.IOStreams, bkp *backup.DeviceBackup, opts backup.RestoreOptions) {
-	if len(bkp.Config) > 0 {
-		if opts.SkipNetwork {
-			ios.Printf("  Config:    %d keys (network config excluded)\n", len(bkp.Config))
-		} else {
-			ios.Printf("  Config:    %d keys\n", len(bkp.Config))
-		}
+	if len(bkp.Config) == 0 {
+		return
+	}
+
+	var excluded []string
+	if opts.SkipNetwork {
+		excluded = append(excluded, "network")
+	}
+	if opts.SkipAuth {
+		excluded = append(excluded, "auth")
+	}
+
+	switch len(excluded) {
+	case 0:
+		ios.Printf("  Config:    %d keys\n", len(bkp.Config))
+	default:
+		ios.Printf("  Config:    %d keys (%s excluded)\n", len(bkp.Config), strings.Join(excluded, ", "))
 	}
 }
 

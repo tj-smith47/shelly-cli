@@ -6,11 +6,9 @@ Restore a device from backup
 
 Restore a Shelly device from a backup file.
 
-By default, all data from the backup is restored. Use --skip-* flags
-to exclude specific sections.
-
-Network configuration (WiFi, Ethernet) is skipped by default with
---skip-network to prevent losing connectivity.
+By default, everything from the backup is restored including network
+and authentication settings. Use --skip-* flags to exclude specific
+sections.
 
 ```
 shelly backup restore <device> <file> [flags]
@@ -19,14 +17,17 @@ shelly backup restore <device> <file> [flags]
 ### Examples
 
 ```
-  # Restore from backup (skip network config)
+  # Full restore from backup
   shelly backup restore living-room backup.json
 
   # Dry run - show what would change
   shelly backup restore living-room backup.json --dry-run
 
-  # Restore everything including network config
-  shelly backup restore living-room backup.json --skip-network=false
+  # Restore without network config (keep current WiFi)
+  shelly backup restore living-room backup.json --skip-network
+
+  # Restore without auth config
+  shelly backup restore living-room backup.json --skip-auth
 
   # Restore encrypted backup
   shelly backup restore living-room backup.json --decrypt mysecret
@@ -41,7 +42,8 @@ shelly backup restore <device> <file> [flags]
   -d, --decrypt string   Password to decrypt backup
       --dry-run          Show what would be restored without applying
   -h, --help             help for restore
-      --skip-network     Skip network configuration (WiFi, Ethernet) (default true)
+      --skip-auth        Skip authentication configuration
+      --skip-network     Skip network configuration (WiFi, Ethernet)
       --skip-schedules   Skip schedule restoration
       --skip-scripts     Skip script restoration
       --skip-webhooks    Skip webhook restoration

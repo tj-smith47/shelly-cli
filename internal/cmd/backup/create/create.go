@@ -42,18 +42,23 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Create a complete backup of a Shelly device.
 
 The backup includes configuration, scripts, schedules, and webhooks.
-If no file is specified, backup is written to stdout.
+If no file is specified, backup is saved to ~/.config/shelly/backups/
+with a name based on the device and date. Use "-" as the file to write
+to stdout.
 
 Use --encrypt to password-protect the backup (password verification only,
 sensitive data is not encrypted in the file).`,
-		Example: `  # Create backup to file
+		Example: `  # Create backup (auto-saved to ~/.config/shelly/backups/)
+  shelly backup create living-room
+
+  # Create backup to specific file
   shelly backup create living-room backup.json
 
   # Create YAML backup
   shelly backup create living-room backup.yaml --format yaml
 
   # Create backup to stdout
-  shelly backup create living-room
+  shelly backup create living-room -
 
   # Create encrypted backup
   shelly backup create living-room backup.json --encrypt mysecret
@@ -109,16 +114,26 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("failed to marshal backup: %w", err)
 	}
 
-	// Write to file or stdout
-	if opts.FilePath == "" || opts.FilePath == "-" {
+	// Write to stdout if "-"
+	if opts.FilePath == "-" {
 		ios.Printf("%s\n", data)
-	} else {
-		if err := afero.WriteFile(config.Fs(), opts.FilePath, data, 0o600); err != nil {
-			return fmt.Errorf("failed to write backup file: %w", err)
-		}
-		ios.Success("Backup created: %s", opts.FilePath)
-		term.DisplayBackupSummary(ios, bkp)
+		return nil
 	}
+
+	// Auto-generate file path if not specified
+	if opts.FilePath == "" {
+		autoPath, pathErr := backup.AutoSavePath(bkp, opts.Format)
+		if pathErr != nil {
+			return pathErr
+		}
+		opts.FilePath = autoPath
+	}
+
+	if err := afero.WriteFile(config.Fs(), opts.FilePath, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write backup file: %w", err)
+	}
+	ios.Success("Backup created: %s", opts.FilePath)
+	term.DisplayBackupSummary(ios, bkp)
 
 	return nil
 }

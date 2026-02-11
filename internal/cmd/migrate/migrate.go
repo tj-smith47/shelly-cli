@@ -18,11 +18,16 @@ import (
 
 // Options holds command options.
 type Options struct {
-	Factory *cmdutil.Factory
-	Source  string
-	Target  string
-	DryRun  bool
-	Force   bool
+	Factory       *cmdutil.Factory
+	Source        string
+	Target        string
+	DryRun        bool
+	Force         bool
+	SkipAuth      bool
+	SkipNetwork   bool
+	SkipScripts   bool
+	SkipSchedules bool
+	SkipWebhooks  bool
 }
 
 // NewCommand creates the migrate command and its subcommands.
@@ -35,6 +40,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Migrate configuration between devices",
 		Long: `Migrate configuration from a source device or backup file to a target device.
 
+By default, everything is migrated including network and authentication
+settings. Use --skip-* flags to exclude specific sections.
+
 Source can be a device name/address or a backup file path.
 The --dry-run flag shows what would be changed without applying.`,
 		Example: `  # Migrate from one device to another
@@ -42,6 +50,9 @@ The --dry-run flag shows what would be changed without applying.`,
 
   # Migrate from backup file to device
   shelly migrate backup.json bedroom
+
+  # Migrate without network config (keep current WiFi)
+  shelly migrate living-room bedroom --skip-network
 
   # Force migration between different device types
   shelly migrate backup.json bedroom --force`,
@@ -55,6 +66,11 @@ The --dry-run flag shows what would be changed without applying.`,
 
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would be changed without applying")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "Force migration between different device types")
+	cmd.Flags().BoolVar(&opts.SkipAuth, "skip-auth", false, "Skip authentication configuration")
+	cmd.Flags().BoolVar(&opts.SkipNetwork, "skip-network", false, "Skip network configuration (WiFi, Ethernet)")
+	cmd.Flags().BoolVar(&opts.SkipScripts, "skip-scripts", false, "Skip script migration")
+	cmd.Flags().BoolVar(&opts.SkipSchedules, "skip-schedules", false, "Skip schedule migration")
+	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Skip webhook migration")
 
 	cmd.AddCommand(validate.NewCommand(f))
 	cmd.AddCommand(diff.NewCommand(f))
@@ -113,7 +129,11 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Perform migration
 	restoreOpts := backup.RestoreOptions{
-		SkipNetwork: true, // Always skip network to prevent disconnection
+		SkipAuth:      opts.SkipAuth,
+		SkipNetwork:   opts.SkipNetwork,
+		SkipScripts:   opts.SkipScripts,
+		SkipSchedules: opts.SkipSchedules,
+		SkipWebhooks:  opts.SkipWebhooks,
 	}
 	var result *backup.RestoreResult
 	err = cmdutil.RunWithSpinner(ctx, ios, "Migrating configuration...", func(ctx context.Context) error {

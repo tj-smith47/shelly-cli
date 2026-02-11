@@ -76,6 +76,34 @@ func GenerateFilename(deviceName, deviceID string, encrypted bool) string {
 	return fmt.Sprintf("backup-%s-%s%s", safeName, timestamp, suffix)
 }
 
+// AutoSavePath returns the auto-generated file path for a backup based on
+// device info and format. It creates the backups directory if needed.
+func AutoSavePath(bkp *DeviceBackup, format string) (string, error) {
+	dir, err := config.BackupsDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to determine backups directory: %w", err)
+	}
+	if err := config.Fs().MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create backups directory: %w", err)
+	}
+
+	name := sanitizeForPath(bkp.Device().Name)
+	if name == "" {
+		name = sanitizeForPath(bkp.Device().ID)
+	}
+	if name == "" {
+		name = "backup"
+	}
+	date := time.Now().Format("2006-01-02")
+	return filepath.Join(dir, fmt.Sprintf("%s-%s.%s", name, date, format)), nil
+}
+
+// sanitizeForPath replaces filesystem-unsafe characters with underscores.
+func sanitizeForPath(s string) string {
+	r := strings.NewReplacer("/", "_", "\\", "_", ":", "_", " ", "_")
+	return r.Replace(s)
+}
+
 // IsFile checks if the path looks like a backup file (exists and is a file).
 func IsFile(path string) bool {
 	info, err := config.Fs().Stat(path)

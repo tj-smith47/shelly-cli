@@ -4,6 +4,7 @@ package backup
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -183,7 +184,7 @@ func TestRestoreOptions_ToRestoreOptions(t *testing.T) {
 			want: &shellybackup.RestoreOptions{
 				RestoreWiFi:       true,
 				RestoreCloud:      true,
-				RestoreAuth:       false,
+				RestoreAuth:       true,
 				RestoreBLE:        true,
 				RestoreMQTT:       true,
 				RestoreWebhooks:   true,
@@ -199,6 +200,7 @@ func TestRestoreOptions_ToRestoreOptions(t *testing.T) {
 			name: "skip all with dry run",
 			opts: RestoreOptions{
 				DryRun:        true,
+				SkipAuth:      true,
 				SkipNetwork:   true,
 				SkipScripts:   true,
 				SkipSchedules: true,
@@ -217,6 +219,26 @@ func TestRestoreOptions_ToRestoreOptions(t *testing.T) {
 				RestoreKVS:        false,
 				RestoreComponents: true,
 				DryRun:            true,
+				StopScripts:       true,
+			},
+		},
+		{
+			name: "skip auth only",
+			opts: RestoreOptions{
+				SkipAuth: true,
+			},
+			want: &shellybackup.RestoreOptions{
+				RestoreWiFi:       true,
+				RestoreCloud:      true,
+				RestoreAuth:       false,
+				RestoreBLE:        true,
+				RestoreMQTT:       true,
+				RestoreWebhooks:   true,
+				RestoreSchedules:  true,
+				RestoreScripts:    true,
+				RestoreKVS:        true,
+				RestoreComponents: true,
+				DryRun:            false,
 				StopScripts:       true,
 			},
 		},
@@ -780,6 +802,66 @@ func TestLoadAndValidate(t *testing.T) {
 
 	if bkp == nil {
 		t.Fatal("expected non-nil backup")
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestAutoSavePath(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	tests := []struct {
+		name   string
+		device DeviceInfo
+		format string
+		// We just check the path contains these substrings
+		wantContains []string
+	}{
+		{
+			name: "with device name",
+			device: DeviceInfo{
+				Name: "Living Room",
+				ID:   "shelly1-123",
+			},
+			format:       "json",
+			wantContains: []string{"backups", "Living_Room", ".json"},
+		},
+		{
+			name: "falls back to ID",
+			device: DeviceInfo{
+				ID: "shelly1-456",
+			},
+			format:       "yaml",
+			wantContains: []string{"backups", "shelly1-456", ".yaml"},
+		},
+		{
+			name:         "empty device info",
+			device:       DeviceInfo{},
+			format:       "json",
+			wantContains: []string{"backups", "backup", ".json"},
+		},
+	}
+
+	for _, tt := range tests {
+		bkp := &DeviceBackup{
+			Backup: &shellybackup.Backup{
+				DeviceInfo: &shellybackup.DeviceInfo{
+					Name: tt.device.Name,
+					ID:   tt.device.ID,
+				},
+			},
+		}
+
+		path, err := AutoSavePath(bkp, tt.format)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", tt.name, err)
+		}
+
+		for _, substr := range tt.wantContains {
+			if !strings.Contains(path, substr) {
+				t.Errorf("%s: path %q missing %q", tt.name, path, substr)
+			}
+		}
 	}
 }
 

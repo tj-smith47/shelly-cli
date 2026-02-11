@@ -6,6 +6,9 @@ Migrate configuration between devices
 
 Migrate configuration from a source device or backup file to a target device.
 
+By default, everything is migrated including network and authentication
+settings. Use --skip-* flags to exclude specific sections.
+
 Source can be a device name/address or a backup file path.
 The --dry-run flag shows what would be changed without applying.
 
@@ -22,6 +25,9 @@ shelly migrate <source> <target> [flags]
   # Migrate from backup file to device
   shelly migrate backup.json bedroom
 
+  # Migrate without network config (keep current WiFi)
+  shelly migrate living-room bedroom --skip-network
+
   # Force migration between different device types
   shelly migrate backup.json bedroom --force
 ```
@@ -29,9 +35,14 @@ shelly migrate <source> <target> [flags]
 ### Options
 
 ```
-      --dry-run   Show what would be changed without applying
-      --force     Force migration between different device types
-  -h, --help      help for migrate
+      --dry-run          Show what would be changed without applying
+      --force            Force migration between different device types
+  -h, --help             help for migrate
+      --skip-auth        Skip authentication configuration
+      --skip-network     Skip network configuration (WiFi, Ethernet)
+      --skip-schedules   Skip schedule migration
+      --skip-scripts     Skip script migration
+      --skip-webhooks    Skip webhook migration
 ```
 
 ### Options inherited from parent commands

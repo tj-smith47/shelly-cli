@@ -13,9 +13,11 @@ import (
 )
 
 // ShellyConnector provides connectivity to Shelly devices.
-// This interface is implemented by *shelly.Service.
+// This interface is implemented by *shelly.BackupConnector.
 type ShellyConnector interface {
 	WithConnection(ctx context.Context, identifier string, fn func(*client.Client) error) error
+	WithGen1Connection(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error
+	IsGen1Device(ctx context.Context, identifier string) (bool, error)
 	DeviceInfo(ctx context.Context, identifier string) (*DeviceInfoResult, error)
 	GetConfig(ctx context.Context, identifier string) (map[string]any, error)
 	ListScripts(ctx context.Context, identifier string) ([]ScriptInfoResult, error)
@@ -77,7 +79,39 @@ func NewService(connector ShellyConnector) *Service {
 }
 
 // CreateBackup creates a complete backup of a device using shelly-go backup.Manager.
+// Gen1 devices are handled via HTTP REST calls; Gen2+ via RPC.
 func (s *Service) CreateBackup(ctx context.Context, identifier string, opts Options) (*DeviceBackup, error) {
+	// Check if this is a Gen1 device
+	isGen1, err := s.connector.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if isGen1 {
+		return s.createGen1Backup(ctx, identifier)
+	}
+
+	return s.createGen2Backup(ctx, identifier, opts)
+}
+
+// createGen1Backup creates a backup from a Gen1 device via HTTP REST.
+func (s *Service) createGen1Backup(ctx context.Context, identifier string) (*DeviceBackup, error) {
+	var result *DeviceBackup
+
+	err := s.connector.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		bkp, err := exportGen1(ctx, conn)
+		if err != nil {
+			return err
+		}
+		result = bkp
+		return nil
+	})
+
+	return result, err
+}
+
+// createGen2Backup creates a backup from a Gen2+ device via RPC.
+func (s *Service) createGen2Backup(ctx context.Context, identifier string, opts Options) (*DeviceBackup, error) {
 	var result *DeviceBackup
 
 	err := s.connector.WithConnection(ctx, identifier, func(conn *client.Client) error {
@@ -85,8 +119,6 @@ func (s *Service) CreateBackup(ctx context.Context, identifier string, opts Opti
 
 		// Handle encrypted vs. regular backup
 		if opts.Password != "" {
-			// For now, encrypted backups not supported via this method
-			// User should use backup create command with --encrypt flag
 			return fmt.Errorf("encrypted backups not supported via service layer; use backup create command with --encrypt flag")
 		}
 
@@ -110,7 +142,39 @@ func (s *Service) CreateBackup(ctx context.Context, identifier string, opts Opti
 }
 
 // RestoreBackup restores a backup to a device using shelly-go backup.Manager.
+// Gen1 devices are handled via HTTP REST calls; Gen2+ via RPC.
 func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBackup *DeviceBackup, opts RestoreOptions) (*RestoreResult, error) {
+	// Check if this is a Gen1 device
+	isGen1, err := s.connector.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if isGen1 {
+		return s.restoreGen1Backup(ctx, identifier, deviceBackup, opts)
+	}
+
+	return s.restoreGen2Backup(ctx, identifier, deviceBackup, opts)
+}
+
+// restoreGen1Backup restores a backup to a Gen1 device via HTTP REST.
+func (s *Service) restoreGen1Backup(ctx context.Context, identifier string, deviceBackup *DeviceBackup, opts RestoreOptions) (*RestoreResult, error) {
+	var result *RestoreResult
+
+	err := s.connector.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		r, err := restoreGen1(ctx, conn, deviceBackup, opts)
+		if err != nil {
+			return err
+		}
+		result = r
+		return nil
+	})
+
+	return result, err
+}
+
+// restoreGen2Backup restores a backup to a Gen2+ device via RPC.
+func (s *Service) restoreGen2Backup(ctx context.Context, identifier string, deviceBackup *DeviceBackup, opts RestoreOptions) (*RestoreResult, error) {
 	var result *RestoreResult
 
 	err := s.connector.WithConnection(ctx, identifier, func(conn *client.Client) error {
@@ -147,7 +211,31 @@ func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBa
 }
 
 // CompareBackup compares a backup with a device's current state.
+// Gen1 comparison is limited since Gen1 doesn't expose structured config via RPC.
 func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBackup *DeviceBackup) (*model.BackupDiff, error) {
+	// Check if Gen1 — comparison is limited for Gen1 devices
+	isGen1, err := s.connector.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if isGen1 {
+		return s.compareGen1Backup(ctx, identifier, deviceBackup)
+	}
+
+	return s.compareGen2Backup(ctx, identifier, deviceBackup)
+}
+
+// compareGen1Backup performs a basic comparison for Gen1 devices.
+// Gen1 doesn't have structured RPC config, so we compare device info only.
+func (s *Service) compareGen1Backup(_ context.Context, _ string, _ *DeviceBackup) (*model.BackupDiff, error) {
+	diff := &model.BackupDiff{}
+	diff.Warnings = append(diff.Warnings, "detailed comparison is not available for Gen1 devices; restore will apply all settings")
+	return diff, nil
+}
+
+// compareGen2Backup compares a Gen2+ backup with the device's current state.
+func (s *Service) compareGen2Backup(ctx context.Context, identifier string, deviceBackup *DeviceBackup) (*model.BackupDiff, error) {
 	diff := &model.BackupDiff{}
 
 	// Get current configuration

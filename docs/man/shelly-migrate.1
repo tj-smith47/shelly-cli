@@ -13,6 +13,10 @@ shelly-migrate - Migrate configuration between devices
 Migrate configuration from a source device or backup file to a target device.
 
 .PP
+By default, everything is migrated including network and authentication
+settings. Use --skip-* flags to exclude specific sections.
+
+.PP
 Source can be a device name/address or a backup file path.
 The --dry-run flag shows what would be changed without applying.
 
@@ -28,6 +32,26 @@ The --dry-run flag shows what would be changed without applying.
 .PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for migrate
+
+.PP
+\fB--skip-auth\fP[=false]
+	Skip authentication configuration
+
+.PP
+\fB--skip-network\fP[=false]
+	Skip network configuration (WiFi, Ethernet)
+
+.PP
+\fB--skip-schedules\fP[=false]
+	Skip schedule migration
+
+.PP
+\fB--skip-scripts\fP[=false]
+	Skip script migration
+
+.PP
+\fB--skip-webhooks\fP[=false]
+	Skip webhook migration
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -86,6 +110,9 @@ The --dry-run flag shows what would be changed without applying.
 
   # Migrate from backup file to device
   shelly migrate backup.json bedroom
+
+  # Migrate without network config (keep current WiFi)
+  shelly migrate living-room bedroom --skip-network
 
   # Force migration between different device types
   shelly migrate backup.json bedroom --force

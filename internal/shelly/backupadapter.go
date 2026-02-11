@@ -30,6 +30,17 @@ func (c *BackupConnector) WithConnection(ctx context.Context, identifier string,
 	return c.svc.WithConnection(ctx, identifier, fn)
 }
 
+// WithGen1Connection implements backup.ShellyConnector.
+func (c *BackupConnector) WithGen1Connection(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error {
+	return c.svc.WithGen1Connection(ctx, identifier, fn)
+}
+
+// IsGen1Device implements backup.ShellyConnector.
+func (c *BackupConnector) IsGen1Device(ctx context.Context, identifier string) (bool, error) {
+	isGen1, _, err := c.svc.IsGen1Device(ctx, identifier)
+	return isGen1, err
+}
+
 // DeviceInfo implements backup.ShellyConnector.
 func (c *BackupConnector) DeviceInfo(ctx context.Context, identifier string) (*backup.DeviceInfoResult, error) {
 	info, err := c.svc.DeviceInfo(ctx, identifier)

@@ -115,13 +115,22 @@ func TestNewCommand_Flags(t *testing.T) {
 		t.Errorf("dry-run flag default = %q, want %q", dryRunFlag.DefValue, testFalseValue)
 	}
 
-	// Check skip-network flag (defaults to true)
+	// Check skip-auth flag (defaults to false)
+	skipAuthFlag := cmd.Flags().Lookup("skip-auth")
+	if skipAuthFlag == nil {
+		t.Fatal("skip-auth flag not found")
+	}
+	if skipAuthFlag.DefValue != testFalseValue {
+		t.Errorf("skip-auth flag default = %q, want %q", skipAuthFlag.DefValue, testFalseValue)
+	}
+
+	// Check skip-network flag (defaults to false)
 	skipNetworkFlag := cmd.Flags().Lookup("skip-network")
 	if skipNetworkFlag == nil {
 		t.Fatal("skip-network flag not found")
 	}
-	if skipNetworkFlag.DefValue != "true" {
-		t.Errorf("skip-network flag default = %q, want 'true'", skipNetworkFlag.DefValue)
+	if skipNetworkFlag.DefValue != testFalseValue {
+		t.Errorf("skip-network flag default = %q, want %q", skipNetworkFlag.DefValue, testFalseValue)
 	}
 
 	// Check skip-scripts flag
@@ -442,6 +451,7 @@ func TestNewCommand_Example_Content(t *testing.T) {
 		"backup.json",
 		"--dry-run",
 		"--skip-network",
+		"--skip-auth",
 		"--decrypt",
 	}
 
