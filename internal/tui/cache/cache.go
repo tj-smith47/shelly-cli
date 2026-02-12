@@ -13,7 +13,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/tj-smith47/shelly-go/events"
-	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -905,19 +904,19 @@ func (c *Cache) reconcileMAC(data *DeviceData, info *shelly.DeviceInfo, updates 
 
 // reconcileType handles device type/SKU reconciliation.
 func (c *Cache) reconcileType(data *DeviceData, info *shelly.DeviceInfo, updates *config.DeviceUpdates) {
-	if info.Model == "" {
+	if info.Type == "" {
 		return
 	}
 
 	if data.Device.Type == "" {
-		data.Device.Type = info.Model
-		updates.Type = info.Model
-		debug.TraceEvent("cache: reconcile %s - added missing Type: %s", data.Device.Name, info.Model)
-	} else if data.Device.Type != info.Model {
+		data.Device.Type = info.Type
+		updates.Type = info.Type
+		debug.TraceEvent("cache: reconcile %s - added missing Type: %s", data.Device.Name, info.Type)
+	} else if data.Device.Type != info.Type {
 		debug.TraceEvent("cache: reconcile %s - corrected Type: %s -> %s",
-			data.Device.Name, data.Device.Type, info.Model)
-		data.Device.Type = info.Model
-		updates.Type = info.Model
+			data.Device.Name, data.Device.Type, info.Type)
+		data.Device.Type = info.Type
+		updates.Type = info.Type
 	}
 }
 
@@ -927,7 +926,8 @@ func (c *Cache) reconcileModel(data *DeviceData, info *shelly.DeviceInfo, update
 		return
 	}
 
-	displayName := types.ModelDisplayName(info.Model)
+	// info.Model is already the display name (derived from Type via types.ModelDisplayName)
+	displayName := info.Model
 
 	if data.Device.Model == "" || data.Device.Model == data.Device.Type {
 		data.Device.Model = displayName

@@ -85,7 +85,7 @@ func run(ctx context.Context, opts *Options) error {
 			return fmt.Errorf("couldn't reach device at %s: %w", opts.Address, err)
 		}
 		generation = info.Generation
-		deviceType = info.App
+		deviceType = info.Type
 		deviceModel = info.Model
 	} else {
 		generation = opts.Generation

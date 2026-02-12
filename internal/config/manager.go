@@ -156,6 +156,7 @@ func (m *Manager) Load() error {
 	}
 
 	initConfigMaps(c)
+	deduplicateDevices(c)
 	populateDerivedModels(c)
 
 	m.config = c
@@ -207,14 +208,37 @@ func initConfigMaps(c *Config) {
 	}
 }
 
+// deduplicateDevices removes duplicate device entries on config load.
+// Two devices are considered duplicates if they share the same non-empty MAC address.
+// When duplicates are found, the first entry (alphabetically by key) is kept.
+func deduplicateDevices(c *Config) {
+	// Build MAC→key index, deleting duplicates
+	seen := make(map[string]string) // normalized MAC → first key
+	for key, dev := range c.Devices {
+		mac := model.NormalizeMAC(dev.MAC)
+		if mac == "" {
+			continue
+		}
+		if firstKey, exists := seen[mac]; exists {
+			// Duplicate MAC: keep the alphabetically-first key
+			if key < firstKey {
+				delete(c.Devices, firstKey)
+				seen[mac] = key
+			} else {
+				delete(c.Devices, key)
+			}
+		} else {
+			seen[mac] = key
+		}
+	}
+}
+
 // populateDerivedModels fills in empty Model fields from Type using shelly-go lookup.
 func populateDerivedModels(c *Config) {
 	for key, dev := range c.Devices {
 		if dev.Model == "" && dev.Type != "" {
-			if displayName := types.ModelDisplayName(dev.Type); displayName != dev.Type {
-				dev.Model = displayName
-				c.Devices[key] = dev
-			}
+			dev.Model = types.ModelDisplayName(dev.Type)
+			c.Devices[key] = dev
 		}
 	}
 }

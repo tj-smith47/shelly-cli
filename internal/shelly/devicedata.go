@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/tj-smith47/shelly-go/types"
+
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -29,7 +31,7 @@ func (s *Service) CollectDeviceData(ctx context.Context, deviceNames []string) [
 		// Try to connect and get live data
 		err := s.WithConnection(ctx, device, func(conn *client.Client) error {
 			info := conn.Info()
-			data.Model = info.Model
+			data.Model = types.ModelDisplayName(info.Model)
 			data.Generation = info.Generation
 			data.App = info.App
 			data.Online = true

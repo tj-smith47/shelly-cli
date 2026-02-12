@@ -190,6 +190,8 @@ func (m *Manager) RegisterDevice(name, address string, generation int, deviceTyp
 // The name is normalized for use as a key (e.g., "Master Bathroom" → "master-bathroom")
 // but the original display name is preserved in the Device struct.
 // Empty platform defaults to "shelly" for native Shelly devices.
+// If another device with the same address already exists under a different key,
+// it is removed and its references are remapped to the new device.
 func (m *Manager) RegisterDeviceWithPlatform(name, address string, generation int, deviceType, deviceModel, platform string, auth *model.Auth) error {
 	if err := ValidateDeviceName(name); err != nil {
 		return err
@@ -199,6 +201,10 @@ func (m *Manager) RegisterDeviceWithPlatform(name, address string, generation in
 	defer m.mu.Unlock()
 
 	key := NormalizeDeviceName(name)
+
+	// Remove any other device with the same address to prevent duplicates
+	m.deduplicateByAddress(key, address)
+
 	m.config.Devices[key] = model.Device{
 		Name:       name, // Preserve original display name
 		Address:    address,
@@ -390,6 +396,24 @@ func (m *Manager) RenameDevice(oldName, newName string) error {
 	m.remapDeviceReferences(oldKey, newKey)
 
 	return m.saveWithoutLock()
+}
+
+// deduplicateByAddress removes any other device with the same address, remapping
+// references to the surviving device key. Caller must hold m.mu.Lock().
+func (m *Manager) deduplicateByAddress(survivingKey, address string) {
+	if address == "" {
+		return
+	}
+	for otherKey, otherDev := range m.config.Devices {
+		if otherKey == survivingKey {
+			continue
+		}
+		if otherDev.Address == address {
+			delete(m.config.Devices, otherKey)
+			m.remapDeviceReferences(otherKey, survivingKey)
+			return
+		}
+	}
 }
 
 // deduplicateByMAC removes any other device with the same MAC address, remapping

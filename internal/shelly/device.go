@@ -22,7 +22,8 @@ import (
 type DeviceInfo struct {
 	ID         string
 	MAC        string
-	Model      string
+	Type       string // Raw SKU/type code (e.g., "SNSW-001P16EU", "SHSW-1")
+	Model      string // Display name (e.g., "Shelly Plus 1PM") derived via types.ModelDisplayName
 	Generation int
 	Firmware   string
 	App        string
@@ -64,7 +65,8 @@ func (s *Service) DeviceInfo(ctx context.Context, identifier string) (*DeviceInf
 		result = &DeviceInfo{
 			ID:         info.ID,
 			MAC:        info.MAC,
-			Model:      info.Model,
+			Type:       info.Model,
+			Model:      types.ModelDisplayName(info.Model),
 			Generation: info.Generation,
 			Firmware:   info.Firmware,
 			App:        info.App,
@@ -99,7 +101,8 @@ func (s *Service) DeviceStatus(ctx context.Context, identifier string) (*DeviceS
 			Info: &DeviceInfo{
 				ID:         info.ID,
 				MAC:        info.MAC,
-				Model:      info.Model,
+				Type:       info.Model,
+				Model:      types.ModelDisplayName(info.Model),
 				Generation: info.Generation,
 				Firmware:   info.Firmware,
 				App:        info.App,
@@ -147,7 +150,8 @@ func (s *Service) DeviceStatusGen1(ctx context.Context, identifier string) (*Dev
 			Info: &DeviceInfo{
 				ID:         info.ID,
 				MAC:        info.MAC,
-				Model:      info.Model,
+				Type:       info.Model,
+				Model:      types.ModelDisplayName(info.Model),
 				Generation: info.Generation,
 				Firmware:   info.Firmware,
 				App:        info.App,
@@ -263,7 +267,8 @@ func (s *Service) DeviceInfoGen1(ctx context.Context, identifier string) (*Devic
 		result = &DeviceInfo{
 			ID:         info.ID,
 			MAC:        info.MAC,
-			Model:      info.Model,
+			Type:       info.Model,
+			Model:      types.ModelDisplayName(info.Model),
 			Generation: info.Generation,
 			Firmware:   info.Firmware,
 			App:        info.App,
@@ -288,14 +293,12 @@ func refreshDeviceMetadata(identifier string, info *DeviceInfo) {
 	}
 	updates := config.DeviceUpdates{
 		MAC:        info.MAC,
-		Type:       info.Model, // info.Model is the SKU/type identifier
+		Type:       info.Type, // raw SKU stored before Model is converted to display name
 		Generation: info.Generation,
 	}
-	// Derive display model name from SKU
-	if info.Model != "" {
-		if displayName := types.ModelDisplayName(info.Model); displayName != info.Model {
-			updates.Model = displayName
-		}
+	// Always derive display model name from SKU via shelly-go
+	if info.Type != "" {
+		updates.Model = types.ModelDisplayName(info.Type)
 	}
 	if err := config.UpdateDeviceInfo(identifier, updates); err != nil {
 		// Expected for IP-addressed devices not in registry - trace only

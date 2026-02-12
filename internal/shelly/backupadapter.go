@@ -50,7 +50,7 @@ func (c *BackupConnector) DeviceInfo(ctx context.Context, identifier string) (*b
 	return &backup.DeviceInfoResult{
 		ID:         info.ID,
 		MAC:        info.MAC,
-		Model:      info.Model,
+		Model:      info.Type, // Raw SKU for backup compatibility checks
 		Generation: info.Generation,
 		Firmware:   info.Firmware,
 		App:        info.App,
