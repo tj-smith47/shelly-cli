@@ -8,6 +8,7 @@ import (
 	"log"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/spf13/afero"
@@ -210,26 +211,42 @@ func initConfigMaps(c *Config) {
 
 // deduplicateDevices removes duplicate device entries on config load.
 // Two devices are considered duplicates if they share the same non-empty MAC address.
-// When duplicates are found, the first entry (alphabetically by key) is kept.
+// When duplicates are found, the preferred key is kept using preferDeviceKey.
 func deduplicateDevices(c *Config) {
-	// Build MAC→key index, deleting duplicates
-	seen := make(map[string]string) // normalized MAC → first key
-	for key, dev := range c.Devices {
-		mac := model.NormalizeMAC(dev.MAC)
+	seen := make(map[string]string) // normalized MAC → preferred key
+	for key := range c.Devices {
+		mac := model.NormalizeMAC(c.Devices[key].MAC)
 		if mac == "" {
 			continue
 		}
-		if firstKey, exists := seen[mac]; exists {
-			// Duplicate MAC: keep the alphabetically-first key
-			if key < firstKey {
-				delete(c.Devices, firstKey)
-				seen[mac] = key
-			} else {
-				delete(c.Devices, key)
-			}
+		if existingKey, exists := seen[mac]; exists {
+			winner, loser := preferDeviceKey(existingKey, key)
+			delete(c.Devices, loser)
+			seen[mac] = winner
 		} else {
 			seen[mac] = key
 		}
+	}
+}
+
+// preferDeviceKey decides which device key to keep when two devices share a MAC.
+// Prefers user-given names over auto-generated discovery names (which contain "shelly").
+// Falls back to alphabetical order as the final tiebreaker.
+func preferDeviceKey(a, b string) (winner, loser string) {
+	aHasShelly := strings.Contains(strings.ToLower(a), "shelly")
+	bHasShelly := strings.Contains(strings.ToLower(b), "shelly")
+
+	switch {
+	case aHasShelly && !bHasShelly:
+		return b, a // prefer b (user-given name)
+	case !aHasShelly && bHasShelly:
+		return a, b // prefer a (user-given name)
+	default:
+		// Both or neither contain "shelly" — alphabetical tiebreaker
+		if a < b {
+			return a, b
+		}
+		return b, a
 	}
 }
 

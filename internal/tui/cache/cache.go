@@ -853,10 +853,19 @@ func (c *Cache) fetchPluginDevice(name string, device model.Device, data *Device
 // missing or incorrect.
 func (c *Cache) populateDeviceInfo(name string, data *DeviceData, info *shelly.DeviceInfo) {
 	updates := c.reconcileDeviceInfo(data, info)
-	if updates.Type != "" || updates.Model != "" || updates.Generation > 0 || updates.MAC != "" {
-		if err := config.UpdateDeviceInfo(name, updates); err != nil {
-			c.ios.DebugErr("persist device info", err)
+	if updates.Type == "" && updates.Generation == 0 && updates.MAC == "" && updates.Address == "" {
+		return
+	}
+
+	// MAC-based lookup is authoritative
+	key := name
+	if info.MAC != "" {
+		if macKey := config.FindDeviceKeyByMAC(info.MAC); macKey != "" {
+			key = macKey
 		}
+	}
+	if err := config.UpdateDeviceInfo(key, updates); err != nil {
+		c.ios.DebugErr("persist device info", err)
 	}
 }
 
@@ -920,8 +929,10 @@ func (c *Cache) reconcileType(data *DeviceData, info *shelly.DeviceInfo, updates
 	}
 }
 
-// reconcileModel handles display name reconciliation.
-func (c *Cache) reconcileModel(data *DeviceData, info *shelly.DeviceInfo, updates *config.DeviceUpdates) {
+// reconcileModel handles display name reconciliation in the in-memory cache.
+// Model is derived from Type (via types.ModelDisplayName) and not persisted to config,
+// so this only updates the cache data, not the config updates struct.
+func (c *Cache) reconcileModel(data *DeviceData, info *shelly.DeviceInfo, _ *config.DeviceUpdates) {
 	if info.Model == "" {
 		return
 	}
@@ -931,13 +942,11 @@ func (c *Cache) reconcileModel(data *DeviceData, info *shelly.DeviceInfo, update
 
 	if data.Device.Model == "" || data.Device.Model == data.Device.Type {
 		data.Device.Model = displayName
-		updates.Model = displayName
-		debug.TraceEvent("cache: reconcile %s - added missing Model: %s", data.Device.Name, displayName)
+		debug.TraceEvent("cache: reconcile %s - set Model: %s", data.Device.Name, displayName)
 	} else if data.Device.Model != displayName {
 		debug.TraceEvent("cache: reconcile %s - corrected Model: %s -> %s",
 			data.Device.Name, data.Device.Model, displayName)
 		data.Device.Model = displayName
-		updates.Model = displayName
 	}
 }
 

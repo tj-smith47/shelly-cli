@@ -165,6 +165,12 @@ func ResolveDevice(identifier string) (model.Device, error) {
 	return getDefaultManager().ResolveDevice(identifier)
 }
 
+// FindDeviceKeyByMAC returns the config key for a device with the given MAC address.
+// Returns empty string if no device has that MAC.
+func FindDeviceKeyByMAC(mac string) string {
+	return getDefaultManager().FindDeviceKeyByMAC(mac)
+}
+
 // =============================================================================
 // Manager Device Methods
 // =============================================================================
@@ -176,6 +182,7 @@ type DeviceUpdates struct {
 	Model      string // Human-readable model name (e.g., "Shelly Pro 1PM")
 	Generation int    // Device generation (1, 2, 3, etc.)
 	MAC        string // Device MAC address (normalized on save)
+	Address    string // Device IP address or hostname
 }
 
 // RegisterDevice adds a device to the registry.
@@ -247,6 +254,10 @@ func (m *Manager) UpdateDeviceInfo(name string, updates DeviceUpdates) error {
 	}
 	if updates.Generation > 0 && dev.Generation != updates.Generation {
 		dev.Generation = updates.Generation
+		changed = true
+	}
+	if updates.Address != "" && dev.Address != updates.Address {
+		dev.Address = updates.Address
 		changed = true
 	}
 	if updates.MAC != "" {
@@ -349,6 +360,24 @@ func (m *Manager) GetDevice(name string) (model.Device, bool) {
 		return dev, true
 	}
 	return model.Device{}, false
+}
+
+// FindDeviceKeyByMAC returns the config key for a device with the given MAC address.
+// Returns empty string if no device has that MAC.
+func (m *Manager) FindDeviceKeyByMAC(mac string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	normalized := model.NormalizeMAC(mac)
+	if normalized == "" {
+		return ""
+	}
+	for key, dev := range m.config.Devices {
+		if model.NormalizeMAC(dev.MAC) == normalized {
+			return key
+		}
+	}
+	return ""
 }
 
 // ListDevices returns all registered devices.

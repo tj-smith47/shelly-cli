@@ -45,10 +45,12 @@ func (s *Service) DeviceReboot(ctx context.Context, identifier string, delayMS i
 }
 
 // DeviceFactoryReset performs a factory reset on the device.
+// Supports both Gen1 (HTTP REST) and Gen2+ (RPC) devices.
 func (s *Service) DeviceFactoryReset(ctx context.Context, identifier string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		return conn.FactoryReset(ctx)
-	})
+	return s.withGenAwareAction(ctx, identifier,
+		func(conn *client.Gen1Client) error { return conn.FactoryReset(ctx) },
+		func(conn *client.Client) error { return conn.FactoryReset(ctx) },
+	)
 }
 
 // DeviceInfo returns information about the device.
@@ -284,24 +286,35 @@ func (s *Service) DeviceInfoGen1(ctx context.Context, identifier string) (*Devic
 }
 
 // refreshDeviceMetadata opportunistically updates stored device metadata
-// from a successful device info response. This keeps MAC, Type, Model,
-// and Generation up to date without requiring explicit refresh commands.
-// Errors are expected when the device is addressed by IP and not registered.
+// from a successful device info response. Uses MAC as the authoritative
+// device identifier to find the config entry, falling back to name-based
+// lookup for devices without a stored MAC. Updates Type, Generation, Address,
+// and MAC. Model is not stored — it's derived from Type on config load.
 func refreshDeviceMetadata(identifier string, info *DeviceInfo) {
 	if info == nil {
 		return
 	}
+
 	updates := config.DeviceUpdates{
 		MAC:        info.MAC,
-		Type:       info.Type, // raw SKU stored before Model is converted to display name
+		Type:       info.Type,
 		Generation: info.Generation,
+		Address:    info.Address,
 	}
-	// Always derive display model name from SKU via shelly-go
-	if info.Type != "" {
-		updates.Model = types.ModelDisplayName(info.Type)
+
+	// MAC-based lookup is authoritative — find config key by MAC first
+	if info.MAC != "" {
+		if key := config.FindDeviceKeyByMAC(info.MAC); key != "" {
+			if err := config.UpdateDeviceInfo(key, updates); err != nil {
+				debug.TraceEvent("metadata refresh for %s (key=%s): %v", identifier, key, err)
+			}
+			return
+		}
 	}
+
+	// Fallback: name-based lookup (for devices without a stored MAC yet)
 	if err := config.UpdateDeviceInfo(identifier, updates); err != nil {
-		// Expected for IP-addressed devices not in registry - trace only
+		// Expected for IP-addressed devices not in registry
 		debug.TraceEvent("metadata refresh for %s: %v", identifier, err)
 	}
 }
