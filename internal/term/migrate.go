@@ -1,6 +1,8 @@
 package term
 
 import (
+	"errors"
+
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
@@ -20,6 +22,17 @@ func DisplayMigrationPreview(ios *iostreams.IOStreams, source, sourceType, targe
 	}
 
 	DisplayMigrationDiff(ios, diff)
+}
+
+// DisplayCompatibilityError displays a device type mismatch error.
+func DisplayCompatibilityError(ios *iostreams.IOStreams, err error) {
+	var compErr *backup.CompatibilityError
+	if errors.As(err, &compErr) {
+		ios.Warning("Source and target are different device types:")
+		ios.Printf("  Source: %s\n", compErr.SourceModel)
+		ios.Printf("  Target: %s\n", compErr.TargetModel)
+		ios.Info("Use --force to migrate anyway")
+	}
 }
 
 // DisplayMigrationDiff shows the differences that would be applied.

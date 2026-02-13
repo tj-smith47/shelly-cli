@@ -54,5 +54,5 @@ shelly provision wifi <device> [flags]
 
 ### SEE ALSO
 
-* [shelly provision](shelly_provision.md)	 - Provision device settings
+* [shelly provision](shelly_provision.md)	 - Discover and provision new Shelly devices
 

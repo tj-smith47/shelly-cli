@@ -3,20 +3,13 @@ package migrate
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/spf13/afero"
-	shellybackup "github.com/tj-smith47/shelly-go/backup"
-
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
-
-const testMigrateDir = "/test/migrate"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -39,8 +32,9 @@ func TestNewCommand_Use(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "migrate <source> <target>" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "migrate <source> <target>")
+	want := "migrate <source-device> <target-device>"
+	if cmd.Use != want {
+		t.Errorf("Use = %q, want %q", cmd.Use, want)
 	}
 }
 
@@ -133,26 +127,19 @@ func TestNewCommand_Flags(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		flagName   string
-		defValue   string
-		wantShort  string
-		wantExists bool
+		name     string
+		flagName string
+		defValue string
 	}{
-		{
-			name:       "dry-run flag exists",
-			flagName:   "dry-run",
-			defValue:   "false",
-			wantShort:  "",
-			wantExists: true,
-		},
-		{
-			name:       "force flag exists",
-			flagName:   "force",
-			defValue:   "false",
-			wantShort:  "",
-			wantExists: true,
-		},
+		{"dry-run", "dry-run", "false"},
+		{"force", "force", "false"},
+		{"yes", "yes", "false"},
+		{"reset-source", "reset-source", "true"},
+		{"skip-auth", "skip-auth", "false"},
+		{"skip-network", "skip-network", "false"},
+		{"skip-scripts", "skip-scripts", "false"},
+		{"skip-schedules", "skip-schedules", "false"},
+		{"skip-webhooks", "skip-webhooks", "false"},
 	}
 
 	for _, tt := range tests {
@@ -161,37 +148,26 @@ func TestNewCommand_Flags(t *testing.T) {
 			cmd := NewCommand(cmdutil.NewFactory())
 
 			flag := cmd.Flags().Lookup(tt.flagName)
-			if tt.wantExists && flag == nil {
+			if flag == nil {
 				t.Fatalf("flag %q not found", tt.flagName)
 			}
-			if !tt.wantExists && flag != nil {
-				t.Fatalf("flag %q should not exist", tt.flagName)
-			}
-			if flag != nil && flag.DefValue != tt.defValue {
+			if flag.DefValue != tt.defValue {
 				t.Errorf("flag %q default = %q, want %q", tt.flagName, flag.DefValue, tt.defValue)
 			}
 		})
 	}
 }
 
-func TestNewCommand_FlagDefaults(t *testing.T) {
+func TestNewCommand_YesFlagShorthand(t *testing.T) {
 	t.Parallel()
-
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Parse with no flags to check defaults
-	if err := cmd.ParseFlags([]string{}); err != nil {
-		t.Fatalf("ParseFlags error: %v", err)
+	flag := cmd.Flags().Lookup("yes")
+	if flag == nil {
+		t.Fatal("yes flag not found")
 	}
-
-	dryRunFlag := cmd.Flags().Lookup("dry-run")
-	if dryRunFlag.DefValue != "false" {
-		t.Errorf("dry-run default = %q, want false", dryRunFlag.DefValue)
-	}
-
-	forceFlag := cmd.Flags().Lookup("force")
-	if forceFlag.DefValue != "false" {
-		t.Errorf("force default = %q, want false", forceFlag.DefValue)
+	if flag.Shorthand != "y" {
+		t.Errorf("yes flag shorthand = %q, want %q", flag.Shorthand, "y")
 	}
 }
 
@@ -199,25 +175,21 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		args    []string
-		wantErr bool
+		name string
+		args []string
 	}{
-		{
-			name:    "dry-run flag long",
-			args:    []string{"--dry-run"},
-			wantErr: false,
-		},
-		{
-			name:    "force flag long",
-			args:    []string{"--force"},
-			wantErr: false,
-		},
-		{
-			name:    "both flags",
-			args:    []string{"--dry-run", "--force"},
-			wantErr: false,
-		},
+		{"dry-run", []string{"--dry-run"}},
+		{"force", []string{"--force"}},
+		{"yes long", []string{"--yes"}},
+		{"yes short", []string{"-y"}},
+		{"reset-source false", []string{"--reset-source=false"}},
+		{"skip-auth", []string{"--skip-auth"}},
+		{"skip-network", []string{"--skip-network"}},
+		{"skip-scripts", []string{"--skip-scripts"}},
+		{"skip-schedules", []string{"--skip-schedules"}},
+		{"skip-webhooks", []string{"--skip-webhooks"}},
+		{"all skip flags", []string{"--skip-auth", "--skip-network", "--skip-scripts", "--skip-schedules", "--skip-webhooks"}},
+		{"combined", []string{"--dry-run", "--force", "-y"}},
 	}
 
 	for _, tt := range tests {
@@ -225,9 +197,8 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 			t.Parallel()
 			cmd := NewCommand(cmdutil.NewFactory())
 
-			err := cmd.ParseFlags(tt.args)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseFlags() error = %v, wantErr %v", err, tt.wantErr)
+			if err := cmd.ParseFlags(tt.args); err != nil {
+				t.Errorf("ParseFlags() error = %v", err)
 			}
 		})
 	}
@@ -256,26 +227,11 @@ func TestNewCommand_HasSubcommands(t *testing.T) {
 	}
 }
 
-func TestNewCommand_WithTestIOStreams(t *testing.T) {
-	t.Parallel()
-
-	var stdout, stderr bytes.Buffer
-	ios := iostreams.Test(nil, &stdout, &stderr)
-	f := cmdutil.NewWithIOStreams(ios)
-
-	cmd := NewCommand(f)
-
-	if cmd == nil {
-		t.Fatal("NewCommand returned nil with test IOStreams")
-	}
-}
-
 func TestNewCommand_Structure(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Verify the command is properly structured
 	if cmd.Use == "" {
 		t.Error("Use is empty")
 	}
@@ -299,112 +255,58 @@ func TestNewCommand_Structure(t *testing.T) {
 	}
 }
 
-// createValidBackupFile creates a test backup file with valid structure using afero.
-func createValidBackupFile(t *testing.T, fs afero.Fs, dir, name string) string {
-	t.Helper()
-
-	bkp := shellybackup.Backup{
-		Version:   1,
-		CreatedAt: time.Now(),
-		DeviceInfo: &shellybackup.DeviceInfo{
-			ID:         "test-device-id",
-			Name:       "test-device",
-			Model:      "SNSW-001X16EU",
-			Version:    "1.0.0",
-			MAC:        "AA:BB:CC:DD:EE:FF",
-			Generation: 2,
-		},
-		Config: json.RawMessage(`{"sys":{"device":{"name":"test"}}}`),
-	}
-
-	data, err := json.MarshalIndent(bkp, "", "  ")
-	if err != nil {
-		t.Fatalf("failed to marshal backup: %v", err)
-	}
-
-	filePath := dir + "/" + name
-	if err := afero.WriteFile(fs, filePath, data, 0o600); err != nil {
-		t.Fatalf("failed to write backup file: %v", err)
-	}
-
-	return filePath
-}
-
-// createInvalidBackupFile creates an invalid backup file for error testing using afero.
-func createInvalidBackupFile(t *testing.T, fs afero.Fs, dir, name, content string) string {
-	t.Helper()
-
-	filePath := dir + "/" + name
-	if err := afero.WriteFile(fs, filePath, []byte(content), 0o600); err != nil {
-		t.Fatalf("failed to write backup file: %v", err)
-	}
-
-	return filePath
-}
-
-func TestRun_SourceFileNotFound(t *testing.T) {
+func TestShouldResetSource(t *testing.T) {
 	t.Parallel()
 
-	tf := factory.NewTestFactory(t)
-
-	// Use a non-existent file as source
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
-	opts := &Options{Factory: tf.Factory, Source: "/nonexistent/backup.json", Target: "target-device"}
-	err := run(ctx, opts)
-
-	// We expect an error because the file doesn't exist
-	// The service's LoadMigrationSource will fail
-	if err == nil {
-		t.Log("Note: run succeeded unexpectedly (mocked service)")
+	tests := []struct {
+		name        string
+		skipNetwork bool
+		explicit    bool
+		resetSource bool
+		want        bool
+	}{
+		{
+			name: "default with network = reset",
+			want: true,
+		},
+		{
+			name:        "skip-network = no reset",
+			skipNetwork: true,
+			want:        false,
+		},
+		{
+			name:        "explicit true",
+			explicit:    true,
+			resetSource: true,
+			want:        true,
+		},
+		{
+			name:        "explicit false overrides default",
+			explicit:    true,
+			resetSource: false,
+			want:        false,
+		},
+		{
+			name:        "explicit true with skip-network overrides auto",
+			skipNetwork: true,
+			explicit:    true,
+			resetSource: true,
+			want:        true,
+		},
 	}
-}
 
-//nolint:paralleltest // Modifies global state via config.SetFs
-func TestRun_InvalidBackupFile(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	config.SetFs(fs)
-	t.Cleanup(func() { config.SetFs(nil) })
-
-	tf := factory.NewTestFactory(t)
-
-	// Create invalid backup file
-	invalidFile := createInvalidBackupFile(t, fs, testMigrateDir, "invalid.json", "{ not valid json }")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-
-	opts := &Options{Factory: tf.Factory, Source: invalidFile, Target: "192.0.2.1"}
-	err := run(ctx, opts)
-
-	// We expect an error because the backup file is invalid
-	if err == nil {
-		t.Log("Note: run succeeded unexpectedly with invalid backup file")
-	}
-}
-
-//nolint:paralleltest // Modifies global state via config.SetFs
-func TestRun_ValidBackupFileUnreachableTarget(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	config.SetFs(fs)
-	t.Cleanup(func() { config.SetFs(nil) })
-
-	tf := factory.NewTestFactory(t)
-
-	// Create valid backup file
-	validFile := createValidBackupFile(t, fs, testMigrateDir, "valid.json")
-
-	// Use unreachable target device address
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-
-	opts := &Options{Factory: tf.Factory, Source: validFile, Target: "192.0.2.1"}
-	err := run(ctx, opts) // TEST-NET-1, unreachable
-
-	// We expect an error due to unreachable target
-	if err == nil {
-		t.Log("Note: run succeeded unexpectedly (device might be mocked)")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			opts := &Options{
+				SkipNetwork:         tt.skipNetwork,
+				ResetSource:         tt.resetSource,
+				resetSourceExplicit: tt.explicit,
+			}
+			if got := opts.shouldResetSource(); got != tt.want {
+				t.Errorf("shouldResetSource() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -413,11 +315,10 @@ func TestRun_DeviceToDeviceMigrationFails(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	// Both source and target are device addresses
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	opts := &Options{Factory: tf.Factory, Source: "192.0.2.1", Target: "192.0.2.2"}
+	opts := &Options{Factory: tf.Factory, Source: "192.0.2.1", Target: "192.0.2.2", Yes: true}
 	err := run(ctx, opts) // TEST-NET-1 addresses
 
 	// Should fail to connect to source device
@@ -431,14 +332,12 @@ func TestRun_ContextCancelled(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	// Cancel context immediately
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	opts := &Options{Factory: tf.Factory, Source: "source", Target: "target"}
+	opts := &Options{Factory: tf.Factory, Source: "source", Target: "target", Yes: true}
 	err := run(ctx, opts)
 
-	// Expect error due to cancelled context
 	if err == nil {
 		t.Log("Note: run succeeded with cancelled context (unexpected)")
 	}
@@ -449,55 +348,38 @@ func TestRun_ContextTimeout(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	// Create context with very short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 	defer cancel()
 
-	// Allow timeout to trigger
 	time.Sleep(1 * time.Millisecond)
 
-	opts := &Options{Factory: tf.Factory, Source: "source", Target: "target"}
+	opts := &Options{Factory: tf.Factory, Source: "source", Target: "target", Yes: true}
 	err := run(ctx, opts)
 
-	// Expect error due to timeout
 	if err == nil {
 		t.Log("Note: run succeeded with timed out context (unexpected)")
 	}
 }
 
-func TestNewCommand_AcceptsIPAddressAsSource(t *testing.T) {
+func TestNewCommand_AcceptsIPAddresses(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Verify the command accepts IP addresses as source
 	err := cmd.Args(cmd, []string{"192.168.1.100", "192.168.1.101"})
 	if err != nil {
 		t.Errorf("Command should accept IP addresses, got error: %v", err)
 	}
 }
 
-func TestNewCommand_AcceptsDeviceNameAsSource(t *testing.T) {
+func TestNewCommand_AcceptsDeviceNames(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Verify the command accepts named devices
 	err := cmd.Args(cmd, []string{"living-room", "bedroom"})
 	if err != nil {
 		t.Errorf("Command should accept device names, got error: %v", err)
-	}
-}
-
-func TestNewCommand_AcceptsFilePath(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Verify the command accepts file paths as source
-	err := cmd.Args(cmd, []string{"/path/to/backup.json", "target-device"})
-	if err != nil {
-		t.Errorf("Command should accept file path, got error: %v", err)
 	}
 }
 
@@ -549,7 +431,6 @@ func TestNewCommand_ExecuteWithNoArgs(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetArgs([]string{})
 
-	// Execute should fail with missing args error
 	err := cmd.Execute()
 	if err == nil {
 		t.Error("Expected error when executing with no args")
@@ -564,92 +445,9 @@ func TestNewCommand_ExecuteWithOneArg(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetArgs([]string{"source"})
 
-	// Execute should fail with missing second arg
 	err := cmd.Execute()
 	if err == nil {
 		t.Error("Expected error when executing with only one arg")
-	}
-}
-
-func TestNewCommand_DryRunFlagParsed(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	if err := cmd.ParseFlags([]string{"--dry-run"}); err != nil {
-		t.Fatalf("ParseFlags error: %v", err)
-	}
-
-	dryRun, err := cmd.Flags().GetBool("dry-run")
-	if err != nil {
-		t.Fatalf("GetBool error: %v", err)
-	}
-	if !dryRun {
-		t.Error("dry-run should be true after --dry-run flag")
-	}
-}
-
-func TestNewCommand_ForceFlagParsed(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	if err := cmd.ParseFlags([]string{"--force"}); err != nil {
-		t.Fatalf("ParseFlags error: %v", err)
-	}
-
-	force, err := cmd.Flags().GetBool("force")
-	if err != nil {
-		t.Fatalf("GetBool error: %v", err)
-	}
-	if !force {
-		t.Error("force should be true after --force flag")
-	}
-}
-
-//nolint:paralleltest // Modifies global state via config.SetFs
-func TestRun_ValidFileSourceFormat(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	config.SetFs(fs)
-	t.Cleanup(func() { config.SetFs(nil) })
-
-	var stdout, stderr bytes.Buffer
-	ios := iostreams.Test(nil, &stdout, &stderr)
-	f := cmdutil.NewWithIOStreams(ios)
-
-	// Create a valid backup file
-	validFile := createValidBackupFile(t, fs, testMigrateDir, "test.json")
-
-	// Create context with short timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-
-	// Run should attempt to load the file and then fail when trying to reach target
-	opts := &Options{Factory: f, Source: validFile, Target: "192.0.2.1"}
-	err := run(ctx, opts)
-
-	// We expect some kind of error (either file processing or network error)
-	// The key is that it doesn't panic and handles the backup file
-	if err == nil {
-		t.Log("Note: run succeeded with file source (service might be mocked)")
-	}
-}
-
-func TestRun_InvalidSourceDeviceAddress(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-
-	// Use an invalid address format
-	opts := &Options{Factory: tf.Factory, Source: "not-a-valid-source", Target: "target-device"}
-	err := run(ctx, opts)
-
-	// Expect error because neither file nor valid device
-	if err == nil {
-		t.Log("Note: run succeeded unexpectedly")
 	}
 }
 
@@ -665,12 +463,62 @@ func TestNewCommand_SubcommandsHaveCorrectParent(t *testing.T) {
 	}
 }
 
+func TestNewCommand_ExampleContainsUsage(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.Example == "" {
+		t.Fatal("Example is empty")
+	}
+
+	// Should contain key usage patterns
+	patterns := []string{"shelly migrate", "--dry-run", "--skip-network", "--yes"}
+	for _, p := range patterns {
+		if !strings.Contains(cmd.Example, p) {
+			t.Errorf("Example should contain %q", p)
+		}
+	}
+}
+
+func TestNewCommand_LongContainsDescription(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.Long == "" {
+		t.Fatal("Long is empty")
+	}
+
+	keywords := []string{"configuration", "factory reset", "IP conflicts", "--skip-network"}
+	for _, kw := range keywords {
+		if !strings.Contains(cmd.Long, kw) {
+			t.Errorf("Long should contain %q", kw)
+		}
+	}
+}
+
+func TestRun_InvalidSourceDevice(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	opts := &Options{Factory: tf.Factory, Source: "not-a-valid-source", Target: "target-device", Yes: true}
+	err := run(ctx, opts)
+
+	if err == nil {
+		t.Log("Note: run succeeded unexpectedly")
+	}
+}
+
 func TestNewCommand_AliasWorks(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Should have "mig" alias
 	found := false
 	for _, alias := range cmd.Aliases {
 		if alias == "mig" {
@@ -683,37 +531,49 @@ func TestNewCommand_AliasWorks(t *testing.T) {
 	}
 }
 
-func TestNewCommand_ExampleContainsUsage(t *testing.T) {
+func TestNewCommand_FlagDefaults(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Example should contain actual usage patterns
-	if cmd.Example == "" {
-		t.Error("Example is empty")
-		return
+	if err := cmd.ParseFlags([]string{}); err != nil {
+		t.Fatalf("ParseFlags error: %v", err)
 	}
 
-	// Should contain shelly migrate
-	if !bytes.Contains([]byte(cmd.Example), []byte("shelly migrate")) {
-		t.Error("Example should contain 'shelly migrate'")
+	checks := map[string]string{
+		"dry-run":        "false",
+		"force":          "false",
+		"yes":            "false",
+		"reset-source":   "true",
+		"skip-auth":      "false",
+		"skip-network":   "false",
+		"skip-scripts":   "false",
+		"skip-schedules": "false",
+		"skip-webhooks":  "false",
+	}
+
+	for name, want := range checks {
+		flag := cmd.Flags().Lookup(name)
+		if flag == nil {
+			t.Errorf("flag %q not found", name)
+			continue
+		}
+		if flag.DefValue != want {
+			t.Errorf("flag %q default = %q, want %q", name, flag.DefValue, want)
+		}
 	}
 }
 
-func TestNewCommand_LongContainsDescription(t *testing.T) {
+func TestNewCommand_WithTestIOStreams(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand(cmdutil.NewFactory())
+	var buf bytes.Buffer
+	tf := factory.NewTestFactory(t)
 
-	// Long should contain migration explanation
-	if cmd.Long == "" {
-		t.Error("Long is empty")
-		return
-	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetOut(&buf)
 
-	// Should mention migration/configuration/device
-	if !bytes.Contains([]byte(cmd.Long), []byte("configuration")) &&
-		!bytes.Contains([]byte(cmd.Long), []byte("Migrate")) {
-		t.Error("Long should describe migration functionality")
+	if cmd == nil {
+		t.Fatal("NewCommand returned nil with test IOStreams")
 	}
 }

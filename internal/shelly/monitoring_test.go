@@ -8,6 +8,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
+const testMonitorDevice = "test"
+
 func TestGetEMDataCSVURL(t *testing.T) {
 	t.Parallel()
 
@@ -26,12 +28,12 @@ func TestGetEMDataCSVURL(t *testing.T) {
 			name: "basic URL without parameters",
 			resolver: &mockResolver{
 				device: model.Device{
-					Name:       testDevice,
+					Name:       testMonitorDevice,
 					Address:    "192.168.1.100",
 					Generation: 2,
 				},
 			},
-			device:  testDevice,
+			device:  testMonitorDevice,
 			id:      0,
 			wantURL: "http://192.168.1.100/emdata/0/data.csv?",
 		},
@@ -42,7 +44,7 @@ func TestGetEMDataCSVURL(t *testing.T) {
 					Address: "192.168.1.100",
 				},
 			},
-			device:  testDevice,
+			device:  testMonitorDevice,
 			id:      0,
 			startTS: int64Ptr(1609459200),
 			wantURL: "http://192.168.1.100/emdata/0/data.csv?ts=1609459200",
@@ -54,7 +56,7 @@ func TestGetEMDataCSVURL(t *testing.T) {
 					Address: "192.168.1.100",
 				},
 			},
-			device:  testDevice,
+			device:  testMonitorDevice,
 			id:      1,
 			startTS: int64Ptr(1609459200),
 			endTS:   int64Ptr(1609545600),
@@ -67,7 +69,7 @@ func TestGetEMDataCSVURL(t *testing.T) {
 					Address: "192.168.1.100",
 				},
 			},
-			device:  testDevice,
+			device:  testMonitorDevice,
 			id:      0,
 			addKeys: true,
 			wantURL: "http://192.168.1.100/emdata/0/data.csv?add_keys=true",
@@ -79,7 +81,7 @@ func TestGetEMDataCSVURL(t *testing.T) {
 					Address: "192.168.1.100",
 				},
 			},
-			device:  testDevice,
+			device:  testMonitorDevice,
 			id:      2,
 			startTS: int64Ptr(1609459200),
 			endTS:   int64Ptr(1609545600),
@@ -140,7 +142,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 					Address: "192.168.1.100",
 				},
 			},
-			device:  testDevice,
+			device:  testMonitorDevice,
 			id:      0,
 			wantURL: "http://192.168.1.100/em1data/0/data.csv?",
 		},
@@ -151,7 +153,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 					Address: "192.168.1.100",
 				},
 			},
-			device:  testDevice,
+			device:  testMonitorDevice,
 			id:      0,
 			startTS: int64Ptr(1609459200),
 			wantURL: "http://192.168.1.100/em1data/0/data.csv?ts=1609459200",
@@ -163,7 +165,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 					Address: "192.168.1.100",
 				},
 			},
-			device:  testDevice,
+			device:  testMonitorDevice,
 			id:      1,
 			startTS: int64Ptr(1609459200),
 			endTS:   int64Ptr(1609545600),
@@ -176,7 +178,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 					Address: "192.168.1.100",
 				},
 			},
-			device:  testDevice,
+			device:  testMonitorDevice,
 			id:      0,
 			addKeys: true,
 			wantURL: "http://192.168.1.100/em1data/0/data.csv?add_keys=true",
@@ -188,7 +190,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 					Address: "192.168.1.100",
 				},
 			},
-			device:  testDevice,
+			device:  testMonitorDevice,
 			id:      2,
 			startTS: int64Ptr(1609459200),
 			endTS:   int64Ptr(1609545600),
@@ -362,15 +364,15 @@ func TestDeviceEvent_Fields(t *testing.T) {
 	t.Parallel()
 
 	event := model.DeviceEvent{
-		Device:      testDevice,
+		Device:      testMonitorDevice,
 		Event:       "switch.on",
 		Component:   "switch",
 		ComponentID: 0,
 		Data:        map[string]any{"output": true},
 	}
 
-	if event.Device != testDevice {
-		t.Errorf("Device = %q, want testDevice", event.Device)
+	if event.Device != testMonitorDevice {
+		t.Errorf("Device = %q, want testMonitorDevice", event.Device)
 	}
 	if event.Event != "switch.on" {
 		t.Errorf("Event = %q, want switch.on", event.Event)
@@ -407,7 +409,7 @@ func TestMonitoringSnapshot_Fields(t *testing.T) {
 	t.Parallel()
 
 	snapshot := model.MonitoringSnapshot{
-		Device: testDevice,
+		Device: testMonitorDevice,
 		EM:     []model.EMStatus{{ID: 0}},
 		EM1:    []model.EM1Status{{ID: 0}},
 		PM:     []model.PMStatus{{ID: 0}},
@@ -415,8 +417,8 @@ func TestMonitoringSnapshot_Fields(t *testing.T) {
 		Error:  "",
 	}
 
-	if snapshot.Device != testDevice {
-		t.Errorf("Device = %q, want testDevice", snapshot.Device)
+	if snapshot.Device != testMonitorDevice {
+		t.Errorf("Device = %q, want testMonitorDevice", snapshot.Device)
 	}
 	if len(snapshot.EM) != 1 {
 		t.Errorf("EM length = %d, want 1", len(snapshot.EM))
@@ -430,13 +432,13 @@ func TestDeviceSnapshot_Fields(t *testing.T) {
 	t.Parallel()
 
 	snapshot := DeviceSnapshot{
-		Device:  testDevice,
+		Device:  testMonitorDevice,
 		Address: "192.168.1.100",
 		Error:   nil,
 	}
 
-	if snapshot.Device != testDevice {
-		t.Errorf("Device = %q, want testDevice", snapshot.Device)
+	if snapshot.Device != testMonitorDevice {
+		t.Errorf("Device = %q, want testMonitorDevice", snapshot.Device)
 	}
 	if snapshot.Address != "192.168.1.100" {
 		t.Errorf("Address = %q, want 192.168.1.100", snapshot.Address)
@@ -546,7 +548,7 @@ func TestPrometheusMetric_Fields(t *testing.T) {
 		Name:   "shelly_power_watts",
 		Help:   "Current power in watts",
 		Type:   "gauge",
-		Labels: map[string]string{"device": "test"},
+		Labels: map[string]string{"device": testMonitorDevice},
 		Value:  100.5,
 	}
 
@@ -582,7 +584,7 @@ func TestComponentReading_Fields(t *testing.T) {
 	energy := 5000.0
 	freq := 50.0
 	reading := model.ComponentReading{
-		Device:  testDevice,
+		Device:  testMonitorDevice,
 		Type:    "pm",
 		ID:      0,
 		Phase:   "a",
@@ -593,8 +595,8 @@ func TestComponentReading_Fields(t *testing.T) {
 		Freq:    &freq,
 	}
 
-	if reading.Device != testDevice {
-		t.Errorf("Device = %q, want testDevice", reading.Device)
+	if reading.Device != testMonitorDevice {
+		t.Errorf("Device = %q, want testMonitorDevice", reading.Device)
 	}
 	if reading.Type != "pm" {
 		t.Errorf("Type = %q, want pm", reading.Type)
@@ -609,14 +611,14 @@ func TestInfluxDBPoint_Fields(t *testing.T) {
 
 	point := export.InfluxDBPoint{
 		Measurement: "shelly_power",
-		Tags:        map[string]string{"device": "test"},
+		Tags:        map[string]string{"device": testMonitorDevice},
 		Fields:      map[string]float64{"power": 100.0},
 	}
 
 	if point.Measurement != "shelly_power" {
 		t.Errorf("Measurement = %q, want shelly_power", point.Measurement)
 	}
-	if point.Tags["device"] != "test" {
+	if point.Tags["device"] != testMonitorDevice {
 		t.Errorf("Tags[device] = %q, want test", point.Tags["device"])
 	}
 	if point.Fields["power"] != 100.0 {
@@ -627,7 +629,7 @@ func TestInfluxDBPoint_Fields(t *testing.T) {
 func TestBuildPowerPromMetrics(t *testing.T) {
 	t.Parallel()
 
-	labels := map[string]string{"device": "test"}
+	labels := map[string]string{"device": testMonitorDevice}
 	metrics := export.BuildPowerPromMetrics(labels, 100.0, 230.0, 0.5)
 
 	if len(metrics) != 3 {
@@ -654,7 +656,7 @@ func TestReadingsToPrometheusMetrics(t *testing.T) {
 	freq := 50.0
 	readings := []model.ComponentReading{
 		{
-			Device:  "test",
+			Device:  testMonitorDevice,
 			Type:    "pm",
 			ID:      0,
 			Power:   100.0,
@@ -679,7 +681,7 @@ func TestReadingsToInfluxDBPoints(t *testing.T) {
 	energy := 5000.0
 	readings := []model.ComponentReading{
 		{
-			Device:  "test",
+			Device:  testMonitorDevice,
 			Type:    "pm",
 			ID:      0,
 			Power:   100.0,
@@ -708,7 +710,7 @@ func TestFormatPrometheusMetrics(t *testing.T) {
 				Name:   "shelly_power_watts",
 				Help:   "Power in watts",
 				Type:   "gauge",
-				Labels: map[string]string{"device": "test"},
+				Labels: map[string]string{"device": testMonitorDevice},
 				Value:  100.0,
 			},
 		},
@@ -730,7 +732,7 @@ func TestFormatInfluxDBLineProtocol(t *testing.T) {
 	points := []export.InfluxDBPoint{
 		{
 			Measurement: "shelly",
-			Tags:        map[string]string{"device": "test"},
+			Tags:        map[string]string{"device": testMonitorDevice},
 			Fields:      map[string]float64{"power": 100.0},
 		},
 	}
@@ -747,7 +749,7 @@ func TestFormatInfluxDBPoint(t *testing.T) {
 
 	point := export.InfluxDBPoint{
 		Measurement: "shelly",
-		Tags:        map[string]string{"device": "test"},
+		Tags:        map[string]string{"device": testMonitorDevice},
 		Fields:      map[string]float64{"power": 100.0},
 	}
 
@@ -788,13 +790,13 @@ func TestJSONMetricsDevice_Fields(t *testing.T) {
 	t.Parallel()
 
 	device := export.JSONMetricsDevice{
-		Device:     testDevice,
+		Device:     testMonitorDevice,
 		Online:     true,
-		Components: []model.ComponentReading{{Device: "test", Type: "pm", ID: 0}},
+		Components: []model.ComponentReading{{Device: testMonitorDevice, Type: "pm", ID: 0}},
 	}
 
-	if device.Device != testDevice {
-		t.Errorf("Device = %q, want testDevice", device.Device)
+	if device.Device != testMonitorDevice {
+		t.Errorf("Device = %q, want testMonitorDevice", device.Device)
 	}
 	if !device.Online {
 		t.Error("Online should be true")

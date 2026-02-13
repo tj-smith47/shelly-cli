@@ -4,32 +4,41 @@ Migrate configuration between devices
 
 ### Synopsis
 
-Migrate configuration from a source device or backup file to a target device.
+Migrate configuration from one Shelly device to another.
 
-By default, everything is migrated including network and authentication
-settings. Use --skip-* flags to exclude specific sections.
+Reads the current configuration from the source device and applies it to
+the target device. By default, everything is migrated including network
+and authentication settings.
 
-Source can be a device name/address or a backup file path.
-The --dry-run flag shows what would be changed without applying.
+When network settings are migrated, the source device is factory reset
+after a successful migration to prevent IP conflicts on the network.
+Use --skip-network to keep both devices online with their current
+network settings, or --reset-source=false to skip the factory reset
+(warning: this may cause IP conflicts).
+
+Use --dry-run to preview what would change without applying.
 
 ```
-shelly migrate <source> <target> [flags]
+shelly migrate <source-device> <target-device> [flags]
 ```
 
 ### Examples
 
 ```
-  # Migrate from one device to another
+  # Preview migration (dry run)
   shelly migrate living-room bedroom --dry-run
 
-  # Migrate from backup file to device
-  shelly migrate backup.json bedroom
+  # Full migration (factory resets source after)
+  shelly migrate living-room bedroom --yes
 
-  # Migrate without network config (keep current WiFi)
+  # Migrate without network config (no factory reset needed)
   shelly migrate living-room bedroom --skip-network
 
+  # Migrate network but skip factory reset (may cause IP conflict)
+  shelly migrate living-room bedroom --reset-source=false
+
   # Force migration between different device types
-  shelly migrate backup.json bedroom --force
+  shelly migrate living-room bedroom --force --yes
 ```
 
 ### Options
@@ -38,11 +47,13 @@ shelly migrate <source> <target> [flags]
       --dry-run          Show what would be changed without applying
       --force            Force migration between different device types
   -h, --help             help for migrate
+      --reset-source     Factory reset source device after migration (default true)
       --skip-auth        Skip authentication configuration
       --skip-network     Skip network configuration (WiFi, Ethernet)
       --skip-schedules   Skip schedule migration
       --skip-scripts     Skip script migration
       --skip-webhooks    Skip webhook migration
+  -y, --yes              Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

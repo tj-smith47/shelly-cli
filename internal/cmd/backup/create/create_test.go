@@ -284,8 +284,11 @@ func TestExecute_TooManyArgs(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithMockDevice(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -377,8 +380,11 @@ func TestExecute_WithOutputFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_YAMLFormat(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -420,8 +426,11 @@ func TestExecute_YAMLFormat(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithSkipFlags(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -463,8 +472,11 @@ func TestExecute_WithSkipFlags(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithEncrypt(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -507,8 +519,11 @@ func TestExecute_WithEncrypt(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_UnknownDevice(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config:  mock.ConfigFixture{},
@@ -539,8 +554,11 @@ func TestExecute_UnknownDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_StdoutOutput(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -583,8 +601,11 @@ func TestExecute_StdoutOutput(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_Success(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -671,8 +692,11 @@ func TestRun_WriteToFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_InvalidFilePath(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -715,8 +739,11 @@ func TestRun_InvalidFilePath(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_YAMLFormat(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -756,8 +783,11 @@ func TestRun_YAMLFormat(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_WithAllSkipFlags(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -800,8 +830,11 @@ func TestRun_WithAllSkipFlags(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_WithPassword(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
