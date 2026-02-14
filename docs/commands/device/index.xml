@@ -274,8 +274,28 @@ and contain only letters, numbers, hyphens, and underscores.&lt;/p&gt;
 &lt;p&gt;Manage device configuration&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Manage device configuration settings.&lt;/p&gt;
+&lt;p&gt;When called with a device argument (and optional component), delegates to
+&amp;ldquo;config get&amp;rdquo; to show the device configuration.&lt;/p&gt;
 &lt;p&gt;Get, set, export, and import device configurations. Configuration includes
 component settings, system parameters, and feature configurations.&lt;/p&gt;
+
+
+
+&lt;div class="expressive-code"&gt;
+ &lt;figure class="frame not-content"&gt;
+ &lt;figcaption class="header"&gt;
+ &lt;span class="title"&gt;&lt;/span&gt;
+ &lt;/figcaption&gt;
+ &lt;div class="highlight"&gt;&lt;div style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;"&gt;&lt;tr&gt;&lt;td style="vertical-align:top;padding:0;margin:0;border:0;"&gt;
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%"&gt;
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-fallback" data-lang="fallback"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;shelly device config [device] [component] [flags]&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+ &lt;/figure&gt;
+&lt;/div&gt;
 &lt;h3 id="examples"&gt;Examples&lt;/h3&gt;
 
 
@@ -307,13 +327,19 @@ component settings, system parameters, and feature configurations.&lt;/p&gt;
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;18
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;19
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;20
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;21
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;22
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;23
 &lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%"&gt;
-&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-gdscript3" data-lang="gdscript3"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Get full device configuration&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config get living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-gdscript3" data-lang="gdscript3"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Get full device configuration (shorthand)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Get specific component configuration&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config get living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room &lt;span style="color:#ff79c6"&gt;switch&lt;/span&gt;:&lt;span style="color:#bd93f9"&gt;0&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Get specific component configuration (shorthand)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room &lt;span style="color:#ff79c6"&gt;switch&lt;/span&gt;:&lt;span style="color:#bd93f9"&gt;0&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Get full device configuration (explicit)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config get living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Set configuration values&lt;/span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config set living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room &lt;span style="color:#ff79c6"&gt;switch&lt;/span&gt;:&lt;span style="color:#bd93f9"&gt;0&lt;/span&gt; name&lt;span style="color:#ff79c6"&gt;=&lt;/span&gt;&lt;span style="color:#f1fa8c"&gt;&amp;#34;Main Light&amp;#34;&lt;/span&gt;

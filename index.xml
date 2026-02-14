@@ -146,7 +146,7 @@ and controlling Shelly devices on your local network.&lt;/p&gt;
 &lt;li&gt;&lt;a href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_power.md"&gt;shelly power&lt;/a&gt;	 - Power meter operations (PM/PM1 components)&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_profile.md"&gt;shelly profile&lt;/a&gt;	 - Device profile information&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_provision.md"&gt;shelly provision&lt;/a&gt;	 - Provision device settings&lt;/li&gt;
+&lt;li&gt;&lt;a href="shelly_provision.md"&gt;shelly provision&lt;/a&gt;	 - Discover and provision new Shelly devices&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_qr.md"&gt;shelly qr&lt;/a&gt;	 - Generate device QR code&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_repl.md"&gt;shelly repl&lt;/a&gt;	 - Launch interactive REPL&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_report.md"&gt;shelly report&lt;/a&gt;	 - Generate reports&lt;/li&gt;
@@ -3975,7 +3975,9 @@ by attempting to connect to the device.&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Create a complete backup of a Shelly device.&lt;/p&gt;
 &lt;p&gt;The backup includes configuration, scripts, schedules, and webhooks.
-If no file is specified, backup is written to stdout.&lt;/p&gt;
+If no file is specified, backup is saved to ~/.config/shelly/backups/
+with a name based on the device and date. Use &amp;ldquo;-&amp;rdquo; as the file to write
+to stdout.&lt;/p&gt;
 &lt;p&gt;Use &amp;ndash;encrypt to password-protect the backup (password verification only,
 sensitive data is not encrypted in the file).&lt;/p&gt;
 
@@ -4021,16 +4023,22 @@ sensitive data is not encrypted in the file).&lt;/p&gt;
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;12
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;13
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;14
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;15
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;16
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;17
 &lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%"&gt;
-&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-fallback" data-lang="fallback"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Create backup to file
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-fallback" data-lang="fallback"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Create backup (auto-saved to ~/.config/shelly/backups/)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup create living-room
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Create backup to specific file
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup create living-room backup.json
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Create YAML backup
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup create living-room backup.yaml --format yaml
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Create backup to stdout
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup create living-room
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup create living-room -
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Create encrypted backup
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup create living-room backup.json --encrypt mysecret
@@ -4386,10 +4394,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;p&gt;Restore a device from backup&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Restore a Shelly device from a backup file.&lt;/p&gt;
-&lt;p&gt;By default, all data from the backup is restored. Use &amp;ndash;skip-* flags
-to exclude specific sections.&lt;/p&gt;
-&lt;p&gt;Network configuration (WiFi, Ethernet) is skipped by default with
-&amp;ndash;skip-network to prevent losing connectivity.&lt;/p&gt;
+&lt;p&gt;By default, everything from the backup is restored including network
+and authentication settings. Use &amp;ndash;skip-* flags to exclude specific
+sections.&lt;/p&gt;
 
 
 
@@ -4433,16 +4440,22 @@ to exclude specific sections.&lt;/p&gt;
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;12
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;13
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;14
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;15
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;16
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;17
 &lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%"&gt;
-&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-fallback" data-lang="fallback"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Restore from backup (skip network config)
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-fallback" data-lang="fallback"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Full restore from backup
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup restore living-room backup.json
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Dry run - show what would change
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup restore living-room backup.json --dry-run
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Restore everything including network config
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup restore living-room backup.json --skip-network=false
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Restore without network config (keep current WiFi)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup restore living-room backup.json --skip-network
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Restore without auth config
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup restore living-room backup.json --skip-auth
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Restore encrypted backup
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly backup restore living-room backup.json --decrypt mysecret
@@ -4471,12 +4484,14 @@ to exclude specific sections.&lt;/p&gt;
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;5
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;6
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;7
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;8
 &lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%"&gt;
 &lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-fallback" data-lang="fallback"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -d, --decrypt string Password to decrypt backup
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --dry-run Show what would be restored without applying
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -h, --help help for restore
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --skip-network Skip network configuration (WiFi, Ethernet) (default true)
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --skip-auth Skip authentication configuration
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --skip-network Skip network configuration (WiFi, Ethernet)
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --skip-schedules Skip schedule restoration
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --skip-scripts Skip script restoration
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; --skip-webhooks Skip webhook restoration&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
@@ -9453,8 +9468,28 @@ and contain only letters, numbers, hyphens, and underscores.&lt;/p&gt;
 &lt;p&gt;Manage device configuration&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Manage device configuration settings.&lt;/p&gt;
+&lt;p&gt;When called with a device argument (and optional component), delegates to
+&amp;ldquo;config get&amp;rdquo; to show the device configuration.&lt;/p&gt;
 &lt;p&gt;Get, set, export, and import device configurations. Configuration includes
 component settings, system parameters, and feature configurations.&lt;/p&gt;
+
+
+
+&lt;div class="expressive-code"&gt;
+ &lt;figure class="frame not-content"&gt;
+ &lt;figcaption class="header"&gt;
+ &lt;span class="title"&gt;&lt;/span&gt;
+ &lt;/figcaption&gt;
+ &lt;div class="highlight"&gt;&lt;div style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;"&gt;&lt;tr&gt;&lt;td style="vertical-align:top;padding:0;margin:0;border:0;"&gt;
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%"&gt;
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-fallback" data-lang="fallback"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;shelly device config [device] [component] [flags]&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+ &lt;/figure&gt;
+&lt;/div&gt;
 &lt;h3 id="examples"&gt;Examples&lt;/h3&gt;
 
 
@@ -9486,13 +9521,19 @@ component settings, system parameters, and feature configurations.&lt;/p&gt;
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;18
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;19
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;20
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;21
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;22
+&lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;23
 &lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%"&gt;
-&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-gdscript3" data-lang="gdscript3"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Get full device configuration&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config get living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-gdscript3" data-lang="gdscript3"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Get full device configuration (shorthand)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Get specific component configuration&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config get living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room &lt;span style="color:#ff79c6"&gt;switch&lt;/span&gt;:&lt;span style="color:#bd93f9"&gt;0&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Get specific component configuration (shorthand)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room &lt;span style="color:#ff79c6"&gt;switch&lt;/span&gt;:&lt;span style="color:#bd93f9"&gt;0&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Get full device configuration (explicit)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config get living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#6272a4"&gt;# Set configuration values&lt;/span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly device config set living&lt;span style="color:#ff79c6"&gt;-&lt;/span&gt;room &lt;span style="color:#ff79c6"&gt;switch&lt;/span&gt;:&lt;span style="color:#bd93f9"&gt;0&lt;/span&gt; name&lt;span style="color:#ff79c6"&gt;=&lt;/span&gt;&lt;span style="color:#f1fa8c"&gt;&amp;#34;Main Light&amp;#34;&lt;/span&gt;
@@ -23830,7 +23871,7 @@ You can also provide SSID and password directly via flags.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_provision.md"&gt;shelly provision&lt;/a&gt;	 - Provision device settings&lt;/li&gt;
+&lt;li&gt;&lt;a href="shelly_provision.md"&gt;shelly provision&lt;/a&gt;	 - Discover and provision new Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly rgb list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/list/</guid><description>&lt;h2 id="shelly-rgb-list"&gt;shelly rgb list&lt;/h2&gt;
 &lt;p&gt;List rgb components&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;

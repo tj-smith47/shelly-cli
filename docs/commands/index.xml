@@ -146,7 +146,7 @@ and controlling Shelly devices on your local network.&lt;/p&gt;
 &lt;li&gt;&lt;a href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_power.md"&gt;shelly power&lt;/a&gt;	 - Power meter operations (PM/PM1 components)&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_profile.md"&gt;shelly profile&lt;/a&gt;	 - Device profile information&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_provision.md"&gt;shelly provision&lt;/a&gt;	 - Provision device settings&lt;/li&gt;
+&lt;li&gt;&lt;a href="shelly_provision.md"&gt;shelly provision&lt;/a&gt;	 - Discover and provision new Shelly devices&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_qr.md"&gt;shelly qr&lt;/a&gt;	 - Generate device QR code&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_repl.md"&gt;shelly repl&lt;/a&gt;	 - Launch interactive REPL&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_report.md"&gt;shelly report&lt;/a&gt;	 - Generate reports&lt;/li&gt;
