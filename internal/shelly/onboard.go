@@ -631,15 +631,17 @@ func (s *Service) LoadProvisionSource(ctx context.Context, fromDevice, fromTempl
 	return source, nil
 }
 
-// extractWiFiFromBackup parses WiFi credentials from a Gen1 device backup.
-// Gen1 settings include the WiFi password; Gen2+ do not.
+// extractWiFiFromBackup extracts WiFi credentials from a device backup.
+// Prefers bkp.WiFi (always populated during backup) over parsing bkp.Config.
+// Gen1 backups include the WiFi password ("key"); Gen2+ include only the SSID.
 func extractWiFiFromBackup(bkp *backup.DeviceBackup) *OnboardWiFiConfig {
-	if bkp.Config == nil {
-		return nil
+	// Primary: use the dedicated WiFi blob (populated by marshalGen1WiFi / Gen2 export).
+	if cfg := extractWiFiFromBlob(bkp.WiFi); cfg != nil {
+		return cfg
 	}
 
-	// Gen1: Config is marshaled gen1.Settings
-	if bkp.DeviceInfo != nil && bkp.DeviceInfo.Generation == 1 {
+	// Fallback for Gen1: parse the full settings from Config.
+	if bkp.DeviceInfo != nil && bkp.DeviceInfo.Generation == 1 && bkp.Config != nil {
 		var settings gen1.Settings
 		if err := json.Unmarshal(bkp.Config, &settings); err != nil {
 			debug.TraceEvent("extractWiFiFromBackup: failed to parse Gen1 settings: %v", err)
@@ -651,15 +653,14 @@ func extractWiFiFromBackup(bkp *backup.DeviceBackup) *OnboardWiFiConfig {
 				Password: settings.WiFiSta.Key,
 			}
 		}
-		return nil
 	}
 
-	// Gen2+: WiFi blob may contain SSID but not password
-	return extractSSIDFromWiFiBlob(bkp.WiFi)
+	return nil
 }
 
-// extractSSIDFromWiFiBlob parses a Gen2+ WiFi JSON blob to extract the station SSID.
-func extractSSIDFromWiFiBlob(data json.RawMessage) *OnboardWiFiConfig {
+// extractWiFiFromBlob parses the backup WiFi blob for station SSID and password.
+// Gen1 blobs include "key" (password); Gen2+ blobs include only "ssid".
+func extractWiFiFromBlob(data json.RawMessage) *OnboardWiFiConfig {
 	if data == nil {
 		return nil
 	}
@@ -675,7 +676,11 @@ func extractSSIDFromWiFiBlob(data json.RawMessage) *OnboardWiFiConfig {
 	if !ok || ssid == "" {
 		return nil
 	}
-	return &OnboardWiFiConfig{SSID: ssid}
+	cfg := &OnboardWiFiConfig{SSID: ssid}
+	if key, ok := sta["key"].(string); ok && key != "" {
+		cfg.Password = key
+	}
+	return cfg
 }
 
 // ApplyProvisionSource applies a previously loaded provision source to a newly

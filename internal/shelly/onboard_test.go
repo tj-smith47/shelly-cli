@@ -417,7 +417,32 @@ func TestRegisterNetworkDevices_Empty(t *testing.T) {
 func TestExtractWiFiFromBackup_Gen1(t *testing.T) {
 	t.Parallel()
 
-	// Simulate Gen1 settings with WiFi STA config
+	// Gen1 WiFi blob as produced by marshalGen1WiFi: {"sta": {WiFiStaSettings}}.
+	wifiBlob := json.RawMessage(`{"sta":{"ssid":"` + testSSID + `","key":"secret123","enabled":true}}`)
+
+	bkp := &backup.DeviceBackup{
+		Backup: &shellybackup.Backup{
+			DeviceInfo: &shellybackup.DeviceInfo{Generation: 1},
+			WiFi:       wifiBlob,
+		},
+	}
+
+	creds := extractWiFiFromBackup(bkp)
+	if creds == nil {
+		t.Fatal("expected WiFi credentials, got nil")
+	}
+	if creds.SSID != testSSID {
+		t.Errorf("SSID = %q, want %q", creds.SSID, testSSID)
+	}
+	if creds.Password != "secret123" {
+		t.Errorf("Password = %q, want %q", creds.Password, "secret123")
+	}
+}
+
+func TestExtractWiFiFromBackup_Gen1_FallbackToConfig(t *testing.T) {
+	t.Parallel()
+
+	// No WiFi blob, but Config has the full gen1.Settings with wifi_sta.
 	settings := map[string]any{
 		"wifi_sta": map[string]any{
 			"ssid":    testSSID,
@@ -439,7 +464,7 @@ func TestExtractWiFiFromBackup_Gen1(t *testing.T) {
 
 	creds := extractWiFiFromBackup(bkp)
 	if creds == nil {
-		t.Fatal("expected WiFi credentials, got nil")
+		t.Fatal("expected WiFi credentials from Config fallback, got nil")
 	}
 	if creds.SSID != testSSID {
 		t.Errorf("SSID = %q, want %q", creds.SSID, testSSID)
@@ -507,37 +532,37 @@ func TestExtractWiFiFromBackup_NilConfig(t *testing.T) {
 	}
 }
 
-func TestExtractSSIDFromWiFiBlob_Nil(t *testing.T) {
+func TestExtractWiFiFromBlob_Nil(t *testing.T) {
 	t.Parallel()
 
-	creds := extractSSIDFromWiFiBlob(nil)
+	creds := extractWiFiFromBlob(nil)
 	if creds != nil {
 		t.Errorf("expected nil, got %+v", creds)
 	}
 }
 
-func TestExtractSSIDFromWiFiBlob_InvalidJSON(t *testing.T) {
+func TestExtractWiFiFromBlob_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
-	creds := extractSSIDFromWiFiBlob(json.RawMessage(`{invalid`))
+	creds := extractWiFiFromBlob(json.RawMessage(`{invalid`))
 	if creds != nil {
 		t.Errorf("expected nil for invalid JSON, got %+v", creds)
 	}
 }
 
-func TestExtractSSIDFromWiFiBlob_NoSTA(t *testing.T) {
+func TestExtractWiFiFromBlob_NoSTA(t *testing.T) {
 	t.Parallel()
 
-	creds := extractSSIDFromWiFiBlob(json.RawMessage(`{"ap":{"ssid":"test"}}`))
+	creds := extractWiFiFromBlob(json.RawMessage(`{"ap":{"ssid":"test"}}`))
 	if creds != nil {
 		t.Errorf("expected nil when no sta key, got %+v", creds)
 	}
 }
 
-func TestExtractSSIDFromWiFiBlob_EmptySSID(t *testing.T) {
+func TestExtractWiFiFromBlob_EmptySSID(t *testing.T) {
 	t.Parallel()
 
-	creds := extractSSIDFromWiFiBlob(json.RawMessage(`{"sta":{"ssid":""}}`))
+	creds := extractWiFiFromBlob(json.RawMessage(`{"sta":{"ssid":""}}`))
 	if creds != nil {
 		t.Errorf("expected nil for empty SSID, got %+v", creds)
 	}
