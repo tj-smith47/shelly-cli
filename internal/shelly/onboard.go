@@ -2,17 +2,19 @@ package shelly
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"net"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/discovery"
+	gen1 "github.com/tj-smith47/shelly-go/gen1"
 	"github.com/tj-smith47/shelly-go/provisioning"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
@@ -52,16 +54,13 @@ type OnboardWiFiConfig struct {
 
 // OnboardOptions configures the onboard operation.
 type OnboardOptions struct {
-	WiFi         *OnboardWiFiConfig
-	Subnet       string
-	Timezone     string
-	DeviceName   string
-	Timeout      time.Duration
-	BLEOnly      bool
-	APOnly       bool
-	NetworkOnly  bool
-	RegisterOnly bool
-	NoCloud      bool
+	WiFi       *OnboardWiFiConfig
+	Timezone   string
+	DeviceName string
+	Timeout    time.Duration
+	BLEOnly    bool
+	APOnly     bool
+	NoCloud    bool
 }
 
 // OnboardResult holds the outcome of onboarding a single device.
@@ -111,7 +110,7 @@ func (s *Service) DiscoverForOnboard(
 	}
 
 	// BLE discovery (Gen2+ in provisioning mode)
-	if !opts.NetworkOnly && !opts.APOnly {
+	if !opts.APOnly {
 		wg.Go(func() {
 			report("BLE", 0, false, nil)
 			found := s.discoverBLEForOnboard(ctx, timeout)
@@ -123,7 +122,7 @@ func (s *Service) DiscoverForOnboard(
 	}
 
 	// WiFi AP discovery (Gen1 unprovisioned)
-	if !opts.BLEOnly && !opts.NetworkOnly {
+	if !opts.BLEOnly {
 		wg.Go(func() {
 			report("WiFi AP", 0, false, nil)
 			found, err := s.discoverWiFiAPForOnboard(ctx)
@@ -131,18 +130,6 @@ func (s *Service) DiscoverForOnboard(
 			devices = append(devices, found...)
 			mu.Unlock()
 			report("WiFi AP", len(found), true, err)
-		})
-	}
-
-	// Network discovery (mDNS + CoIoT + HTTP for already-networked devices)
-	if !opts.BLEOnly && !opts.APOnly {
-		wg.Go(func() {
-			report("Network", 0, false, nil)
-			found := s.discoverNetworkForOnboard(ctx, opts, timeout)
-			mu.Lock()
-			devices = append(devices, found...)
-			mu.Unlock()
-			report("Network", len(found), true, nil)
 		})
 	}
 
@@ -251,97 +238,6 @@ func (s *Service) discoverWiFiAPForOnboard(ctx context.Context) ([]OnboardDevice
 	}
 
 	return result, nil
-}
-
-// discoverNetworkForOnboard runs mDNS + CoIoT concurrently to find
-// devices already on the network but not registered.
-func (s *Service) discoverNetworkForOnboard(ctx context.Context, opts *OnboardOptions, timeout time.Duration) []OnboardDevice {
-	var (
-		mu      sync.Mutex
-		devices []discovery.DiscoveredDevice
-		wg      sync.WaitGroup
-	)
-
-	// mDNS (Gen2+)
-	wg.Go(func() {
-		mdnsTimeout := timeout
-		if mdnsTimeout > 10*time.Second {
-			mdnsTimeout = 10 * time.Second
-		}
-		found, cleanup, err := DiscoverMDNS(mdnsTimeout)
-		defer cleanup()
-		if err != nil {
-			debug.TraceEvent("onboard mDNS discovery error: %v", err)
-			return
-		}
-		mu.Lock()
-		devices = append(devices, found...)
-		mu.Unlock()
-	})
-
-	// CoIoT (Gen1)
-	wg.Go(func() {
-		coiotTimeout := timeout
-		if coiotTimeout > 10*time.Second {
-			coiotTimeout = 10 * time.Second
-		}
-		found, cleanup, err := DiscoverCoIoT(coiotTimeout)
-		defer cleanup()
-		if err != nil {
-			debug.TraceEvent("onboard CoIoT discovery error: %v", err)
-			return
-		}
-		mu.Lock()
-		devices = append(devices, found...)
-		mu.Unlock()
-	})
-
-	// HTTP subnet scan (if subnet available)
-	if opts.Subnet != "" {
-		wg.Go(func() {
-			_, _, err := net.ParseCIDR(opts.Subnet)
-			if err != nil {
-				debug.TraceEvent("onboard HTTP scan invalid subnet: %v", err)
-				return
-			}
-			addresses := discovery.GenerateSubnetAddresses(opts.Subnet)
-			if len(addresses) == 0 {
-				return
-			}
-			httpCtx, cancel := context.WithTimeout(ctx, timeout)
-			defer cancel()
-			found := discovery.ProbeAddresses(httpCtx, addresses)
-			mu.Lock()
-			devices = append(devices, found...)
-			mu.Unlock()
-		})
-	}
-
-	wg.Wait()
-
-	// Convert and enrich
-	enriched := enrichDiscoveredDevices(ctx, devices)
-	result := make([]OnboardDevice, 0, len(enriched))
-	for _, d := range enriched {
-		source := OnboardSourceMDNS
-		// Try to determine the original protocol
-		if d.Generation == 1 {
-			source = OnboardSourceCoIoT
-		}
-
-		result = append(result, OnboardDevice{
-			Name:        d.Name,
-			Model:       d.Model,
-			Address:     d.Address,
-			MACAddress:  d.ID, // enriched ID often contains MAC-derived info
-			Source:      source,
-			Generation:  d.Generation,
-			Registered:  d.Added,
-			Provisioned: true, // Network-discovered devices are already provisioned
-		})
-	}
-
-	return result
 }
 
 // deduplicateOnboardDevices merges duplicate devices found by multiple
@@ -662,6 +558,143 @@ func (s *Service) OnboardBLEParallel(
 
 	wg.Wait()
 	return results
+}
+
+// GetWiFiCredentials attempts to retrieve WiFi credentials from an existing
+// registered device. Gen1 devices return both SSID and password via their
+// settings API. Gen2+ devices return only the SSID (password is write-only).
+// Returns nil if no credentials could be retrieved.
+func (s *Service) GetWiFiCredentials(ctx context.Context) *OnboardWiFiConfig {
+	devices := config.ListDevices()
+
+	// Try Gen1 devices first — they return the password
+	for name, dev := range devices {
+		if dev.Generation != 1 {
+			continue
+		}
+		var creds *OnboardWiFiConfig
+		err := s.WithGen1Connection(ctx, name, func(conn *client.Gen1Client) error {
+			settings, settingsErr := conn.GetSettings(ctx)
+			if settingsErr != nil {
+				return settingsErr
+			}
+			if settings.WiFiSta != nil && settings.WiFiSta.SSID != "" && settings.WiFiSta.Key != "" {
+				creds = &OnboardWiFiConfig{
+					SSID:     settings.WiFiSta.SSID,
+					Password: settings.WiFiSta.Key,
+				}
+			}
+			return nil
+		})
+		if err == nil && creds != nil {
+			return creds
+		}
+		debug.TraceEvent("onboard: could not get WiFi creds from %s: %v", name, err)
+	}
+
+	return nil
+}
+
+// ProvisionSource holds configuration to apply to newly provisioned devices.
+// Populated from either a live device backup or a saved template.
+type ProvisionSource struct {
+	Backup   *backup.DeviceBackup   // From --from-device (Gen1+Gen2)
+	Template *config.DeviceTemplate // From --from-template (Gen2+ only)
+	WiFi     *OnboardWiFiConfig     // Extracted WiFi creds (if available)
+}
+
+// LoadProvisionSource loads device configuration from a source device or template.
+// For --from-device: creates a backup and extracts WiFi credentials.
+// For --from-template: loads the saved template from config.
+func (s *Service) LoadProvisionSource(ctx context.Context, fromDevice, fromTemplate string) (*ProvisionSource, error) {
+	source := &ProvisionSource{}
+
+	switch {
+	case fromDevice != "":
+		bkp, err := s.CreateBackup(ctx, fromDevice, backup.Options{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to backup source device %q: %w", fromDevice, err)
+		}
+		source.Backup = bkp
+
+		// Extract WiFi credentials from backup (Gen1 devices include the password)
+		source.WiFi = extractWiFiFromBackup(bkp)
+
+	case fromTemplate != "":
+		tpl, ok := config.GetDeviceTemplate(fromTemplate)
+		if !ok {
+			return nil, fmt.Errorf("template %q not found", fromTemplate)
+		}
+		source.Template = &tpl
+	}
+
+	return source, nil
+}
+
+// extractWiFiFromBackup parses WiFi credentials from a Gen1 device backup.
+// Gen1 settings include the WiFi password; Gen2+ do not.
+func extractWiFiFromBackup(bkp *backup.DeviceBackup) *OnboardWiFiConfig {
+	if bkp.Config == nil {
+		return nil
+	}
+
+	// Gen1: Config is marshaled gen1.Settings
+	if bkp.DeviceInfo != nil && bkp.DeviceInfo.Generation == 1 {
+		var settings gen1.Settings
+		if err := json.Unmarshal(bkp.Config, &settings); err != nil {
+			debug.TraceEvent("extractWiFiFromBackup: failed to parse Gen1 settings: %v", err)
+			return nil
+		}
+		if settings.WiFiSta != nil && settings.WiFiSta.SSID != "" && settings.WiFiSta.Key != "" {
+			return &OnboardWiFiConfig{
+				SSID:     settings.WiFiSta.SSID,
+				Password: settings.WiFiSta.Key,
+			}
+		}
+		return nil
+	}
+
+	// Gen2+: WiFi blob may contain SSID but not password
+	return extractSSIDFromWiFiBlob(bkp.WiFi)
+}
+
+// extractSSIDFromWiFiBlob parses a Gen2+ WiFi JSON blob to extract the station SSID.
+func extractSSIDFromWiFiBlob(data json.RawMessage) *OnboardWiFiConfig {
+	if data == nil {
+		return nil
+	}
+	var wifiData map[string]any
+	if err := json.Unmarshal(data, &wifiData); err != nil {
+		return nil
+	}
+	sta, ok := wifiData["sta"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	ssid, ok := sta["ssid"].(string)
+	if !ok || ssid == "" {
+		return nil
+	}
+	return &OnboardWiFiConfig{SSID: ssid}
+}
+
+// ApplyProvisionSource applies a previously loaded provision source to a newly
+// provisioned device at the given address. Skips network config since WiFi
+// was already configured during provisioning.
+func (s *Service) ApplyProvisionSource(ctx context.Context, deviceAddr string, source *ProvisionSource) error {
+	switch {
+	case source.Backup != nil:
+		_, err := s.RestoreBackup(ctx, deviceAddr, source.Backup, backup.RestoreOptions{
+			SkipNetwork: true,
+		})
+		return err
+
+	case source.Template != nil:
+		_, err := s.ApplyTemplate(ctx, deviceAddr, source.Template.Config, false)
+		return err
+	}
+
+	return nil
 }
 
 // RegisterNetworkDevices registers already-networked devices in config.

@@ -15,20 +15,26 @@ Discover and provision new Shelly devices
 Discover and provision new Shelly devices on your network.
 
 When run without a subcommand, provision scans for unprovisioned Shelly devices
-using BLE (Gen2+), WiFi AP (Gen1), and network discovery (mDNS/CoIoT). Found
-devices are presented for interactive selection and provisioned with WiFi
-credentials automatically.
+using BLE (Gen2+) and WiFi AP (Gen1). Found devices are presented for
+interactive selection and provisioned with WiFi credentials automatically.
+
+WiFi credentials are resolved in order: --from-device backup, --ssid/--password
+flags, auto-detected from an existing Gen1 device, or prompted interactively.
+
+Use --from-device to clone an existing device's full configuration (WiFi, MQTT,
+cloud, light settings, schedules, etc.) onto newly provisioned devices. Use
+--from-template to apply a saved device template instead.
 
 Gen2+ devices are provisioned via BLE (parallel, no network disruption).
 Gen1 devices are provisioned via their WiFi AP (sequential, requires temporary
 network switch to the device's AP).
 
-Already-networked but unregistered devices are simply registered in the config.
-
 Use the subcommands for targeted provisioning of specific devices:
   wifi   - Interactive WiFi provisioning for a single device
   ble    - BLE-based provisioning for a specific device
   bulk   - Bulk provisioning from a config file
+
+To register already-networked devices, use: shelly discover --register
 
 ```
 shelly provision [flags]
@@ -40,6 +46,12 @@ shelly provision [flags]
   # Auto-discover and provision all new devices
   shelly provision
 
+  # Clone config from an existing device onto new devices
+  shelly provision --from-device living-room --ap-only
+
+  # Apply a saved template to new devices
+  shelly provision --from-template bulb-config --ap-only -y
+
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
 
@@ -49,17 +61,8 @@ shelly provision [flags]
   # Only discover via WiFi AP (Gen1 devices)
   shelly provision --ap-only
 
-  # Only register already-networked devices (no provisioning)
-  shelly provision --register-only
-
-  # Scan a specific subnet for devices
-  shelly provision --subnet 192.168.1.0/24
-
   # Interactive WiFi provisioning for a single device
   shelly provision wifi living-room
-
-  # Bulk provision from config file
-  shelly provision bulk devices.yaml
 
   # BLE-based provisioning for new device
   shelly provision ble 192.168.33.1
@@ -68,19 +71,18 @@ shelly provision [flags]
 ### Options
 
 ```
-      --ap-only            Only discover via WiFi AP (Gen1 devices)
-      --ble-only           Only discover via BLE (Gen2+ devices)
-  -h, --help               help for provision
-      --name string        Device name to assign after provisioning
-      --network-only       Only discover already-networked devices
-      --no-cloud           Disable cloud on provisioned devices
-      --password string    WiFi password for provisioning
-      --register-only      Only register devices (skip provisioning)
-      --ssid string        WiFi SSID for provisioning
-      --subnet string      Subnet to scan (e.g., 192.168.1.0/24)
-      --timeout duration   Discovery timeout (default 30s)
-      --timezone string    Timezone to set on device
-  -y, --yes                Skip confirmation prompts
+      --ap-only                Only discover via WiFi AP (Gen1 devices)
+      --ble-only               Only discover via BLE (Gen2+ devices)
+      --from-device string     Clone config from existing device
+      --from-template string   Apply saved template after provisioning
+  -h, --help                   help for provision
+      --name string            Device name to assign after provisioning
+      --no-cloud               Disable cloud on provisioned devices
+      --password string        WiFi password for provisioning
+      --ssid string            WiFi SSID for provisioning
+      --timeout duration       Discovery timeout (default 30s)
+      --timezone string        Timezone to set on device
+  -y, --yes                    Skip confirmation prompts
 ```
 
 ### Options inherited from parent commands

@@ -1,12 +1,12 @@
 package provision
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 const testSSID = "MyNetwork"
@@ -73,13 +73,12 @@ func TestNewCommand_Flags(t *testing.T) {
 		{"ssid", "ssid", ""},
 		{"password", "password", ""},
 		{"timeout", "timeout", "30s"},
-		{"subnet", "subnet", ""},
 		{"name", "name", ""},
 		{"timezone", "timezone", ""},
 		{"ble-only", "ble-only", "false"},
 		{"ap-only", "ap-only", "false"},
-		{"network-only", "network-only", "false"},
-		{"register-only", "register-only", "false"},
+		{"from-device", "from-device", ""},
+		{"from-template", "from-template", ""},
 		{"no-cloud", "no-cloud", "false"},
 		{"yes", "yes", "false"},
 	}
@@ -123,17 +122,17 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 		{"ssid", []string{"--ssid", testSSID}},
 		{"password", []string{"--password", "secret"}},
 		{"timeout", []string{"--timeout", "60s"}},
-		{"subnet", []string{"--subnet", "192.168.1.0/24"}},
 		{"name", []string{"--name", "my-device"}},
 		{"timezone", []string{"--timezone", "America/Chicago"}},
 		{"ble-only", []string{"--ble-only"}},
 		{"ap-only", []string{"--ap-only"}},
-		{"network-only", []string{"--network-only"}},
-		{"register-only", []string{"--register-only"}},
+		{"from-device", []string{"--from-device", "my-device"}},
+		{"from-template", []string{"--from-template", "my-template"}},
 		{"no-cloud", []string{"--no-cloud"}},
 		{"yes long", []string{"--yes"}},
 		{"yes short", []string{"-y"}},
 		{"combined", []string{"--ssid", "Net", "--password", "pass", "--ble-only", "-y"}},
+		{"from-device with ap-only", []string{"--from-device", "fl", "--ap-only", "-y"}},
 	}
 
 	for _, tt := range tests {
@@ -187,7 +186,7 @@ func TestNewCommand_Long(t *testing.T) {
 		t.Fatal("Long description is empty")
 	}
 
-	keywords := []string{"BLE", "WiFi AP", "Gen1", "Gen2", "mDNS"}
+	keywords := []string{"BLE", "WiFi AP", "Gen1", "Gen2"}
 	for _, kw := range keywords {
 		if !strings.Contains(cmd.Long, kw) {
 			t.Errorf("Long should contain %q", kw)
@@ -203,7 +202,7 @@ func TestNewCommand_Example(t *testing.T) {
 		t.Fatal("Example is empty")
 	}
 
-	patterns := []string{"shelly provision", "--ssid", "--ble-only", "--register-only"}
+	patterns := []string{"shelly provision", "--ssid", "--ble-only", "--from-device", "--from-template"}
 	for _, p := range patterns {
 		if !strings.Contains(cmd.Example, p) {
 			t.Errorf("Example should contain %q", p)
@@ -241,7 +240,6 @@ func TestOptions_BuildOnboardOptions(t *testing.T) {
 	opts := &Options{
 		SSID:       testSSID,
 		Password:   "secret",
-		Subnet:     "192.168.1.0/24",
 		Timezone:   "UTC",
 		DeviceName: "my-dev",
 		Timeout:    45 * time.Second,
@@ -251,9 +249,6 @@ func TestOptions_BuildOnboardOptions(t *testing.T) {
 
 	result := opts.buildOnboardOptions()
 
-	if result.Subnet != "192.168.1.0/24" {
-		t.Errorf("Subnet = %q, want %q", result.Subnet, "192.168.1.0/24")
-	}
 	if result.Timezone != "UTC" {
 		t.Errorf("Timezone = %q, want %q", result.Timezone, "UTC")
 	}
@@ -292,7 +287,7 @@ func TestOptions_PromptWiFiCredentials_AlreadySet(t *testing.T) {
 	t.Parallel()
 
 	opts := &Options{Factory: cmdutil.NewFactory(), SSID: testSSID}
-	err := opts.promptWiFiCredentials()
+	err := opts.promptWiFiCredentials(context.Background())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -301,23 +296,48 @@ func TestOptions_PromptWiFiCredentials_AlreadySet(t *testing.T) {
 	}
 }
 
-func TestRegisterNetworkDevices(t *testing.T) {
+func TestNewCommand_FromDeviceAndTemplateMutuallyExclusive(t *testing.T) {
 	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
 
-	devices := []*shelly.OnboardDevice{
-		{Name: "dev-1", Address: "192.168.1.50"},
-		{Name: "dev-2", Address: ""},
+	cmd.SetArgs([]string{"--from-device", "fl", "--from-template", "my-tpl"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for mutually exclusive flags, got nil")
 	}
+	if !strings.Contains(err.Error(), "from-device") || !strings.Contains(err.Error(), "from-template") {
+		t.Errorf("error should mention both flags, got: %v", err)
+	}
+}
 
-	results := shelly.RegisterNetworkDevices(devices)
-	if len(results) != 2 {
-		t.Fatalf("len(results) = %d, want 2", len(results))
+func TestNewCommand_FromDeviceFlag(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if err := cmd.ParseFlags([]string{"--from-device", "fl"}); err != nil {
+		t.Fatalf("ParseFlags error: %v", err)
 	}
-	// dev-2 has no address, should error
-	if results[1].Error == nil {
-		t.Error("expected error for device with no address")
+	val, err := cmd.Flags().GetString("from-device")
+	if err != nil {
+		t.Fatalf("GetString error: %v", err)
 	}
-	if results[0].Method != "register-only" {
-		t.Errorf("Method = %q, want %q", results[0].Method, "register-only")
+	if val != "fl" {
+		t.Errorf("from-device = %q, want %q", val, "fl")
+	}
+}
+
+func TestNewCommand_FromTemplateFlag(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if err := cmd.ParseFlags([]string{"--from-template", "my-tpl"}); err != nil {
+		t.Fatalf("ParseFlags error: %v", err)
+	}
+	val, err := cmd.Flags().GetString("from-template")
+	if err != nil {
+		t.Fatalf("GetString error: %v", err)
+	}
+	if val != "my-tpl" {
+		t.Errorf("from-template = %q, want %q", val, "my-tpl")
 	}
 }

@@ -1,7 +1,13 @@
 package shelly
 
 import (
+	"encoding/json"
 	"testing"
+
+	shellybackup "github.com/tj-smith47/shelly-go/backup"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
 
 const testSSID = "MyNetwork"
@@ -73,12 +79,6 @@ func TestOnboardOptions_Defaults(t *testing.T) {
 	}
 	if opts.APOnly {
 		t.Error("APOnly should default to false")
-	}
-	if opts.NetworkOnly {
-		t.Error("NetworkOnly should default to false")
-	}
-	if opts.RegisterOnly {
-		t.Error("RegisterOnly should default to false")
 	}
 	if opts.NoCloud {
 		t.Error("NoCloud should default to false")
@@ -411,5 +411,164 @@ func TestRegisterNetworkDevices_Empty(t *testing.T) {
 	results := RegisterNetworkDevices(nil)
 	if len(results) != 0 {
 		t.Errorf("len(results) = %d, want 0", len(results))
+	}
+}
+
+func TestExtractWiFiFromBackup_Gen1(t *testing.T) {
+	t.Parallel()
+
+	// Simulate Gen1 settings with WiFi STA config
+	settings := map[string]any{
+		"wifi_sta": map[string]any{
+			"ssid":    testSSID,
+			"key":     "secret123",
+			"enabled": true,
+		},
+	}
+	configData, err := json.Marshal(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bkp := &backup.DeviceBackup{
+		Backup: &shellybackup.Backup{
+			DeviceInfo: &shellybackup.DeviceInfo{Generation: 1},
+			Config:     configData,
+		},
+	}
+
+	creds := extractWiFiFromBackup(bkp)
+	if creds == nil {
+		t.Fatal("expected WiFi credentials, got nil")
+	}
+	if creds.SSID != testSSID {
+		t.Errorf("SSID = %q, want %q", creds.SSID, testSSID)
+	}
+	if creds.Password != "secret123" {
+		t.Errorf("Password = %q, want %q", creds.Password, "secret123")
+	}
+}
+
+func TestExtractWiFiFromBackup_Gen1_NoWiFi(t *testing.T) {
+	t.Parallel()
+
+	configData := json.RawMessage(`{}`)
+	bkp := &backup.DeviceBackup{
+		Backup: &shellybackup.Backup{
+			DeviceInfo: &shellybackup.DeviceInfo{Generation: 1},
+			Config:     configData,
+		},
+	}
+
+	creds := extractWiFiFromBackup(bkp)
+	if creds != nil {
+		t.Errorf("expected nil, got %+v", creds)
+	}
+}
+
+func TestExtractWiFiFromBackup_Gen2_WithSSID(t *testing.T) {
+	t.Parallel()
+
+	wifiBlob := json.RawMessage(`{"sta":{"ssid":"` + testSSID + `","is_open":false,"enable":true}}`)
+
+	bkp := &backup.DeviceBackup{
+		Backup: &shellybackup.Backup{
+			DeviceInfo: &shellybackup.DeviceInfo{Generation: 2},
+			Config:     json.RawMessage(`{}`),
+			WiFi:       wifiBlob,
+		},
+	}
+
+	creds := extractWiFiFromBackup(bkp)
+	if creds == nil {
+		t.Fatal("expected WiFi credentials, got nil")
+	}
+	if creds.SSID != testSSID {
+		t.Errorf("SSID = %q, want %q", creds.SSID, testSSID)
+	}
+	// Gen2+ doesn't return password
+	if creds.Password != "" {
+		t.Errorf("Password should be empty for Gen2+, got %q", creds.Password)
+	}
+}
+
+func TestExtractWiFiFromBackup_NilConfig(t *testing.T) {
+	t.Parallel()
+
+	bkp := &backup.DeviceBackup{
+		Backup: &shellybackup.Backup{
+			DeviceInfo: &shellybackup.DeviceInfo{Generation: 1},
+		},
+	}
+
+	creds := extractWiFiFromBackup(bkp)
+	if creds != nil {
+		t.Errorf("expected nil for nil config, got %+v", creds)
+	}
+}
+
+func TestExtractSSIDFromWiFiBlob_Nil(t *testing.T) {
+	t.Parallel()
+
+	creds := extractSSIDFromWiFiBlob(nil)
+	if creds != nil {
+		t.Errorf("expected nil, got %+v", creds)
+	}
+}
+
+func TestExtractSSIDFromWiFiBlob_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	creds := extractSSIDFromWiFiBlob(json.RawMessage(`{invalid`))
+	if creds != nil {
+		t.Errorf("expected nil for invalid JSON, got %+v", creds)
+	}
+}
+
+func TestExtractSSIDFromWiFiBlob_NoSTA(t *testing.T) {
+	t.Parallel()
+
+	creds := extractSSIDFromWiFiBlob(json.RawMessage(`{"ap":{"ssid":"test"}}`))
+	if creds != nil {
+		t.Errorf("expected nil when no sta key, got %+v", creds)
+	}
+}
+
+func TestExtractSSIDFromWiFiBlob_EmptySSID(t *testing.T) {
+	t.Parallel()
+
+	creds := extractSSIDFromWiFiBlob(json.RawMessage(`{"sta":{"ssid":""}}`))
+	if creds != nil {
+		t.Errorf("expected nil for empty SSID, got %+v", creds)
+	}
+}
+
+func TestProvisionSource_Types(t *testing.T) {
+	t.Parallel()
+
+	// Test with backup
+	source := &ProvisionSource{
+		Backup: &backup.DeviceBackup{Backup: &shellybackup.Backup{}},
+		WiFi:   &OnboardWiFiConfig{SSID: testSSID, Password: "pass"},
+	}
+	if source.Backup == nil {
+		t.Error("Backup should not be nil")
+	}
+	if source.WiFi.SSID != testSSID {
+		t.Errorf("WiFi.SSID = %q, want %q", source.WiFi.SSID, testSSID)
+	}
+
+	// Test with template
+	source2 := &ProvisionSource{
+		Template: &config.DeviceTemplate{
+			Name:  "test-tpl",
+			Model: "SHBDUO-1",
+		},
+	}
+	if source2.Template == nil {
+		t.Error("Template should not be nil")
+	}
+	if source2.Template.Name != "test-tpl" {
+		t.Errorf("Template.Name = %q, want %q", source2.Template.Name, "test-tpl")
 	}
 }

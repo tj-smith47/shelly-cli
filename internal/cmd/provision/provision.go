@@ -22,14 +22,13 @@ type Options struct {
 	Factory      *cmdutil.Factory
 	SSID         string
 	Password     string
-	Subnet       string
 	Timezone     string
 	DeviceName   string
+	FromDevice   string
+	FromTemplate string
 	Timeout      time.Duration
 	BLEOnly      bool
 	APOnly       bool
-	NetworkOnly  bool
-	RegisterOnly bool
 	NoCloud      bool
 	Yes          bool
 }
@@ -45,22 +44,34 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Discover and provision new Shelly devices on your network.
 
 When run without a subcommand, provision scans for unprovisioned Shelly devices
-using BLE (Gen2+), WiFi AP (Gen1), and network discovery (mDNS/CoIoT). Found
-devices are presented for interactive selection and provisioned with WiFi
-credentials automatically.
+using BLE (Gen2+) and WiFi AP (Gen1). Found devices are presented for
+interactive selection and provisioned with WiFi credentials automatically.
+
+WiFi credentials are resolved in order: --from-device backup, --ssid/--password
+flags, auto-detected from an existing Gen1 device, or prompted interactively.
+
+Use --from-device to clone an existing device's full configuration (WiFi, MQTT,
+cloud, light settings, schedules, etc.) onto newly provisioned devices. Use
+--from-template to apply a saved device template instead.
 
 Gen2+ devices are provisioned via BLE (parallel, no network disruption).
 Gen1 devices are provisioned via their WiFi AP (sequential, requires temporary
 network switch to the device's AP).
 
-Already-networked but unregistered devices are simply registered in the config.
-
 Use the subcommands for targeted provisioning of specific devices:
   wifi   - Interactive WiFi provisioning for a single device
   ble    - BLE-based provisioning for a specific device
-  bulk   - Bulk provisioning from a config file`,
+  bulk   - Bulk provisioning from a config file
+
+To register already-networked devices, use: shelly discover --register`,
 		Example: `  # Auto-discover and provision all new devices
   shelly provision
+
+  # Clone config from an existing device onto new devices
+  shelly provision --from-device living-room --ap-only
+
+  # Apply a saved template to new devices
+  shelly provision --from-template bulb-config --ap-only -y
 
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
@@ -71,17 +82,8 @@ Use the subcommands for targeted provisioning of specific devices:
   # Only discover via WiFi AP (Gen1 devices)
   shelly provision --ap-only
 
-  # Only register already-networked devices (no provisioning)
-  shelly provision --register-only
-
-  # Scan a specific subnet for devices
-  shelly provision --subnet 192.168.1.0/24
-
   # Interactive WiFi provisioning for a single device
   shelly provision wifi living-room
-
-  # Bulk provision from config file
-  shelly provision bulk devices.yaml
 
   # BLE-based provisioning for new device
   shelly provision ble 192.168.33.1`,
@@ -93,15 +95,15 @@ Use the subcommands for targeted provisioning of specific devices:
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "WiFi SSID for provisioning")
 	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi password for provisioning")
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 30*time.Second, "Discovery timeout")
-	cmd.Flags().StringVar(&opts.Subnet, "subnet", "", "Subnet to scan (e.g., 192.168.1.0/24)")
 	cmd.Flags().StringVar(&opts.DeviceName, "name", "", "Device name to assign after provisioning")
 	cmd.Flags().StringVar(&opts.Timezone, "timezone", "", "Timezone to set on device")
 	cmd.Flags().BoolVar(&opts.BLEOnly, "ble-only", false, "Only discover via BLE (Gen2+ devices)")
 	cmd.Flags().BoolVar(&opts.APOnly, "ap-only", false, "Only discover via WiFi AP (Gen1 devices)")
-	cmd.Flags().BoolVar(&opts.NetworkOnly, "network-only", false, "Only discover already-networked devices")
-	cmd.Flags().BoolVar(&opts.RegisterOnly, "register-only", false, "Only register devices (skip provisioning)")
+	cmd.Flags().StringVar(&opts.FromDevice, "from-device", "", "Clone config from existing device")
+	cmd.Flags().StringVar(&opts.FromTemplate, "from-template", "", "Apply saved template after provisioning")
 	cmd.Flags().BoolVar(&opts.NoCloud, "no-cloud", false, "Disable cloud on provisioned devices")
 	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompts")
+	cmd.MarkFlagsMutuallyExclusive("from-device", "from-template")
 
 	cmd.AddCommand(wifi.NewCommand(f))
 	cmd.AddCommand(bulk.NewCommand(f))
@@ -114,11 +116,33 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	// Prompt for WiFi credentials if not provided via flags (unless register-only)
-	if !opts.RegisterOnly {
-		if err := opts.promptWiFiCredentials(); err != nil {
+	// Load provision source (--from-device or --from-template)
+	var source *shelly.ProvisionSource
+	if opts.FromDevice != "" || opts.FromTemplate != "" {
+		label := opts.FromDevice
+		if label == "" {
+			label = opts.FromTemplate
+		}
+		ios.StartProgress(fmt.Sprintf("Loading config from %s...", label))
+		var err error
+		source, err = svc.LoadProvisionSource(ctx, opts.FromDevice, opts.FromTemplate)
+		ios.StopProgress()
+		if err != nil {
 			return err
 		}
+		ios.Success("Config loaded from %s", label)
+
+		// Use WiFi creds from source if available and not overridden by flags
+		if source.WiFi != nil && opts.SSID == "" {
+			opts.SSID = source.WiFi.SSID
+			opts.Password = source.WiFi.Password
+			ios.Info("Using WiFi credentials from source: %s", source.WiFi.SSID)
+		}
+	}
+
+	// Resolve WiFi credentials: flags/source → auto-detect → prompt
+	if err := opts.promptWiFiCredentials(ctx); err != nil {
+		return err
 	}
 
 	// Discovery phase
@@ -148,19 +172,37 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Provision and display results
 	wifiCfg := &shelly.OnboardWiFiConfig{SSID: opts.SSID, Password: opts.Password}
-	results := opts.provisionAll(ctx, svc, selected, wifiCfg, onboardOpts)
+	results := opts.provisionAll(ctx, svc, selected, wifiCfg, onboardOpts, source)
 	term.DisplayOnboardSummary(ios, results)
 
 	return nil
 }
 
-// promptWiFiCredentials prompts for SSID and password if not provided via flags.
-func (o *Options) promptWiFiCredentials() error {
+// promptWiFiCredentials resolves WiFi credentials for provisioning. Tries in order:
+// 1. Flags (--ssid/--password) — already set, return immediately
+// 2. Auto-detect from an existing Gen1 device on the network
+// 3. Interactive prompt.
+func (o *Options) promptWiFiCredentials(ctx context.Context) error {
 	if o.SSID != "" {
 		return nil
 	}
 
 	ios := o.Factory.IOStreams()
+	svc := o.Factory.ShellyService()
+
+	// Try to auto-detect from an existing device
+	ios.StartProgress("Detecting WiFi credentials from existing devices...")
+	creds := svc.GetWiFiCredentials(ctx)
+	ios.StopProgress()
+
+	if creds != nil {
+		ios.Success("WiFi credentials detected from network: %s", creds.SSID)
+		o.SSID = creds.SSID
+		o.Password = creds.Password
+		return nil
+	}
+
+	// Fall back to interactive prompt
 	ssid, err := ios.Input("WiFi SSID:", "")
 	if err != nil {
 		return fmt.Errorf("SSID input failed: %w", err)
@@ -184,15 +226,12 @@ func (o *Options) promptWiFiCredentials() error {
 // buildOnboardOptions converts command Options to service OnboardOptions.
 func (o *Options) buildOnboardOptions() *shelly.OnboardOptions {
 	onboardOpts := &shelly.OnboardOptions{
-		Subnet:       o.Subnet,
-		Timezone:     o.Timezone,
-		DeviceName:   o.DeviceName,
-		Timeout:      o.Timeout,
-		BLEOnly:      o.BLEOnly,
-		APOnly:       o.APOnly,
-		NetworkOnly:  o.NetworkOnly,
-		RegisterOnly: o.RegisterOnly,
-		NoCloud:      o.NoCloud,
+		Timezone:   o.Timezone,
+		DeviceName: o.DeviceName,
+		Timeout:    o.Timeout,
+		BLEOnly:    o.BLEOnly,
+		APOnly:     o.APOnly,
+		NoCloud:    o.NoCloud,
 	}
 	if o.SSID != "" {
 		onboardOpts.WiFi = &shelly.OnboardWiFiConfig{
@@ -209,7 +248,6 @@ func (o *Options) runDiscovery(ctx context.Context, svc *shelly.Service, opts *s
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
 	mw.AddLine("ble", "BLE scan")
 	mw.AddLine("wifi-ap", "WiFi AP scan")
-	mw.AddLine("network", "Network scan")
 
 	devices, err := svc.DiscoverForOnboard(ctx, opts, func(p shelly.OnboardProgress) {
 		lineID := "network"
@@ -239,15 +277,17 @@ func (o *Options) runDiscovery(ctx context.Context, svc *shelly.Service, opts *s
 }
 
 // provisionAll provisions devices grouped by their discovery source.
+// If source is non-nil, applies the source config to each device after provisioning.
 func (o *Options) provisionAll(
 	ctx context.Context,
 	svc *shelly.Service,
 	selected []shelly.OnboardDevice,
 	wifiCfg *shelly.OnboardWiFiConfig,
 	onboardOpts *shelly.OnboardOptions,
+	source *shelly.ProvisionSource,
 ) []*shelly.OnboardResult {
 	ios := o.Factory.IOStreams()
-	bleDevices, apDevices, networkDevices := shelly.SplitBySource(selected)
+	bleDevices, apDevices, _ := shelly.SplitBySource(selected)
 	var results []*shelly.OnboardResult
 
 	// BLE devices in parallel
@@ -271,14 +311,34 @@ func (o *Options) provisionAll(
 		}
 	}
 
-	// Already-networked devices: just register
-	if len(networkDevices) > 0 {
-		ios.Println()
-		ios.Title("Registering %d networked device(s)...", len(networkDevices))
-		netResults := shelly.RegisterNetworkDevices(networkDevices)
-		results = append(results, netResults...)
-		term.DisplayOnboardResults(ios, netResults)
+	// Apply source config (--from-device or --from-template) to each provisioned device
+	if source != nil {
+		o.applySourceConfig(ctx, svc, results, source)
 	}
 
 	return results
+}
+
+// applySourceConfig applies a provision source config to all successfully provisioned devices.
+func (o *Options) applySourceConfig(
+	ctx context.Context,
+	svc *shelly.Service,
+	results []*shelly.OnboardResult,
+	source *shelly.ProvisionSource,
+) {
+	ios := o.Factory.IOStreams()
+	ios.Println()
+	ios.Title("Applying source config to provisioned devices...")
+
+	for _, r := range results {
+		if r.Error != nil || r.NewAddress == "" {
+			continue
+		}
+		ios.Printf("  %s (%s)... ", r.Device.Name, r.NewAddress)
+		if err := svc.ApplyProvisionSource(ctx, r.NewAddress, source); err != nil {
+			ios.Error("failed: %v", err)
+		} else {
+			ios.Success("done")
+		}
+	}
 }
