@@ -40,6 +40,10 @@ the device name and either the response or error message.
 	Max concurrent operations
 
 .PP
+\fB--dry-run\fP[=false]
+	Preview actions without executing
+
+.PP
 \fB-g\fP, \fB--group\fP=""
 	Target device group
 
@@ -59,6 +63,14 @@ the device name and either the response or error message.
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
 	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB-F\fP, \fB--fields\fP[=false]
+	Print available field names for use with --jq and --template
+
+.PP
+\fB-Q\fP, \fB--jq\fP=[]
+	Apply jq expression to filter output (repeatable, joined with |)
 
 .PP
 \fB--log-categories\fP=""

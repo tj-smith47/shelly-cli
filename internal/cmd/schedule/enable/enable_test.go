@@ -2,7 +2,6 @@ package enable
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -34,12 +33,10 @@ func TestNewCommand_Structure(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Test Use
 	if cmd.Use != "enable <device> <id>" {
 		t.Errorf("Use = %q, want %q", cmd.Use, "enable <device> <id>")
 	}
 
-	// Test Aliases
 	wantAliases := []string{"on", "activate"}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
@@ -51,12 +48,10 @@ func TestNewCommand_Structure(t *testing.T) {
 		}
 	}
 
-	// Test Long
 	if cmd.Long == "" {
 		t.Error("Long description is empty")
 	}
 
-	// Test Example
 	if cmd.Example == "" {
 		t.Error("Example is empty")
 	}
@@ -116,7 +111,6 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 
 	// Execute the ValidArgsFunction to cover completion paths
 	suggestions, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
-	// We don't care about the actual values, just that it runs
 	_ = suggestions
 	_ = directive
 
@@ -165,9 +159,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
-func TestRun_Success(t *testing.T) {
-	t.Parallel()
-
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_Success(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -204,15 +197,12 @@ func TestRun_Success(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-		ID:      1,
-	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device", "1"})
 
-	err = run(context.Background(), opts)
+	err = cmd.Execute()
 	if err != nil {
-		t.Errorf("run() error = %v", err)
+		t.Errorf("Execute() error = %v", err)
 	}
 
 	output := tf.OutString()
@@ -221,9 +211,8 @@ func TestRun_Success(t *testing.T) {
 	}
 }
 
-func TestRun_DeviceNotFound(t *testing.T) {
-	t.Parallel()
-
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_DeviceNotFound(t *testing.T) {
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)
@@ -235,13 +224,10 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "nonexistent-device",
-		ID:      1,
-	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device", "1"})
 
-	err = run(context.Background(), opts)
+	err = cmd.Execute()
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
 	}

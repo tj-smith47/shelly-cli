@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/viper"
 
+	"github.com/tj-smith47/shelly-cli/internal/jq"
 	"github.com/tj-smith47/shelly-cli/internal/output/jsonfmt"
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/output/tmplfmt"
@@ -67,7 +68,15 @@ func Print(data any) error {
 }
 
 // PrintTo outputs data to the specified writer in the configured format.
+// If --fields is set, prints available field names instead of data.
+// If --jq is set, the jq filter is applied instead.
 func PrintTo(w io.Writer, data any) error {
+	if jq.HasFields() {
+		return jq.PrintFields(w, data)
+	}
+	if jq.HasFilter() {
+		return jq.Apply(w, data, jq.GetFilter())
+	}
 	formatter := NewFormatter(GetFormat())
 	return formatter.Format(w, data)
 }
@@ -233,7 +242,15 @@ func WantsStructured() bool {
 // FormatOutput prints data in the configured output format.
 // For table format, it uses the Table type from the output package.
 // For other formats (json, yaml, template), it uses the standard formatters.
+// If --fields is set, prints available field names instead of data.
+// If --jq is set, the jq filter is applied instead.
 func FormatOutput(w io.Writer, data any) error {
+	if jq.HasFields() {
+		return jq.PrintFields(w, data)
+	}
+	if jq.HasFilter() {
+		return jq.Apply(w, data, jq.GetFilter())
+	}
 	formatter := NewFormatter(GetFormat())
 	return formatter.Format(w, data)
 }

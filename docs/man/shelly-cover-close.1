@@ -35,6 +35,14 @@ Close a cover/roller component on the specified device.
 	Config file (default $HOME/.config/shelly/config.yaml)
 
 .PP
+\fB-F\fP, \fB--fields\fP[=false]
+	Print available field names for use with --jq and --template
+
+.PP
+\fB-Q\fP, \fB--jq\fP=[]
+	Apply jq expression to filter output (repeatable, joined with |)
+
+.PP
 \fB--log-categories\fP=""
 	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
 

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
@@ -128,148 +127,18 @@ func TestNewCommand_HasValidArgsFunction(t *testing.T) {
 	}
 }
 
-func TestRun_Success(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory:    tf.Factory,
-		Device:     "test-device",
-		Red:        255,
-		Green:      128,
-		Blue:       64,
-		White:      100,
-		Brightness: 50,
-		On:         true,
-		ComponentFlags: flags.ComponentFlags{
-			ID: 0,
-		},
-	}
-
-	// Create a cancelled context to prevent actual device connection
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	// Should fail due to cancelled context, but validates the run function path
-	err := run(ctx, opts)
-	if err == nil {
-		t.Error("Expected error with cancelled context")
-	}
-}
-
-func TestRun_WithDefaultID(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-		Red:     100,
-	}
-
-	// Default ID should be 0
-	if opts.ID != 0 {
-		t.Errorf("Default ID = %d, want 0", opts.ID)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	err := run(ctx, opts)
-	if err == nil {
-		t.Error("Expected error with cancelled context")
-	}
-}
-
-func TestRun_WithCustomID(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "rgbw-device",
-		ComponentFlags: flags.ComponentFlags{
-			ID: 2,
-		},
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	err := run(ctx, opts)
-	if err == nil {
-		t.Error("Expected error with cancelled context")
-	}
-}
-
-func TestOptions_DeviceFieldSet(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "my-rgbw-device",
-	}
-
-	if opts.Device != "my-rgbw-device" {
-		t.Errorf("Device = %q, want 'my-rgbw-device'", opts.Device)
-	}
-}
-
-func TestOptions_DefaultValues(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory:    tf.Factory,
-		Device:     "test-device",
-		Red:        -1,
-		Green:      -1,
-		Blue:       -1,
-		White:      -1,
-		Brightness: -1,
-	}
-
-	// Default values should match flag defaults
-	if opts.Red != -1 {
-		t.Errorf("Default Red = %d, want -1", opts.Red)
-	}
-	if opts.Green != -1 {
-		t.Errorf("Default Green = %d, want -1", opts.Green)
-	}
-	if opts.Blue != -1 {
-		t.Errorf("Default Blue = %d, want -1", opts.Blue)
-	}
-	if opts.White != -1 {
-		t.Errorf("Default White = %d, want -1", opts.White)
-	}
-	if opts.Brightness != -1 {
-		t.Errorf("Default Brightness = %d, want -1", opts.Brightness)
-	}
-	if opts.On {
-		t.Error("Default On should be false")
-	}
-}
-
-func TestNewCommand_Execute_SetsDevice(t *testing.T) {
+func TestExecute_WithCancelledContext(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"my-test-device", "--red", "255"})
+	cmd.SetArgs([]string{"test-device", "--red", "255"})
 
-	// Create a cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	cmd.SetContext(ctx)
 
-	// Execute - we expect an error due to cancelled context but want to verify structure
 	if err := cmd.Execute(); err == nil {
 		t.Error("Expected error from Execute with cancelled context")
 	}

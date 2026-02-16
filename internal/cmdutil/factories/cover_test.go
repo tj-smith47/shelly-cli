@@ -174,15 +174,15 @@ func TestNewCoverCommand_Execute_Success(t *testing.T) {
 		},
 	})
 
-	cmd.SetArgs([]string{"test-device", "--id", "2", "--duration", "5"})
+	cmd.SetArgs([]string{testDevice, "--id", "2", "--duration", "5"})
 	err := cmd.Execute()
 
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if calledDevice != "test-device" {
-		t.Errorf("device = %q, want %q", calledDevice, "test-device")
+	if calledDevice != testDevice {
+		t.Errorf("device = %q, want %q", calledDevice, testDevice)
 	}
 	if calledID != 2 {
 		t.Errorf("id = %d, want 2", calledID)
@@ -212,7 +212,7 @@ func TestNewCoverCommand_Execute_NoDuration(t *testing.T) {
 		},
 	})
 
-	cmd.SetArgs([]string{"test-device"})
+	cmd.SetArgs([]string{testDevice})
 	err := cmd.Execute()
 
 	if err != nil {
@@ -242,7 +242,7 @@ func TestNewCoverCommand_Execute_Error(t *testing.T) {
 		},
 	})
 
-	cmd.SetArgs([]string{"test-device"})
+	cmd.SetArgs([]string{testDevice})
 	err := cmd.Execute()
 
 	if err == nil {
@@ -276,15 +276,15 @@ func TestNewCoverCommand_Execute_Stop(t *testing.T) {
 		},
 	})
 
-	cmd.SetArgs([]string{"test-device", "--id", "1"})
+	cmd.SetArgs([]string{testDevice, "--id", "1"})
 	err := cmd.Execute()
 
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if calledDevice != "test-device" {
-		t.Errorf("device = %q, want %q", calledDevice, "test-device")
+	if calledDevice != testDevice {
+		t.Errorf("device = %q, want %q", calledDevice, testDevice)
 	}
 	if calledID != 1 {
 		t.Errorf("id = %d, want 1", calledID)

@@ -175,12 +175,19 @@ func execute() int {
 		return config.ExecuteShellAlias(ctx, expandedArgs)
 	}
 
+	// Substitute "-" argument with piped stdin content (enables: echo "dev" | shelly status -)
+	expandedArgs, err := utils.ReplaceStdinArg(expandedArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %s\n", theme.StatusError().Render("[ERROR]"), err.Error())
+		return 1
+	}
+
 	// Set the expanded args for cobra to process
 	rootCmd.SetArgs(expandedArgs)
 
 	// Track command execution for telemetry
 	start := time.Now()
-	err := rootCmd.ExecuteContext(ctx)
+	err = rootCmd.ExecuteContext(ctx)
 	duration := time.Since(start)
 
 	// Get the executed command path and track (non-blocking, respects opt-in setting)
@@ -233,6 +240,8 @@ func init() {
 	rootCmd.PersistentFlags().Bool("no-headers", false, "Hide table headers in output")
 	rootCmd.PersistentFlags().Bool("log-json", false, "Output logs in JSON format")
 	rootCmd.PersistentFlags().String("log-categories", "", "Filter logs by category (comma-separated: network,api,device,config,auth,plugin)")
+	rootCmd.PersistentFlags().StringArrayP("jq", "Q", nil, "Apply jq expression to filter output (repeatable, joined with |)")
+	rootCmd.PersistentFlags().BoolP("fields", "F", false, "Print available field names for use with --jq and --template")
 	rootCmd.PersistentFlags().Bool("refresh", false, "Bypass cache and fetch fresh data from device")
 	rootCmd.PersistentFlags().Bool("offline", false, "Only read from cache, error on cache miss")
 
@@ -246,8 +255,17 @@ func init() {
 	utils.Must(viper.BindPFlag("no-headers", rootCmd.PersistentFlags().Lookup("no-headers")))
 	utils.Must(viper.BindPFlag("log.json", rootCmd.PersistentFlags().Lookup("log-json")))
 	utils.Must(viper.BindPFlag("log.categories", rootCmd.PersistentFlags().Lookup("log-categories")))
+	utils.Must(viper.BindPFlag("jq", rootCmd.PersistentFlags().Lookup("jq")))
+	utils.Must(viper.BindPFlag("fields", rootCmd.PersistentFlags().Lookup("fields")))
 	utils.Must(viper.BindPFlag("refresh", rootCmd.PersistentFlags().Lookup("refresh")))
 	utils.Must(viper.BindPFlag("offline", rootCmd.PersistentFlags().Lookup("offline")))
+
+	// --fields is a discovery flag, mutually exclusive with filtering/formatting flags
+	rootCmd.MarkFlagsMutuallyExclusive("fields", "jq")
+	rootCmd.MarkFlagsMutuallyExclusive("fields", "template")
+	// --jq produces its own output, mutually exclusive with format flags
+	rootCmd.MarkFlagsMutuallyExclusive("jq", "output")
+	rootCmd.MarkFlagsMutuallyExclusive("jq", "template")
 
 	// Define command groups for organized help output (alphabetical by title)
 	rootCmd.AddGroup(

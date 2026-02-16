@@ -195,3 +195,19 @@ func capitalize(s string) string {
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
 }
+
+// toggleVerbs holds the verb forms for enable/disable commands.
+type toggleVerbs struct {
+	Verb     string // "enable" or "disable"
+	PastVerb string // "enabled" or "disabled"
+	Gerund   string // "Enabling" or "Disabling"
+	Alias    string // "on" or "off"
+}
+
+// newToggleVerbs returns the verb forms for the given enable/disable state.
+func newToggleVerbs(enable bool) toggleVerbs {
+	if enable {
+		return toggleVerbs{Verb: "enable", PastVerb: "enabled", Gerund: "Enabling", Alias: "on"}
+	}
+	return toggleVerbs{Verb: "disable", PastVerb: "disabled", Gerund: "Disabling", Alias: "off"}
+}

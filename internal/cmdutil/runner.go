@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/jq"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -228,6 +229,18 @@ func PrintBatchSummary(ios *iostreams.IOStreams, results []BatchResult) {
 	}
 }
 
+// PrintDryRun prints a dry-run preview showing the action and target devices.
+// The description should be a human-readable action like "Would turn on switch (id:0)".
+func PrintDryRun(ios *iostreams.IOStreams, description string, targets []string) {
+	ios.Info("Dry run — showing what would be applied:")
+	ios.Printf("\n")
+	ios.Info("%s on %d device(s):", description, len(targets))
+	for _, t := range targets {
+		ios.Printf("  - %s\n", t)
+	}
+	ios.Printf("\nDry run complete. No changes were made.\n")
+}
+
 // StatusFetcher is a function that fetches component status.
 type StatusFetcher[T any] func(ctx context.Context, svc *shelly.Service, device string, id int) (T, error)
 
@@ -257,7 +270,16 @@ func RunStatus[T any](
 }
 
 // PrintResult outputs result data in the configured format (JSON, YAML, or human-readable).
+// If --fields is set, prints available field names instead of data.
+// If --jq is set, the jq filter is applied to the data regardless of output format.
 func PrintResult[T any](ios *iostreams.IOStreams, data T, display StatusDisplay[T]) error {
+	if jq.HasFields() {
+		return jq.PrintFields(ios.Out, data)
+	}
+	if jq.HasFilter() {
+		return jq.Apply(ios.Out, data, jq.GetFilter())
+	}
+
 	switch viper.GetString("output") {
 	case outputJSON:
 		enc := json.NewEncoder(ios.Out)
@@ -330,7 +352,16 @@ func RunList[T any](
 }
 
 // PrintListResult outputs list data in the configured format (JSON, YAML, or human-readable).
+// If --fields is set, prints available field names instead of data.
+// If --jq is set, the jq filter is applied to the data regardless of output format.
 func PrintListResult[T any](ios *iostreams.IOStreams, items []T, display ListDisplay[T]) error {
+	if jq.HasFields() {
+		return jq.PrintFields(ios.Out, items)
+	}
+	if jq.HasFilter() {
+		return jq.Apply(ios.Out, items, jq.GetFilter())
+	}
+
 	switch viper.GetString("output") {
 	case outputJSON:
 		enc := json.NewEncoder(ios.Out)

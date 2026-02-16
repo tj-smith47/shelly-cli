@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
@@ -48,6 +49,7 @@ func NewBatchComponentCommand(f *cmdutil.Factory, opts BatchComponentOpts) *cobr
 	var (
 		groupName   string
 		all         bool
+		dryRun      bool
 		timeout     time.Duration
 		componentID int
 		concurrent  int
@@ -143,6 +145,11 @@ from files or other commands.`, short, componentLower, componentLower, component
 			if err != nil {
 				return err
 			}
+			if dryRun {
+				desc := fmt.Sprintf("Would %s %s (id:%d)", strings.ToLower(short), componentLower, componentID)
+				cmdutil.PrintDryRun(f.IOStreams(), desc, targets)
+				return nil
+			}
 			return runBatchComponent(cmd.Context(), f, opts, targets, componentID, timeout, concurrent)
 		},
 	}
@@ -157,6 +164,7 @@ from files or other commands.`, short, componentLower, componentLower, component
 		cmd.Flags().IntVar(&componentID, componentLower, 0, fmt.Sprintf("%s component ID", component))
 	}
 	cmd.Flags().IntVarP(&concurrent, "concurrent", "c", 5, "Max concurrent operations")
+	flags.AddDryRunFlag(cmd, &dryRun)
 
 	return cmd
 }

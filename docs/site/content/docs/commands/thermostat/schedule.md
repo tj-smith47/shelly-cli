@@ -53,6 +53,8 @@ Examples:
 
 ```
       --config string           Config file (default $HOME/.config/shelly/config.yaml)
+  -F, --fields                  Print available field names for use with --jq and --template
+  -Q, --jq stringArray          Apply jq expression to filter output (repeatable, joined with |)
       --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
       --log-json                Output logs in JSON format
       --no-color                Disable colored output
@@ -71,7 +73,7 @@ Examples:
 * [shelly thermostat](shelly_thermostat.md)	 - Manage thermostats
 * [shelly thermostat schedule create](shelly_thermostat_schedule_create.md)	 - Create a thermostat schedule
 * [shelly thermostat schedule delete](shelly_thermostat_schedule_delete.md)	 - Delete a thermostat schedule
-* [shelly thermostat schedule disable](shelly_thermostat_schedule_disable.md)	 - Disable a schedule
-* [shelly thermostat schedule enable](shelly_thermostat_schedule_enable.md)	 - Enable a schedule
+* [shelly thermostat schedule disable](shelly_thermostat_schedule_disable.md)	 - Disable schedule
+* [shelly thermostat schedule enable](shelly_thermostat_schedule_enable.md)	 - Enable schedule
 * [shelly thermostat schedule list](shelly_thermostat_schedule_list.md)	 - List thermostat schedules
 

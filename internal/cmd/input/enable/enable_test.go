@@ -3,7 +3,6 @@ package enable
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -138,9 +137,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
-func TestRun_WithMock(t *testing.T) {
-	t.Parallel()
-
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_WithMock(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -175,21 +173,18 @@ func TestRun_WithMock(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device"})
 
-	err = run(context.Background(), opts)
+	err = cmd.Execute()
 	// May fail due to mock limitations
 	if err != nil {
-		t.Logf("run() error = %v (expected for mock)", err)
+		t.Logf("Execute() error = %v (expected for mock)", err)
 	}
 }
 
-func TestRun_DeviceNotFound(t *testing.T) {
-	t.Parallel()
-
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_DeviceNotFound(t *testing.T) {
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)
@@ -201,34 +196,11 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "nonexistent-device",
-	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device"})
 
-	err = run(context.Background(), opts)
+	err = cmd.Execute()
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
-	}
-}
-
-func TestOptions_Fields(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "my-device",
-	}
-
-	if opts.Device != "my-device" {
-		t.Errorf("Device = %q, want 'my-device'", opts.Device)
-	}
-
-	// Verify ComponentFlags is embedded and accessible
-	opts.ID = 1
-	if opts.ID != 1 {
-		t.Errorf("ID = %d, want 1", opts.ID)
 	}
 }

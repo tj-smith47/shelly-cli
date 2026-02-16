@@ -2,7 +2,6 @@ package disable
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -119,22 +118,8 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 	}
 }
 
-func TestOptions(t *testing.T) {
-	t.Parallel()
-
-	f := cmdutil.NewFactory()
-	opts := &Options{
-		Device:  "test-device",
-		Factory: f,
-	}
-
-	if opts.Device != "test-device" {
-		t.Errorf("Device = %q, want %q", opts.Device, "test-device")
-	}
-}
-
 //nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
-func TestRun_WithMock(t *testing.T) {
+func TestExecute_WithMock(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -163,20 +148,18 @@ func TestRun_WithMock(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device"})
 
-	err = run(context.Background(), opts)
+	err = cmd.Execute()
 	// May fail due to mock limitations
 	if err != nil {
-		t.Logf("run() error = %v (expected for mock)", err)
+		t.Logf("Execute() error = %v (expected for mock)", err)
 	}
 }
 
 //nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
-func TestRun_DeviceNotFound(t *testing.T) {
+func TestExecute_DeviceNotFound(t *testing.T) {
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)
@@ -188,60 +171,17 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "nonexistent-device",
-	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device"})
 
-	err = run(context.Background(), opts)
+	err = cmd.Execute()
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
 	}
 }
 
 //nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
-func TestRun_CanceledContext(t *testing.T) {
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "cancel-device",
-					Address:    "192.168.1.102",
-					MAC:        "CC:DD:EE:FF:00:11",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "cancel-device",
-	}
-
-	err = run(ctx, opts)
-	if err == nil {
-		t.Error("expected error for canceled context")
-	}
-}
-
-//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
-func TestRun_Success(t *testing.T) {
+func TestExecute_Success(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -273,14 +213,12 @@ func TestRun_Success(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "modbus-device",
-	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"modbus-device"})
 
-	err = run(context.Background(), opts)
+	err = cmd.Execute()
 	if err != nil {
-		t.Errorf("run() error = %v", err)
+		t.Errorf("Execute() error = %v", err)
 	}
 
 	output := tf.OutString()

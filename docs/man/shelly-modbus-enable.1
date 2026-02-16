@@ -2,7 +2,7 @@
 .TH "SHELLY" "1" "Feb 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-modbus-enable - Enable Modbus-TCP server
+shelly-modbus-enable - Enable Modbus-TCP
 
 
 .SH SYNOPSIS
@@ -24,6 +24,14 @@ When enabled, the device exposes Modbus registers on TCP port 502.
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
 	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB-F\fP, \fB--fields\fP[=false]
+	Print available field names for use with --jq and --template
+
+.PP
+\fB-Q\fP, \fB--jq\fP=[]
+	Apply jq expression to filter output (repeatable, joined with |)
 
 .PP
 \fB--log-categories\fP=""

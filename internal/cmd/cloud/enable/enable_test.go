@@ -2,7 +2,6 @@ package enable
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -33,12 +32,10 @@ func TestNewCommand_Structure(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Test Use
 	if cmd.Use != "enable <device>" {
 		t.Errorf("Use = %q, want %q", cmd.Use, "enable <device>")
 	}
 
-	// Test Aliases
 	wantAliases := []string{"on", "connect"}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
@@ -50,12 +47,10 @@ func TestNewCommand_Structure(t *testing.T) {
 		}
 	}
 
-	// Test Long
 	if cmd.Long == "" {
 		t.Error("Long description is empty")
 	}
 
-	// Test Example
 	if cmd.Example == "" {
 		t.Error("Example is empty")
 	}
@@ -130,7 +125,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 }
 
 //nolint:paralleltest // Uses mock server which modifies global state
-func TestRun_WithMock(t *testing.T) {
+func TestExecute_WithMock(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -159,16 +154,17 @@ func TestRun_WithMock(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{Factory: tf.Factory, Device: "test-device"}
-	err = run(context.Background(), opts)
-	// May fail due to mock limitations
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device"})
+
+	err = cmd.Execute()
 	if err != nil {
-		t.Logf("run() error = %v (expected for mock)", err)
+		t.Logf("Execute() error = %v (expected for mock)", err)
 	}
 }
 
 //nolint:paralleltest // Uses mock server which modifies global state
-func TestRun_DeviceNotFound(t *testing.T) {
+func TestExecute_DeviceNotFound(t *testing.T) {
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)
@@ -180,26 +176,12 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{Factory: tf.Factory, Device: "nonexistent-device"}
-	err = run(context.Background(), opts)
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device"})
+
+	err = cmd.Execute()
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
-	}
-}
-
-//nolint:paralleltest // Uses test factory which may modify global state
-func TestRun_CancelledContext(t *testing.T) {
-	tf := factory.NewTestFactory(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
-
-	opts := &Options{Factory: tf.Factory, Device: "test-device"}
-	err := run(ctx, opts)
-
-	// Should fail due to cancelled context
-	if err == nil {
-		t.Error("expected error with cancelled context")
 	}
 }
 
@@ -268,23 +250,6 @@ func TestNewCommand_ShortIsConcise(t *testing.T) {
 	}
 }
 
-func TestOptions_Fields(t *testing.T) {
-	t.Parallel()
-
-	f := cmdutil.NewFactory()
-	opts := &Options{
-		Factory: f,
-		Device:  "my-device",
-	}
-
-	if opts.Factory == nil {
-		t.Error("Factory should not be nil")
-	}
-	if opts.Device != "my-device" {
-		t.Errorf("Device = %q, want 'my-device'", opts.Device)
-	}
-}
-
 func TestExecute_MissingArgs(t *testing.T) {
 	t.Parallel()
 
@@ -333,7 +298,6 @@ func TestExecute_WithDevice(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"exec-test"})
 
-	// May succeed or fail depending on mock capability
 	err = cmd.Execute()
 	if err != nil {
 		t.Logf("Execute() error = %v (expected for mock)", err)

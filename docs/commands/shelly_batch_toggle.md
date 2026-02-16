@@ -55,6 +55,7 @@ shelly batch toggle [device...] [flags]
 ```
   -a, --all                Target all registered devices
   -c, --concurrent int     Max concurrent operations (default 5)
+      --dry-run            Preview actions without executing
   -g, --group string       Target device group
   -h, --help               help for toggle
   -s, --switch int         Switch component ID
@@ -65,6 +66,8 @@ shelly batch toggle [device...] [flags]
 
 ```
       --config string           Config file (default $HOME/.config/shelly/config.yaml)
+  -F, --fields                  Print available field names for use with --jq and --template
+  -Q, --jq stringArray          Apply jq expression to filter output (repeatable, joined with |)
       --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
       --log-json                Output logs in JSON format
       --no-color                Disable colored output

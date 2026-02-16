@@ -2,10 +2,8 @@ package disable
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -142,7 +140,6 @@ func TestNewCommand_Flags(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Test id flag
 	idFlag := cmd.Flags().Lookup("id")
 	if idFlag == nil {
 		t.Fatal("--id flag not found")
@@ -182,65 +179,6 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 		if !strings.Contains(cmd.Example, pattern) {
 			t.Errorf("expected Example to contain %q", pattern)
 		}
-	}
-}
-
-func TestOptions_DefaultValues(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-	}
-
-	if opts.ScheduleID != 0 {
-		t.Errorf("Default ScheduleID = %d, want 0", opts.ScheduleID)
-	}
-}
-
-func TestRun_ContextCancelled(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	opts := &Options{
-		Factory:    tf.Factory,
-		Device:     "test-device",
-		ScheduleID: 1,
-	}
-
-	err := run(ctx, opts)
-
-	if err == nil {
-		t.Error("Expected error with cancelled context")
-	}
-}
-
-func TestRun_Timeout(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
-	defer cancel()
-
-	time.Sleep(1 * time.Millisecond)
-
-	opts := &Options{
-		Factory:    tf.Factory,
-		Device:     "test-device",
-		ScheduleID: 1,
-	}
-
-	err := run(ctx, opts)
-
-	if err == nil {
-		t.Error("Expected error with timed out context")
 	}
 }
 
@@ -288,9 +226,8 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 	}
 }
 
-func TestRun_WithMockGen1Device(t *testing.T) {
-	t.Parallel()
-
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_WithMockGen1Device(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -319,14 +256,10 @@ func TestRun_WithMockGen1Device(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{
-		Factory:    tf.Factory,
-		Device:     "gen1-device",
-		ScheduleID: 1,
-	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"gen1-device", "--id", "1"})
 
-	err = run(context.Background(), opts)
-
+	err = cmd.Execute()
 	if err == nil {
 		t.Error("Expected error for Gen1 device")
 	}
@@ -336,9 +269,8 @@ func TestRun_WithMockGen1Device(t *testing.T) {
 	}
 }
 
-func TestRun_WithMockGen2Device(t *testing.T) {
-	t.Parallel()
-
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_WithMockGen2Device(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -380,52 +312,22 @@ func TestRun_WithMockGen2Device(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{
-		Factory:    tf.Factory,
-		Device:     "thermostat-device",
-		ScheduleID: 1,
-	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"thermostat-device", "--id", "1"})
 
-	err = run(context.Background(), opts)
-
+	err = cmd.Execute()
 	if err != nil {
 		t.Errorf("Unexpected error for Gen2 device schedule disable: %v", err)
 	}
 
 	output := tf.OutString()
-	if !strings.Contains(output, "Disabled") {
+	if !strings.Contains(output, "disabled") {
 		t.Logf("Output: %s", output)
 	}
 }
 
-func TestOptions_FactoryAccess(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-	}
-
-	if opts.Factory == nil {
-		t.Fatal("Options.Factory should not be nil")
-	}
-
-	ios := opts.Factory.IOStreams()
-	if ios == nil {
-		t.Error("Factory.IOStreams() should not return nil")
-	}
-
-	svc := opts.Factory.ShellyService()
-	if svc == nil {
-		t.Error("Factory.ShellyService() should not return nil")
-	}
-}
-
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestNewCommand_ExecuteWithIDFlag(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -469,7 +371,6 @@ func TestNewCommand_ExecuteWithIDFlag(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
 	cmd.SetArgs([]string{"thermostat-device", "--id", "1"})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)

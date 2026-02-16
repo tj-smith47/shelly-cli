@@ -23,6 +23,7 @@ type Options struct {
 	flags.OutputFlags
 	Factory    *cmdutil.Factory
 	All        bool
+	DryRun     bool
 	Concurrent int
 	GroupName  string
 	Timeout    time.Duration
@@ -100,6 +101,16 @@ the device name and either the response or error message.`,
 			if err != nil {
 				return err
 			}
+			if opts.DryRun {
+				desc := "Would run " + method
+				if params != nil {
+					if b, err := json.Marshal(params); err == nil {
+						desc += " " + string(b)
+					}
+				}
+				cmdutil.PrintDryRun(opts.Factory.IOStreams(), desc, targets)
+				return nil
+			}
 			return run(cmd.Context(), targets, method, params, opts)
 		},
 	}
@@ -109,6 +120,7 @@ the device name and either the response or error message.`,
 	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", 10*time.Second, "Timeout per device")
 	cmd.Flags().IntVarP(&opts.Concurrent, "concurrent", "c", 5, "Max concurrent operations")
 	flags.AddOutputFlagsNamed(cmd, &opts.OutputFlags, "output", "o", "json", "json", "yaml")
+	flags.AddDryRunFlag(cmd, &opts.DryRun)
 
 	return cmd
 }

@@ -2,7 +2,7 @@
 .TH "SHELLY" "1" "Feb 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-modbus-disable - Disable Modbus-TCP server
+shelly-modbus-disable - Disable Modbus-TCP
 
 
 .SH SYNOPSIS
@@ -21,6 +21,14 @@ Disable the Modbus-TCP server on a Shelly device.
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
 	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB-F\fP, \fB--fields\fP[=false]
+	Print available field names for use with --jq and --template
+
+.PP
+\fB-Q\fP, \fB--jq\fP=[]
+	Apply jq expression to filter output (repeatable, joined with |)
 
 .PP
 \fB--log-categories\fP=""
