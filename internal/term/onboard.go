@@ -141,9 +141,9 @@ func FormatOnboardDeviceOptions(devices []shelly.OnboardDevice) []string {
 }
 
 // SelectOnboardDevices presents an interactive multi-select for device selection.
-// If autoConfirm is true, returns all devices without prompting.
+// If autoConfirm is true or only one device is found, returns all devices without prompting.
 func SelectOnboardDevices(ios *iostreams.IOStreams, devices []shelly.OnboardDevice, autoConfirm bool) ([]shelly.OnboardDevice, error) {
-	if autoConfirm {
+	if autoConfirm || len(devices) == 1 {
 		return devices, nil
 	}
 

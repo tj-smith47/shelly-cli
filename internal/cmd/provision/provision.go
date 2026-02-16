@@ -103,6 +103,7 @@ To register already-networked devices, use: shelly discover --register`,
 	cmd.Flags().StringVar(&opts.FromTemplate, "from-template", "", "Apply saved template after provisioning")
 	cmd.Flags().BoolVar(&opts.NoCloud, "no-cloud", false, "Disable cloud on provisioned devices")
 	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompts")
+	cmd.Flags().BoolVar(&opts.Yes, "all", false, "Provision all discovered devices (non-interactive)")
 	cmd.MarkFlagsMutuallyExclusive("from-device", "from-template")
 
 	cmd.AddCommand(wifi.NewCommand(f))
@@ -246,8 +247,12 @@ func (o *Options) buildOnboardOptions() *shelly.OnboardOptions {
 func (o *Options) runDiscovery(ctx context.Context, svc *shelly.Service, opts *shelly.OnboardOptions) ([]shelly.OnboardDevice, error) {
 	ios := o.Factory.IOStreams()
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
-	mw.AddLine("ble", "BLE scan")
-	mw.AddLine("wifi-ap", "WiFi AP scan")
+	if !opts.APOnly {
+		mw.AddLine("ble", "BLE scan")
+	}
+	if !opts.BLEOnly {
+		mw.AddLine("wifi-ap", "WiFi AP scan")
+	}
 
 	devices, err := svc.DiscoverForOnboard(ctx, opts, func(p shelly.OnboardProgress) {
 		lineID := "network"

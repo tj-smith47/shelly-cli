@@ -383,16 +383,13 @@ func (s *Service) OnboardViaAP(
 	configErr := s.configureWiFiAtAP(ctx, wifi.SSID, wifi.Password, device.Generation)
 
 	// Always try to reconnect to home network, even if config failed.
-	// Prefer the original network; fall back to the provisioning target.
-	reconnectSSID := wifi.SSID
-	reconnectPass := wifi.Password
-	if originalNet != nil && originalNet.SSID != "" {
-		reconnectSSID = originalNet.SSID
-		reconnectPass = "" // original network uses saved credentials
-	}
+	// Determine the reconnect target: if the original network is different from
+	// the provisioning target, try it first with saved creds (NetworkManager).
+	// Otherwise use the target WiFi credentials — nl80211 has no credential store.
+	reconnectSSID, reconnectPass := reconnectCredentials(originalNet, wifi)
 	if reconnErr := scanner.Connect(ctx, reconnectSSID, reconnectPass); reconnErr != nil {
 		debug.TraceEvent("onboard reconnect to %s failed: %v", reconnectSSID, reconnErr)
-		// If we tried the original network, fall back to the target WiFi
+		// If we tried the original network, fall back to the provisioning target.
 		if reconnectSSID != wifi.SSID {
 			if err := scanner.Connect(ctx, wifi.SSID, wifi.Password); err != nil {
 				debug.TraceEvent("onboard fallback connect to %s also failed: %v", wifi.SSID, err)
@@ -440,6 +437,18 @@ func (s *Service) configureWiFiAtAP(ctx context.Context, ssid, password string, 
 	return s.ConfigureWiFi(ctx, address, ssid, password)
 }
 
+// reconnectCredentials determines the SSID and password for reconnecting to
+// the home network after AP provisioning. If the original network differs from
+// the provisioning target, returns the original SSID with an empty password
+// (NetworkManager may have saved credentials). Otherwise returns the target
+// WiFi credentials directly since nl80211 has no credential store.
+func reconnectCredentials(originalNet *discovery.WiFiNetwork, wifi *OnboardWiFiConfig) (ssid, password string) {
+	if originalNet != nil && originalNet.SSID != "" && originalNet.SSID != wifi.SSID {
+		return originalNet.SSID, ""
+	}
+	return wifi.SSID, wifi.Password
+}
+
 // WaitForDeviceOnNetwork waits for a provisioned device to appear on the
 // network by repeatedly scanning via mDNS (using MAC) with HTTP fallback.
 // Returns the device's new IP address or an error if not found within timeout.
@@ -474,6 +483,7 @@ func (s *Service) WaitForDeviceOnNetwork(
 }
 
 // RegisterOnboardedDevice adds a successfully onboarded device to the config registry.
+// The device name is preserved as-is from discovery (typically the SSID or BLE name).
 func RegisterOnboardedDevice(device *OnboardDevice, newAddress string) error {
 	if newAddress == "" {
 		return fmt.Errorf("no address for device %q", device.Name)
@@ -484,33 +494,12 @@ func RegisterOnboardedDevice(device *OnboardDevice, newAddress string) error {
 		return nil
 	}
 
-	// Derive a clean name for registration
-	name := sanitizeDeviceName(device.Name)
+	name := device.Name
 	if name == "" {
 		name = newAddress
 	}
 
 	return config.RegisterDevice(name, newAddress, device.Generation, device.Model, "", nil)
-}
-
-// sanitizeDeviceName creates a config-safe device name from a discovery name.
-// Lowercases and replaces spaces with hyphens.
-func sanitizeDeviceName(name string) string {
-	name = strings.ToLower(strings.TrimSpace(name))
-	name = strings.ReplaceAll(name, " ", "-")
-	// Remove characters that aren't alphanumeric, hyphen, or underscore
-	var clean strings.Builder
-	for _, c := range name {
-		switch {
-		case c >= 'a' && c <= 'z':
-			clean.WriteRune(c)
-		case c >= '0' && c <= '9':
-			clean.WriteRune(c)
-		case c == '-' || c == '_':
-			clean.WriteRune(c)
-		}
-	}
-	return clean.String()
 }
 
 // FilterUnregistered returns only devices that are not already in the config registry.

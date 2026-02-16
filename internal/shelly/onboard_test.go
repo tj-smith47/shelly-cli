@@ -125,35 +125,6 @@ func TestOnboardProgress_Fields(t *testing.T) {
 	}
 }
 
-func TestSanitizeDeviceName(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		input string
-		want  string
-	}{
-		{"simple", "my-device", "my-device"},
-		{"uppercase", "My Device", "my-device"},
-		{"spaces", "  test  device  ", "test--device"},
-		{"special chars", "device@#$123", "device123"},
-		{"underscores", "my_device_01", "my_device_01"},
-		{"empty", "", ""},
-		{"only special", "!@#$%", ""},
-		{"mixed", "Shelly Plus 1PM (Living Room)", "shelly-plus-1pm-living-room"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := sanitizeDeviceName(tt.input)
-			if got != tt.want {
-				t.Errorf("sanitizeDeviceName(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestFilterUnregistered(t *testing.T) {
 	t.Parallel()
 

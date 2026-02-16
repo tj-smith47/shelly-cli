@@ -71,6 +71,7 @@ shelly provision [flags]
 ### Options
 
 ```
+      --all                    Provision all discovered devices (non-interactive)
       --ap-only                Only discover via WiFi AP (Gen1 devices)
       --ble-only               Only discover via BLE (Gen2+ devices)
       --from-device string     Clone config from existing device
