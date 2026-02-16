@@ -26,8 +26,10 @@ func TestDetectSubnet_Format(t *testing.T) {
 		t.Errorf("DetectSubnet() = %q, expected format IP/mask", subnet)
 	}
 
-	// Verify it's a network address (ends with .0 for /24 or similar)
-	// Note: This may not always be true for all subnets
+	// Should NOT return the Shelly AP subnet
+	if strings.HasPrefix(parts[0], shellyAPSubnet) {
+		t.Errorf("DetectSubnet() = %q, should not return Shelly AP subnet", subnet)
+	}
 }
 
 func TestDetectSubnet_ReturnsValidCIDR(t *testing.T) {
@@ -48,5 +50,33 @@ func TestDetectSubnet_ReturnsValidCIDR(t *testing.T) {
 	ipParts := strings.Split(parts[0], ".")
 	if len(ipParts) != 4 {
 		t.Errorf("IP part should have 4 octets, got: %s", parts[0])
+	}
+}
+
+func TestIsVirtualInterface(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		iface    string
+		expected bool
+	}{
+		{name: "docker0", iface: "docker0", expected: true},
+		{name: "veth123", iface: "veth123abc", expected: true},
+		{name: "br-network", iface: "br-abcdef", expected: true},
+		{name: "virbr0", iface: "virbr0", expected: true},
+		{name: "eth0", iface: "eth0", expected: false},
+		{name: "wlan0", iface: "wlan0", expected: false},
+		{name: "enp0s3", iface: "enp0s3", expected: false},
+		{name: "wlp2s0", iface: "wlp2s0", expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := isVirtualInterface(tt.iface); got != tt.expected {
+				t.Errorf("isVirtualInterface(%q) = %v, want %v", tt.iface, got, tt.expected)
+			}
+		})
 	}
 }
