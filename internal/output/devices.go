@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/tj-smith47/shelly-go/discovery"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
@@ -77,7 +78,7 @@ func FormatDiscoveredDevices(devices []discovery.DiscoveredDevice) *table.Builde
 			name,
 			d.ID,
 			d.Address.String(),
-			d.Model,
+			types.ModelDisplayName(d.Model),
 			gen,
 			string(d.Protocol),
 			auth,

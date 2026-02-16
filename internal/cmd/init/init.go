@@ -3,7 +3,6 @@ package init
 
 import (
 	"context"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -90,7 +89,7 @@ Use --check to verify your current setup without making changes.`,
 
 	// Discovery flags
 	cmd.Flags().BoolVar(&wizardOpts.Discover, "discover", false, "Enable device discovery (opt-in in non-interactive mode)")
-	cmd.Flags().DurationVar(&wizardOpts.DiscoverTimeout, "discover-timeout", 15*time.Second, "Discovery timeout")
+	cmd.Flags().DurationVar(&wizardOpts.DiscoverTimeout, "discover-timeout", cmdutil.DefaultScanTimeout, "Discovery timeout")
 	cmd.Flags().StringVar(&wizardOpts.DiscoverModes, "discover-modes", "http", "Discovery modes: http,mdns,coiot,ble,all (comma-separated)")
 	cmd.Flags().StringVar(&wizardOpts.Network, "network", "", "Subnet for HTTP probe discovery (e.g., 192.168.1.0/24)")
 

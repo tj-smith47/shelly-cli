@@ -85,7 +85,7 @@ shelly init [flags]
       --devices-json stringArray    JSON device(s): file path, array, or single object (repeatable)
       --discover                    Enable device discovery (opt-in in non-interactive mode)
       --discover-modes string       Discovery modes: http,mdns,coiot,ble,all (comma-separated) (default "http")
-      --discover-timeout duration   Discovery timeout (default 15s)
+      --discover-timeout duration   Discovery timeout (default 2m0s)
       --force                       Overwrite existing configuration
   -h, --help                        help for init
       --network string              Subnet for HTTP probe discovery (e.g., 192.168.1.0/24)
