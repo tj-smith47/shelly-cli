@@ -248,32 +248,32 @@ func (o *Options) runDiscovery(ctx context.Context, svc *shelly.Service, opts *s
 	ios := o.Factory.IOStreams()
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
 	if !opts.APOnly {
-		mw.AddLine("ble", "BLE scan")
+		mw.AddLine("BLE", "scanning...")
 	}
 	if !opts.BLEOnly {
-		mw.AddLine("wifi-ap", "WiFi AP scan")
+		mw.AddLine("WiFi AP", "scanning...")
 	}
 
 	devices, err := svc.DiscoverForOnboard(ctx, opts, func(p shelly.OnboardProgress) {
 		lineID := "network"
 		switch p.Method {
 		case "BLE":
-			lineID = "ble"
+			lineID = "BLE"
 		case "WiFi AP":
-			lineID = "wifi-ap"
+			lineID = "WiFi AP"
 		}
 
 		switch {
 		case p.Done && p.Err != nil:
-			mw.UpdateLine(lineID, iostreams.StatusError, fmt.Sprintf("%s: %v", p.Method, p.Err))
+			mw.UpdateLine(lineID, iostreams.StatusError, p.Err.Error())
 		case p.Done:
 			status := iostreams.StatusSuccess
 			if p.Found == 0 {
 				status = iostreams.StatusSkipped
 			}
-			mw.UpdateLine(lineID, status, fmt.Sprintf("%s: %d found", p.Method, p.Found))
+			mw.UpdateLine(lineID, status, fmt.Sprintf("%d found", p.Found))
 		default:
-			mw.UpdateLine(lineID, iostreams.StatusRunning, fmt.Sprintf("%s: scanning...", p.Method))
+			mw.UpdateLine(lineID, iostreams.StatusRunning, "scanning...")
 		}
 	})
 	mw.Finalize()
