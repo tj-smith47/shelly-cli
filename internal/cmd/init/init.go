@@ -29,54 +29,58 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Initialize shelly CLI for first-time use",
 		Long: `Initialize the shelly CLI with a guided setup wizard.
 
-This command helps new users get started by:
-  - Creating a configuration file with sensible defaults
-  - Discovering Shelly devices on your network
-  - Registering discovered devices with friendly names
-  - Installing shell completions for tab completion
-  - Optionally setting up Shelly Cloud access
+This command walks you through:
+  1. Configuration (theme, output format, aliases)
+  2. Device discovery (find Shelly devices on your network)
+  3. Device registration (give discovered devices friendly names)
+  4. Shell completions (tab completion for commands)
+  5. Cloud access (optional remote control via Shelly Cloud)
+  6. Telemetry (optional anonymous usage statistics)
 
 INTERACTIVE MODE (default):
-  Run without flags to use the interactive wizard.
+  Run without flags for the full guided wizard.
 
-NON-INTERACTIVE MODE:
-  Automatically enabled when any device or config flags are provided.
-  Discovery, completions, aliases, and cloud are opt-in via flags.
+DEFAULTS MODE (--defaults):
+  Runs the full wizard with sensible defaults, no prompts.
+  Discovers devices, registers with default names, installs completions.
+  Combine with flags to override individual defaults (e.g., --defaults --theme nord).
+
+INDIVIDUAL FLAGS:
+  Pass specific flags to set values; other steps remain interactive.
 
 Use --check to verify your current setup without making changes.`,
-		Example: `  # Interactive setup wizard
+		Example: `  # Interactive setup wizard (recommended for first use)
   shelly init
+
+  # Quick setup with sensible defaults (no prompts)
+  shelly init --defaults
+
+  # Defaults with a specific theme
+  shelly init --defaults --theme nord
+
+  # Defaults with force overwrite of existing config
+  shelly init --defaults --force
 
   # Check current setup without changes
   shelly init --check
 
-  # Non-interactive: register devices directly
+  # Register devices directly (other steps remain interactive)
   shelly init --device kitchen=192.168.1.100 --device bedroom=192.168.1.101
 
-  # Non-interactive: device with authentication
-  shelly init --device secure=192.168.1.102:admin:secret
+  # Run discovery without prompting (other steps remain interactive)
+  shelly init --discover
 
-  # Non-interactive: import from JSON file
-  shelly init --devices-json devices.json
+  # Scan specific subnets
+  shelly init --discover --network 192.168.1.0/24 --network 10.0.0.0/24
 
-  # Non-interactive: inline JSON
-  shelly init --devices-json '{"name":"kitchen","address":"192.168.1.100"}'
-
-  # Non-interactive: with discovery and completions
-  shelly init --discover --discover-modes http,mdns --completions bash,zsh
-
-  # Non-interactive: full CI/CD setup
-  shelly init \
+  # Full CI/CD setup (no prompts)
+  shelly init --defaults \
     --device kitchen=192.168.1.100 \
     --theme dracula \
-    --api-mode local \
     --no-color
 
-  # Non-interactive: with cloud credentials
-  shelly init --cloud-email user@example.com --cloud-password secret
-
-  # Non-interactive: enable anonymous telemetry
-  shelly init --telemetry`,
+  # With cloud credentials
+  shelly init --defaults --cloud-email user@example.com --cloud-password secret`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			opts.RootCommand = cmd.Root()
 			return run(cmd.Context(), opts)
@@ -88,10 +92,11 @@ Use --check to verify your current setup without making changes.`,
 	cmd.Flags().StringArrayVar(&wizardOpts.DevicesJSON, "devices-json", nil, "JSON device(s): file path, array, or single object (repeatable)")
 
 	// Discovery flags
-	cmd.Flags().BoolVar(&wizardOpts.Discover, "discover", false, "Enable device discovery (opt-in in non-interactive mode)")
+	cmd.Flags().BoolVar(&wizardOpts.Discover, "discover", false, "Run device discovery without prompting")
 	cmd.Flags().DurationVar(&wizardOpts.DiscoverTimeout, "discover-timeout", cmdutil.DefaultScanTimeout, "Discovery timeout")
 	cmd.Flags().StringVar(&wizardOpts.DiscoverModes, "discover-modes", "http", "Discovery modes: http,mdns,coiot,ble,all (comma-separated)")
-	cmd.Flags().StringVar(&wizardOpts.Network, "network", "", "Subnet for HTTP probe discovery (e.g., 192.168.1.0/24)")
+	cmd.Flags().StringArrayVar(&wizardOpts.Networks, "network", nil, "Subnet(s) for HTTP probe discovery (repeatable)")
+	cmd.Flags().BoolVar(&wizardOpts.AllNetworks, "all-networks", false, "Scan all detected subnets without prompting")
 
 	// Completion flags
 	cmd.Flags().StringVar(&wizardOpts.Completions, "completions", "", "Install completions for shells: bash,zsh,fish,powershell (comma-separated)")
@@ -111,6 +116,7 @@ Use --check to verify your current setup without making changes.`,
 	cmd.Flags().BoolVar(&wizardOpts.Telemetry, "telemetry", false, "Enable anonymous usage telemetry (opt-in)")
 
 	// Control flags
+	cmd.Flags().BoolVar(&wizardOpts.Defaults, "defaults", false, "Use sensible defaults for all prompts (no interactive questions)")
 	cmd.Flags().BoolVar(&wizardOpts.Force, "force", false, "Overwrite existing configuration")
 	cmd.Flags().BoolVar(&opts.Check, "check", false, "Verify current setup without making changes")
 

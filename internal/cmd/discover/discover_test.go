@@ -41,10 +41,10 @@ func TestNewCommand(t *testing.T) {
 	// Verify subcommands are registered
 	subcommands := cmd.Commands()
 	expectedSubcmds := map[string]bool{
-		"mdns":          false,
-		"ble":           false,
-		"coiot":         false,
-		"http [subnet]": false,
+		"mdns":             false,
+		"ble":              false,
+		"coiot":            false,
+		"http [subnet...]": false,
 	}
 
 	for _, sub := range subcommands {
@@ -174,9 +174,9 @@ func TestNewCommand_SubnetFlag(t *testing.T) {
 		return
 	}
 
-	// Default should be empty (auto-detected)
-	if subnetFlag.DefValue != "" {
-		t.Errorf("subnet default = %q, want empty string", subnetFlag.DefValue)
+	// Default should be empty array (auto-detected)
+	if subnetFlag.DefValue != "[]" {
+		t.Errorf("subnet default = %q, want %q", subnetFlag.DefValue, "[]")
 	}
 }
 
@@ -232,8 +232,8 @@ func TestOptions_Defaults(t *testing.T) {
 		t.Error("default skipExisting = true, want false (from zero value)")
 	}
 
-	if opts.Subnet != "" {
-		t.Errorf("default subnet = %q, want empty string", opts.Subnet)
+	if len(opts.Subnets) != 0 {
+		t.Errorf("default subnets = %v, want empty", opts.Subnets)
 	}
 
 	if opts.Method != "" {
@@ -248,7 +248,7 @@ func TestOptions_AllFields(t *testing.T) {
 		Timeout:      30 * time.Second,
 		Register:     true,
 		SkipExisting: true,
-		Subnet:       "192.168.1.0/24",
+		Subnets:      []string{"192.168.1.0/24"},
 		Method:       "http",
 		SkipPlugins:  true,
 		Platform:     "tasmota",
@@ -266,8 +266,8 @@ func TestOptions_AllFields(t *testing.T) {
 		t.Error("skipExisting = false, want true")
 	}
 
-	if opts.Subnet != "192.168.1.0/24" {
-		t.Errorf("subnet = %q, want %q", opts.Subnet, "192.168.1.0/24")
+	if len(opts.Subnets) != 1 || opts.Subnets[0] != "192.168.1.0/24" {
+		t.Errorf("subnets = %v, want [192.168.1.0/24]", opts.Subnets)
 	}
 
 	if opts.Method != testMethodHTTP {

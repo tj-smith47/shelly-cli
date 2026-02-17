@@ -32,6 +32,12 @@ shelly discover [flags]
   # Specify subnet for HTTP scan
   shelly discover --subnet 192.168.1.0/24
 
+  # Scan multiple subnets
+  shelly discover --subnet 192.168.1.0/24 --subnet 10.0.0.0/24
+
+  # Scan all detected subnets without prompting
+  shelly discover --all-networks
+
   # Use mDNS instead of HTTP scan
   shelly discover --method mdns
 
@@ -51,14 +57,15 @@ shelly discover [flags]
 ### Options
 
 ```
-  -h, --help               help for discover
-  -m, --method string      Discovery method: http, mdns, ble, coiot (default "http")
-  -p, --platform string    Only discover devices of this platform (e.g., tasmota)
-      --register           Auto-register discovered devices
-      --skip-existing      Skip devices already registered (default true)
-      --skip-plugins       Skip plugin detection (Shelly-only discovery)
-      --subnet string      Subnet to scan (auto-detected if not specified)
-  -t, --timeout duration   Discovery timeout (default 2m0s)
+      --all-networks         Scan all detected subnets without prompting
+  -h, --help                 help for discover
+  -m, --method string        Discovery method: http, mdns, ble, coiot (default "http")
+  -p, --platform string      Only discover devices of this platform (e.g., tasmota)
+      --register             Auto-register discovered devices
+      --skip-existing        Skip devices already registered (default true)
+      --skip-plugins         Skip plugin detection (Shelly-only discovery)
+      --subnet stringArray   Subnet(s) to scan (repeatable, auto-detected if not specified)
+  -t, --timeout duration     Discovery timeout (default 2m0s)
 ```
 
 ### Options inherited from parent commands

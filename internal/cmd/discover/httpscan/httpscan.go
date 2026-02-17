@@ -4,7 +4,7 @@ package httpscan
 import (
 	"context"
 	"fmt"
-	"net"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -22,9 +22,10 @@ const DefaultTimeout = 2 * time.Minute
 // Options holds the command options.
 type Options struct {
 	Factory      *cmdutil.Factory
+	Subnets      []string
 	Register     bool
 	SkipExisting bool
-	Subnet       string
+	AllNetworks  bool
 	Timeout      time.Duration
 }
 
@@ -33,12 +34,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "http [subnet]",
+		Use:     "http [subnet...]",
 		Aliases: []string{"scan", "search", "probe"},
 		Short:   "Discover devices via HTTP subnet scanning",
 		Long: `Discover Shelly devices by probing HTTP endpoints on a subnet.
 
-If no subnet is provided, attempts to detect the local network.
+If no subnet is provided, attempts to detect the local network(s).
+When multiple subnets are detected, an interactive prompt lets you
+choose which to scan. Use --all-networks to scan all without prompting.
+
 This method is slower than mDNS or CoIoT but works when multicast
 is blocked or devices are on different VLANs.
 
@@ -57,6 +61,15 @@ Protocol, and Auth status.`,
   # Scan specific subnet
   shelly discover http 192.168.1.0/24
 
+  # Scan multiple subnets
+  shelly discover http 192.168.1.0/24 10.0.0.0/24
+
+  # Scan all detected subnets without prompting
+  shelly discover http --all-networks
+
+  # Use --network flag (repeatable)
+  shelly discover http --network 192.168.1.0/24 --network 10.0.0.0/24
+
   # Scan a /16 network (large, use longer timeout)
   shelly discover http 10.0.0.0/16 --timeout 30m
 
@@ -71,10 +84,10 @@ Protocol, and Auth status.`,
 
   # Combine flags for initial network setup
   shelly discover http 192.168.1.0/24 --register --timeout 10m`,
-		Args: cobra.MaximumNArgs(1),
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				opts.Subnet = args[0]
+				opts.Subnets = append(opts.Subnets, args...)
 			}
 			return run(cmd.Context(), opts)
 		},
@@ -83,43 +96,39 @@ Protocol, and Auth status.`,
 	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", DefaultTimeout, "Scan timeout")
 	cmd.Flags().BoolVar(&opts.Register, "register", false, "Automatically register discovered devices")
 	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", true, "Skip devices already registered")
+	cmd.Flags().StringArrayVar(&opts.Subnets, "network", nil, "Subnet(s) to scan (repeatable, auto-detected if not specified)")
+	cmd.Flags().BoolVar(&opts.AllNetworks, "all-networks", false, "Scan all detected subnets without prompting")
 
 	return cmd
 }
 
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
-	subnet := opts.Subnet
 
-	if subnet == "" {
-		var err error
-		subnet, err = utils.DetectSubnet()
-		if err != nil {
-			return fmt.Errorf("failed to detect subnet: %w", err)
-		}
-		ios.Success("Detected subnet: %s", subnet)
-	}
-
-	_, ipNet, err := net.ParseCIDR(subnet)
+	subnets, err := cmdutil.ResolveSubnets(ios, opts.Subnets, opts.AllNetworks)
 	if err != nil {
-		return fmt.Errorf("invalid subnet: %w", err)
+		return err
 	}
 
-	// Generate addresses to probe
-	addresses := discovery.GenerateSubnetAddresses(subnet)
-	if len(addresses) == 0 {
-		return fmt.Errorf("no addresses to scan in subnet %s", subnet)
+	// Generate addresses across all subnets
+	var allAddresses []string
+	for _, subnet := range subnets {
+		allAddresses = append(allAddresses, discovery.GenerateSubnetAddresses(subnet)...)
+	}
+	if len(allAddresses) == 0 {
+		return fmt.Errorf("no addresses to scan in %s", strings.Join(subnets, ", "))
 	}
 
-	ios.Success("Scanning %d addresses in %s", len(addresses), ipNet)
+	subnetLabel := strings.Join(subnets, ", ")
+	ios.Success("Scanning %d addresses in %s", len(allAddresses), subnetLabel)
 
 	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
 	// Use animated spinner for scan progress
-	ios.StartProgress(fmt.Sprintf("0/%d addresses probed", len(addresses)))
+	ios.StartProgress(fmt.Sprintf("0/%d addresses probed", len(allAddresses)))
 
-	devices := discovery.ProbeAddressesWithProgress(ctx, addresses, func(p discovery.ProbeProgress) bool {
+	devices := discovery.ProbeAddressesWithProgress(ctx, allAddresses, func(p discovery.ProbeProgress) bool {
 		msg := fmt.Sprintf("%d/%d addresses probed", p.Done, p.Total)
 		if p.Found && p.Device != nil {
 			msg = fmt.Sprintf("%d/%d - found %s (%s)", p.Done, p.Total, p.Device.Name, p.Device.Model)
@@ -130,7 +139,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Stop spinner with success summary
 	ios.StopProgressWithSuccess(fmt.Sprintf("%d/%d addresses probed, %d devices found",
-		len(addresses), len(addresses), len(devices)))
+		len(allAddresses), len(allAddresses), len(devices)))
 
 	if len(devices) == 0 {
 		ios.NoResults("devices", "Ensure devices are powered on and accessible on the network")
@@ -149,9 +158,9 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if opts.Register {
-		added, err := utils.RegisterDiscoveredDevices(devices, opts.SkipExisting)
-		if err != nil {
-			ios.Warning("Registration error: %v", err)
+		added, regErr := utils.RegisterDiscoveredDevices(devices, opts.SkipExisting)
+		if regErr != nil {
+			ios.Warning("Registration error: %v", regErr)
 		}
 		ios.Added("device", added)
 	}

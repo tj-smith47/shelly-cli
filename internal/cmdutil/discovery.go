@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/discovery"
@@ -23,10 +24,67 @@ const DefaultScanTimeout = 2 * time.Minute
 type DiscoveryOptions struct {
 	Factory      *Factory
 	Platform     string
+	Subnets      []string
 	Register     bool
 	SkipExisting bool
-	Subnet       string
+	AllNetworks  bool
 	Timeout      time.Duration
+}
+
+// ResolveSubnets determines which subnets to scan based on explicit flags
+// and auto-detection. When no subnets are specified explicitly:
+//   - Detects all local subnets via utils.DetectSubnets()
+//   - If allNetworks is true, non-TTY, or only one subnet found: returns all
+//   - Otherwise presents an interactive multi-select prompt
+func ResolveSubnets(ios *iostreams.IOStreams, explicit []string, allNetworks bool) ([]string, error) {
+	if len(explicit) > 0 {
+		for _, s := range explicit {
+			if _, _, err := net.ParseCIDR(s); err != nil {
+				return nil, fmt.Errorf("invalid subnet %q: %w", s, err)
+			}
+		}
+		return explicit, nil
+	}
+
+	subnets, err := utils.DetectSubnets()
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect subnets: %w", err)
+	}
+
+	// No prompt needed: single subnet, non-TTY, or --all-networks
+	if allNetworks || len(subnets) == 1 || !ios.IsStdinTTY() {
+		for _, s := range subnets {
+			ios.Info("Detected subnet: %s", s)
+		}
+		return subnets, nil
+	}
+
+	// Interactive multi-select (all pre-selected by default)
+	selected, selectErr := ios.MultiSelect("Select networks to scan:", subnets, subnets)
+	if selectErr != nil {
+		// Fallback to all detected subnets on prompt error (e.g., non-TTY piped input)
+		return subnets, nil //nolint:nilerr // intentional fallback to all subnets
+	}
+	if len(selected) == 0 {
+		return nil, fmt.Errorf("no subnets selected")
+	}
+	return selected, nil
+}
+
+// generateAddresses generates probe addresses for all given subnets.
+func generateAddresses(subnets []string) ([]string, error) {
+	var allAddresses []string
+	for _, subnet := range subnets {
+		if _, _, err := net.ParseCIDR(subnet); err != nil {
+			return nil, fmt.Errorf("invalid subnet %q: %w", subnet, err)
+		}
+		addrs := discovery.GenerateSubnetAddresses(subnet)
+		allAddresses = append(allAddresses, addrs...)
+	}
+	if len(allAddresses) == 0 {
+		return nil, fmt.Errorf("no addresses to scan in %s", strings.Join(subnets, ", "))
+	}
+	return allAddresses, nil
 }
 
 // RunPluginOnlyDiscovery runs discovery for a specific platform only.
@@ -49,28 +107,19 @@ func RunPluginOnlyDiscovery(ctx context.Context, opts *DiscoveryOptions) error {
 		return fmt.Errorf("no plugin found for platform %q (is shelly-%s installed?)", opts.Platform, opts.Platform)
 	}
 
-	// Get or detect subnet
-	subnet := opts.Subnet
-	if subnet == "" {
-		var detectErr error
-		subnet, detectErr = utils.DetectSubnet()
-		if detectErr != nil {
-			return fmt.Errorf("failed to detect subnet: %w", detectErr)
-		}
-		ios.Info("Detected subnet: %s", subnet)
+	// Resolve subnets
+	subnets, resolveErr := ResolveSubnets(ios, opts.Subnets, opts.AllNetworks)
+	if resolveErr != nil {
+		return resolveErr
 	}
 
-	_, ipNet, err := net.ParseCIDR(subnet)
-	if err != nil {
-		return fmt.Errorf("invalid subnet: %w", err)
+	addresses, addrErr := generateAddresses(subnets)
+	if addrErr != nil {
+		return addrErr
 	}
 
-	addresses := discovery.GenerateSubnetAddresses(subnet)
-	if len(addresses) == 0 {
-		return fmt.Errorf("no addresses to scan in subnet %s", subnet)
-	}
-
-	ios.Info("Scanning %d addresses for %s devices...", len(addresses), opts.Platform)
+	subnetLabel := strings.Join(subnets, ", ")
+	ios.Info("Scanning %d addresses for %s devices across %s...", len(addresses), opts.Platform, subnetLabel)
 
 	// Create MultiWriter for progress tracking
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
@@ -79,8 +128,8 @@ func RunPluginOnlyDiscovery(ctx context.Context, opts *DiscoveryOptions) error {
 	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
-	// Use shelly service layer for plugin discovery with progress callback
-	pluginDevices := shelly.RunPluginPlatformDiscoveryWithProgress(ctx, registry, opts.Platform, subnet, shelly.IsDeviceRegistered, func(p shelly.DiscoveryProgress) bool {
+	// Plugin discovery uses first subnet (plugins scan one subnet at a time)
+	pluginDevices := shelly.RunPluginPlatformDiscoveryWithProgress(ctx, registry, opts.Platform, subnets[0], shelly.IsDeviceRegistered, func(p shelly.DiscoveryProgress) bool {
 		if p.Found && p.Device != nil {
 			mw.UpdateLine("scan", iostreams.StatusRunning,
 				fmt.Sprintf("%d/%d - found %s (%s)", p.Done, p.Total, p.Device.Name, p.Device.Model))
@@ -98,7 +147,7 @@ func RunPluginOnlyDiscovery(ctx context.Context, opts *DiscoveryOptions) error {
 
 	if len(pluginDevices) == 0 {
 		ios.NoResults(opts.Platform+" devices",
-			fmt.Sprintf("Ensure %s devices are powered on and accessible in %s", opts.Platform, ipNet))
+			fmt.Sprintf("Ensure %s devices are powered on and accessible in %s", opts.Platform, subnetLabel))
 		return nil
 	}
 
@@ -116,7 +165,7 @@ func RunPluginOnlyDiscovery(ctx context.Context, opts *DiscoveryOptions) error {
 
 // RunPluginDetection runs plugin detection on addresses that Shelly detection may have missed.
 // Uses shelly.RunPluginDetection for the core logic.
-func RunPluginDetection(ctx context.Context, ios *iostreams.IOStreams, subnet string) []term.PluginDiscoveredDevice {
+func RunPluginDetection(ctx context.Context, ios *iostreams.IOStreams, subnets []string) []term.PluginDiscoveredDevice {
 	// Get plugin registry
 	registry, err := plugins.NewRegistry()
 	if err != nil {
@@ -135,10 +184,10 @@ func RunPluginDetection(ctx context.Context, ios *iostreams.IOStreams, subnet st
 		return nil // No detection-capable plugins installed
 	}
 
-	// Get addresses to probe for plugin detection
-	if subnet == "" {
+	// Auto-detect if no subnets provided
+	if len(subnets) == 0 {
 		var detectErr error
-		subnet, detectErr = utils.DetectSubnet()
+		subnets, detectErr = utils.DetectSubnets()
 		if detectErr != nil {
 			return nil
 		}
@@ -150,38 +199,25 @@ func RunPluginDetection(ctx context.Context, ios *iostreams.IOStreams, subnet st
 	pluginCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	pluginDevices := shelly.RunPluginDetection(pluginCtx, registry, subnet, shelly.IsDeviceRegistered)
+	// Plugin detection uses first subnet
+	pluginDevices := shelly.RunPluginDetection(pluginCtx, registry, subnets[0], shelly.IsDeviceRegistered)
 
 	return term.ConvertPluginDevices(pluginDevices)
 }
 
-// RunHTTPDiscovery performs HTTP subnet scanning discovery.
-func RunHTTPDiscovery(ctx context.Context, ios *iostreams.IOStreams, timeout time.Duration, subnet string) ([]discovery.DiscoveredDevice, error) {
+// RunHTTPDiscovery performs HTTP subnet scanning discovery across one or more subnets.
+func RunHTTPDiscovery(ctx context.Context, ios *iostreams.IOStreams, timeout time.Duration, subnets []string) ([]discovery.DiscoveredDevice, error) {
 	if timeout == 0 {
 		timeout = DefaultScanTimeout
 	}
 
-	if subnet == "" {
-		var err error
-		subnet, err = utils.DetectSubnet()
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect subnet: %w", err)
-		}
-		ios.Info("Detected subnet: %s", subnet)
-	}
-
-	_, ipNet, err := net.ParseCIDR(subnet)
+	addresses, err := generateAddresses(subnets)
 	if err != nil {
-		return nil, fmt.Errorf("invalid subnet: %w", err)
+		return nil, err
 	}
 
-	// Generate addresses to probe
-	addresses := discovery.GenerateSubnetAddresses(subnet)
-	if len(addresses) == 0 {
-		return nil, fmt.Errorf("no addresses to scan in subnet %s", subnet)
-	}
-
-	ios.Info("Scanning %d addresses in %s...", len(addresses), ipNet)
+	subnetLabel := strings.Join(subnets, ", ")
+	ios.Info("Scanning %d addresses in %s...", len(addresses), subnetLabel)
 
 	// Create MultiWriter for progress tracking
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())

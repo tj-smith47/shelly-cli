@@ -21,15 +21,18 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
+const methodHTTP = "http"
+
 // Options holds all discovery options.
 type Options struct {
 	Factory      *cmdutil.Factory
 	Method       string
 	Platform     string
+	Subnets      []string
 	Register     bool
 	SkipExisting bool
 	SkipPlugins  bool
-	Subnet       string
+	AllNetworks  bool
 	Timeout      time.Duration
 }
 
@@ -61,6 +64,12 @@ plugin detection, or --platform to filter by specific platform.`,
   # Specify subnet for HTTP scan
   shelly discover --subnet 192.168.1.0/24
 
+  # Scan multiple subnets
+  shelly discover --subnet 192.168.1.0/24 --subnet 10.0.0.0/24
+
+  # Scan all detected subnets without prompting
+  shelly discover --all-networks
+
   # Use mDNS instead of HTTP scan
   shelly discover --method mdns
 
@@ -84,8 +93,9 @@ plugin detection, or --platform to filter by specific platform.`,
 	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", cmdutil.DefaultScanTimeout, "Discovery timeout")
 	cmd.Flags().BoolVar(&opts.Register, "register", false, "Auto-register discovered devices")
 	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", true, "Skip devices already registered")
-	cmd.Flags().StringVar(&opts.Subnet, "subnet", "", "Subnet to scan (auto-detected if not specified)")
-	cmd.Flags().StringVarP(&opts.Method, "method", "m", "http", "Discovery method: http, mdns, ble, coiot")
+	cmd.Flags().StringArrayVar(&opts.Subnets, "subnet", nil, "Subnet(s) to scan (repeatable, auto-detected if not specified)")
+	cmd.Flags().BoolVar(&opts.AllNetworks, "all-networks", false, "Scan all detected subnets without prompting")
+	cmd.Flags().StringVarP(&opts.Method, "method", "m", methodHTTP, "Discovery method: http, mdns, ble, coiot")
 	cmd.Flags().BoolVar(&opts.SkipPlugins, "skip-plugins", false, "Skip plugin detection (Shelly-only discovery)")
 	cmd.Flags().StringVarP(&opts.Platform, "platform", "p", "", "Only discover devices of this platform (e.g., tasmota)")
 
@@ -117,17 +127,28 @@ func run(ctx context.Context, opts *Options) error {
 			Platform:     opts.Platform,
 			Register:     opts.Register,
 			SkipExisting: opts.SkipExisting,
-			Subnet:       opts.Subnet,
+			Subnets:      opts.Subnets,
+			AllNetworks:  opts.AllNetworks,
 			Timeout:      opts.Timeout,
 		})
+	}
+
+	// Resolve subnets for HTTP scanning
+	var subnets []string
+	if opts.Method == "" || opts.Method == methodHTTP || opts.Method == "scan" {
+		var resolveErr error
+		subnets, resolveErr = cmdutil.ResolveSubnets(ios, opts.Subnets, opts.AllNetworks)
+		if resolveErr != nil {
+			return resolveErr
+		}
 	}
 
 	var shellyDevices []discovery.DiscoveredDevice
 	var err error
 
 	switch opts.Method {
-	case "http", "scan", "":
-		shellyDevices, err = cmdutil.RunHTTPDiscovery(ctx, ios, opts.Timeout, opts.Subnet)
+	case methodHTTP, "scan", "":
+		shellyDevices, err = cmdutil.RunHTTPDiscovery(ctx, ios, opts.Timeout, subnets)
 	case "mdns":
 		shellyDevices, err = cmdutil.RunMDNSDiscovery(ctx, ios, opts.Timeout)
 	case "coiot":
@@ -144,8 +165,8 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Run plugin detection if not skipped
 	var pluginDevices []term.PluginDiscoveredDevice
-	if !opts.SkipPlugins && opts.Method == "http" {
-		pluginDevices = cmdutil.RunPluginDetection(ctx, ios, opts.Subnet)
+	if !opts.SkipPlugins && opts.Method == methodHTTP {
+		pluginDevices = cmdutil.RunPluginDetection(ctx, ios, subnets)
 	}
 
 	// Display results

@@ -23,7 +23,8 @@ type Options struct {
 	Discover        bool
 	DiscoverTimeout time.Duration
 	DiscoverModes   string
-	Network         string
+	Networks        []string
+	AllNetworks     bool
 
 	// Completion flags
 	Completions string
@@ -43,24 +44,14 @@ type Options struct {
 	Telemetry bool
 
 	// Control flags
-	Force bool
+	Defaults bool
+	Force    bool
 }
 
-// IsNonInteractive returns true if non-interactive mode should be used.
-func (o *Options) IsNonInteractive() bool {
-	return len(o.Devices) > 0 ||
-		len(o.DevicesJSON) > 0 ||
-		o.Theme != "" ||
-		o.OutputFormat != "" ||
-		o.APIMode != "" ||
-		o.NoColor ||
-		o.CloudEmail != "" ||
-		o.CloudPassword != "" ||
-		o.Completions != "" ||
-		o.Aliases ||
-		o.Discover ||
-		o.Telemetry ||
-		o.Force
+// UseDefaults returns true if prompts should be skipped and sensible defaults used.
+// Triggered by the --defaults flag only.
+func (o *Options) UseDefaults() bool {
+	return o.Defaults
 }
 
 // WantsCloudSetup returns true if cloud setup should be performed.

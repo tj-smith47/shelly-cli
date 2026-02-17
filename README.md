@@ -82,8 +82,11 @@ Available for:
 ## Quick Start
 
 ```bash
-# Initialize the CLI (first-time setup)
+# Interactive setup wizard (first-time setup)
 shelly init
+
+# Or quick setup with sensible defaults (no prompts)
+shelly init --defaults
 
 # Discover devices on your network
 shelly discover

@@ -56,7 +56,7 @@ func TestDiscoveryOptions_Fields(t *testing.T) {
 	opts := DiscoveryOptions{
 		Method:     DiscoveryHTTP,
 		Timeout:    15 * time.Second,
-		Subnet:     "192.168.1.0/24",
+		Subnets:    []string{"192.168.1.0/24"},
 		AutoDetect: true,
 	}
 
@@ -66,8 +66,8 @@ func TestDiscoveryOptions_Fields(t *testing.T) {
 	if opts.Timeout != 15*time.Second {
 		t.Errorf("expected Timeout 15s, got %v", opts.Timeout)
 	}
-	if opts.Subnet != "192.168.1.0/24" {
-		t.Errorf("expected Subnet '192.168.1.0/24', got %q", opts.Subnet)
+	if len(opts.Subnets) != 1 || opts.Subnets[0] != "192.168.1.0/24" {
+		t.Errorf("expected Subnets [192.168.1.0/24], got %v", opts.Subnets)
 	}
 	if !opts.AutoDetect {
 		t.Error("expected AutoDetect to be true")

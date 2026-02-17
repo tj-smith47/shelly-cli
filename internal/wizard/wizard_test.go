@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -41,7 +42,7 @@ func setupTestConfig(t *testing.T) {
 	}
 }
 
-func TestOptions_IsNonInteractive(t *testing.T) {
+func TestOptions_UseDefaults(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -55,73 +56,38 @@ func TestOptions_IsNonInteractive(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "devices set",
-			options: Options{Devices: []string{"device1"}},
+			name:    "defaults set",
+			options: Options{Defaults: true},
 			want:    true,
 		},
 		{
-			name:    "devicesJSON set",
-			options: Options{DevicesJSON: []string{`{"name":"dev"}`}},
-			want:    true,
-		},
-		{
-			name:    "theme set",
+			name:    "theme set without defaults",
 			options: Options{Theme: "dark"},
-			want:    true,
+			want:    false,
 		},
 		{
-			name:    "outputFormat set",
-			options: Options{OutputFormat: "json"},
-			want:    true,
-		},
-		{
-			name:    "apiMode set",
-			options: Options{APIMode: "rpc"},
-			want:    true,
-		},
-		{
-			name:    "noColor set",
-			options: Options{NoColor: true},
-			want:    true,
-		},
-		{
-			name:    "cloudEmail set",
-			options: Options{CloudEmail: "test@example.com"},
-			want:    true,
-		},
-		{
-			name:    "cloudPassword set",
-			options: Options{CloudPassword: "secret"},
-			want:    true,
-		},
-		{
-			name:    "completions set",
-			options: Options{Completions: "bash"},
-			want:    true,
-		},
-		{
-			name:    "aliases set",
-			options: Options{Aliases: true},
-			want:    true,
-		},
-		{
-			name:    "discover set",
+			name:    "discover set without defaults",
 			options: Options{Discover: true},
-			want:    true,
+			want:    false,
 		},
 		{
-			name:    "force set",
+			name:    "force set without defaults",
 			options: Options{Force: true},
-			want:    true,
+			want:    false,
+		},
+		{
+			name:    "devices set without defaults",
+			options: Options{Devices: []string{"device1"}},
+			want:    false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := tt.options.IsNonInteractive()
+			got := tt.options.UseDefaults()
 			if got != tt.want {
-				t.Errorf("IsNonInteractive() = %v, want %v", got, tt.want)
+				t.Errorf("UseDefaults() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -201,7 +167,7 @@ func TestOptionsFields(t *testing.T) {
 		Discover:        true,
 		DiscoverTimeout: 5e9,
 		DiscoverModes:   "mdns,broadcast",
-		Network:         "192.168.1.0/24",
+		Networks:        []string{"192.168.1.0/24"},
 		Completions:     "zsh",
 		Aliases:         true,
 		Theme:           "dracula",
@@ -222,8 +188,8 @@ func TestOptionsFields(t *testing.T) {
 	if opts.DiscoverModes != "mdns,broadcast" {
 		t.Errorf("DiscoverModes = %q", opts.DiscoverModes)
 	}
-	if opts.Network != "192.168.1.0/24" {
-		t.Errorf("Network = %q", opts.Network)
+	if len(opts.Networks) != 1 || opts.Networks[0] != "192.168.1.0/24" {
+		t.Errorf("Networks = %v", opts.Networks)
 	}
 	if opts.Completions != "zsh" {
 		t.Errorf("Completions = %q", opts.Completions)
@@ -761,7 +727,7 @@ func TestOptions_AllFieldsSet(t *testing.T) {
 		Discover:        true,
 		DiscoverTimeout: 20 * time.Second,
 		DiscoverModes:   "http,mdns,coiot,ble",
-		Network:         "10.0.0.0/8",
+		Networks:        []string{"10.0.0.0/8"},
 		Completions:     "bash,zsh,fish",
 		Aliases:         true,
 		Theme:           "nord",
@@ -789,8 +755,8 @@ func TestOptions_AllFieldsSet(t *testing.T) {
 	if opts.DiscoverModes != "http,mdns,coiot,ble" {
 		t.Errorf("DiscoverModes = %q", opts.DiscoverModes)
 	}
-	if opts.Network != "10.0.0.0/8" {
-		t.Errorf("Network = %q", opts.Network)
+	if len(opts.Networks) != 1 || opts.Networks[0] != "10.0.0.0/8" {
+		t.Errorf("Networks = %v", opts.Networks)
 	}
 	if opts.Completions != "bash,zsh,fish" {
 		t.Errorf("Completions = %q", opts.Completions)
@@ -862,7 +828,7 @@ func TestRunDiscoveryMethod_UnknownMethod(t *testing.T) {
 
 	// Test unknown method returns error
 	ctx := context.Background()
-	_, err := runDiscoveryMethod(ctx, ios, "unknown-method", 5e9, "")
+	_, err := runDiscoveryMethod(ctx, ios, "unknown-method", 5e9, nil)
 	if err == nil {
 		t.Error("runDiscoveryMethod with unknown method should return error")
 	}
@@ -1250,7 +1216,7 @@ func TestRunDiscoveryMethod(t *testing.T) {
 			t.Parallel()
 			ios, _, _ := testIOStreams()
 			ctx := context.Background()
-			_, err := runDiscoveryMethod(ctx, ios, tt.method, 5*time.Second, "")
+			_, err := runDiscoveryMethod(ctx, ios, tt.method, 5*time.Second, nil)
 			if err == nil {
 				t.Error("expected error, got nil")
 				return
@@ -1312,8 +1278,8 @@ func TestSelectDiscoveryMethods_MoreCases(t *testing.T) {
 			want: []string{"ble"},
 		},
 		{
-			name: "non-interactive with force defaults to all",
-			opts: &Options{Force: true, DiscoverModes: ""},
+			name: "defaults mode defaults to all methods",
+			opts: &Options{Defaults: true, DiscoverModes: ""},
 			want: []string{"http", "mdns", "coiot"},
 		},
 	}
@@ -1508,9 +1474,9 @@ func TestOptions_ZeroValue(t *testing.T) {
 
 	var opts Options
 
-	// Zero value should be interactive
-	if opts.IsNonInteractive() {
-		t.Error("zero value Options should be interactive")
+	// Zero value should not use defaults
+	if opts.UseDefaults() {
+		t.Error("zero value Options should not use defaults")
 	}
 
 	// Zero value should not want cloud setup
@@ -1534,8 +1500,8 @@ func TestOptions_ZeroValue(t *testing.T) {
 	if opts.DiscoverModes != "" {
 		t.Error("DiscoverModes should be empty")
 	}
-	if opts.Network != "" {
-		t.Error("Network should be empty")
+	if len(opts.Networks) != 0 {
+		t.Error("Networks should be empty")
 	}
 	if opts.Completions != "" {
 		t.Error("Completions should be empty")
@@ -1567,7 +1533,7 @@ func TestOptions_ZeroValue(t *testing.T) {
 }
 
 // TestOptions_NonInteractiveVariations tests various non-interactive flag combinations.
-func TestOptions_NonInteractiveVariations(t *testing.T) {
+func TestOptions_UseDefaultsVariations(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -1576,61 +1542,42 @@ func TestOptions_NonInteractiveVariations(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "discover only",
-			opts: Options{Discover: true},
+			name: "defaults only",
+			opts: Options{Defaults: true},
 			want: true,
 		},
 		{
-			name: "aliases only",
-			opts: Options{Aliases: true},
+			name: "defaults with theme override",
+			opts: Options{Defaults: true, Theme: "nord"},
 			want: true,
 		},
 		{
-			name: "completions only",
-			opts: Options{Completions: "bash"},
+			name: "defaults with force",
+			opts: Options{Defaults: true, Force: true},
 			want: true,
 		},
 		{
-			name: "nocolor only",
-			opts: Options{NoColor: true},
-			want: true,
-		},
-		{
-			name: "multiple devices",
-			opts: Options{Devices: []string{"dev1", "dev2", "dev3"}},
-			want: true,
-		},
-		{
-			name: "multiple devicesJSON",
-			opts: Options{DevicesJSON: []string{`{"a":"b"}`, `{"c":"d"}`}},
-			want: true,
-		},
-		{
-			name: "all flags set",
+			name: "flags without defaults are interactive",
 			opts: Options{
 				Devices:       []string{"dev"},
-				DevicesJSON:   []string{"{}"},
 				Discover:      true,
 				Completions:   "zsh",
-				Aliases:       true,
 				Theme:         "nord",
 				OutputFormat:  "yaml",
-				NoColor:       true,
-				APIMode:       "local",
 				CloudEmail:    "a@b.com",
 				CloudPassword: "pass",
 				Force:         true,
 			},
-			want: true,
+			want: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := tt.opts.IsNonInteractive()
+			got := tt.opts.UseDefaults()
 			if got != tt.want {
-				t.Errorf("IsNonInteractive() = %v, want %v", got, tt.want)
+				t.Errorf("UseDefaults() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1918,7 +1865,7 @@ func TestRunDiscoveryMethod_ValidMethods(t *testing.T) {
 			ios, _, _ := testIOStreams()
 			ctx := context.Background()
 			// Use a very short timeout since we expect these to fail
-			_, err := runDiscoveryMethod(ctx, ios, method, 1*time.Millisecond, "")
+			_, err := runDiscoveryMethod(ctx, ios, method, 1*time.Millisecond, nil)
 			// We don't care about the error, just that the method was dispatched
 			// The error will be about network failure, not "unknown method"
 			if err != nil && strings.Contains(err.Error(), "unknown method") {
@@ -2099,7 +2046,7 @@ func TestOptionsFields_Comprehensive(t *testing.T) {
 				Discover:        true,
 				DiscoverTimeout: 30 * time.Second,
 				DiscoverModes:   "http,mdns",
-				Network:         "10.0.0.0/8",
+				Networks:        []string{"10.0.0.0/8"},
 			},
 		},
 		{
@@ -2137,18 +2084,12 @@ func TestOptionsFields_Comprehensive(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Verify IsNonInteractive returns expected value
-			if len(tt.opts.Devices) > 0 && !tt.opts.IsNonInteractive() {
-				t.Error("with Devices set, should be non-interactive")
+			// Verify UseDefaults returns expected value
+			if tt.opts.Defaults && !tt.opts.UseDefaults() {
+				t.Error("with Defaults set, UseDefaults should be true")
 			}
-			if len(tt.opts.DevicesJSON) > 0 && !tt.opts.IsNonInteractive() {
-				t.Error("with DevicesJSON set, should be non-interactive")
-			}
-			if tt.opts.Theme != "" && !tt.opts.IsNonInteractive() {
-				t.Error("with Theme set, should be non-interactive")
-			}
-			if tt.opts.Force && !tt.opts.IsNonInteractive() {
-				t.Error("with Force set, should be non-interactive")
+			if !tt.opts.Defaults && tt.opts.UseDefaults() {
+				t.Error("without Defaults set, UseDefaults should be false")
 			}
 
 			// Verify WantsCloudSetup returns expected value
@@ -2489,45 +2430,51 @@ func TestRunCheck_NoConfig(t *testing.T) {
 	}
 }
 
-// TestRunDiscoveryStepIfNeeded_NonInteractive tests runDiscoveryStepIfNeeded behavior.
-func TestRunDiscoveryStepIfNeeded_NonInteractive(t *testing.T) {
+// TestDiscoveryStepDefaults tests discovery step behavior with defaults mode.
+func TestDiscoveryStepDefaults(t *testing.T) {
 	t.Parallel()
 
-	ios, _, _ := testIOStreams()
-
 	tests := []struct {
-		name     string
-		opts     *Options
-		wantNil  bool
-		wantSkip bool
+		name         string
+		opts         *Options
+		wantDefault  bool
+		wantDiscover bool
 	}{
 		{
-			name:     "non-interactive without discover flag skips",
-			opts:     &Options{Theme: "dracula", Discover: false},
-			wantNil:  true,
-			wantSkip: true,
+			name:         "defaults mode runs discovery automatically",
+			opts:         &Options{Defaults: true},
+			wantDefault:  true,
+			wantDiscover: false,
 		},
 		{
-			name:     "non-interactive with discover flag continues",
-			opts:     &Options{Theme: "dracula", Discover: true},
-			wantNil:  false, // Will run discovery (and likely fail but that's ok)
-			wantSkip: false,
+			name:         "discover flag runs discovery without prompting",
+			opts:         &Options{Discover: true},
+			wantDefault:  false,
+			wantDiscover: true,
+		},
+		{
+			name:         "defaults with discover flag uses discover",
+			opts:         &Options{Defaults: true, Discover: true},
+			wantDefault:  true,
+			wantDiscover: true,
+		},
+		{
+			name:         "theme flag alone does not trigger defaults",
+			opts:         &Options{Theme: "dracula"},
+			wantDefault:  false,
+			wantDiscover: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if tt.wantSkip {
-				// Just verify the logic path
-				if !tt.opts.IsNonInteractive() {
-					t.Error("expected non-interactive mode")
-				}
-				if tt.opts.Discover {
-					t.Error("expected discover to be false for skip case")
-				}
+			if got := tt.opts.UseDefaults(); got != tt.wantDefault {
+				t.Errorf("UseDefaults() = %v, want %v", got, tt.wantDefault)
 			}
-			_ = ios
+			if got := tt.opts.Discover; got != tt.wantDiscover {
+				t.Errorf("Discover = %v, want %v", got, tt.wantDiscover)
+			}
 		})
 	}
 }
@@ -2621,19 +2568,18 @@ func TestRunFlagDevicesStep(t *testing.T) {
 	}
 }
 
-// TestRunDiscoveryStepIfNeeded tests runDiscoveryStepIfNeeded.
-func TestRunDiscoveryStepIfNeeded(t *testing.T) {
+// TestRunDiscoveryStep_DefaultsMode tests runDiscoveryStep in defaults mode.
+func TestRunDiscoveryStep_DefaultsMode(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _ := testIOStreams()
 	ctx := context.Background()
 
-	// Non-interactive without discover flag should return nil immediately
-	opts := &Options{Theme: "dracula", Discover: false}
-	devices := runDiscoveryStepIfNeeded(ctx, ios, opts)
-	if devices != nil {
-		t.Error("expected nil devices when discovery is skipped")
-	}
+	// Defaults mode runs discovery automatically (HTTP mode)
+	opts := &Options{Defaults: true}
+	devices := runDiscoveryStep(ctx, ios, opts)
+	// Discovery will fail in test (no network) but should not panic
+	_ = devices
 }
 
 // TestRunRegistrationStep tests runRegistrationStep.
@@ -2655,14 +2601,15 @@ func TestRunCompletionsStep(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _ := testIOStreams()
+	rootCmd := &cobra.Command{Use: "shelly"}
 
-	// Non-interactive without completions flag - does nothing
-	opts := &Options{Theme: "dracula", Completions: ""}
-	runCompletionsStep(ios, nil, opts)
+	// Defaults mode - auto-detects shell and installs
+	opts := &Options{Defaults: true}
+	runCompletionsStep(ios, rootCmd, opts)
 
-	// Non-interactive with invalid shell - should warn but not panic
-	opts = &Options{Theme: "dracula", Completions: "invalid-shell"}
-	runCompletionsStep(ios, nil, opts)
+	// Explicit with invalid shell - should warn but not panic
+	opts = &Options{Completions: "invalid-shell"}
+	runCompletionsStep(ios, rootCmd, opts)
 }
 
 // TestRunCloudStep tests runCloudStep.
@@ -2692,8 +2639,8 @@ func TestRunDiscoveryStep(t *testing.T) {
 	opts := &Options{
 		Discover:        true,
 		DiscoverModes:   "http",
-		DiscoverTimeout: 1 * time.Millisecond, // Very short timeout
-		Network:         "10.255.255.0/30",    // Unlikely to have devices
+		DiscoverTimeout: 1 * time.Millisecond,        // Very short timeout
+		Networks:        []string{"10.255.255.0/30"}, // Unlikely to have devices
 	}
 	devices := runDiscoveryStep(ctx, ios, opts)
 	// May or may not find devices, but shouldn't panic
@@ -2810,7 +2757,7 @@ func TestStepCloudNonInteractive_IncompleteCredentials(t *testing.T) {
 	}
 }
 
-// TestStepCompletionsNonInteractive tests stepCompletionsNonInteractive.
+// TestStepCompletionsNonInteractive tests stepCompletionsExplicit.
 func TestStepCompletionsNonInteractive(t *testing.T) {
 	t.Parallel()
 
@@ -2843,9 +2790,9 @@ func TestStepCompletionsNonInteractive(t *testing.T) {
 			t.Parallel()
 			ios, _, _ := testIOStreams() // Create new buffer per subtest to avoid race
 			// Pass nil for rootCmd - invalid shells are skipped before trying to use it
-			err := stepCompletionsNonInteractive(ios, nil, tt.opts)
+			err := stepCompletionsExplicit(ios, nil, tt.opts)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("stepCompletionsNonInteractive() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("stepCompletionsExplicit() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -2864,9 +2811,10 @@ func TestRunSetupSteps_Components(t *testing.T) {
 	opts := &Options{Devices: []string{"testdev=127.0.0.1"}}
 	runFlagDevicesStep(ios, opts)
 
-	// Test runCompletionsStep with non-interactive no completions
-	opts = &Options{Theme: "dracula"}
-	runCompletionsStep(ios, nil, opts)
+	// Test runCompletionsStep with explicit completions flag
+	opts = &Options{Completions: "bash"}
+	rootCmd := &cobra.Command{Use: "shelly"}
+	runCompletionsStep(ios, rootCmd, opts)
 }
 
 // TestRunCheck_AllPaths tests RunCheck covers all output paths.
@@ -2909,7 +2857,7 @@ func TestStepDiscovery_NonInteractive(t *testing.T) {
 		Discover:        true,
 		DiscoverModes:   "http",
 		DiscoverTimeout: 1 * time.Millisecond,
-		Network:         "10.255.255.0/30", // Very small subnet unlikely to have devices
+		Networks:        []string{"10.255.255.0/30"}, // Very small subnet unlikely to have devices
 	}
 
 	devices, err := stepDiscovery(ctx, ios, opts)
@@ -2920,19 +2868,20 @@ func TestStepDiscovery_NonInteractive(t *testing.T) {
 	t.Logf("discovered %d devices", len(devices))
 }
 
-// TestRunCompletionsStep_NonInteractive tests runCompletionsStep paths.
-func TestRunCompletionsStep_NonInteractive(t *testing.T) {
+// TestRunCompletionsStep_Defaults tests runCompletionsStep in defaults mode.
+func TestRunCompletionsStep_Defaults(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _ := testIOStreams()
+	rootCmd := &cobra.Command{Use: "shelly"}
 
-	// Test non-interactive with no completions
-	opts := &Options{Force: true} // Non-interactive
-	runCompletionsStep(ios, nil, opts)
+	// Test defaults mode - auto-detects shell
+	opts := &Options{Defaults: true}
+	runCompletionsStep(ios, rootCmd, opts)
 
-	// Test non-interactive with completions set (but empty)
-	opts = &Options{Force: true, Completions: ""}
-	runCompletionsStep(ios, nil, opts)
+	// Test defaults with explicit completions flag
+	opts = &Options{Defaults: true, Completions: "bash"}
+	runCompletionsStep(ios, rootCmd, opts)
 }
 
 // TestRunCloudStep_NonInteractive tests runCloudStep with various options.
@@ -3146,15 +3095,16 @@ func TestStepDiscovery_NoMethods(t *testing.T) {
 	t.Logf("discovered %d devices", len(devices))
 }
 
-// TestRunDiscoveryStepIfNeeded_Interactive tests interactive path.
-func TestRunDiscoveryStepIfNeeded_Interactive(t *testing.T) {
+// TestRunDiscoveryStep_DiscoverFlag tests runDiscoveryStep with --discover flag.
+func TestRunDiscoveryStep_DiscoverFlag(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _ := testIOStreams()
 	ctx := context.Background()
 
-	// Interactive mode - will attempt discovery
-	opts := &Options{} // Not non-interactive
-	devices := runDiscoveryStepIfNeeded(ctx, ios, opts)
+	// Discover flag runs discovery without prompting
+	opts := &Options{Discover: true}
+	devices := runDiscoveryStep(ctx, ios, opts)
+	// Discovery will fail in test (no network) but should not panic
 	_ = devices
 }

@@ -8,24 +8,27 @@ import (
 )
 
 // shellyAPSubnet is the subnet used by Shelly devices in AP mode.
-// DetectSubnet skips this to avoid picking up stale static IPs
+// DetectSubnets skips this to avoid picking up stale static IPs
 // left after WiFi provisioning via nl80211.
 const shellyAPSubnet = "192.168.33."
 
-// DetectSubnet attempts to detect the local network subnet.
-// It returns a CIDR notation string like "192.168.1.0/24".
-//
-// It iterates all network interfaces and picks the best candidate:
+// DetectSubnets returns all local network subnets in CIDR notation.
+// It iterates all network interfaces and collects valid candidates:
 //   - Skips loopback, link-local, and Shelly AP (192.168.33.0/24) addresses
-//   - Prefers interfaces that are up and not virtual (docker, veth, br-, etc.)
-//   - Falls back to any non-loopback IPv4 address if no ideal match is found
-func DetectSubnet() (string, error) {
+//   - Skips virtual/container interfaces (docker, veth, br-, etc.)
+//   - Skips down interfaces
+//   - Deduplicates subnets (same interface may have multiple addresses in one subnet)
+//
+// Returns an error only if no suitable interface is found at all.
+func DetectSubnets() ([]string, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var fallback string
+	seen := make(map[string]bool)
+	var subnets []string
+	var fallbacks []string
 
 	for _, iface := range ifaces {
 		// Skip down interfaces.
@@ -63,24 +66,41 @@ func DetectSubnet() (string, error) {
 			ones, _ := ipNet.Mask.Size()
 			cidr := fmt.Sprintf("%s/%d", network, ones)
 
-			// Skip Shelly AP subnet.
+			if seen[cidr] {
+				continue
+			}
+			seen[cidr] = true
+
+			// Shelly AP subnet goes to fallback list.
 			if strings.HasPrefix(ipNet.IP.String(), shellyAPSubnet) {
-				if fallback == "" {
-					fallback = cidr
-				}
+				fallbacks = append(fallbacks, cidr)
 				continue
 			}
 
-			return cidr, nil
+			subnets = append(subnets, cidr)
 		}
 	}
 
-	// If all non-loopback addresses were Shelly AP, return that as last resort.
-	if fallback != "" {
-		return fallback, nil
+	if len(subnets) > 0 {
+		return subnets, nil
 	}
 
-	return "", fmt.Errorf("no suitable network interface found")
+	// If all non-loopback addresses were Shelly AP, return those as last resort.
+	if len(fallbacks) > 0 {
+		return fallbacks, nil
+	}
+
+	return nil, fmt.Errorf("no suitable network interface found")
+}
+
+// DetectSubnet returns the first detected local network subnet.
+// Use DetectSubnets to get all subnets when scanning for devices.
+func DetectSubnet() (string, error) {
+	subnets, err := DetectSubnets()
+	if err != nil {
+		return "", err
+	}
+	return subnets[0], nil
 }
 
 // isVirtualInterface returns true for known virtual interface name prefixes.

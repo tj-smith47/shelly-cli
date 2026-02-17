@@ -38,7 +38,7 @@ func CheckAndConfirmConfig(ios *iostreams.IOStreams, opts *Options) (bool, error
 		return true, nil
 	}
 
-	if opts.IsNonInteractive() {
+	if opts.UseDefaults() {
 		ios.Warning("Configuration already exists at %s", configPath)
 		ios.Info("Use --force to overwrite")
 		return false, nil

@@ -6,7 +6,10 @@ Discover devices via HTTP subnet scanning
 
 Discover Shelly devices by probing HTTP endpoints on a subnet.
 
-If no subnet is provided, attempts to detect the local network.
+If no subnet is provided, attempts to detect the local network(s).
+When multiple subnets are detected, an interactive prompt lets you
+choose which to scan. Use --all-networks to scan all without prompting.
+
 This method is slower than mDNS or CoIoT but works when multicast
 is blocked or devices are on different VLANs.
 
@@ -21,7 +24,7 @@ Output is formatted as a table showing: ID, Address, Model, Generation,
 Protocol, and Auth status.
 
 ```
-shelly discover http [subnet] [flags]
+shelly discover http [subnet...] [flags]
 ```
 
 ### Examples
@@ -32,6 +35,15 @@ shelly discover http [subnet] [flags]
 
   # Scan specific subnet
   shelly discover http 192.168.1.0/24
+
+  # Scan multiple subnets
+  shelly discover http 192.168.1.0/24 10.0.0.0/24
+
+  # Scan all detected subnets without prompting
+  shelly discover http --all-networks
+
+  # Use --network flag (repeatable)
+  shelly discover http --network 192.168.1.0/24 --network 10.0.0.0/24
 
   # Scan a /16 network (large, use longer timeout)
   shelly discover http 10.0.0.0/16 --timeout 30m
@@ -52,10 +64,12 @@ shelly discover http [subnet] [flags]
 ### Options
 
 ```
-  -h, --help               help for http
-      --register           Automatically register discovered devices
-      --skip-existing      Skip devices already registered (default true)
-  -t, --timeout duration   Scan timeout (default 2m0s)
+      --all-networks          Scan all detected subnets without prompting
+  -h, --help                  help for http
+      --network stringArray   Subnet(s) to scan (repeatable, auto-detected if not specified)
+      --register              Automatically register discovered devices
+      --skip-existing         Skip devices already registered (default true)
+  -t, --timeout duration      Scan timeout (default 2m0s)
 ```
 
 ### Options inherited from parent commands

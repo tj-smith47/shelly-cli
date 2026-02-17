@@ -23,7 +23,14 @@ import (
 
 const (
 	defaultTheme = "dracula"
-	totalSteps   = 5
+	totalSteps   = 6
+)
+
+// Registration mode constants for the 3-way registration choice.
+const (
+	regDefaultNames = "Yes, with default names"
+	regCustomNames  = "Yes, let me name each one"
+	regSkip         = "No, skip registration"
 )
 
 func runSetupSteps(ctx context.Context, f *cmdutil.Factory, rootCmd *cobra.Command, opts *Options) error {
@@ -34,7 +41,7 @@ func runSetupSteps(ctx context.Context, f *cmdutil.Factory, rootCmd *cobra.Comma
 	}
 
 	runFlagDevicesStep(ios, opts)
-	discoveredDevices := runDiscoveryStepIfNeeded(ctx, ios, opts)
+	discoveredDevices := runDiscoveryStep(ctx, ios, opts)
 	runRegistrationStep(f, opts, discoveredDevices)
 	runCompletionsStep(ios, rootCmd, opts)
 	runCloudStep(ctx, ios, opts)
@@ -52,13 +59,6 @@ func runFlagDevicesStep(ios *iostreams.IOStreams, opts *Options) {
 	}
 }
 
-func runDiscoveryStepIfNeeded(ctx context.Context, ios *iostreams.IOStreams, opts *Options) []discovery.DiscoveredDevice {
-	if opts.IsNonInteractive() && !opts.Discover {
-		return nil
-	}
-	return runDiscoveryStep(ctx, ios, opts)
-}
-
 func runRegistrationStep(f *cmdutil.Factory, opts *Options, devices []discovery.DiscoveredDevice) {
 	if len(devices) > 0 {
 		if err := stepRegistration(f, opts, devices); err != nil {
@@ -69,11 +69,12 @@ func runRegistrationStep(f *cmdutil.Factory, opts *Options, devices []discovery.
 
 func runCompletionsStep(ios *iostreams.IOStreams, rootCmd *cobra.Command, opts *Options) {
 	var err error
-	if opts.IsNonInteractive() {
-		if opts.Completions != "" {
-			err = stepCompletionsNonInteractive(ios, rootCmd, opts)
-		}
-	} else {
+	switch {
+	case opts.UseDefaults():
+		err = stepCompletionsDefaults(ios, rootCmd)
+	case opts.Completions != "":
+		err = stepCompletionsExplicit(ios, rootCmd, opts)
+	default:
 		err = stepCompletions(ios, rootCmd)
 	}
 	if err != nil {
@@ -83,11 +84,16 @@ func runCompletionsStep(ios *iostreams.IOStreams, rootCmd *cobra.Command, opts *
 }
 
 func runCloudStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) {
+	if opts.UseDefaults() && !opts.WantsCloudSetup() {
+		printStepHeader(ios, 5, "Cloud Access (Optional)")
+		ios.Info("Skipping cloud setup (use --cloud-email/--cloud-password to configure)")
+		ios.Println("")
+		return
+	}
+
 	var err error
-	if opts.IsNonInteractive() {
-		if opts.WantsCloudSetup() {
-			err = stepCloudNonInteractive(ctx, ios, opts)
-		}
+	if opts.WantsCloudSetup() {
+		err = stepCloudNonInteractive(ctx, ios, opts)
 	} else {
 		err = stepCloud(ctx, ios)
 	}
@@ -101,11 +107,16 @@ func runCloudStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) 
 }
 
 func runTelemetryStep(ios *iostreams.IOStreams, opts *Options) {
+	if opts.UseDefaults() && !opts.Telemetry {
+		printStepHeader(ios, 6, "Anonymous Usage Statistics (Optional)")
+		ios.Info("Telemetry disabled (use --telemetry to enable)")
+		ios.Println("")
+		return
+	}
+
 	var err error
-	if opts.IsNonInteractive() {
-		if opts.Telemetry {
-			err = stepTelemetryNonInteractive(ios)
-		}
+	if opts.Telemetry {
+		err = stepTelemetryNonInteractive(ios)
 	} else {
 		err = stepTelemetry(ios)
 	}
@@ -122,6 +133,13 @@ func runDiscoveryStep(ctx context.Context, ios *iostreams.IOStreams, opts *Optio
 		return nil
 	}
 	return devices
+}
+
+// printStepHeader prints a consistent step header.
+func printStepHeader(ios *iostreams.IOStreams, step int, title string) {
+	ios.Println(theme.Bold().Render(fmt.Sprintf("Step %d/%d: %s", step, totalSteps, title)))
+	ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
+	ios.Println("")
 }
 
 func stepFlagDevices(ios *iostreams.IOStreams, opts *Options) error {
@@ -149,13 +167,7 @@ func stepFlagDevices(ios *iostreams.IOStreams, opts *Options) error {
 }
 
 func stepConfiguration(ios *iostreams.IOStreams, opts *Options) error {
-	nonInteractive := opts.IsNonInteractive()
-
-	if !nonInteractive {
-		ios.Println(theme.Bold().Render(fmt.Sprintf("Step 1/%d: Configuration", totalSteps)))
-		ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
-		ios.Println("")
-	}
+	printStepHeader(ios, 1, "Configuration")
 
 	outputFormat, err := selectOutputFormat(ios, opts)
 	if err != nil {
@@ -184,7 +196,7 @@ func stepConfiguration(ios *iostreams.IOStreams, opts *Options) error {
 	if cfg.Aliases == nil {
 		cfg.Aliases = make(map[string]config.Alias)
 	}
-	if !nonInteractive || opts.Aliases {
+	if !opts.UseDefaults() || opts.Aliases {
 		for name, alias := range config.DefaultAliases {
 			cfg.Aliases[name] = alias
 		}
@@ -213,13 +225,10 @@ func stepConfiguration(ios *iostreams.IOStreams, opts *Options) error {
 }
 
 func stepDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts *Options) ([]discovery.DiscoveredDevice, error) {
-	nonInteractive := opts.IsNonInteractive()
+	printStepHeader(ios, 2, "Device Discovery")
 
-	if !nonInteractive {
-		ios.Println(theme.Bold().Render(fmt.Sprintf("Step 2/%d: Device Discovery", totalSteps)))
-		ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
-		ios.Println("")
-
+	// In interactive mode (no --defaults, no --discover), ask the user
+	if !opts.UseDefaults() && !opts.Discover {
 		proceed, err := ios.Confirm("Discover devices on your network?", true)
 		if err != nil {
 			return nil, err
@@ -245,12 +254,25 @@ func stepDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts *Options)
 		timeout = defaultDiscoveryTimeout
 	}
 
+	// Resolve subnets for HTTP scanning (only needed if HTTP is selected)
+	var subnets []string
+	for _, m := range methods {
+		if m == methodHTTP {
+			var resolveErr error
+			subnets, resolveErr = cmdutil.ResolveSubnets(ios, opts.Networks, opts.AllNetworks)
+			if resolveErr != nil {
+				ios.Warning("Subnet detection failed: %v", resolveErr)
+			}
+			break
+		}
+	}
+
 	// Run discovery for each method and combine results
 	var allDevices []discovery.DiscoveredDevice
 	seenAddresses := make(map[string]bool)
 
 	for _, method := range methods {
-		devices, err := runDiscoveryMethod(ctx, ios, method, timeout, opts.Network)
+		devices, err := runDiscoveryMethod(ctx, ios, method, timeout, subnets)
 		if err != nil {
 			ios.Warning("%s discovery failed: %v", method, err)
 			continue
@@ -287,25 +309,56 @@ func stepDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts *Options)
 
 func stepRegistration(f *cmdutil.Factory, opts *Options, devices []discovery.DiscoveredDevice) error {
 	ios := f.IOStreams()
-	nonInteractive := opts.IsNonInteractive()
 
-	if !nonInteractive {
-		proceed, err := ios.Confirm("Register these devices with friendly names?", true)
+	printStepHeader(ios, 3, "Device Registration")
+
+	// Determine registration mode
+	var mode string
+	if opts.UseDefaults() {
+		mode = regDefaultNames
+	} else {
+		selected, err := ios.Select("Register discovered devices?", []string{
+			regDefaultNames,
+			regCustomNames,
+			regSkip,
+		}, 0)
 		if err != nil {
 			return err
 		}
-		if !proceed {
-			ios.Info("Skipping device registration")
-			ios.Info("You can register devices later with: shelly device add <name> <address>")
-			ios.Println("")
-			return nil
-		}
+		mode = selected
+	}
+
+	if mode == regSkip {
+		ios.Info("Skipping device registration")
+		ios.Info("You can register devices later with: shelly device add <name> <address>")
+		ios.Println("")
+		return nil
 	}
 
 	ios.Println("")
 
-	registered := 0
-	skipped := 0
+	registered, skipped, err := registerDevices(f, ios, mode, devices)
+	if err != nil {
+		return err
+	}
+
+	ios.Println("")
+	switch {
+	case registered > 0:
+		ios.Success("Registered %d device(s)", registered)
+		if skipped > 0 {
+			ios.Info("Skipped %d already registered device(s)", skipped)
+		}
+	case skipped > 0:
+		ios.Info("Skipped %d already registered device(s)", skipped)
+	default:
+		ios.Info("No devices registered")
+	}
+	ios.Println("")
+	return nil
+}
+
+func registerDevices(f *cmdutil.Factory, ios *iostreams.IOStreams, mode string, devices []discovery.DiscoveredDevice) (registered, skipped int, err error) {
 	for _, d := range devices {
 		defaultName := SanitizeDeviceName(d.ID)
 		if d.Name != "" {
@@ -313,14 +366,14 @@ func stepRegistration(f *cmdutil.Factory, opts *Options, devices []discovery.Dis
 		}
 
 		var name string
-		if nonInteractive {
+		switch mode {
+		case regDefaultNames:
 			name = defaultName
-		} else {
+		case regCustomNames:
 			promptMsg := fmt.Sprintf("Name for %s (%s):", d.ID, d.Address)
-			var err error
 			name, err = ios.Input(promptMsg, defaultName)
 			if err != nil {
-				return err
+				return registered, skipped, err
 			}
 		}
 
@@ -334,32 +387,18 @@ func stepRegistration(f *cmdutil.Factory, opts *Options, devices []discovery.Dis
 		}
 
 		// Type is the raw model code, Model is the human-readable name
-		err := config.RegisterDevice(name, d.Address.String(), int(d.Generation), d.Model, types.ModelDisplayName(d.Model), nil)
-		if err != nil {
-			ios.Warning("Failed to register %q: %v", name, err)
+		regErr := config.RegisterDevice(name, d.Address.String(), int(d.Generation), d.Model, types.ModelDisplayName(d.Model), nil)
+		if regErr != nil {
+			ios.Warning("Failed to register %q: %v", name, regErr)
 			continue
 		}
 		registered++
 	}
-
-	ios.Println("")
-	if registered > 0 {
-		ios.Success("Registered %d device(s)", registered)
-	}
-	if skipped > 0 {
-		ios.Info("Skipped %d already registered device(s)", skipped)
-	}
-	if registered == 0 && skipped == 0 {
-		ios.Info("No devices registered")
-	}
-	ios.Println("")
-	return nil
+	return registered, skipped, nil
 }
 
 func stepCompletions(ios *iostreams.IOStreams, rootCmd *cobra.Command) error {
-	ios.Println(theme.Bold().Render(fmt.Sprintf("Step 3/%d: Shell Completions", totalSteps)))
-	ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
-	ios.Println("")
+	printStepHeader(ios, 4, "Shell Completions")
 
 	shell, err := completion.DetectShell()
 	if err != nil {
@@ -387,7 +426,24 @@ func stepCompletions(ios *iostreams.IOStreams, rootCmd *cobra.Command) error {
 	return nil
 }
 
-func stepCompletionsNonInteractive(ios *iostreams.IOStreams, rootCmd *cobra.Command, opts *Options) error {
+func stepCompletionsDefaults(ios *iostreams.IOStreams, rootCmd *cobra.Command) error {
+	printStepHeader(ios, 4, "Shell Completions")
+
+	shell, err := completion.DetectShell()
+	if err != nil {
+		ios.Info("Could not detect shell, skipping completions")
+		ios.Println("")
+		return nil //nolint:nilerr // graceful degradation: skip completions if shell detection fails
+	}
+
+	if err := generateAndInstallCompletions(ios, rootCmd, shell); err != nil {
+		return err
+	}
+	ios.Println("")
+	return nil
+}
+
+func stepCompletionsExplicit(ios *iostreams.IOStreams, rootCmd *cobra.Command, opts *Options) error {
 	shells := strings.Split(opts.Completions, ",")
 	installed := 0
 	var errs []string
@@ -427,9 +483,7 @@ func stepCompletionsNonInteractive(ios *iostreams.IOStreams, rootCmd *cobra.Comm
 }
 
 func stepCloud(ctx context.Context, ios *iostreams.IOStreams) error {
-	ios.Println(theme.Bold().Render(fmt.Sprintf("Step 4/%d: Cloud Access (Optional)", totalSteps)))
-	ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
-	ios.Println("")
+	printStepHeader(ios, 5, "Cloud Access (Optional)")
 
 	proceed, err := ios.Confirm("Set up Shelly Cloud access for remote control?", false)
 	if err != nil {
@@ -623,7 +677,7 @@ func selectOutputFormat(ios *iostreams.IOStreams, opts *Options) (string, error)
 	if opts.OutputFormat != "" {
 		return opts.OutputFormat, nil
 	}
-	if opts.IsNonInteractive() {
+	if opts.UseDefaults() {
 		return "table", nil
 	}
 
@@ -643,7 +697,7 @@ func selectTheme(ios *iostreams.IOStreams, opts *Options) (string, error) {
 	if opts.Theme != "" {
 		return opts.Theme, nil
 	}
-	if opts.IsNonInteractive() {
+	if opts.UseDefaults() {
 		return defaultTheme, nil
 	}
 
@@ -668,9 +722,7 @@ func selectTheme(ios *iostreams.IOStreams, opts *Options) (string, error) {
 }
 
 func stepTelemetry(ios *iostreams.IOStreams) error {
-	ios.Println(theme.Bold().Render(fmt.Sprintf("Step %d/%d: Anonymous Usage Statistics (Optional)", totalSteps, totalSteps)))
-	ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
-	ios.Println("")
+	printStepHeader(ios, 6, "Anonymous Usage Statistics (Optional)")
 	ios.Println("Help improve Shelly CLI by sharing anonymous usage statistics.")
 	ios.Println("")
 	ios.Println(theme.Dim().Render("What we collect:"))

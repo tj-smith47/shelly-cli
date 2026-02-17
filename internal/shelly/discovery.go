@@ -31,8 +31,8 @@ type DiscoveredDevice struct {
 type DiscoveryOptions struct {
 	Method     DiscoveryMethod
 	Timeout    time.Duration
-	Subnet     string // For HTTP scanning
-	AutoDetect bool   // Auto-detect subnet for HTTP scanning
+	Subnets    []string // For HTTP scanning (multiple subnets supported)
+	AutoDetect bool     // Auto-detect subnets for HTTP scanning
 }
 
 // DiscoveryMethod specifies the discovery protocol.
@@ -105,32 +105,33 @@ func discoverMDNS(ctx context.Context, timeout time.Duration) ([]discovery.Disco
 }
 
 func discoverHTTP(ctx context.Context, opts DiscoveryOptions) ([]discovery.DiscoveredDevice, error) {
-	subnet := opts.Subnet
-	if subnet == "" && opts.AutoDetect {
+	subnets := opts.Subnets
+	if len(subnets) == 0 && opts.AutoDetect {
 		var err error
-		subnet, err = utils.DetectSubnet()
+		subnets, err = utils.DetectSubnets()
 		if err != nil {
-			return nil, fmt.Errorf("failed to detect subnet: %w", err)
+			return nil, fmt.Errorf("failed to detect subnets: %w", err)
 		}
 	}
-	if subnet == "" {
+	if len(subnets) == 0 {
 		return nil, fmt.Errorf("subnet required for HTTP discovery")
 	}
 
-	_, _, err := net.ParseCIDR(subnet)
-	if err != nil {
-		return nil, fmt.Errorf("invalid subnet: %w", err)
+	var allAddresses []string
+	for _, subnet := range subnets {
+		if _, _, err := net.ParseCIDR(subnet); err != nil {
+			return nil, fmt.Errorf("invalid subnet %q: %w", subnet, err)
+		}
+		allAddresses = append(allAddresses, discovery.GenerateSubnetAddresses(subnet)...)
 	}
-
-	addresses := discovery.GenerateSubnetAddresses(subnet)
-	if len(addresses) == 0 {
-		return nil, fmt.Errorf("no addresses to scan in subnet %s", subnet)
+	if len(allAddresses) == 0 {
+		return nil, fmt.Errorf("no addresses to scan in subnets")
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
-	return discovery.ProbeAddresses(ctx, addresses), nil
+	return discovery.ProbeAddresses(ctx, allAddresses), nil
 }
 
 // DiscoverCoIoT performs CoIoT/CoAP discovery and returns raw discovered devices.

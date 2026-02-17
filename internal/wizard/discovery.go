@@ -12,12 +12,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
-const defaultDiscoveryTimeout = 15 * time.Second
+const (
+	defaultDiscoveryTimeout = 15 * time.Second
+	methodHTTP              = "http"
+)
 
 // selectDiscoveryMethods selects which discovery methods to use.
 func selectDiscoveryMethods(ios *iostreams.IOStreams, opts *Options) []string {
 	// Non-interactive: parse --discover-modes flag
-	if opts.IsNonInteractive() {
+	if opts.UseDefaults() || opts.Discover {
 		return parseDiscoverModes(opts.DiscoverModes)
 	}
 
@@ -33,14 +36,14 @@ func selectDiscoveryMethods(ios *iostreams.IOStreams, opts *Options) []string {
 	selected, err := ios.MultiSelect("Select discovery methods:", options, defaults)
 	if err != nil {
 		ios.DebugErr("multi-select", err)
-		return []string{"http"} // Fallback to http
+		return []string{methodHTTP} // Fallback to http
 	}
 
 	var methods []string
 	for _, s := range selected {
 		switch {
 		case strings.HasPrefix(s, "HTTP"):
-			methods = append(methods, "http")
+			methods = append(methods, methodHTTP)
 		case strings.HasPrefix(s, "mDNS"):
 			methods = append(methods, "mdns")
 		case strings.HasPrefix(s, "CoIoT"):
@@ -51,7 +54,7 @@ func selectDiscoveryMethods(ios *iostreams.IOStreams, opts *Options) []string {
 	}
 
 	if len(methods) == 0 {
-		methods = []string{"http"} // Fallback
+		methods = []string{methodHTTP} // Fallback
 	}
 	return methods
 }
@@ -59,15 +62,15 @@ func selectDiscoveryMethods(ios *iostreams.IOStreams, opts *Options) []string {
 // parseDiscoverModes parses the --discover-modes flag value.
 func parseDiscoverModes(modes string) []string {
 	if modes == "" || modes == "all" {
-		return []string{"http", "mdns", "coiot"}
+		return []string{methodHTTP, "mdns", "coiot"}
 	}
 
 	var result []string
 	for _, m := range strings.Split(modes, ",") {
 		m = strings.TrimSpace(strings.ToLower(m))
 		switch m {
-		case "http", "scan":
-			result = append(result, "http")
+		case methodHTTP, "scan":
+			result = append(result, methodHTTP)
 		case "mdns", "zeroconf", "bonjour":
 			result = append(result, "mdns")
 		case "coiot", "coap":
@@ -78,16 +81,16 @@ func parseDiscoverModes(modes string) []string {
 	}
 
 	if len(result) == 0 {
-		result = []string{"http"} // Default fallback
+		result = []string{methodHTTP} // Default fallback
 	}
 	return result
 }
 
 // runDiscoveryMethod runs a single discovery method.
-func runDiscoveryMethod(ctx context.Context, ios *iostreams.IOStreams, method string, timeout time.Duration, subnet string) ([]discovery.DiscoveredDevice, error) {
+func runDiscoveryMethod(ctx context.Context, ios *iostreams.IOStreams, method string, timeout time.Duration, subnets []string) ([]discovery.DiscoveredDevice, error) {
 	switch method {
-	case "http":
-		return runHTTPDiscovery(ctx, ios, timeout, subnet)
+	case methodHTTP:
+		return runHTTPDiscovery(ctx, ios, timeout, subnets)
 	case "mdns":
 		return runMDNSDiscovery(ios, timeout)
 	case "coiot":
@@ -99,27 +102,32 @@ func runDiscoveryMethod(ctx context.Context, ios *iostreams.IOStreams, method st
 	}
 }
 
-func runHTTPDiscovery(ctx context.Context, ios *iostreams.IOStreams, timeout time.Duration, subnet string) ([]discovery.DiscoveredDevice, error) {
-	if subnet == "" {
+func runHTTPDiscovery(ctx context.Context, ios *iostreams.IOStreams, timeout time.Duration, subnets []string) ([]discovery.DiscoveredDevice, error) {
+	if len(subnets) == 0 {
 		var err error
-		subnet, err = utils.DetectSubnet()
+		subnets, err = utils.DetectSubnets()
 		if err != nil {
-			return nil, fmt.Errorf("failed to detect subnet: %w", err)
+			return nil, fmt.Errorf("failed to detect subnets: %w", err)
 		}
 	}
 
-	ios.StartProgress(fmt.Sprintf("Scanning %s (timeout: %s)...", subnet, timeout))
-	defer ios.StopProgress()
-
-	addresses := discovery.GenerateSubnetAddresses(subnet)
-	if len(addresses) == 0 {
-		return nil, fmt.Errorf("no addresses in subnet %s", subnet)
+	// Generate addresses across all subnets
+	var allAddresses []string
+	for _, subnet := range subnets {
+		allAddresses = append(allAddresses, discovery.GenerateSubnetAddresses(subnet)...)
 	}
+	if len(allAddresses) == 0 {
+		return nil, fmt.Errorf("no addresses in %s", strings.Join(subnets, ", "))
+	}
+
+	subnetLabel := strings.Join(subnets, ", ")
+	ios.StartProgress(fmt.Sprintf("Scanning %s (timeout: %s)...", subnetLabel, timeout))
+	defer ios.StopProgress()
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	devices := discovery.ProbeAddressesWithProgress(ctx, addresses, func(_ discovery.ProbeProgress) bool {
+	devices := discovery.ProbeAddressesWithProgress(ctx, allAddresses, func(_ discovery.ProbeProgress) bool {
 		return ctx.Err() == nil
 	})
 

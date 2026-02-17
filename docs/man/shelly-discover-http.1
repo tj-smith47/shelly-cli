@@ -6,14 +6,18 @@ shelly-discover-http - Discover devices via HTTP subnet scanning
 
 
 .SH SYNOPSIS
-\fBshelly discover http [subnet] [flags]\fP
+\fBshelly discover http [subnet...] [flags]\fP
 
 
 .SH DESCRIPTION
 Discover Shelly devices by probing HTTP endpoints on a subnet.
 
 .PP
-If no subnet is provided, attempts to detect the local network.
+If no subnet is provided, attempts to detect the local network(s).
+When multiple subnets are detected, an interactive prompt lets you
+choose which to scan. Use --all-networks to scan all without prompting.
+
+.PP
 This method is slower than mDNS or CoIoT but works when multicast
 is blocked or devices are on different VLANs.
 
@@ -32,8 +36,16 @@ Protocol, and Auth status.
 
 
 .SH OPTIONS
+\fB--all-networks\fP[=false]
+	Scan all detected subnets without prompting
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for http
+
+.PP
+\fB--network\fP=[]
+	Subnet(s) to scan (repeatable, auto-detected if not specified)
 
 .PP
 \fB--register\fP[=false]
@@ -112,6 +124,15 @@ Protocol, and Auth status.
 
   # Scan specific subnet
   shelly discover http 192.168.1.0/24
+
+  # Scan multiple subnets
+  shelly discover http 192.168.1.0/24 10.0.0.0/24
+
+  # Scan all detected subnets without prompting
+  shelly discover http --all-networks
+
+  # Use --network flag (repeatable)
+  shelly discover http --network 192.168.1.0/24 --network 10.0.0.0/24
 
   # Scan a /16 network (large, use longer timeout)
   shelly discover http 10.0.0.0/16 --timeout 30m
