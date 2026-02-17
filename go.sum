@@ -255,6 +255,8 @@ github.com/tj-smith47/shelly-go v0.2.20-0.20260217060018-ceab5d4949cc h1:HZd6vh1
 github.com/tj-smith47/shelly-go v0.2.20-0.20260217060018-ceab5d4949cc/go.mod h1:q+xGZfgB0rcqnV2+d7BHF+BupJR96+FU+RgTiGjj3kE=
 github.com/tj-smith47/shelly-go v0.2.21-0.20260217141237-80481fa01e86 h1:CEapxbLA7FZuT+/G3oeewtI06dVlA4nvFYffAdpFx28=
 github.com/tj-smith47/shelly-go v0.2.21-0.20260217141237-80481fa01e86/go.mod h1:q+xGZfgB0rcqnV2+d7BHF+BupJR96+FU+RgTiGjj3kE=
+github.com/tj-smith47/shelly-go v0.3.0 h1:u9koL3QTYIy5xj34jOMQKTD/mBv5CHZ70fbpoNwiM7s=
+github.com/tj-smith47/shelly-go v0.3.0/go.mod h1:q+xGZfgB0rcqnV2+d7BHF+BupJR96+FU+RgTiGjj3kE=
 github.com/tklauser/go-sysconf v0.3.12 h1:0QaGUFOdQaIVdPgfITYzaTegZvdCjmYO52cSFAEVmqU=
 github.com/tklauser/go-sysconf v0.3.12/go.mod h1:Ho14jnntGE1fpdOqQEEaiKRpvIavV0hSfmBq8nJbHYI=
 github.com/tklauser/numcpus v0.6.1 h1:ng9scYS7az0Bk4OZLvrNXNSAO2Pxr1XXRAPyjhIx+Fk=
