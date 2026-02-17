@@ -4,6 +4,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/tj-smith47/shelly-go/gen1"
 	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
@@ -30,6 +31,9 @@ func ConnectGen1(ctx context.Context, device model.Device) (*Gen1Client, error) 
 	var opts []transport.Option
 	if device.HasAuth() {
 		opts = append(opts, transport.WithAuth(device.Auth.Username, device.Auth.Password))
+	}
+	if strings.HasPrefix(url, "https") {
+		opts = append(opts, transport.WithInsecureSkipVerify())
 	}
 
 	httpTransport := transport.NewHTTP(url, opts...)

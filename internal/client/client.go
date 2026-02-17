@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/tj-smith47/shelly-go/gen2"
 	"github.com/tj-smith47/shelly-go/gen2/components"
@@ -46,6 +47,9 @@ func Connect(ctx context.Context, device model.Device) (*Client, error) {
 	var opts []transport.Option
 	if device.HasAuth() {
 		opts = append(opts, transport.WithAuth(device.Auth.Username, device.Auth.Password))
+	}
+	if strings.HasPrefix(url, "https") {
+		opts = append(opts, transport.WithInsecureSkipVerify())
 	}
 
 	httpTransport := transport.NewHTTP(url, opts...)

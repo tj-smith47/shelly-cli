@@ -202,42 +202,69 @@ func (s *Service) discoverBLEForOnboard(ctx context.Context, timeout time.Durati
 }
 
 // discoverWiFiAPForOnboard scans for Shelly WiFi AP SSIDs.
+// WiFi scans are inherently unreliable — a single sweep may miss APs on
+// different channels or with weak signal. This function retries the scan
+// every 3 seconds until the context deadline, accumulating unique results.
 func (s *Service) discoverWiFiAPForOnboard(ctx context.Context) ([]OnboardDevice, error) {
 	wifiDisc := discovery.NewWiFiDiscoverer()
-	rawDevices, err := wifiDisc.DiscoverWithContext(ctx)
-	if err != nil {
-		debug.TraceEvent("onboard WiFi AP discovery error: %v", err)
-		return nil, err
+	seen := make(map[string]OnboardDevice) // keyed by SSID
+
+	const scanInterval = 3 * time.Second
+	var lastErr error
+
+	for {
+		rawDevices, err := wifiDisc.DiscoverWithContext(ctx)
+		if err != nil {
+			debug.TraceEvent("onboard WiFi AP scan attempt error: %v", err)
+			lastErr = err
+		}
+
+		wifiDetails := wifiDisc.GetDiscoveredDevices()
+		for i, raw := range rawDevices {
+			dev := OnboardDevice{
+				Name:        raw.Name,
+				Model:       raw.Model,
+				Address:     discovery.DefaultAPIP,
+				MACAddress:  raw.MACAddress,
+				Source:      OnboardSourceWiFiAP,
+				Generation:  int(raw.Generation),
+				Provisioned: false,
+			}
+
+			if i < len(wifiDetails) {
+				dev.SSID = wifiDetails[i].SSID
+				dev.RSSI = wifiDetails[i].Signal
+			}
+
+			if dev.Name == "" && dev.SSID != "" {
+				dev.Name = dev.SSID
+			}
+
+			key := dev.SSID
+			if key == "" {
+				key = dev.MACAddress
+			}
+			if key != "" {
+				seen[key] = dev
+			}
+		}
+
+		// Wait before next scan, or exit if context is done.
+		select {
+		case <-ctx.Done():
+			// Return whatever we found so far.
+			if len(seen) == 0 && lastErr != nil {
+				return nil, lastErr
+			}
+			result := make([]OnboardDevice, 0, len(seen))
+			for _, dev := range seen {
+				result = append(result, dev)
+			}
+			return result, nil
+		case <-time.After(scanInterval):
+			// Continue scanning.
+		}
 	}
-
-	wifiDetails := wifiDisc.GetDiscoveredDevices()
-
-	var result []OnboardDevice
-	for i, raw := range rawDevices {
-		dev := OnboardDevice{
-			Name:        raw.Name,
-			Model:       raw.Model,
-			Address:     discovery.DefaultAPIP,
-			MACAddress:  raw.MACAddress,
-			Source:      OnboardSourceWiFiAP,
-			Generation:  int(raw.Generation),
-			Provisioned: false,
-		}
-
-		// Get SSID and signal from WiFi details
-		if i < len(wifiDetails) {
-			dev.SSID = wifiDetails[i].SSID
-			dev.RSSI = wifiDetails[i].Signal
-		}
-
-		if dev.Name == "" && dev.SSID != "" {
-			dev.Name = dev.SSID
-		}
-
-		result = append(result, dev)
-	}
-
-	return result, nil
 }
 
 // deduplicateOnboardDevices merges duplicate devices found by multiple

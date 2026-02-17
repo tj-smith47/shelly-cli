@@ -2577,8 +2577,11 @@ func TestRunDiscoveryStep_DefaultsMode(t *testing.T) {
 
 	// Defaults mode runs discovery automatically (HTTP mode)
 	opts := &Options{Defaults: true}
-	devices := runDiscoveryStep(ctx, ios, opts)
+	devices, err := runDiscoveryStep(ctx, ios, opts)
 	// Discovery will fail in test (no network) but should not panic
+	if err != nil {
+		t.Logf("discovery error (expected in test): %v", err)
+	}
 	_ = devices
 }
 
@@ -2590,10 +2593,14 @@ func TestRunRegistrationStep(t *testing.T) {
 	opts := &Options{Force: true}
 
 	// No devices - should do nothing
-	runRegistrationStep(tf.Factory, opts, nil)
+	if err := runRegistrationStep(tf.Factory, opts, nil); err != nil {
+		t.Errorf("runRegistrationStep(nil) error = %v", err)
+	}
 
 	// Empty devices slice - should do nothing
-	runRegistrationStep(tf.Factory, opts, []discovery.DiscoveredDevice{})
+	if err := runRegistrationStep(tf.Factory, opts, []discovery.DiscoveredDevice{}); err != nil {
+		t.Errorf("runRegistrationStep(empty) error = %v", err)
+	}
 }
 
 // TestRunCompletionsStep tests runCompletionsStep.
@@ -2605,11 +2612,15 @@ func TestRunCompletionsStep(t *testing.T) {
 
 	// Defaults mode - auto-detects shell and installs
 	opts := &Options{Defaults: true}
-	runCompletionsStep(ios, rootCmd, opts)
+	if err := runCompletionsStep(ios, rootCmd, opts); err != nil {
+		t.Errorf("runCompletionsStep(defaults) error = %v", err)
+	}
 
 	// Explicit with invalid shell - should warn but not panic
 	opts = &Options{Completions: "invalid-shell"}
-	runCompletionsStep(ios, rootCmd, opts)
+	if err := runCompletionsStep(ios, rootCmd, opts); err != nil {
+		t.Errorf("runCompletionsStep(invalid) error = %v", err)
+	}
 }
 
 // TestRunCloudStep tests runCloudStep.
@@ -2621,11 +2632,15 @@ func TestRunCloudStep(t *testing.T) {
 
 	// Non-interactive without cloud setup - does nothing
 	opts := &Options{Theme: "dracula"}
-	runCloudStep(ctx, ios, opts)
+	if err := runCloudStep(ctx, ios, opts); err != nil {
+		t.Errorf("runCloudStep(theme) error = %v", err)
+	}
 
 	// Non-interactive with incomplete credentials - should warn
 	opts = &Options{Theme: "dracula", CloudEmail: "test@example.com"}
-	runCloudStep(ctx, ios, opts)
+	if err := runCloudStep(ctx, ios, opts); err != nil {
+		t.Errorf("runCloudStep(email) error = %v", err)
+	}
 }
 
 // TestRunDiscoveryStep tests runDiscoveryStep.
@@ -2642,8 +2657,11 @@ func TestRunDiscoveryStep(t *testing.T) {
 		DiscoverTimeout: 1 * time.Millisecond,        // Very short timeout
 		Networks:        []string{"10.255.255.0/30"}, // Unlikely to have devices
 	}
-	devices := runDiscoveryStep(ctx, ios, opts)
+	devices, err := runDiscoveryStep(ctx, ios, opts)
 	// May or may not find devices, but shouldn't panic
+	if err != nil {
+		t.Logf("discovery error (expected in test): %v", err)
+	}
 	_ = devices
 }
 
@@ -2814,7 +2832,9 @@ func TestRunSetupSteps_Components(t *testing.T) {
 	// Test runCompletionsStep with explicit completions flag
 	opts = &Options{Completions: "bash"}
 	rootCmd := &cobra.Command{Use: "shelly"}
-	runCompletionsStep(ios, rootCmd, opts)
+	if err := runCompletionsStep(ios, rootCmd, opts); err != nil {
+		t.Errorf("runCompletionsStep(bash) error = %v", err)
+	}
 }
 
 // TestRunCheck_AllPaths tests RunCheck covers all output paths.
@@ -2877,11 +2897,15 @@ func TestRunCompletionsStep_Defaults(t *testing.T) {
 
 	// Test defaults mode - auto-detects shell
 	opts := &Options{Defaults: true}
-	runCompletionsStep(ios, rootCmd, opts)
+	if err := runCompletionsStep(ios, rootCmd, opts); err != nil {
+		t.Errorf("runCompletionsStep(defaults) error = %v", err)
+	}
 
 	// Test defaults with explicit completions flag
 	opts = &Options{Defaults: true, Completions: "bash"}
-	runCompletionsStep(ios, rootCmd, opts)
+	if err := runCompletionsStep(ios, rootCmd, opts); err != nil {
+		t.Errorf("runCompletionsStep(defaults+bash) error = %v", err)
+	}
 }
 
 // TestRunCloudStep_NonInteractive tests runCloudStep with various options.
@@ -2893,15 +2917,21 @@ func TestRunCloudStep_NonInteractive(t *testing.T) {
 
 	// Non-interactive without cloud flags - does nothing
 	opts := &Options{Force: true}
-	runCloudStep(ctx, ios, opts)
+	if err := runCloudStep(ctx, ios, opts); err != nil {
+		t.Errorf("runCloudStep(force) error = %v", err)
+	}
 
 	// Non-interactive with only email - WantsCloudSetup is true
 	opts = &Options{Force: true, CloudEmail: "user@test.com"}
-	runCloudStep(ctx, ios, opts)
+	if err := runCloudStep(ctx, ios, opts); err != nil {
+		t.Errorf("runCloudStep(email) error = %v", err)
+	}
 
 	// Non-interactive with only password
 	opts = &Options{Force: true, CloudPassword: "pass"}
-	runCloudStep(ctx, ios, opts)
+	if err := runCloudStep(ctx, ios, opts); err != nil {
+		t.Errorf("runCloudStep(password) error = %v", err)
+	}
 }
 
 // TestStepDiscovery_Paths tests more stepDiscovery paths.
@@ -2958,7 +2988,10 @@ func TestRunDiscoveryStep_WithMethods(t *testing.T) {
 		DiscoverModes:   "mdns",
 		DiscoverTimeout: 1 * time.Millisecond,
 	}
-	devices := runDiscoveryStep(ctx, ios, opts)
+	devices, err := runDiscoveryStep(ctx, ios, opts)
+	if err != nil {
+		t.Logf("mdns discovery error (expected in test): %v", err)
+	}
 	_ = devices
 
 	// Test with coiot
@@ -2967,7 +3000,10 @@ func TestRunDiscoveryStep_WithMethods(t *testing.T) {
 		DiscoverModes:   "coiot",
 		DiscoverTimeout: 1 * time.Millisecond,
 	}
-	devices = runDiscoveryStep(ctx, ios, opts)
+	devices, err = runDiscoveryStep(ctx, ios, opts)
+	if err != nil {
+		t.Logf("coiot discovery error (expected in test): %v", err)
+	}
 	_ = devices
 }
 
@@ -3104,7 +3140,10 @@ func TestRunDiscoveryStep_DiscoverFlag(t *testing.T) {
 
 	// Discover flag runs discovery without prompting
 	opts := &Options{Discover: true}
-	devices := runDiscoveryStep(ctx, ios, opts)
+	devices, err := runDiscoveryStep(ctx, ios, opts)
 	// Discovery will fail in test (no network) but should not panic
+	if err != nil {
+		t.Logf("discovery error (expected in test): %v", err)
+	}
 	_ = devices
 }

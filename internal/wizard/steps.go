@@ -2,9 +2,11 @@ package wizard
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tj-smith47/shelly-go/discovery"
@@ -20,6 +22,11 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
+
+// isInterrupt returns true if the error is a terminal interrupt (Ctrl+C).
+func isInterrupt(err error) bool {
+	return errors.Is(err, terminal.InterruptErr)
+}
 
 const (
 	defaultTheme = "dracula"
@@ -41,11 +48,27 @@ func runSetupSteps(ctx context.Context, f *cmdutil.Factory, rootCmd *cobra.Comma
 	}
 
 	runFlagDevicesStep(ios, opts)
-	discoveredDevices := runDiscoveryStep(ctx, ios, opts)
-	runRegistrationStep(f, opts, discoveredDevices)
-	runCompletionsStep(ios, rootCmd, opts)
-	runCloudStep(ctx, ios, opts)
-	runTelemetryStep(ios, opts)
+
+	discoveredDevices, err := runDiscoveryStep(ctx, ios, opts)
+	if err != nil {
+		return err
+	}
+
+	if err := runRegistrationStep(f, opts, discoveredDevices); err != nil {
+		return err
+	}
+
+	if err := runCompletionsStep(ios, rootCmd, opts); err != nil {
+		return err
+	}
+
+	if err := runCloudStep(ctx, ios, opts); err != nil {
+		return err
+	}
+
+	if err := runTelemetryStep(ios, opts); err != nil {
+		return err
+	}
 
 	PrintSummary(ios)
 	return nil
@@ -59,15 +82,19 @@ func runFlagDevicesStep(ios *iostreams.IOStreams, opts *Options) {
 	}
 }
 
-func runRegistrationStep(f *cmdutil.Factory, opts *Options, devices []discovery.DiscoveredDevice) {
+func runRegistrationStep(f *cmdutil.Factory, opts *Options, devices []discovery.DiscoveredDevice) error {
 	if len(devices) > 0 {
 		if err := stepRegistration(f, opts, devices); err != nil {
+			if isInterrupt(err) {
+				return err
+			}
 			f.IOStreams().Warning("Registration failed: %v", err)
 		}
 	}
+	return nil
 }
 
-func runCompletionsStep(ios *iostreams.IOStreams, rootCmd *cobra.Command, opts *Options) {
+func runCompletionsStep(ios *iostreams.IOStreams, rootCmd *cobra.Command, opts *Options) error {
 	var err error
 	switch {
 	case opts.UseDefaults():
@@ -78,17 +105,21 @@ func runCompletionsStep(ios *iostreams.IOStreams, rootCmd *cobra.Command, opts *
 		err = stepCompletions(ios, rootCmd)
 	}
 	if err != nil {
+		if isInterrupt(err) {
+			return err
+		}
 		ios.Warning("Completion setup failed: %v", err)
 		ios.Info("You can install completions later with: shelly completion install")
 	}
+	return nil
 }
 
-func runCloudStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) {
+func runCloudStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) error {
 	if opts.UseDefaults() && !opts.WantsCloudSetup() {
 		printStepHeader(ios, 5, "Cloud Access (Optional)")
 		ios.Info("Skipping cloud setup (use --cloud-email/--cloud-password to configure)")
 		ios.Println("")
-		return
+		return nil
 	}
 
 	var err error
@@ -98,20 +129,24 @@ func runCloudStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) 
 		err = stepCloud(ctx, ios)
 	}
 	if err != nil {
+		if isInterrupt(err) {
+			return err
+		}
 		msg, hint := formatCloudError(err)
 		ios.Warning("%s", msg)
 		if hint != "" {
 			ios.Info("%s", hint)
 		}
 	}
+	return nil
 }
 
-func runTelemetryStep(ios *iostreams.IOStreams, opts *Options) {
+func runTelemetryStep(ios *iostreams.IOStreams, opts *Options) error {
 	if opts.UseDefaults() && !opts.Telemetry {
 		printStepHeader(ios, 6, "Anonymous Usage Statistics (Optional)")
 		ios.Info("Telemetry disabled (use --telemetry to enable)")
 		ios.Println("")
-		return
+		return nil
 	}
 
 	var err error
@@ -121,18 +156,25 @@ func runTelemetryStep(ios *iostreams.IOStreams, opts *Options) {
 		err = stepTelemetry(ios)
 	}
 	if err != nil {
+		if isInterrupt(err) {
+			return err
+		}
 		ios.Warning("Telemetry setup failed: %v", err)
 	}
+	return nil
 }
 
-func runDiscoveryStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) []discovery.DiscoveredDevice {
+func runDiscoveryStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) ([]discovery.DiscoveredDevice, error) {
 	devices, err := stepDiscovery(ctx, ios, opts)
 	if err != nil {
+		if isInterrupt(err) {
+			return nil, err
+		}
 		ios.Warning("Discovery failed: %v", err)
 		ios.Info("You can manually add devices later with: shelly device add <name> <address>")
-		return nil
+		return nil, nil
 	}
-	return devices
+	return devices, nil
 }
 
 // printStepHeader prints a consistent step header.
