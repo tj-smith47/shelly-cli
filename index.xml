@@ -11998,12 +11998,11 @@ multicast group 224.0.1.187:5683.&lt;/p&gt;
 &lt;p&gt;Discover devices via HTTP subnet scanning&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Discover Shelly devices by probing HTTP endpoints on a subnet.&lt;/p&gt;
-&lt;p&gt;If no subnet is provided, attempts to detect the local network.
-This method is slower than mDNS or CoIoT but works when multicast
-is blocked or devices are on different VLANs.&lt;/p&gt;
-&lt;p&gt;The scan probes each IP address in the subnet range for Shelly device
-HTTP endpoints. Progress is shown in real-time. Discovered devices
-can be automatically registered with &amp;ndash;register.&lt;/p&gt;</description></item><item><title>shelly discover mdns</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/mdns/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/mdns/</guid><description>&lt;h2 id="shelly-discover-mdns"&gt;shelly discover mdns&lt;/h2&gt;
+&lt;p&gt;If no subnet is provided, attempts to detect the local network(s).
+When multiple subnets are detected, an interactive prompt lets you
+choose which to scan. Use &amp;ndash;all-networks to scan all without prompting.&lt;/p&gt;
+&lt;p&gt;This method is slower than mDNS or CoIoT but works when multicast
+is blocked or devices are on different VLANs.&lt;/p&gt;</description></item><item><title>shelly discover mdns</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/mdns/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/mdns/</guid><description>&lt;h2 id="shelly-discover-mdns"&gt;shelly discover mdns&lt;/h2&gt;
 &lt;p&gt;Discover devices using mDNS/Zeroconf&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Discover Shelly devices using mDNS/Zeroconf.&lt;/p&gt;
