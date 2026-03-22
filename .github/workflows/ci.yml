@@ -56,34 +56,7 @@ jobs:
 
       - name: Update coverage badge
         if: github.ref == 'refs/heads/master'
-        run: |
-          # Parse coverage
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          if (( $(echo "$COVERAGE >= 90" | bc -l) )); then COLOR="brightgreen"
-          elif (( $(echo "$COVERAGE >= 80" | bc -l) )); then COLOR="green"
-          elif (( $(echo "$COVERAGE >= 70" | bc -l) )); then COLOR="yellowgreen"
-          elif (( $(echo "$COVERAGE >= 60" | bc -l) )); then COLOR="yellow"
-          else COLOR="red"; fi
-
-          # Setup git
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          git fetch origin badges:badges 2>/dev/null || true
-          if git show-ref --verify --quiet refs/heads/badges; then
-            git checkout badges
-          else
-            git checkout --orphan badges
-            git rm -rf . > /dev/null 2>&1 || true
-          fi
-
-          # Store coverage
-          BADGE="{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${COVERAGE}%\",\"color\":\"${COLOR}\"}"
-          echo "$BADGE" > coverage.json
-
-          # Commit & push changes
-          git add coverage.json
-          git diff --cached --quiet || git commit -m "Update coverage to ${COVERAGE}%"
-          git push origin badges --force
+        run: bash scripts/update-coverage-badge.sh
 
   build:
     name: Build

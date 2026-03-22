@@ -1,4 +1,4 @@
-.PHONY: audit build build-test check clean completions deps docs docs-serve fmt generate help install lint manpages push release-local test test-coverage
+.PHONY: audit build build-test check ci clean completions deps docs docs-serve fmt generate help install lint manpages push release-local test test-coverage
 
 # Build variables
 BINARY_NAME := shelly
@@ -32,6 +32,9 @@ build:
 
 build-test:
 	@go build -o /tmp/shelly-test ./cmd/shelly
+
+## ci: Run the full CI pipeline locally (lint, test, build, audit — excludes security/gosec)
+ci: lint test build audit
 
 ## check: Run all checks (format, then full convention audit with build/lint/test)
 check:
