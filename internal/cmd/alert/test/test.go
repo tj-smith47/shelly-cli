@@ -10,6 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+const actionNotify = "notify"
+
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -59,7 +61,7 @@ func run(_ context.Context, opts *Options) error {
 
 	// Execute the action
 	switch {
-	case alert.Action == "notify":
+	case alert.Action == actionNotify:
 		// Desktop notification - just print for now
 		ios.Success("[TEST] Alert triggered: %s on %s", alert.Condition, alert.Device)
 	case len(alert.Action) > 8 && alert.Action[:8] == "webhook:":

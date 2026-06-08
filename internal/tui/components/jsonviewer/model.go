@@ -26,6 +26,12 @@ import (
 	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
+// Chroma style names used for syntax highlighting.
+const (
+	chromaStyleDracula = "dracula"
+	chromaStyleGruvbox = "gruvbox"
+)
+
 // CloseMsg is sent when the viewer is closed.
 type CloseMsg struct{}
 
@@ -350,15 +356,15 @@ func (m Model) getChromaStyle() *chroma.Style {
 	// Try to match the current theme name to a chroma style
 	currentTheme := viper.GetString("theme.name")
 	if currentTheme == "" {
-		currentTheme = "dracula"
+		currentTheme = chromaStyleDracula
 	}
 
 	// Map theme names to chroma styles
 	styleMap := map[string]string{
-		"dracula":      "dracula",
+		"dracula":      chromaStyleDracula,
 		"nord":         "nord",
-		"gruvbox":      "gruvbox",
-		"gruvbox-dark": "gruvbox",
+		"gruvbox":      chromaStyleGruvbox,
+		"gruvbox-dark": chromaStyleGruvbox,
 		"tokyo-night":  "tokyonight-night",
 		"catppuccin":   "catppuccin-mocha",
 	}
@@ -370,7 +376,7 @@ func (m Model) getChromaStyle() *chroma.Style {
 	}
 
 	// Default to dracula which works well on dark terminals
-	if style := styles.Get("dracula"); style != nil {
+	if style := styles.Get(chromaStyleDracula); style != nil {
 		return style
 	}
 

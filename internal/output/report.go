@@ -18,9 +18,9 @@ func FormatTextReport(report model.DeviceReport) string {
 	if len(report.Devices) > 0 {
 		result += "Devices:\n"
 		for _, d := range report.Devices {
-			status := "offline"
+			status := LabelOfflineLower
 			if d.Online {
-				status = "online"
+				status = LabelOnlineLower
 			}
 			result += fmt.Sprintf("  - %s (%s): %s\n", d.Name, d.IP, status)
 			if d.Model != "" {

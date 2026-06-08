@@ -10,6 +10,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// Command aliases, shared with tests.
+const (
+	aliasView = "view"
+	aliasCat  = "cat"
+)
+
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -25,7 +31,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "show",
-		Aliases: []string{"view", "cat"},
+		Aliases: []string{aliasView, aliasCat},
 		Short:   "Show recent log entries",
 		Long:    `Show the most recent log entries from the CLI log file.`,
 		Example: `  # Show last 50 lines (default)

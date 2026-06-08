@@ -16,6 +16,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// useList is the command usage string for the thermostat list command.
+const useList = "list <device>"
+
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
@@ -28,7 +31,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "list <device>",
+		Use:     useList,
 		Aliases: []string{"ls", "l"},
 		Short:   "List thermostats",
 		Long: `List all thermostat components on a Shelly device.

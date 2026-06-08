@@ -45,7 +45,7 @@ func TestNewDeviceReport_DifferentTypes(t *testing.T) {
 		reportType string
 	}{
 		{"status report", "status"},
-		{"inventory report", "inventory"},
+		{"inventory report", testReportTypeInventory},
 		{"firmware report", "firmware"},
 		{"empty type", ""},
 	}
@@ -67,22 +67,22 @@ func TestDeviceReport_Fields(t *testing.T) {
 	now := time.Now()
 	report := DeviceReport{
 		Timestamp:  now,
-		ReportType: "inventory",
+		ReportType: testReportTypeInventory,
 		Devices: []DeviceReportInfo{
 			{Name: "Device1", IP: "192.168.1.1", Online: true},
 			{Name: "Device2", IP: "192.168.1.2", Online: false},
 		},
 		Summary: map[string]interface{}{
-			"total":  2,
-			"online": 1,
+			"total":          2,
+			testStatusOnline: 1,
 		},
 	}
 
 	if report.Timestamp != now {
 		t.Errorf("Timestamp = %v, want %v", report.Timestamp, now)
 	}
-	if report.ReportType != "inventory" {
-		t.Errorf("ReportType = %q, want %q", report.ReportType, "inventory")
+	if report.ReportType != testReportTypeInventory {
+		t.Errorf("ReportType = %q, want %q", report.ReportType, testReportTypeInventory)
 	}
 	if len(report.Devices) != 2 {
 		t.Errorf("Devices len = %d, want 2", len(report.Devices))
@@ -96,22 +96,22 @@ func TestDeviceReportInfo(t *testing.T) {
 	t.Parallel()
 
 	info := DeviceReportInfo{
-		Name:     "Living Room Switch",
+		Name:     testLivingRoomSwitch,
 		IP:       testReportIP,
-		Model:    "Shelly Plus 1PM",
+		Model:    testShellyPlus1PM,
 		Firmware: "1.0.0-stable",
 		Online:   true,
 		MAC:      testReportMAC,
 	}
 
-	if info.Name != "Living Room Switch" {
-		t.Errorf("Name = %q, want %q", info.Name, "Living Room Switch")
+	if info.Name != testLivingRoomSwitch {
+		t.Errorf("Name = %q, want %q", info.Name, testLivingRoomSwitch)
 	}
 	if info.IP != testReportIP {
 		t.Errorf("IP = %q, want %q", info.IP, testReportIP)
 	}
-	if info.Model != "Shelly Plus 1PM" {
-		t.Errorf("Model = %q, want %q", info.Model, "Shelly Plus 1PM")
+	if info.Model != testShellyPlus1PM {
+		t.Errorf("Model = %q, want %q", info.Model, testShellyPlus1PM)
 	}
 	if info.Firmware != "1.0.0-stable" {
 		t.Errorf("Firmware = %q, want %q", info.Firmware, "1.0.0-stable")

@@ -20,6 +20,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
+// compTypeSwitch is the component type label for switch components.
+const compTypeSwitch = "Switch"
+
 // RequestJSONMsg is sent when user requests JSON view for an endpoint.
 type RequestJSONMsg struct {
 	DeviceName string
@@ -279,7 +282,7 @@ func (m Model) handleToggle(components []ComponentInfo) (Model, tea.Cmd) {
 
 	var compType string
 	switch comp.Type {
-	case "Switch":
+	case compTypeSwitch:
 		compType = "switch"
 	case "Light":
 		compType = "light"
@@ -644,7 +647,7 @@ func (m Model) appendSwitchComponents(components []ComponentInfo) []ComponentInf
 		comp := ComponentInfo{
 			ID:    sw.ID,
 			Name:  name,
-			Type:  "Switch",
+			Type:  compTypeSwitch,
 			State: state,
 		}
 		if !m.device.Device.IsPluginManaged() {

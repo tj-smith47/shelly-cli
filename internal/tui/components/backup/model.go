@@ -56,15 +56,22 @@ const (
 	ModeImport
 )
 
+// Mode display labels.
+const (
+	labelExport  = "Export"
+	labelImport  = "Import"
+	labelUnknown = "Unknown"
+)
+
 // String returns the mode name.
 func (m Mode) String() string {
 	switch m {
 	case ModeExport:
-		return "Export"
+		return labelExport
 	case ModeImport:
-		return "Import"
+		return labelImport
 	default:
-		return "Unknown"
+		return labelUnknown
 	}
 }
 
@@ -715,8 +722,8 @@ func (m Model) renderModeSelector() string {
 		key  string
 		name string
 	}{
-		{ModeExport, "1", "Export"},
-		{ModeImport, "2", "Import"},
+		{ModeExport, "1", labelExport},
+		{ModeImport, "2", labelImport},
 	}
 
 	parts := make([]string, 0, len(modes))
@@ -834,7 +841,7 @@ func (m Model) renderBackupFileLine(backupFile File, isCursor bool) string {
 		deviceStr = backupFile.DeviceID
 	}
 	if deviceStr == "" {
-		deviceStr = "Unknown"
+		deviceStr = labelUnknown
 	}
 
 	timeStr := backupFile.Timestamp.Format("2006-01-02 15:04")

@@ -75,11 +75,11 @@ func NewBatchComponentCommand(f *cmdutil.Factory, opts BatchComponentOpts) *cobr
 	switch opts.Action {
 	case ActionOn:
 		use = "on [device...]"
-		aliases = []string{"enable"}
+		aliases = []string{verbEnable}
 		short = fmt.Sprintf("Turn on %s", componentPlural)
 	case ActionOff:
 		use = "off [device...]"
-		aliases = []string{"disable"}
+		aliases = []string{verbDisable}
 		short = fmt.Sprintf("Turn off %s", componentPlural)
 	case ActionToggle:
 		use = "toggle [device...]"

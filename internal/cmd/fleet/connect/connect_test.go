@@ -133,7 +133,7 @@ func TestNewCommand_HostFlagParsing(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if err := cmd.Flags().Set("host", "shelly-13-eu.shelly.cloud"); err != nil {
+	if err := cmd.Flags().Set("host", hostEU13); err != nil {
 		t.Fatalf("failed to set host flag: %v", err)
 	}
 
@@ -142,8 +142,8 @@ func TestNewCommand_HostFlagParsing(t *testing.T) {
 		t.Fatalf("failed to get host value: %v", err)
 	}
 
-	if val != "shelly-13-eu.shelly.cloud" {
-		t.Errorf("host = %q, want %q", val, "shelly-13-eu.shelly.cloud")
+	if val != hostEU13 {
+		t.Errorf("host = %q, want %q", val, hostEU13)
 	}
 }
 
@@ -224,7 +224,7 @@ func TestCloudHosts(t *testing.T) {
 		{
 			name:           "eu region has hosts",
 			region:         "eu",
-			wantHosts:      []string{"shelly-13-eu.shelly.cloud", "shelly-14-eu.shelly.cloud"},
+			wantHosts:      []string{hostEU13, "shelly-14-eu.shelly.cloud"},
 			wantHostsExist: true,
 		},
 		{
@@ -393,7 +393,7 @@ func TestRun_WithHostFlag(t *testing.T) {
 	}
 
 	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"--host", "shelly-13-eu.shelly.cloud"})
+	cmd.SetArgs([]string{"--host", hostEU13})
 	err := cmd.Execute()
 
 	// Will fail auth, but flag parsing should work
@@ -484,11 +484,11 @@ func TestOptions_HostField(t *testing.T) {
 	t.Parallel()
 
 	opts := &Options{
-		Host: "shelly-13-eu.shelly.cloud",
+		Host: hostEU13,
 	}
 
-	if opts.Host != "shelly-13-eu.shelly.cloud" {
-		t.Errorf("Options.Host = %q, want %q", opts.Host, "shelly-13-eu.shelly.cloud")
+	if opts.Host != hostEU13 {
+		t.Errorf("Options.Host = %q, want %q", opts.Host, hostEU13)
 	}
 }
 

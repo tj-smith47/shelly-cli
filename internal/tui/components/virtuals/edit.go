@@ -27,6 +27,21 @@ const (
 	EditFieldCount
 )
 
+// typeBoolean is the dropdown label for the Boolean virtual component type.
+const typeBoolean = "Boolean"
+
+// typeButton is the dropdown label for the Button virtual component type.
+const typeButton = "Button"
+
+// typeNumber is the dropdown label for the Number virtual component type.
+const typeNumber = "Number"
+
+// typeText is the dropdown label for the Text virtual component type.
+const typeText = "Text"
+
+// typeEnum is the dropdown label for the Enum virtual component type.
+const typeEnum = "Enum"
+
 // EditSaveResultMsg is an alias for the shared save result message.
 type EditSaveResultMsg = messages.SaveResultMsg
 
@@ -56,7 +71,7 @@ type EditModel struct {
 
 // NewEditModel creates a new virtual component edit modal.
 func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
-	typeOptions := []string{"Boolean", "Number", "Text", "Enum", "Button"}
+	typeOptions := []string{typeBoolean, typeNumber, typeText, typeEnum, typeButton}
 
 	nameInput := form.NewTextInput(
 		form.WithPlaceholder("Component Name"),
@@ -314,15 +329,15 @@ func (m EditModel) getVirtualType() shelly.VirtualComponentType {
 	selected := m.typeDropdown.SelectedValue()
 
 	switch selected {
-	case "Boolean":
+	case typeBoolean:
 		return shelly.VirtualBoolean
-	case "Number":
+	case typeNumber:
 		return shelly.VirtualNumber
-	case "Text":
+	case typeText:
 		return shelly.VirtualText
-	case "Enum":
+	case typeEnum:
 		return shelly.VirtualEnum
-	case "Button":
+	case typeButton:
 		return shelly.VirtualButton
 	default:
 		return shelly.VirtualBoolean
@@ -636,15 +651,15 @@ func (m EditModel) buildRangeInfo(vType shelly.VirtualComponentType) string {
 func virtualTypeLabel(t shelly.VirtualComponentType) string {
 	switch t {
 	case shelly.VirtualBoolean:
-		return "Boolean"
+		return typeBoolean
 	case shelly.VirtualNumber:
-		return "Number"
+		return typeNumber
 	case shelly.VirtualText:
-		return "Text"
+		return typeText
 	case shelly.VirtualEnum:
-		return "Enum"
+		return typeEnum
 	case shelly.VirtualButton:
-		return "Button"
+		return typeButton
 	case shelly.VirtualGroup:
 		return "Group"
 	default:

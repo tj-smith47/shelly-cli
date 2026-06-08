@@ -16,7 +16,7 @@ import (
 func main() {
 	outputDir := "./docs/commands"
 	if len(os.Args) > 1 {
-		outputDir = os.Args[1]
+		outputDir = filepath.Clean(os.Args[1])
 	}
 
 	// Create output directory if it doesn't exist

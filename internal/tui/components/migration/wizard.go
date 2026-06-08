@@ -25,6 +25,9 @@ import (
 // WizardStep represents a step in the migration wizard.
 type WizardStep int
 
+// keyHintJK is the footer hint label for vim-style up/down navigation.
+const keyHintJK = "j/k"
+
 // Wizard step constants.
 const (
 	StepSourceSelect WizardStep = iota
@@ -913,23 +916,23 @@ func (w Wizard) footerForStep() string {
 	switch w.step {
 	case StepSourceSelect:
 		hints = []keys.Hint{
-			{Key: "j/k", Desc: "nav"},
-			{Key: "enter", Desc: "select"},
+			{Key: keyHintJK, Desc: "nav"},
+			{Key: keyconst.KeyEnter, Desc: "select"},
 			{Key: "w", Desc: "toggle-wifi"},
 		}
 	case StepTargetSelect:
 		hints = []keys.Hint{
-			{Key: "j/k", Desc: "nav"},
-			{Key: "enter", Desc: "select"},
+			{Key: keyHintJK, Desc: "nav"},
+			{Key: keyconst.KeyEnter, Desc: "select"},
 			{Key: "esc", Desc: "back"},
 		}
 	case StepPreview:
 		hints = []keys.Hint{
-			{Key: "j/k", Desc: "scroll"},
+			{Key: keyHintJK, Desc: "scroll"},
 			{Key: "spc", Desc: "toggle"},
 			{Key: "a", Desc: "all"},
 			{Key: "n", Desc: "none"},
-			{Key: "enter", Desc: "apply"},
+			{Key: keyconst.KeyEnter, Desc: "apply"},
 			{Key: "esc", Desc: "back"},
 		}
 	case StepComplete:

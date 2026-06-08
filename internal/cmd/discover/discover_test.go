@@ -41,9 +41,9 @@ func TestNewCommand(t *testing.T) {
 	// Verify subcommands are registered
 	subcommands := cmd.Commands()
 	expectedSubcmds := map[string]bool{
-		"mdns":             false,
-		"ble":              false,
-		"coiot":            false,
+		methodMDNS:         false,
+		methodBLE:          false,
+		methodCoIoT:        false,
 		"http [subnet...]": false,
 	}
 
@@ -551,7 +551,7 @@ func TestRun_MDNSMethod(t *testing.T) {
 
 	opts := &Options{
 		Factory: f,
-		Method:  "mdns",
+		Method:  methodMDNS,
 		Timeout: 1 * time.Millisecond,
 	}
 
@@ -575,7 +575,7 @@ func TestRun_CoIoTMethod(t *testing.T) {
 
 	opts := &Options{
 		Factory: f,
-		Method:  "coiot",
+		Method:  methodCoIoT,
 		Timeout: 1 * time.Millisecond,
 	}
 
@@ -598,7 +598,7 @@ func TestRun_BLEMethod(t *testing.T) { //nolint:paralleltest // Intentional - BL
 
 	opts := &Options{
 		Factory: f,
-		Method:  "ble",
+		Method:  methodBLE,
 		Timeout: 1 * time.Millisecond,
 	}
 

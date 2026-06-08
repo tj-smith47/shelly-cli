@@ -34,7 +34,9 @@ var (
 
 // defaultExecCommandStart is the default implementation that starts a command.
 func defaultExecCommandStart(ctx context.Context, path string, args []string) error {
-	cmd := exec.CommandContext(ctx, path, args...)
+	// G204: path is always the resolved path to the current executable
+	// (GetExecutablePath), never user-controlled, so re-exec is safe.
+	cmd := exec.CommandContext(ctx, path, args...) //nolint:gosec // G204: path is the current executable, not user input
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

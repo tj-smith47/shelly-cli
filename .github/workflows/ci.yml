@@ -16,7 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25.5"
+  GO_VERSION: "1.26.4"
+  GOLANGCI_VERSION: v2.12.2
 
 jobs:
   lint:
@@ -32,11 +33,14 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: v2.8.0
-          args: --timeout 10m
+      - name: Setup Task
+        uses: go-task/setup-task@v2
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_VERSION }}
+
+      - name: Lint
+        run: task lint
 
   test:
     name: Test
@@ -51,8 +55,11 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      - name: Setup Task
+        uses: go-task/setup-task@v2
+
       - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: task test -- -coverprofile=coverage.out -covermode=atomic
 
       - name: Update coverage badge
         if: github.ref == 'refs/heads/master'
@@ -74,8 +81,11 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      - name: Setup Task
+        uses: go-task/setup-task@v2
+
       - name: Build
-        run: go build -v -o bin/shelly ./cmd/shelly
+        run: task build
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -91,10 +101,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Task
+        uses: go-task/setup-task@v2
+
       - name: Run convention audit
         env:
           AUDIT_ONLY: "true"
-        run: ./scripts/audit-conventions.sh
+        run: task audit
 
   security:
     name: Security Scan

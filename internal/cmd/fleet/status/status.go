@@ -14,6 +14,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Command name and alias literals.
+const (
+	cmdName   = "status"
+	aliasList = "list"
+)
+
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -26,8 +32,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "status",
-		Aliases: []string{"st", "list", "ls"},
+		Use:     cmdName,
+		Aliases: []string{"st", aliasList, "ls"},
 		Short:   "View fleet device status",
 		Long: `View the status of all devices in your fleet.
 

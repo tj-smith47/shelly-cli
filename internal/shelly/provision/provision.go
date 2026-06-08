@@ -10,6 +10,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
 
+// WiFi configuration map keys used when building RPC parameters.
+const (
+	wifiKeySta  = "sta"
+	wifiKeySSID = "ssid"
+)
+
 // DeviceInfo holds basic device information for provisioning.
 type DeviceInfo struct {
 	Model string `json:"model"`
@@ -61,10 +67,10 @@ func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password str
 	return s.provider.WithConnection(ctx, address, func(conn *client.Client) error {
 		params := map[string]any{
 			"config": map[string]any{
-				"sta": map[string]any{
-					"ssid":   ssid,
-					"pass":   password,
-					"enable": true,
+				wifiKeySta: map[string]any{
+					wifiKeySSID: ssid,
+					"pass":      password,
+					"enable":    true,
 				},
 			},
 		}

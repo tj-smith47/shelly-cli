@@ -13,6 +13,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+const (
+	// aliasSet is the "set" alias for the apply command.
+	aliasSet = "set"
+	// aliasPush is the "push" alias, shared with the apply verb semantics.
+	aliasPush = "push"
+)
+
 // Options holds command options.
 type Options struct {
 	flags.ConfirmFlags
@@ -28,7 +35,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "apply <template> <device>",
-		Aliases: []string{"set", "push"},
+		Aliases: []string{aliasSet, aliasPush},
 		Short:   "Apply a template to a device",
 		Long: `Apply a saved configuration template to a device.
 

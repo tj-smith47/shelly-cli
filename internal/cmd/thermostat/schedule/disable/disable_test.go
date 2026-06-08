@@ -289,15 +289,15 @@ func TestExecute_WithMockGen2Device(t *testing.T) {
 			"thermostat-device": {
 				"thermostat:0": map[string]any{
 					"id":        float64(0),
-					"enable":    true,
+					paramEnable: true,
 					"target_C":  float64(22.0),
 					"current_C": float64(21.5),
 					"output":    true,
 				},
 				"schedule:1": map[string]any{
-					"id":       float64(1),
-					"enable":   true,
-					"timespec": "0 0 8 * *",
+					"id":        float64(1),
+					paramEnable: true,
+					"timespec":  "0 0 8 * *",
 				},
 			},
 		},
@@ -346,15 +346,15 @@ func TestNewCommand_ExecuteWithIDFlag(t *testing.T) {
 			"thermostat-device": {
 				"thermostat:0": map[string]any{
 					"id":        float64(0),
-					"enable":    true,
+					paramEnable: true,
 					"target_C":  float64(22.0),
 					"current_C": float64(21.5),
 					"output":    true,
 				},
 				"schedule:1": map[string]any{
-					"id":       float64(1),
-					"enable":   true,
-					"timespec": "0 0 8 * *",
+					"id":        float64(1),
+					paramEnable: true,
+					"timespec":  "0 0 8 * *",
 				},
 			},
 		},

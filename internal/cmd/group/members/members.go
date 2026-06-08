@@ -13,6 +13,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// keyGroup is the output field name for the group identifier.
+const keyGroup = "group"
+
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
@@ -62,7 +65,7 @@ func run(cmd *cobra.Command, opts *Options) error {
 
 	if output.WantsJSON() {
 		data := map[string]any{
-			"group":   opts.GroupName,
+			keyGroup:  opts.GroupName,
 			"members": group.Devices,
 			"count":   len(group.Devices),
 		}
@@ -70,7 +73,7 @@ func run(cmd *cobra.Command, opts *Options) error {
 	}
 	if output.WantsYAML() {
 		data := map[string]any{
-			"group":   opts.GroupName,
+			keyGroup:  opts.GroupName,
 			"members": group.Devices,
 			"count":   len(group.Devices),
 		}

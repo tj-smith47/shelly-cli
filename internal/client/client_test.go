@@ -25,6 +25,85 @@ const (
 	testKitchenLight = "Kitchen Light"
 	gen2Endpoint     = "/rpc/Shelly.GetDeviceInfo"
 	gen1Endpoint     = "/shelly"
+
+	testCoverKey         = "cover:0"
+	componentsKey        = "components"
+	testModelSHSW1       = "SHSW-1"
+	testModelSHSW25      = "SHSW-25"
+	testFirmware1110     = "1.11.0"
+	testFirmware1100     = "1.10.0"
+	testKey              = "abc123"
+	testFwGen2           = "20231107-164738/1.0.0-g1234567"
+	testFwGen2v114       = "20230913-114351/v1.14.0-gcb84623"
+	appKey               = "app"
+	authEnKey            = "auth_en"
+	authKey              = "auth"
+	adminVal             = "admin"
+	testNetwork          = "MyNetwork"
+	buttonComp           = "button"
+	apowerKey            = "apower"
+	deviceKey            = "device"
+	autoOnKey            = "auto_on"
+	autoOffKey           = "auto_off"
+	currentKey           = "current"
+	currentPosKey        = "current_pos"
+	brightnessKey        = "brightness"
+	defaultBrightnessKey = "default_brightness"
+	blueKey              = "blue"
+	testTEST             = "TEST"
+
+	switchKey0         = "switch:0"
+	switchKey1         = "switch:1"
+	lightKey0          = "light:0"
+	rgbKey0            = "rgb:0"
+	inputKey0          = "input:0"
+	sysKey             = "sys"
+	nameKey            = "name"
+	keyKey             = "key"
+	secondVal          = "second"
+	mykeyVal           = "mykey"
+	key1Key            = "key1"
+	newetagVal         = "newetag"
+	switchComp         = "switch"
+	testDeviceID       = "shellyplus1pm-test123"
+	macKey             = "mac"
+	modelKey           = "model"
+	genKey             = "gen"
+	fwIDKey            = "fw_id"
+	typeKey            = "type"
+	numOutputsKey      = "num_outputs"
+	numMetersKey       = "num_meters"
+	secretVal          = "secret"
+	passwordVal        = "password"
+	totalKey           = "total"
+	statusKey          = "status"
+	ssidKey            = "ssid"
+	outputComp         = "output"
+	sourceKey          = "source"
+	enableKey          = "enable"
+	initialStateKey    = "initial_state"
+	restartRequiredKey = "restart_required"
+	successKey         = "success"
+	isonKey            = "ison"
+	stateKey           = "state"
+	openVal            = "open"
+	stopVal            = "stop"
+	modeKey            = "mode"
+	etagKey            = "etag"
+	revKey             = "rev"
+	greenKey           = "green"
+
+	testVal        = "test"
+	valueKey       = "value"
+	thirdVal       = "third"
+	key2Key        = "key2"
+	verKey         = "ver"
+	voltageKey     = "voltage"
+	restoreLastVal = "restore_last"
+	wasOnKey       = "was_on"
+	stoppedVal     = "stopped"
+	whiteVal       = "white"
+	redKey         = "red"
 )
 
 func TestDeviceInfo_Fields(t *testing.T) {
@@ -73,15 +152,15 @@ func TestParseComponentKey_ValidKeys(t *testing.T) {
 		wantID   int
 		wantOK   bool
 	}{
-		{"switch:0", "switch:0", model.ComponentSwitch, 0, true},
-		{"switch:1", "switch:1", model.ComponentSwitch, 1, true},
-		{"cover:0", "cover:0", model.ComponentCover, 0, true},
+		{switchKey0, switchKey0, model.ComponentSwitch, 0, true},
+		{switchKey1, switchKey1, model.ComponentSwitch, 1, true},
+		{testCoverKey, testCoverKey, model.ComponentCover, 0, true},
 		{"cover:2", "cover:2", model.ComponentCover, 2, true},
-		{"light:0", "light:0", model.ComponentLight, 0, true},
+		{lightKey0, lightKey0, model.ComponentLight, 0, true},
 		{"light:3", "light:3", model.ComponentLight, 3, true},
-		{"rgb:0", "rgb:0", model.ComponentRGB, 0, true},
+		{rgbKey0, rgbKey0, model.ComponentRGB, 0, true},
 		{"rgb:1", "rgb:1", model.ComponentRGB, 1, true},
-		{"input:0", "input:0", model.ComponentInput, 0, true},
+		{inputKey0, inputKey0, model.ComponentInput, 0, true},
 		{"input:5", "input:5", model.ComponentInput, 5, true},
 	}
 
@@ -117,9 +196,9 @@ func TestParseComponentKey_InvalidKeys(t *testing.T) {
 	}{
 		{"unknown type", "unknown:0"},
 		{"wifi component", "wifi:0"},
-		{"sys component", "sys"},
+		{"sys component", sysKey},
 		{"empty", ""},
-		{"just prefix", "switch:"},
+		{"just prefix", switchPrefix},
 		{"invalid id", "switch:abc"},
 		{"no colon", "switch0"},
 		{"wrong format", "0:switch"},
@@ -148,8 +227,8 @@ func TestUnmarshalResponse_Success(t *testing.T) {
 	}
 
 	data := map[string]any{
-		"name":  "test",
-		"value": 42,
+		nameKey:  testVal,
+		valueKey: 42,
 	}
 
 	var result testStruct
@@ -158,7 +237,7 @@ func TestUnmarshalResponse_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unmarshalResponse() error = %v", err)
 	}
-	if result.Name != "test" {
+	if result.Name != testVal {
 		t.Errorf("Name = %q, want test", result.Name)
 	}
 	if result.Value != 42 {
@@ -177,7 +256,7 @@ func TestUnmarshalResponse_Nested(t *testing.T) {
 	}
 
 	data := map[string]any{
-		"components": []any{
+		componentsKey: []any{
 			map[string]any{"id": 0},
 			map[string]any{"id": 1},
 		},
@@ -208,7 +287,7 @@ func TestUnmarshalResponse_TypeMismatch(t *testing.T) {
 	}
 
 	data := map[string]any{
-		"value": "not an int",
+		valueKey: "not an int",
 	}
 
 	var result testStruct
@@ -223,12 +302,12 @@ func TestComponentPrefixes_AllTypes(t *testing.T) {
 	t.Parallel()
 
 	expectedPrefixes := map[string]model.ComponentType{
-		"switch:": model.ComponentSwitch,
-		"cover:":  model.ComponentCover,
-		"light:":  model.ComponentLight,
-		"rgb:":    model.ComponentRGB,
-		"rgbw:":   model.ComponentRGBW,
-		"input:":  model.ComponentInput,
+		switchPrefix: model.ComponentSwitch,
+		coverPrefix:  model.ComponentCover,
+		lightPrefix:  model.ComponentLight,
+		rgbPrefix:    model.ComponentRGB,
+		rgbwPrefix:   model.ComponentRGBW,
+		inputPrefix:  model.ComponentInput,
 	}
 
 	for prefix, expectedType := range expectedPrefixes {
@@ -280,10 +359,10 @@ func TestClient_Info(t *testing.T) {
 
 	info := &DeviceInfo{
 		ID:         "shelly123",
-		MAC:        "AA:BB:CC:DD:EE:FF",
+		MAC:        testMAC1,
 		Model:      "SNSW-001",
 		Generation: 2,
-		Firmware:   "1.0.0",
+		Firmware:   testFirmware,
 		App:        "Plus1",
 		AuthEn:     true,
 	}
@@ -426,7 +505,7 @@ func TestDeviceInfo_AllFields(t *testing.T) {
 	// Test with all fields populated
 	info := DeviceInfo{
 		ID:         "shellypluspmmini-abc123",
-		MAC:        "11:22:33:44:55:66",
+		MAC:        testMAC2,
 		Model:      "SNPM-001PCEU16",
 		Generation: 2,
 		Firmware:   "1.2.3-beta",
@@ -550,8 +629,8 @@ func TestUnmarshalResponse_SliceData(t *testing.T) {
 	t.Parallel()
 
 	data := []any{
-		map[string]any{"id": 0, "key": "switch:0"},
-		map[string]any{"id": 1, "key": "switch:1"},
+		map[string]any{"id": 0, keyKey: switchKey0},
+		map[string]any{"id": 1, keyKey: switchKey1},
 	}
 
 	type item struct {
@@ -571,7 +650,7 @@ func TestUnmarshalResponse_SliceData(t *testing.T) {
 	if result[0].ID != 0 {
 		t.Errorf("result[0].ID = %d, want 0", result[0].ID)
 	}
-	if result[1].Key != "switch:1" {
+	if result[1].Key != switchKey1 {
 		t.Errorf("result[1].Key = %q, want switch:1", result[1].Key)
 	}
 }
@@ -645,10 +724,10 @@ func TestDetectionResult_Fields(t *testing.T) {
 
 	result := DetectionResult{
 		Generation: Gen2,
-		DeviceType: "Plus1PM",
-		Model:      "SNSW-001P16EU",
-		MAC:        "AA:BB:CC:DD:EE:FF",
-		Firmware:   "1.0.0",
+		DeviceType: testApp,
+		Model:      testModel1,
+		MAC:        testMAC1,
+		Firmware:   testFirmware,
 		AuthEn:     true,
 	}
 
@@ -712,18 +791,18 @@ func TestFirstNonEmpty(t *testing.T) {
 	}{
 		{
 			name: "first is non-empty",
-			strs: []string{"first", "second", "third"},
+			strs: []string{"first", secondVal, thirdVal},
 			want: "first",
 		},
 		{
 			name: "second is first non-empty",
-			strs: []string{"", "second", "third"},
-			want: "second",
+			strs: []string{"", secondVal, thirdVal},
+			want: secondVal,
 		},
 		{
 			name: "third is first non-empty",
-			strs: []string{"", "", "third"},
-			want: "third",
+			strs: []string{"", "", thirdVal},
+			want: thirdVal,
 		},
 		{
 			name: "all empty",
@@ -775,10 +854,10 @@ func TestGen1Client_Info(t *testing.T) {
 
 	info := &DeviceInfo{
 		ID:         "shelly1-abc123",
-		MAC:        "AA:BB:CC:DD:EE:FF",
-		Model:      "SHSW-1",
+		MAC:        testMAC1,
+		Model:      testModelSHSW1,
 		Generation: 1,
-		Firmware:   "1.11.0",
+		Firmware:   testFirmware1110,
 		App:        "Shelly1",
 		AuthEn:     false,
 	}
@@ -938,18 +1017,18 @@ func TestKVSItem_Fields(t *testing.T) {
 	t.Parallel()
 
 	item := KVSItem{
-		Key:   "mykey",
+		Key:   mykeyVal,
 		Value: "myvalue",
-		Etag:  "abc123",
+		Etag:  testKey,
 	}
 
-	if item.Key != "mykey" {
+	if item.Key != mykeyVal {
 		t.Errorf("Key = %q, want mykey", item.Key)
 	}
 	if item.Value != "myvalue" {
 		t.Errorf("Value = %v, want myvalue", item.Value)
 	}
-	if item.Etag != "abc123" {
+	if item.Etag != testKey {
 		t.Errorf("Etag = %q, want abc123", item.Etag)
 	}
 }
@@ -958,14 +1037,14 @@ func TestKVSListResult_Fields(t *testing.T) {
 	t.Parallel()
 
 	result := KVSListResult{
-		Keys: []string{"key1", "key2", "key3"},
+		Keys: []string{key1Key, key2Key, "key3"},
 		Rev:  42,
 	}
 
 	if len(result.Keys) != 3 {
 		t.Errorf("len(Keys) = %d, want 3", len(result.Keys))
 	}
-	if result.Keys[0] != "key1" {
+	if result.Keys[0] != key1Key {
 		t.Errorf("Keys[0] = %q, want key1", result.Keys[0])
 	}
 	if result.Rev != 42 {
@@ -993,11 +1072,11 @@ func TestKVSSetResult_Fields(t *testing.T) {
 	t.Parallel()
 
 	result := KVSSetResult{
-		Etag: "newetag",
+		Etag: newetagVal,
 		Rev:  100,
 	}
 
-	if result.Etag != "newetag" {
+	if result.Etag != newetagVal {
 		t.Errorf("Etag = %q, want newetag", result.Etag)
 	}
 	if result.Rev != 100 {
@@ -1148,10 +1227,10 @@ func TestClient_Fields(t *testing.T) {
 
 	info := &DeviceInfo{
 		ID:         "test-device",
-		MAC:        "AA:BB:CC:DD:EE:FF",
+		MAC:        testMAC1,
 		Model:      "TestModel",
 		Generation: 2,
-		Firmware:   "1.0.0",
+		Firmware:   testFirmware,
 		App:        "TestApp",
 		AuthEn:     true,
 	}
@@ -1182,10 +1261,10 @@ func TestGen1Client_Fields(t *testing.T) {
 
 	info := &DeviceInfo{
 		ID:         "shelly1-test",
-		MAC:        "11:22:33:44:55:66",
-		Model:      "SHSW-1",
+		MAC:        testMAC2,
+		Model:      testModelSHSW1,
 		Generation: 1,
-		Firmware:   "1.11.0",
+		Firmware:   testFirmware1110,
 		App:        "Shelly1",
 		AuthEn:     false,
 	}
@@ -1310,9 +1389,9 @@ func TestParseComponentKey_Boundary(t *testing.T) {
 		key    string
 		wantOK bool
 	}{
-		{"switch with 0", "switch:0", true},
-		{"switch with empty after colon", "switch:", false},
-		{"exact prefix length", "switch", false},
+		{"switch with 0", switchKey0, true},
+		{"switch with empty after colon", switchPrefix, false},
+		{"exact prefix length", switchComp, false},
 		{"one char short", "switc:0", false},
 	}
 
@@ -1349,7 +1428,7 @@ func TestUnmarshalResponse_InvalidJSON(t *testing.T) {
 func TestUnmarshalResponse_NilDestination(t *testing.T) {
 	t.Parallel()
 
-	data := map[string]any{"key": "value"}
+	data := map[string]any{keyKey: valueKey}
 
 	// This should handle nil destination gracefully
 	var nilPtr *struct{ Key string }
@@ -1377,7 +1456,7 @@ func TestUnmarshalResponse_ComplexNesting(t *testing.T) {
 	data := map[string]any{
 		"level2": map[string]any{
 			"level3": map[string]any{
-				"value": 42,
+				valueKey: 42,
 			},
 		},
 	}
@@ -1403,9 +1482,9 @@ func TestFirstNonEmpty_WithSpaces(t *testing.T) {
 		strs []string
 		want string
 	}{
-		{"space is non-empty", []string{"", " ", "value"}, " "},
-		{"tab is non-empty", []string{"", "\t", "value"}, "\t"},
-		{"newline is non-empty", []string{"", "\n", "value"}, "\n"},
+		{"space is non-empty", []string{"", " ", valueKey}, " "},
+		{"tab is non-empty", []string{"", "\t", valueKey}, "\t"},
+		{"newline is non-empty", []string{"", "\n", valueKey}, "\n"},
 	}
 
 	for _, tt := range tests {
@@ -1523,12 +1602,12 @@ func TestComponentPrefixes_NoExtraKeys(t *testing.T) {
 	t.Parallel()
 
 	validPrefixes := map[string]bool{
-		"switch:": true,
-		"cover:":  true,
-		"light:":  true,
-		"rgb:":    true,
-		"rgbw:":   true,
-		"input:":  true,
+		switchPrefix: true,
+		coverPrefix:  true,
+		lightPrefix:  true,
+		rgbPrefix:    true,
+		rgbwPrefix:   true,
+		inputPrefix:  true,
 	}
 
 	for prefix := range componentPrefixes {
@@ -1544,14 +1623,14 @@ func TestDetectGeneration_Gen2Device(t *testing.T) {
 	t.Parallel()
 
 	gen2Response := map[string]any{
-		"id":      "shellyplus1pm-test123",
-		"mac":     "AA:BB:CC:DD:EE:FF",
-		"model":   "SNSW-001P16EU",
-		"gen":     2,
-		"fw_id":   "20231107-164738/1.0.0-g1234567",
-		"ver":     "1.0.0",
-		"app":     "Plus1PM",
-		"auth_en": false,
+		"id":      testDeviceID,
+		macKey:    testMAC1,
+		modelKey:  testModel1,
+		genKey:    2,
+		fwIDKey:   testFwGen2,
+		verKey:    testFirmware,
+		appKey:    testApp,
+		authEnKey: false,
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1608,14 +1687,14 @@ func TestDetectGeneration_HTTPSSelfSigned(t *testing.T) {
 	t.Parallel()
 
 	gen2Response := map[string]any{
-		"id":      "shellyplus1pm-test123",
-		"mac":     "AA:BB:CC:DD:EE:FF",
-		"model":   "SNSW-001P16EU",
-		"gen":     2,
-		"fw_id":   "20231107-164738/1.0.0-g1234567",
-		"ver":     "1.0.0",
-		"app":     "Plus1PM",
-		"auth_en": false,
+		"id":      testDeviceID,
+		macKey:    testMAC1,
+		modelKey:  testModel1,
+		genKey:    2,
+		fwIDKey:   testFwGen2,
+		verKey:    testFirmware,
+		appKey:    testApp,
+		authEnKey: false,
 	}
 
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1649,12 +1728,12 @@ func TestDetectGeneration_Gen1Device(t *testing.T) {
 	t.Parallel()
 
 	gen1Response := map[string]any{
-		"type":        "SHSW-1",
-		"mac":         "11:22:33:44:55:66",
-		"auth":        false,
+		typeKey:       testModelSHSW1,
+		macKey:        testMAC2,
+		authKey:       false,
 		"fw":          "20210226-091923/v1.10.0-rc2@28a456c3",
-		"num_outputs": 1,
-		"num_meters":  0,
+		numOutputsKey: 1,
+		numMetersKey:  0,
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1685,7 +1764,7 @@ func TestDetectGeneration_Gen1Device(t *testing.T) {
 	if result.Generation != Gen1 {
 		t.Errorf("Generation = %d, want %d", result.Generation, Gen1)
 	}
-	if result.DeviceType != "SHSW-1" {
+	if result.DeviceType != testModelSHSW1 {
 		t.Errorf("DeviceType = %q, want SHSW-1", result.DeviceType)
 	}
 	if result.MAC != testMAC2 {
@@ -1705,7 +1784,7 @@ func TestDetectGeneration_AuthRequired(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check for basic auth
 		user, pass, ok := r.BasicAuth()
-		if !ok || user != "admin" || pass != "secret" {
+		if !ok || user != adminVal || pass != secretVal {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -1714,12 +1793,12 @@ func TestDetectGeneration_AuthRequired(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			resp := map[string]any{
 				"id":      "shellyplus1-auth",
-				"mac":     "AA:BB:CC:DD:EE:FF",
-				"model":   "SNSW-001X16EU",
-				"gen":     2,
-				"ver":     "1.0.0",
-				"app":     "Plus1",
-				"auth_en": true,
+				macKey:    testMAC1,
+				modelKey:  "SNSW-001X16EU",
+				genKey:    2,
+				verKey:    testFirmware,
+				appKey:    "Plus1",
+				authEnKey: true,
 			}
 			if err := json.NewEncoder(w).Encode(resp); err != nil {
 				t.Logf("warning: failed to encode response: %v", err)
@@ -1740,7 +1819,7 @@ func TestDetectGeneration_AuthRequired(t *testing.T) {
 	}
 
 	// With correct auth - should succeed
-	auth := &model.Auth{Username: "admin", Password: "secret"}
+	auth := &model.Auth{Username: adminVal, Password: secretVal}
 	result, err := DetectGeneration(ctx, server.URL, auth)
 	if err != nil {
 		t.Fatalf("DetectGeneration() with auth error = %v", err)
@@ -1807,13 +1886,13 @@ func TestDetectGeneration_Gen2FirmwareFallback(t *testing.T) {
 
 	// Test fallback from 'ver' to 'fw_id' when 'ver' is empty
 	gen2Response := map[string]any{
-		"id":    "shellyplus1pm-test",
-		"mac":   "AA:BB:CC:DD:EE:FF",
-		"model": "SNSW-001P16EU",
-		"gen":   2,
-		"fw_id": "20231107-164738/1.2.3-g1234567",
-		"ver":   "", // Empty ver, should fall back to fw_id
-		"app":   "Plus1PM",
+		"id":     "shellyplus1pm-test",
+		macKey:   testMAC1,
+		modelKey: testModel1,
+		genKey:   2,
+		fwIDKey:  "20231107-164738/1.2.3-g1234567",
+		verKey:   "", // Empty ver, should fall back to fw_id
+		appKey:   testApp,
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1852,25 +1931,25 @@ func TestDetectGeneration_Gen2DeviceTypeFallback(t *testing.T) {
 		{
 			name: "app field",
 			response: map[string]any{
-				"id":    "test1",
-				"mac":   "AA:BB:CC:DD:EE:FF",
-				"model": "TEST",
-				"gen":   2,
-				"ver":   "1.0.0",
-				"app":   "MyApp",
+				"id":     "test1",
+				macKey:   testMAC1,
+				modelKey: testTEST,
+				genKey:   2,
+				verKey:   testFirmware,
+				appKey:   "MyApp",
 			},
 			wantType: "MyApp",
 		},
 		{
 			name: "type field when app empty",
 			response: map[string]any{
-				"id":    "test2",
-				"mac":   "AA:BB:CC:DD:EE:FF",
-				"model": "TEST",
-				"gen":   2,
-				"ver":   "1.0.0",
-				"app":   "",
-				"type":  "MyType",
+				"id":     "test2",
+				macKey:   testMAC1,
+				modelKey: testTEST,
+				genKey:   2,
+				verKey:   testFirmware,
+				appKey:   "",
+				typeKey:  "MyType",
 			},
 			wantType: "MyType",
 		},
@@ -1878,12 +1957,12 @@ func TestDetectGeneration_Gen2DeviceTypeFallback(t *testing.T) {
 			name: "dev_type field when app and type empty",
 			response: map[string]any{
 				"id":       "test3",
-				"mac":      "AA:BB:CC:DD:EE:FF",
-				"model":    "TEST",
-				"gen":      2,
-				"ver":      "1.0.0",
-				"app":      "",
-				"type":     "",
+				macKey:     testMAC1,
+				modelKey:   testTEST,
+				genKey:     2,
+				verKey:     testFirmware,
+				appKey:     "",
+				typeKey:    "",
 				"dev_type": "DevType",
 			},
 			wantType: "DevType",
@@ -1926,18 +2005,18 @@ func TestDetectGeneration_Gen2ReportsGen1(t *testing.T) {
 
 	// Gen2 endpoint returns gen=1, should fail and try Gen1
 	gen2Response := map[string]any{
-		"id":    "test",
-		"mac":   "AA:BB:CC:DD:EE:FF",
-		"model": "TEST",
-		"gen":   1, // Reports gen 1, should reject
-		"ver":   "1.0.0",
+		"id":     testVal,
+		macKey:   testMAC1,
+		modelKey: testTEST,
+		genKey:   1, // Reports gen 1, should reject
+		verKey:   testFirmware,
 	}
 
 	gen1Response := map[string]any{
-		"type": "SHSW-1",
-		"mac":  "AA:BB:CC:DD:EE:FF",
-		"auth": false,
-		"fw":   "1.10.0",
+		typeKey: testModelSHSW1,
+		macKey:  testMAC1,
+		authKey: false,
+		"fw":    testFirmware1100,
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1977,12 +2056,12 @@ func TestDetectGeneration_AddressNormalization(t *testing.T) {
 	t.Parallel()
 
 	gen2Response := map[string]any{
-		"id":    "test",
-		"mac":   "AA:BB:CC:DD:EE:FF",
-		"model": "TEST",
-		"gen":   2,
-		"ver":   "1.0.0",
-		"app":   "Test",
+		"id":     testVal,
+		macKey:   testMAC1,
+		modelKey: testTEST,
+		genKey:   2,
+		verKey:   testFirmware,
+		appKey:   "Test",
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2078,16 +2157,16 @@ func TestDetectGeneration_Gen1WithAuth(t *testing.T) {
 	t.Parallel()
 
 	gen1Response := map[string]any{
-		"type": "SHSW-1",
-		"mac":  "AA:BB:CC:DD:EE:FF",
-		"auth": true,
-		"fw":   "1.11.0",
+		typeKey: testModelSHSW1,
+		macKey:  testMAC1,
+		authKey: true,
+		"fw":    testFirmware1110,
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check for basic auth
 		user, pass, ok := r.BasicAuth()
-		if !ok || user != "admin" || pass != "password" {
+		if !ok || user != adminVal || pass != passwordVal {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -2112,7 +2191,7 @@ func TestDetectGeneration_Gen1WithAuth(t *testing.T) {
 	defer cancel()
 
 	// With correct auth - should succeed and detect Gen1
-	auth := &model.Auth{Username: "admin", Password: "password"}
+	auth := &model.Auth{Username: adminVal, Password: passwordVal}
 	result, err := DetectGeneration(ctx, server.URL, auth)
 	if err != nil {
 		t.Fatalf("DetectGeneration() with auth error = %v", err)
@@ -2130,11 +2209,11 @@ func TestDetectGeneration_Gen1ReportsGen2(t *testing.T) {
 
 	// Gen1 endpoint (/shelly) reports gen >= 2, should reject
 	gen1Response := map[string]any{
-		"type": "SHSW-1",
-		"mac":  "AA:BB:CC:DD:EE:FF",
-		"auth": false,
-		"fw":   "1.10.0",
-		"gen":  2, // Reports gen 2, should reject this as a Gen1 device
+		typeKey: testModelSHSW1,
+		macKey:  testMAC1,
+		authKey: false,
+		"fw":    testFirmware1100,
+		genKey:  2, // Reports gen 2, should reject this as a Gen1 device
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2167,10 +2246,10 @@ func TestDetectGeneration_Gen1WithEmptyUsername(t *testing.T) {
 	t.Parallel()
 
 	gen1Response := map[string]any{
-		"type": "SHSW-1",
-		"mac":  "AA:BB:CC:DD:EE:FF",
-		"auth": false,
-		"fw":   "1.10.0",
+		typeKey: testModelSHSW1,
+		macKey:  testMAC1,
+		authKey: false,
+		"fw":    testFirmware1100,
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2193,7 +2272,7 @@ func TestDetectGeneration_Gen1WithEmptyUsername(t *testing.T) {
 	defer cancel()
 
 	// Auth with empty username should not set basic auth
-	auth := &model.Auth{Username: "", Password: "password"}
+	auth := &model.Auth{Username: "", Password: passwordVal}
 	result, err := DetectGeneration(ctx, server.URL, auth)
 	if err != nil {
 		t.Fatalf("DetectGeneration() with empty username error = %v", err)
@@ -2207,12 +2286,12 @@ func TestDetectGeneration_Gen2WithEmptyUsername(t *testing.T) {
 	t.Parallel()
 
 	gen2Response := map[string]any{
-		"id":    "test",
-		"mac":   "AA:BB:CC:DD:EE:FF",
-		"model": "TEST",
-		"gen":   2,
-		"ver":   "1.0.0",
-		"app":   "Test",
+		"id":     testVal,
+		macKey:   testMAC1,
+		modelKey: testTEST,
+		genKey:   2,
+		verKey:   testFirmware,
+		appKey:   "Test",
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2231,7 +2310,7 @@ func TestDetectGeneration_Gen2WithEmptyUsername(t *testing.T) {
 	defer cancel()
 
 	// Auth with empty username should not set basic auth
-	auth := &model.Auth{Username: "", Password: "password"}
+	auth := &model.Auth{Username: "", Password: passwordVal}
 	result, err := DetectGeneration(ctx, server.URL, auth)
 	if err != nil {
 		t.Fatalf("DetectGeneration() with empty username error = %v", err)
@@ -2245,13 +2324,13 @@ func TestDetectGeneration_Gen1AllFields(t *testing.T) {
 	t.Parallel()
 
 	gen1Response := map[string]any{
-		"type":        "SHSW-25",
-		"mac":         "11:22:33:44:55:66",
-		"auth":        true,
-		"fw":          "20230913-114351/v1.14.0-gcb84623",
-		"num_outputs": 2,
-		"num_meters":  1,
-		"gen":         1, // Explicitly set to 1
+		typeKey:       testModelSHSW25,
+		macKey:        testMAC2,
+		authKey:       true,
+		"fw":          testFwGen2v114,
+		numOutputsKey: 2,
+		numMetersKey:  1,
+		genKey:        1, // Explicitly set to 1
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2281,16 +2360,16 @@ func TestDetectGeneration_Gen1AllFields(t *testing.T) {
 	if result.Generation != Gen1 {
 		t.Errorf("Generation = %d, want %d", result.Generation, Gen1)
 	}
-	if result.DeviceType != "SHSW-25" {
+	if result.DeviceType != testModelSHSW25 {
 		t.Errorf("DeviceType = %q, want SHSW-25", result.DeviceType)
 	}
-	if result.Model != "SHSW-25" {
+	if result.Model != testModelSHSW25 {
 		t.Errorf("Model = %q, want SHSW-25", result.Model)
 	}
 	if result.MAC != testMAC2 {
 		t.Errorf("MAC = %q, want %s", result.MAC, testMAC2)
 	}
-	if result.Firmware != "20230913-114351/v1.14.0-gcb84623" {
+	if result.Firmware != testFwGen2v114 {
 		t.Errorf("Firmware = %q, want specific version", result.Firmware)
 	}
 	if !result.AuthEn {
@@ -2499,14 +2578,14 @@ func (m *mockRPCServer) start(t *testing.T) *httptest.Server {
 // Standard device info response for tests.
 func standardDeviceInfo() map[string]any {
 	return map[string]any{
-		"id":      "shellyplus1pm-test123",
-		"mac":     "AA:BB:CC:DD:EE:FF",
-		"model":   "SNSW-001P16EU",
-		"gen":     2,
-		"fw_id":   "20231107-164738/1.0.0-g1234567",
-		"ver":     "1.0.0",
-		"app":     "Plus1PM",
-		"auth_en": false,
+		"id":      testDeviceID,
+		macKey:    testMAC1,
+		modelKey:  testModel1,
+		genKey:    2,
+		fwIDKey:   testFwGen2,
+		verKey:    testFirmware,
+		appKey:    testApp,
+		authEnKey: false,
 	}
 }
 
@@ -2538,22 +2617,22 @@ func TestConnect_Success(t *testing.T) {
 	if info == nil {
 		t.Fatal("Info() returned nil")
 	}
-	if info.ID != "shellyplus1pm-test123" {
+	if info.ID != testDeviceID {
 		t.Errorf("Info().ID = %q, want shellyplus1pm-test123", info.ID)
 	}
-	if info.MAC != "AA:BB:CC:DD:EE:FF" {
+	if info.MAC != testMAC1 {
 		t.Errorf("Info().MAC = %q, want AA:BB:CC:DD:EE:FF", info.MAC)
 	}
-	if info.Model != "SNSW-001P16EU" {
+	if info.Model != testModel1 {
 		t.Errorf("Info().Model = %q, want SNSW-001P16EU", info.Model)
 	}
 	if info.Generation != 2 {
 		t.Errorf("Info().Generation = %d, want 2", info.Generation)
 	}
-	if info.Firmware != "1.0.0" {
+	if info.Firmware != testFirmware {
 		t.Errorf("Info().Firmware = %q, want 1.0.0", info.Firmware)
 	}
-	if info.App != "Plus1PM" {
+	if info.App != testApp {
 		t.Errorf("Info().App = %q, want Plus1PM", info.App)
 	}
 }
@@ -2562,10 +2641,10 @@ func TestConnect_WithAuth(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockRPCServer().
-		withAuth("admin", "secret").
+		withAuth(adminVal, secretVal).
 		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
 			info := standardDeviceInfo()
-			info["auth_en"] = true
+			info[authEnKey] = true
 			return info, nil
 		})
 
@@ -2576,7 +2655,7 @@ func TestConnect_WithAuth(t *testing.T) {
 
 	device := model.Device{
 		Address: server.URL,
-		Auth:    &model.Auth{Username: "admin", Password: "secret"},
+		Auth:    &model.Auth{Username: adminVal, Password: secretVal},
 	}
 	client, err := Connect(ctx, device)
 	if err != nil {
@@ -2597,7 +2676,7 @@ func TestConnect_AuthRequired(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockRPCServer().
-		withAuth("admin", "secret").
+		withAuth(adminVal, secretVal).
 		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
 			return standardDeviceInfo(), nil
 		})
@@ -2641,7 +2720,7 @@ func TestConnect_AddressNormalization(t *testing.T) {
 		}
 	}()
 
-	if client.Info().ID != "shellyplus1pm-test123" {
+	if client.Info().ID != testDeviceID {
 		t.Errorf("Info().ID = %q, want shellyplus1pm-test123", client.Info().ID)
 	}
 }
@@ -2669,14 +2748,14 @@ func TestClient_ListComponents_Success(t *testing.T) {
 		}).
 		handle("Shelly.GetComponents", func(_ map[string]any) (any, error) {
 			return map[string]any{
-				"components": []any{
-					map[string]any{"key": "switch:0"},
-					map[string]any{"key": "switch:1"},
-					map[string]any{"key": "input:0"},
-					map[string]any{"key": "cover:0"},
-					map[string]any{"key": "light:0"},
-					map[string]any{"key": "sys"},      // Should be filtered out
-					map[string]any{"key": "wifi:sta"}, // Should be filtered out
+				componentsKey: []any{
+					map[string]any{keyKey: switchKey0},
+					map[string]any{keyKey: switchKey1},
+					map[string]any{keyKey: inputKey0},
+					map[string]any{keyKey: testCoverKey},
+					map[string]any{keyKey: lightKey0},
+					map[string]any{keyKey: sysKey},     // Should be filtered out
+					map[string]any{keyKey: "wifi:sta"}, // Should be filtered out
 				},
 			}, nil
 		})
@@ -2774,8 +2853,8 @@ func TestClient_ListComponents_Pagination(t *testing.T) {
 // paginatedComponents returns a page of components for pagination testing.
 func paginatedComponents(offset int) map[string]any {
 	allComps := []string{
-		"switch:0", "switch:1", "input:0", "input:1",
-		"cover:0", "light:0", "rgb:0", "rgbw:0",
+		switchKey0, switchKey1, inputKey0, "input:1",
+		testCoverKey, lightKey0, rgbKey0, "rgbw:0",
 		"switch:2", "switch:3", "input:2", "input:3",
 	}
 	total := len(allComps)
@@ -2788,13 +2867,13 @@ func paginatedComponents(offset int) map[string]any {
 
 	var comps []any
 	for i := offset; i < end; i++ {
-		comps = append(comps, map[string]any{"key": allComps[i]})
+		comps = append(comps, map[string]any{keyKey: allComps[i]})
 	}
 
 	return map[string]any{
-		"components": comps,
-		"offset":     offset,
-		"total":      total,
+		componentsKey: comps,
+		"offset":      offset,
+		totalKey:      total,
 	}
 }
 
@@ -2843,11 +2922,11 @@ func TestClient_FilterComponents_Success(t *testing.T) {
 		}).
 		handle("Shelly.GetComponents", func(_ map[string]any) (any, error) {
 			return map[string]any{
-				"components": []any{
-					map[string]any{"key": "switch:0"},
-					map[string]any{"key": "switch:1"},
-					map[string]any{"key": "input:0"},
-					map[string]any{"key": "cover:0"},
+				componentsKey: []any{
+					map[string]any{keyKey: switchKey0},
+					map[string]any{keyKey: switchKey1},
+					map[string]any{keyKey: inputKey0},
+					map[string]any{keyKey: testCoverKey},
 				},
 			}, nil
 		})
@@ -2905,23 +2984,23 @@ func TestClient_GetStatus_Success(t *testing.T) {
 	t.Parallel()
 
 	expectedStatus := map[string]any{
-		"sys": map[string]any{
-			"mac":            "AA:BB:CC:DD:EE:FF",
+		sysKey: map[string]any{
+			macKey:           testMAC1,
 			"restart_reason": "power_on",
 			"uptime":         12345,
 		},
 		"wifi": map[string]any{
-			"sta_ip": "192.168.1.100",
-			"status": "connected",
-			"ssid":   "MyNetwork",
-			"rssi":   -55,
+			"sta_ip":  "192.168.1.100",
+			statusKey: "connected",
+			ssidKey:   testNetwork,
+			"rssi":    -55,
 		},
-		"switch:0": map[string]any{
-			"id":      0,
-			"output":  true,
-			"source":  "button",
-			"apower":  150.5,
-			"voltage": 230.1,
+		switchKey0: map[string]any{
+			"id":       0,
+			outputComp: true,
+			sourceKey:  buttonComp,
+			apowerKey:  150.5,
+			voltageKey: 230.1,
 		},
 	}
 
@@ -2955,21 +3034,21 @@ func TestClient_GetStatus_Success(t *testing.T) {
 	}
 
 	// Check sys status
-	sys, ok := status["sys"].(map[string]any)
+	sys, ok := status[sysKey].(map[string]any)
 	if !ok {
 		t.Fatal("status[sys] not a map")
 	}
-	if sys["mac"] != "AA:BB:CC:DD:EE:FF" {
-		t.Errorf("sys.mac = %v, want AA:BB:CC:DD:EE:FF", sys["mac"])
+	if sys[macKey] != testMAC1 {
+		t.Errorf("sys.mac = %v, want AA:BB:CC:DD:EE:FF", sys[macKey])
 	}
 
 	// Check switch status
-	sw, ok := status["switch:0"].(map[string]any)
+	sw, ok := status[switchKey0].(map[string]any)
 	if !ok {
 		t.Fatal("status[switch:0] not a map")
 	}
-	if sw["output"] != true {
-		t.Errorf("switch:0.output = %v, want true", sw["output"])
+	if sw[outputComp] != true {
+		t.Errorf("switch:0.output = %v, want true", sw[outputComp])
 	}
 }
 
@@ -2977,26 +3056,26 @@ func TestClient_GetConfig_Success(t *testing.T) {
 	t.Parallel()
 
 	expectedConfig := map[string]any{
-		"sys": map[string]any{
-			"device": map[string]any{
-				"name":  "My Shelly",
+		sysKey: map[string]any{
+			deviceKey: map[string]any{
+				nameKey: "My Shelly",
 				"eco":   false,
-				"fw_id": "1.0.0",
+				fwIDKey: testFirmware,
 			},
 		},
 		"wifi": map[string]any{
 			"sta": map[string]any{
-				"ssid":   "MyNetwork",
-				"pass":   "****",
-				"enable": true,
+				ssidKey:   testNetwork,
+				"pass":    "****",
+				enableKey: true,
 			},
 		},
-		"switch:0": map[string]any{
+		switchKey0: map[string]any{
 			"id":            0,
-			"name":          testKitchenLight,
-			"initial_state": "restore_last",
-			"auto_on":       false,
-			"auto_off":      false,
+			nameKey:         testKitchenLight,
+			initialStateKey: restoreLastVal,
+			autoOnKey:       false,
+			autoOffKey:      false,
 		},
 	}
 
@@ -3030,25 +3109,25 @@ func TestClient_GetConfig_Success(t *testing.T) {
 	}
 
 	// Check sys config
-	sys, ok := config["sys"].(map[string]any)
+	sys, ok := config[sysKey].(map[string]any)
 	if !ok {
 		t.Fatal("config[sys] not a map")
 	}
-	sysDevice, ok := sys["device"].(map[string]any)
+	sysDevice, ok := sys[deviceKey].(map[string]any)
 	if !ok {
 		t.Fatal("sys.device not a map")
 	}
-	if sysDevice["name"] != "My Shelly" {
-		t.Errorf("sys.device.name = %v, want My Shelly", sysDevice["name"])
+	if sysDevice[nameKey] != "My Shelly" {
+		t.Errorf("sys.device.name = %v, want My Shelly", sysDevice[nameKey])
 	}
 
 	// Check switch config
-	sw, ok := config["switch:0"].(map[string]any)
+	sw, ok := config[switchKey0].(map[string]any)
 	if !ok {
 		t.Fatal("config[switch:0] not a map")
 	}
-	if sw["name"] != testKitchenLight {
-		t.Errorf("switch:0.name = %v, want %s", sw["name"], testKitchenLight)
+	if sw[nameKey] != testKitchenLight {
+		t.Errorf("switch:0.name = %v, want %s", sw[nameKey], testKitchenLight)
 	}
 }
 
@@ -3065,7 +3144,7 @@ func TestClient_SetConfig_Success(t *testing.T) {
 			if cfg, ok := params["config"].(map[string]any); ok {
 				receivedConfig = cfg
 			}
-			return map[string]any{"restart_required": false}, nil
+			return map[string]any{restartRequiredKey: false}, nil
 		})
 
 	server := mock.start(t)
@@ -3085,9 +3164,9 @@ func TestClient_SetConfig_Success(t *testing.T) {
 	}()
 
 	newConfig := map[string]any{
-		"sys": map[string]any{
-			"device": map[string]any{
-				"name": "New Name",
+		sysKey: map[string]any{
+			deviceKey: map[string]any{
+				nameKey: "New Name",
 			},
 		},
 	}
@@ -3101,16 +3180,16 @@ func TestClient_SetConfig_Success(t *testing.T) {
 	if receivedConfig == nil {
 		t.Fatal("SetConfig did not send config")
 	}
-	sysConfig, ok := receivedConfig["sys"].(map[string]any)
+	sysConfig, ok := receivedConfig[sysKey].(map[string]any)
 	if !ok {
 		t.Fatal("received config sys not a map")
 	}
-	deviceConfig, ok := sysConfig["device"].(map[string]any)
+	deviceConfig, ok := sysConfig[deviceKey].(map[string]any)
 	if !ok {
 		t.Fatal("received config sys.device not a map")
 	}
-	if deviceConfig["name"] != "New Name" {
-		t.Errorf("received config name = %v, want New Name", deviceConfig["name"])
+	if deviceConfig[nameKey] != "New Name" {
+		t.Errorf("received config name = %v, want New Name", deviceConfig[nameKey])
 	}
 }
 
@@ -3249,7 +3328,7 @@ func TestClient_Call_Success(t *testing.T) {
 		handle("Custom.Method", func(params map[string]any) (any, error) {
 			return map[string]any{
 				"received_param": params["test_param"],
-				"custom_result":  "success",
+				"custom_result":  successKey,
 			}, nil
 		})
 
@@ -3287,7 +3366,7 @@ func TestClient_Call_Success(t *testing.T) {
 		t.Fatalf("result is not map[string]any or json.RawMessage, got %T", result)
 	}
 
-	if resultMap["custom_result"] != "success" {
+	if resultMap["custom_result"] != successKey {
 		t.Errorf("custom_result = %v, want success", resultMap["custom_result"])
 	}
 	if resultMap["received_param"] != "test_value" {
@@ -3463,12 +3542,12 @@ func (m *mockGen1Server) start(t *testing.T) *httptest.Server {
 // Standard Gen1 device info response.
 func standardGen1DeviceInfo() map[string]any {
 	return map[string]any{
-		"type":        "SHSW-1",
-		"mac":         "11:22:33:44:55:66",
-		"auth":        false,
-		"fw":          "20230913-114351/v1.14.0-gcb84623",
-		"num_outputs": 1,
-		"num_meters":  0,
+		typeKey:       testModelSHSW1,
+		macKey:        testMAC2,
+		authKey:       false,
+		"fw":          testFwGen2v114,
+		numOutputsKey: 1,
+		numMetersKey:  0,
 	}
 }
 
@@ -3500,10 +3579,10 @@ func TestConnectGen1_Success(t *testing.T) {
 	if info == nil {
 		t.Fatal("Info() returned nil")
 	}
-	if info.MAC != "11:22:33:44:55:66" {
+	if info.MAC != testMAC2 {
 		t.Errorf("Info().MAC = %q, want 11:22:33:44:55:66", info.MAC)
 	}
-	if info.Model != "SHSW-1" {
+	if info.Model != testModelSHSW1 {
 		t.Errorf("Info().Model = %q, want SHSW-1", info.Model)
 	}
 	if info.Generation != 1 {
@@ -3515,10 +3594,10 @@ func TestConnectGen1_WithAuth(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockGen1Server().
-		withAuth("admin", "password").
+		withAuth(adminVal, passwordVal).
 		handle("/shelly", func(_ string) (any, int) {
 			info := standardGen1DeviceInfo()
-			info["auth"] = true
+			info[authKey] = true
 			return info, http.StatusOK
 		})
 
@@ -3529,7 +3608,7 @@ func TestConnectGen1_WithAuth(t *testing.T) {
 
 	device := model.Device{
 		Address: server.URL,
-		Auth:    &model.Auth{Username: "admin", Password: "password"},
+		Auth:    &model.Auth{Username: adminVal, Password: passwordVal},
 	}
 	client, err := ConnectGen1(ctx, device)
 	if err != nil {
@@ -3550,7 +3629,7 @@ func TestConnectGen1_AuthRequired(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockGen1Server().
-		withAuth("admin", "secret").
+		withAuth(adminVal, secretVal).
 		handle("/shelly", func(_ string) (any, int) {
 			return standardGen1DeviceInfo(), http.StatusOK
 		})
@@ -3594,7 +3673,7 @@ func TestConnectGen1_AddressNormalization(t *testing.T) {
 		}
 	}()
 
-	if client.Info().MAC != "11:22:33:44:55:66" {
+	if client.Info().MAC != testMAC2 {
 		t.Errorf("Info().MAC = %q, want 11:22:33:44:55:66", client.Info().MAC)
 	}
 }
@@ -3619,9 +3698,9 @@ func TestGen1Client_GetStatus_Success(t *testing.T) {
 	statusResponse := map[string]any{
 		"relays": []any{
 			map[string]any{
-				"ison":      true,
+				isonKey:     true,
 				"has_timer": false,
-				"source":    "button",
+				sourceKey:   buttonComp,
 			},
 		},
 		"meters": []any{
@@ -3631,12 +3710,12 @@ func TestGen1Client_GetStatus_Success(t *testing.T) {
 		},
 		"wifi_sta": map[string]any{
 			"connected": true,
-			"ssid":      "MyNetwork",
+			ssidKey:     testNetwork,
 			"ip":        "192.168.1.100",
 			"rssi":      -55,
 		},
 		"update": map[string]any{
-			"status": "idle",
+			statusKey: "idle",
 		},
 		"uptime": 12345,
 	}
@@ -3682,22 +3761,22 @@ func TestGen1Client_GetSettings_Success(t *testing.T) {
 	t.Parallel()
 
 	settingsResponse := map[string]any{
-		"device": map[string]any{
-			"type":     "SHSW-1",
-			"mac":      "11:22:33:44:55:66",
+		deviceKey: map[string]any{
+			typeKey:    testModelSHSW1,
+			macKey:     testMAC2,
 			"hostname": "shelly1-123456",
 		},
 		"wifi_sta": map[string]any{
 			"enabled": true,
-			"ssid":    "MyNetwork",
+			ssidKey:   testNetwork,
 		},
 		"relays": []any{
 			map[string]any{
-				"name":           testKitchenLight,
+				nameKey:          testKitchenLight,
 				"default_state":  "last",
 				"btn_type":       "toggle",
-				"auto_on":        0,
-				"auto_off":       0,
+				autoOnKey:        0,
+				autoOffKey:       0,
 				"schedule":       false,
 				"schedule_rules": []any{},
 			},
@@ -3827,7 +3906,7 @@ func TestGen1Client_Call_Success(t *testing.T) {
 			return standardGen1DeviceInfo(), http.StatusOK
 		}).
 		handle("/custom/endpoint", func(_ string) (any, int) {
-			return map[string]any{"result": "success"}, http.StatusOK
+			return map[string]any{"result": successKey}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -4040,7 +4119,7 @@ func TestGen1Client_CheckForUpdate_Success(t *testing.T) {
 	t.Parallel()
 
 	updateResponse := map[string]any{
-		"status":      "idle",
+		statusKey:     "idle",
 		"has_update":  true,
 		"new_version": "1.15.0",
 		"old_version": "1.14.0",
@@ -4123,7 +4202,7 @@ func TestGen1Relay_TurnOn(t *testing.T) {
 			if query == "turn=on" {
 				turnOnCalled = true
 			}
-			return map[string]any{"ison": true}, http.StatusOK
+			return map[string]any{isonKey: true}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -4170,7 +4249,7 @@ func TestGen1Relay_TurnOff(t *testing.T) {
 			if query == "turn=off" {
 				turnOffCalled = true
 			}
-			return map[string]any{"ison": false}, http.StatusOK
+			return map[string]any{isonKey: false}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -4217,7 +4296,7 @@ func TestGen1Relay_Toggle(t *testing.T) {
 			if query == "turn=toggle" {
 				toggleCalled = true
 			}
-			return map[string]any{"ison": true}, http.StatusOK
+			return map[string]any{isonKey: true}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -4264,7 +4343,7 @@ func TestGen1Relay_Set(t *testing.T) {
 			if query == "turn=on" || query == "turn=off" {
 				setCalled = true
 			}
-			return map[string]any{"ison": true}, http.StatusOK
+			return map[string]any{isonKey: true}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -4307,12 +4386,12 @@ func TestGen1Relay_GetStatus(t *testing.T) {
 		}).
 		handle("/relay/0", func(_ string) (any, int) {
 			return map[string]any{
-				"ison":             true,
+				isonKey:            true,
 				"has_timer":        false,
 				"timer_started_at": 0,
 				"timer_duration":   0,
 				"timer_remaining":  0,
-				"source":           "button",
+				sourceKey:          buttonComp,
 			}, http.StatusOK
 		})
 
@@ -4359,11 +4438,11 @@ func TestGen1Relay_GetConfig(t *testing.T) {
 		}).
 		handle("/settings/relay/0", func(_ string) (any, int) {
 			return map[string]any{
-				"name":          testKitchenLight,
+				nameKey:         testKitchenLight,
 				"default_state": "last",
 				"btn_type":      "toggle",
-				"auto_on":       0,
-				"auto_off":      0,
+				autoOnKey:       0,
+				autoOffKey:      0,
 			}, http.StatusOK
 		})
 
@@ -4414,7 +4493,7 @@ func TestGen1Relay_TurnOnForDuration(t *testing.T) {
 			if query != "" {
 				called = true
 			}
-			return map[string]any{"ison": true}, http.StatusOK
+			return map[string]any{isonKey: true}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -4461,7 +4540,7 @@ func TestGen1Relay_TurnOffForDuration(t *testing.T) {
 			if query != "" {
 				called = true
 			}
-			return map[string]any{"ison": false}, http.StatusOK
+			return map[string]any{isonKey: false}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -4506,14 +4585,14 @@ func TestGen2Switch_GetStatus(t *testing.T) {
 		}).
 		handle("Switch.GetStatus", func(_ map[string]any) (any, error) {
 			return map[string]any{
-				"id":      0,
-				"output":  true,
-				"source":  "button",
-				"apower":  125.5,
-				"voltage": 230.1,
-				"current": 0.55,
+				"id":       0,
+				outputComp: true,
+				sourceKey:  buttonComp,
+				apowerKey:  125.5,
+				voltageKey: 230.1,
+				currentKey: 0.55,
 				"aenergy": map[string]any{
-					"total":     1234.5,
+					totalKey:    1234.5,
 					"by_minute": []float64{50.0, 50.1, 50.0},
 				},
 				"temperature": map[string]any{
@@ -4563,11 +4642,11 @@ func TestGen2Switch_GetConfig(t *testing.T) {
 		handle("Switch.GetConfig", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"id":             0,
-				"name":           testKitchenLight,
-				"initial_state":  "restore_last",
-				"auto_on":        false,
+				nameKey:          testKitchenLight,
+				initialStateKey:  restoreLastVal,
+				autoOnKey:        false,
 				"auto_on_delay":  0,
-				"auto_off":       false,
+				autoOffKey:       false,
 				"auto_off_delay": 0,
 			}, nil
 		})
@@ -4621,7 +4700,7 @@ func TestGen2Switch_On(t *testing.T) {
 			if on, ok := params["on"].(bool); ok {
 				receivedOn = on
 			}
-			return map[string]any{"was_on": false}, nil
+			return map[string]any{wasOnKey: false}, nil
 		})
 
 	server := mock.start(t)
@@ -4669,7 +4748,7 @@ func TestGen2Switch_Off(t *testing.T) {
 			if on, ok := params["on"].(bool); ok {
 				receivedOn = on
 			}
-			return map[string]any{"was_on": true}, nil
+			return map[string]any{wasOnKey: true}, nil
 		})
 
 	server := mock.start(t)
@@ -4713,7 +4792,7 @@ func TestGen2Switch_Toggle(t *testing.T) {
 		}).
 		handle("Switch.Toggle", func(_ map[string]any) (any, error) {
 			toggleCalled = true
-			return map[string]any{"was_on": true}, nil
+			return map[string]any{wasOnKey: true}, nil
 		})
 
 	server := mock.start(t)
@@ -4751,7 +4830,7 @@ func TestGen2Switch_Set(t *testing.T) {
 			return standardDeviceInfo(), nil
 		}).
 		handle("Switch.Set", func(_ map[string]any) (any, error) {
-			return map[string]any{"was_on": false}, nil
+			return map[string]any{wasOnKey: false}, nil
 		})
 
 	server := mock.start(t)
@@ -4789,13 +4868,13 @@ func TestGen2Cover_GetStatus(t *testing.T) {
 		handle("Cover.GetStatus", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"id":          0,
-				"state":       "stopped",
-				"source":      "button",
-				"current_pos": 75,
+				stateKey:      stoppedVal,
+				sourceKey:     buttonComp,
+				currentPosKey: 75,
 				"target_pos":  75,
-				"apower":      0,
-				"voltage":     230.0,
-				"current":     0,
+				apowerKey:     0,
+				voltageKey:    230.0,
+				currentKey:    0,
 				"pos_control": true,
 			}, nil
 		})
@@ -4825,7 +4904,7 @@ func TestGen2Cover_GetStatus(t *testing.T) {
 	if status == nil {
 		t.Fatal("GetStatus() returned nil")
 	}
-	if status.State != "stopped" {
+	if status.State != stoppedVal {
 		t.Errorf("status.State = %q, want stopped", status.State)
 	}
 	if status.CurrentPosition == nil || *status.CurrentPosition != 75 {
@@ -4843,8 +4922,8 @@ func TestGen2Cover_GetConfig(t *testing.T) {
 		handle("Cover.GetConfig", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"id":            0,
-				"name":          "Living Room Blinds",
-				"initial_state": "stopped",
+				nameKey:         "Living Room Blinds",
+				initialStateKey: stoppedVal,
 				"invert_dir":    false,
 				"pos_control":   true,
 			}, nil
@@ -5105,7 +5184,7 @@ func TestGen1Roller_Open(t *testing.T) {
 		}).
 		handle("/roller/0", func(_ string) (any, int) {
 			openCalled = true
-			return map[string]any{"state": "open"}, http.StatusOK
+			return map[string]any{stateKey: openVal}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -5148,7 +5227,7 @@ func TestGen1Roller_Close(t *testing.T) {
 		}).
 		handle("/roller/0", func(_ string) (any, int) {
 			closeCalled = true
-			return map[string]any{"state": "close"}, http.StatusOK
+			return map[string]any{stateKey: "close"}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -5191,7 +5270,7 @@ func TestGen1Roller_Stop(t *testing.T) {
 		}).
 		handle("/roller/0", func(_ string) (any, int) {
 			stopCalled = true
-			return map[string]any{"state": "stop"}, http.StatusOK
+			return map[string]any{stateKey: stopVal}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -5234,7 +5313,7 @@ func TestGen1Roller_GoToPosition(t *testing.T) {
 		}).
 		handle("/roller/0", func(_ string) (any, int) {
 			positionCalled = true
-			return map[string]any{"current_pos": 50}, http.StatusOK
+			return map[string]any{currentPosKey: 50}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -5276,14 +5355,14 @@ func TestGen1Roller_GetStatus(t *testing.T) {
 		}).
 		handle("/roller/0", func(_ string) (any, int) {
 			return map[string]any{
-				"state":           "stop",
+				stateKey:          stopVal,
 				"power":           0.0,
 				"is_valid":        true,
 				"safety_switch":   false,
 				"overtemperature": false,
 				"stop_reason":     "normal",
-				"last_direction":  "open",
-				"current_pos":     75,
+				"last_direction":  openVal,
+				currentPosKey:     75,
 				"calibrating":     false,
 				"positioning":     true,
 			}, http.StatusOK
@@ -5317,7 +5396,7 @@ func TestGen1Roller_GetStatus(t *testing.T) {
 	if status == nil {
 		t.Fatal("GetStatus() returned nil")
 	}
-	if status.State != "stop" {
+	if status.State != stopVal {
 		t.Errorf("status.State = %q, want stop", status.State)
 	}
 }
@@ -5379,7 +5458,7 @@ func TestGen1Light_TurnOn(t *testing.T) {
 		}).
 		handle("/light/0", func(_ string) (any, int) {
 			turnOnCalled = true
-			return map[string]any{"ison": true, "brightness": 100}, http.StatusOK
+			return map[string]any{isonKey: true, brightnessKey: 100}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -5422,7 +5501,7 @@ func TestGen1Light_TurnOff(t *testing.T) {
 		}).
 		handle("/light/0", func(_ string) (any, int) {
 			turnOffCalled = true
-			return map[string]any{"ison": false, "brightness": 0}, http.StatusOK
+			return map[string]any{isonKey: false, brightnessKey: 0}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -5465,7 +5544,7 @@ func TestGen1Light_Toggle(t *testing.T) {
 		}).
 		handle("/light/0", func(_ string) (any, int) {
 			toggleCalled = true
-			return map[string]any{"ison": true, "brightness": 100}, http.StatusOK
+			return map[string]any{isonKey: true, brightnessKey: 100}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -5508,7 +5587,7 @@ func TestGen1Light_SetBrightness(t *testing.T) {
 		}).
 		handle("/light/0", func(_ string) (any, int) {
 			setBrightnessCalled = true
-			return map[string]any{"ison": true, "brightness": 75}, http.StatusOK
+			return map[string]any{isonKey: true, brightnessKey: 75}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -5550,9 +5629,9 @@ func TestGen1Light_GetStatus(t *testing.T) {
 		}).
 		handle("/light/0", func(_ string) (any, int) {
 			return map[string]any{
-				"ison":       true,
-				"brightness": 85,
-				"mode":       "white",
+				isonKey:       true,
+				brightnessKey: 85,
+				modeKey:       whiteVal,
 			}, http.StatusOK
 		})
 
@@ -5605,13 +5684,13 @@ func TestGen2Light_GetStatus(t *testing.T) {
 		}).
 		handle("Light.GetStatus", func(_ map[string]any) (any, error) {
 			return map[string]any{
-				"id":         0,
-				"output":     true,
-				"source":     "button",
-				"brightness": 80,
-				"apower":     5.5,
-				"voltage":    120.0,
-				"current":    0.046,
+				"id":          0,
+				outputComp:    true,
+				sourceKey:     buttonComp,
+				brightnessKey: 80,
+				apowerKey:     5.5,
+				voltageKey:    120.0,
+				currentKey:    0.046,
 			}, nil
 		})
 
@@ -5658,13 +5737,13 @@ func TestGen2Light_GetConfig(t *testing.T) {
 		handle("Light.GetConfig", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"id":                 0,
-				"name":               "Living Room Light",
-				"initial_state":      "on",
-				"auto_on":            false,
+				nameKey:              "Living Room Light",
+				initialStateKey:      "on",
+				autoOnKey:            false,
 				"auto_on_delay":      0.0,
-				"auto_off":           true,
+				autoOffKey:           true,
 				"auto_off_delay":     300.0,
-				"default_brightness": 100,
+				defaultBrightnessKey: 100,
 			}, nil
 		})
 
@@ -5788,7 +5867,7 @@ func TestGen2Light_Toggle(t *testing.T) {
 		}).
 		handle("Light.Toggle", func(_ map[string]any) (any, error) {
 			toggleCalled = true
-			return map[string]any{"was_on": true}, nil
+			return map[string]any{wasOnKey: true}, nil
 		})
 
 	server := mock.start(t)
@@ -5916,14 +5995,14 @@ func TestGen2RGB_GetStatus(t *testing.T) {
 		}).
 		handle("RGB.GetStatus", func(_ map[string]any) (any, error) {
 			return map[string]any{
-				"id":         0,
-				"output":     true,
-				"source":     "button",
-				"brightness": 80,
-				"rgb":        []any{255.0, 128.0, 64.0},
-				"apower":     5.5,
-				"voltage":    120.0,
-				"current":    0.046,
+				"id":          0,
+				outputComp:    true,
+				sourceKey:     buttonComp,
+				brightnessKey: 80,
+				"rgb":         []any{255.0, 128.0, 64.0},
+				apowerKey:     5.5,
+				voltageKey:    120.0,
+				currentKey:    0.046,
 			}, nil
 		})
 
@@ -5970,11 +6049,11 @@ func TestGen2RGB_GetConfig(t *testing.T) {
 		handle("RGB.GetConfig", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"id":                 0,
-				"name":               "RGB Strip",
-				"initial_state":      "restore_last",
-				"auto_on":            false,
-				"auto_off":           false,
-				"default_brightness": 100,
+				nameKey:              "RGB Strip",
+				initialStateKey:      restoreLastVal,
+				autoOnKey:            false,
+				autoOffKey:           false,
+				defaultBrightnessKey: 100,
 			}, nil
 		})
 
@@ -6098,7 +6177,7 @@ func TestGen2RGB_Toggle(t *testing.T) {
 		}).
 		handle("RGB.Toggle", func(_ map[string]any) (any, error) {
 			toggleCalled = true
-			return map[string]any{"was_on": false}, nil
+			return map[string]any{wasOnKey: false}, nil
 		})
 
 	server := mock.start(t)
@@ -6307,15 +6386,15 @@ func TestGen2RGBW_GetStatus(t *testing.T) {
 		}).
 		handle("RGBW.GetStatus", func(_ map[string]any) (any, error) {
 			return map[string]any{
-				"id":         0,
-				"output":     true,
-				"source":     "button",
-				"brightness": 80,
-				"white":      50,
-				"rgb":        []any{255.0, 128.0, 64.0},
-				"apower":     5.5,
-				"voltage":    120.0,
-				"current":    0.046,
+				"id":          0,
+				outputComp:    true,
+				sourceKey:     buttonComp,
+				brightnessKey: 80,
+				whiteVal:      50,
+				"rgb":         []any{255.0, 128.0, 64.0},
+				apowerKey:     5.5,
+				voltageKey:    120.0,
+				currentKey:    0.046,
 			}, nil
 		})
 
@@ -6365,16 +6444,16 @@ func TestGen2RGBW_GetConfig(t *testing.T) {
 		handle("RGBW.GetConfig", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"id":                 0,
-				"name":               "RGBW Strip",
-				"initial_state":      "restore_last",
-				"auto_on":            false,
-				"auto_off":           false,
-				"default_brightness": 100,
+				nameKey:              "RGBW Strip",
+				initialStateKey:      restoreLastVal,
+				autoOnKey:            false,
+				autoOffKey:           false,
+				defaultBrightnessKey: 100,
 				"default_white":      50,
 				"night_mode": map[string]any{
-					"enable":     true,
-					"brightness": 30,
-					"white":      20,
+					enableKey:     true,
+					brightnessKey: 30,
+					whiteVal:      20,
 				},
 			}, nil
 		})
@@ -6499,7 +6578,7 @@ func TestGen2RGBW_Toggle(t *testing.T) {
 		}).
 		handle("RGBW.Toggle", func(_ map[string]any) (any, error) {
 			toggleCalled = true
-			return map[string]any{"was_on": false}, nil
+			return map[string]any{wasOnKey: false}, nil
 		})
 
 	server := mock.start(t)
@@ -6750,8 +6829,8 @@ func TestGen2Input_GetStatus(t *testing.T) {
 		}).
 		handle("Input.GetStatus", func(_ map[string]any) (any, error) {
 			return map[string]any{
-				"id":    0,
-				"state": true,
+				"id":     0,
+				stateKey: true,
 			}, nil
 		})
 
@@ -6795,9 +6874,9 @@ func TestGen2Input_GetConfig(t *testing.T) {
 		handle("Input.GetConfig", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"id":            0,
-				"name":          "Wall Switch",
-				"type":          "switch",
-				"enable":        true,
+				nameKey:         "Wall Switch",
+				typeKey:         switchComp,
+				enableKey:       true,
 				"invert":        false,
 				"factory_reset": true,
 			}, nil
@@ -6831,7 +6910,7 @@ func TestGen2Input_GetConfig(t *testing.T) {
 	if config.Name == nil || *config.Name != "Wall Switch" {
 		t.Errorf("config.Name = %v, want Wall Switch", config.Name)
 	}
-	if config.Type != "switch" {
+	if config.Type != switchComp {
 		t.Errorf("config.Type = %q, want switch", config.Type)
 	}
 }
@@ -6846,7 +6925,7 @@ func TestGen2Input_SetConfig(t *testing.T) {
 		}).
 		handle("Input.SetConfig", func(_ map[string]any) (any, error) {
 			setConfigCalled = true
-			return map[string]any{"restart_required": false}, nil
+			return map[string]any{restartRequiredKey: false}, nil
 		})
 
 	server := mock.start(t)
@@ -6870,7 +6949,7 @@ func TestGen2Input_SetConfig(t *testing.T) {
 	cfg := &model.InputConfig{
 		ID:     0,
 		Name:   &name,
-		Type:   "switch",
+		Type:   switchComp,
 		Enable: true,
 		Invert: false,
 	}
@@ -6934,7 +7013,7 @@ func TestGen2Input_ResetCounters(t *testing.T) {
 		}).
 		handle("Input.ResetCounters", func(_ map[string]any) (any, error) {
 			resetCountersCalled = true
-			return map[string]any{"counts": map[string]any{"total": 0}}, nil
+			return map[string]any{"counts": map[string]any{totalKey: 0}}, nil
 		})
 
 	server := mock.start(t)
@@ -6954,7 +7033,7 @@ func TestGen2Input_ResetCounters(t *testing.T) {
 	}()
 
 	input := client.Input(0)
-	err = input.ResetCounters(ctx, []string{"total"})
+	err = input.ResetCounters(ctx, []string{totalKey})
 	if err != nil {
 		t.Fatalf("ResetCounters() error = %v", err)
 	}
@@ -6978,12 +7057,12 @@ func TestGen2Thermostat_GetStatus(t *testing.T) {
 		handle("Thermostat.GetStatus", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"id":              0,
-				"enable":          true,
+				enableKey:         true,
 				"target_C":        21.5,
 				"current_C":       20.2,
-				"output":          true,
+				outputComp:        true,
 				"boost_minutes":   0,
-				"mode":            "heat",
+				modeKey:           "heat",
 				"schedule_active": false,
 			}, nil
 		})
@@ -7025,11 +7104,11 @@ func TestGen2Thermostat_GetConfig(t *testing.T) {
 		handle("Thermostat.GetConfig", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"id":         0,
-				"enable":     true,
+				enableKey:    true,
 				"target_C":   21.5,
 				"min_C":      5.0,
 				"max_C":      30.0,
-				"mode":       "heat",
+				modeKey:      "heat",
 				"hysteresis": 0.5,
 			}, nil
 		})
@@ -7071,7 +7150,7 @@ func TestGen2Thermostat_SetTarget(t *testing.T) {
 		}).
 		handle("Thermostat.SetConfig", func(_ map[string]any) (any, error) {
 			setTargetCalled = true
-			return map[string]any{"restart_required": false}, nil
+			return map[string]any{restartRequiredKey: false}, nil
 		})
 
 	server := mock.start(t)
@@ -7111,7 +7190,7 @@ func TestGen2Thermostat_Enable(t *testing.T) {
 		}).
 		handle("Thermostat.SetConfig", func(_ map[string]any) (any, error) {
 			enableCalled = true
-			return map[string]any{"restart_required": false}, nil
+			return map[string]any{restartRequiredKey: false}, nil
 		})
 
 	server := mock.start(t)
@@ -7151,7 +7230,7 @@ func TestGen2Thermostat_SetMode(t *testing.T) {
 		}).
 		handle("Thermostat.SetConfig", func(_ map[string]any) (any, error) {
 			setModeCalled = true
-			return map[string]any{"restart_required": false}, nil
+			return map[string]any{restartRequiredKey: false}, nil
 		})
 
 	server := mock.start(t)
@@ -7425,11 +7504,11 @@ func TestKVS_List(t *testing.T) {
 		handle("KVS.List", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"keys": map[string]any{
-					"key1": map[string]any{"etag": "abc123"},
-					"key2": map[string]any{"etag": "def456"},
-					"key3": map[string]any{"etag": "ghi789"},
+					key1Key: map[string]any{etagKey: testKey},
+					key2Key: map[string]any{etagKey: "def456"},
+					"key3":  map[string]any{etagKey: "ghi789"},
 				},
-				"rev": 42,
+				revKey: 42,
 			}, nil
 		})
 
@@ -7471,13 +7550,13 @@ func TestKVS_Get(t *testing.T) {
 			return standardDeviceInfo(), nil
 		}).
 		handle("KVS.Get", func(params map[string]any) (any, error) {
-			key, ok := params["key"].(string)
+			key, ok := params[keyKey].(string)
 			if !ok || key != "testkey" {
 				return nil, fmt.Errorf("unexpected key: %s", key)
 			}
 			return map[string]any{
-				"value": "testvalue",
-				"etag":  "abc123",
+				valueKey: "testvalue",
+				etagKey:  testKey,
 			}, nil
 		})
 
@@ -7506,7 +7585,7 @@ func TestKVS_Get(t *testing.T) {
 	if result.Value != "testvalue" {
 		t.Errorf("Get() value = %v, want testvalue", result.Value)
 	}
-	if result.Etag != "abc123" {
+	if result.Etag != testKey {
 		t.Errorf("Get() etag = %s, want abc123", result.Etag)
 	}
 }
@@ -7522,8 +7601,8 @@ func TestKVS_GetMany(t *testing.T) {
 			etag1 := "etag1"
 			return map[string]any{
 				"items": []map[string]any{
-					{"key": "key1", "value": "value1", "etag": &etag1},
-					{"key": "key2", "value": "value2"},
+					{keyKey: key1Key, valueKey: "value1", etagKey: &etag1},
+					{keyKey: key2Key, valueKey: "value2"},
 				},
 			}, nil
 		})
@@ -7565,13 +7644,13 @@ func TestKVS_Set(t *testing.T) {
 		}).
 		handle("KVS.Set", func(params map[string]any) (any, error) {
 			setCalled = true
-			key, ok := params["key"].(string)
-			if !ok || key != "mykey" {
+			key, ok := params[keyKey].(string)
+			if !ok || key != mykeyVal {
 				return nil, fmt.Errorf("unexpected key: %s", key)
 			}
 			return map[string]any{
-				"etag": "newetag",
-				"rev":  43,
+				etagKey: newetagVal,
+				revKey:  43,
 			}, nil
 		})
 
@@ -7592,7 +7671,7 @@ func TestKVS_Set(t *testing.T) {
 	}()
 
 	kvs := client.KVS()
-	result, err := kvs.Set(ctx, "mykey", "myvalue")
+	result, err := kvs.Set(ctx, mykeyVal, "myvalue")
 	if err != nil {
 		t.Fatalf("Set() error = %v", err)
 	}
@@ -7600,7 +7679,7 @@ func TestKVS_Set(t *testing.T) {
 	if !setCalled {
 		t.Error("KVS.Set was not called")
 	}
-	if result.Etag != "newetag" {
+	if result.Etag != newetagVal {
 		t.Errorf("Set() etag = %s, want newetag", result.Etag)
 	}
 	if result.Rev != 43 {
@@ -7618,12 +7697,12 @@ func TestKVS_Delete(t *testing.T) {
 		}).
 		handle("KVS.Delete", func(params map[string]any) (any, error) {
 			deleteCalled = true
-			key, ok := params["key"].(string)
+			key, ok := params[keyKey].(string)
 			if !ok || key != "deletekey" {
 				return nil, fmt.Errorf("unexpected key: %s", key)
 			}
 			return map[string]any{
-				"rev": 44,
+				revKey: 44,
 			}, nil
 		})
 
@@ -7672,8 +7751,8 @@ func TestKVS_GetAll(t *testing.T) {
 			}
 			return map[string]any{
 				"items": []map[string]any{
-					{"key": "key1", "value": "value1"},
-					{"key": "key2", "value": "value2"},
+					{keyKey: key1Key, valueKey: "value1"},
+					{keyKey: key2Key, valueKey: "value2"},
 				},
 			}, nil
 		})
@@ -7721,7 +7800,7 @@ func TestGen1Color_TurnOn(t *testing.T) {
 			if strings.Contains(query, "turn=on") {
 				turnOnCalled = true
 			}
-			return map[string]any{"ison": true}, http.StatusOK
+			return map[string]any{isonKey: true}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -7767,7 +7846,7 @@ func TestGen1Color_TurnOff(t *testing.T) {
 			if strings.Contains(query, "turn=off") {
 				turnOffCalled = true
 			}
-			return map[string]any{"ison": false}, http.StatusOK
+			return map[string]any{isonKey: false}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -7813,7 +7892,7 @@ func TestGen1Color_Toggle(t *testing.T) {
 			if strings.Contains(query, "turn=toggle") {
 				toggleCalled = true
 			}
-			return map[string]any{"ison": true}, http.StatusOK
+			return map[string]any{isonKey: true}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -7859,7 +7938,7 @@ func TestGen1Color_SetRGB(t *testing.T) {
 			if strings.Contains(query, "red=255") && strings.Contains(query, "green=128") && strings.Contains(query, "blue=64") {
 				setRGBCalled = true
 			}
-			return map[string]any{"ison": true, "red": 255, "green": 128, "blue": 64}, http.StatusOK
+			return map[string]any{isonKey: true, redKey: 255, greenKey: 128, blueKey: 64}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -7905,7 +7984,7 @@ func TestGen1Color_SetRGBW(t *testing.T) {
 			if strings.Contains(query, "red=255") && strings.Contains(query, "green=128") && strings.Contains(query, "blue=64") && strings.Contains(query, "white=100") {
 				setRGBWCalled = true
 			}
-			return map[string]any{"ison": true, "red": 255, "green": 128, "blue": 64, "white": 100}, http.StatusOK
+			return map[string]any{isonKey: true, redKey: 255, greenKey: 128, blueKey: 64, whiteVal: 100}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -7951,7 +8030,7 @@ func TestGen1Color_SetGain(t *testing.T) {
 			if strings.Contains(query, "gain=75") {
 				setGainCalled = true
 			}
-			return map[string]any{"ison": true, "gain": 75}, http.StatusOK
+			return map[string]any{isonKey: true, "gain": 75}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -7994,12 +8073,12 @@ func TestGen1Color_GetStatus(t *testing.T) {
 		}).
 		handle("/color/0", func(_ string) (any, int) {
 			return map[string]any{
-				"ison":  true,
-				"red":   255,
-				"green": 128,
-				"blue":  64,
-				"white": 50,
-				"gain":  80,
+				isonKey:  true,
+				redKey:   255,
+				greenKey: 128,
+				blueKey:  64,
+				whiteVal: 50,
+				"gain":   80,
 			}, http.StatusOK
 		})
 
@@ -8049,7 +8128,7 @@ func TestGen1Color_TurnOnForDuration(t *testing.T) {
 			if strings.Contains(query, "turn=on") && strings.Contains(query, "timer=60") {
 				turnOnForDurationCalled = true
 			}
-			return map[string]any{"ison": true}, http.StatusOK
+			return map[string]any{isonKey: true}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8095,7 +8174,7 @@ func TestGen1Color_TurnOnWithRGB(t *testing.T) {
 			if strings.Contains(query, "turn=on") && strings.Contains(query, "red=200") && strings.Contains(query, "green=100") && strings.Contains(query, "blue=50") && strings.Contains(query, "gain=90") {
 				turnOnWithRGBCalled = true
 			}
-			return map[string]any{"ison": true}, http.StatusOK
+			return map[string]any{isonKey: true}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8145,7 +8224,7 @@ func TestGen1White_TurnOn(t *testing.T) {
 			if strings.Contains(query, "turn=on") {
 				turnOnCalled = true
 			}
-			return map[string]any{"ison": true, "brightness": 100}, http.StatusOK
+			return map[string]any{isonKey: true, brightnessKey: 100}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8191,7 +8270,7 @@ func TestGen1White_TurnOff(t *testing.T) {
 			if strings.Contains(query, "turn=off") {
 				turnOffCalled = true
 			}
-			return map[string]any{"ison": false, "brightness": 100}, http.StatusOK
+			return map[string]any{isonKey: false, brightnessKey: 100}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8237,7 +8316,7 @@ func TestGen1White_SetBrightness(t *testing.T) {
 			if strings.Contains(query, "brightness=75") {
 				setBrightnessCalled = true
 			}
-			return map[string]any{"ison": true, "brightness": 75}, http.StatusOK
+			return map[string]any{isonKey: true, brightnessKey: 75}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8280,8 +8359,8 @@ func TestGen1White_GetStatus(t *testing.T) {
 		}).
 		handle("/white/0", func(_ string) (any, int) {
 			return map[string]any{
-				"ison":       true,
-				"brightness": 80,
+				isonKey:       true,
+				brightnessKey: 80,
 			}, http.StatusOK
 		})
 
@@ -8335,7 +8414,7 @@ func TestGen1Roller_OpenForDuration(t *testing.T) {
 			if strings.Contains(query, "go=open") && strings.Contains(query, "duration=10") {
 				openForDurationCalled = true
 			}
-			return map[string]any{"state": "open"}, http.StatusOK
+			return map[string]any{stateKey: openVal}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8381,7 +8460,7 @@ func TestGen1Roller_CloseForDuration(t *testing.T) {
 			if strings.Contains(query, "go=close") && strings.Contains(query, "duration=15") {
 				closeForDurationCalled = true
 			}
-			return map[string]any{"state": "close"}, http.StatusOK
+			return map[string]any{stateKey: "close"}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8427,7 +8506,7 @@ func TestGen1Light_TurnOnWithBrightness(t *testing.T) {
 			if strings.Contains(query, "turn=on") && strings.Contains(query, "brightness=50") {
 				turnOnWithBrightnessCalled = true
 			}
-			return map[string]any{"ison": true, "brightness": 50}, http.StatusOK
+			return map[string]any{isonKey: true, brightnessKey: 50}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8473,7 +8552,7 @@ func TestGen1Light_TurnOnForDuration(t *testing.T) {
 			if strings.Contains(query, "turn=on") && strings.Contains(query, "timer=30") {
 				turnOnForDurationCalled = true
 			}
-			return map[string]any{"ison": true}, http.StatusOK
+			return map[string]any{isonKey: true}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8519,7 +8598,7 @@ func TestGen1Light_SetBrightnessWithTransition(t *testing.T) {
 			if strings.Contains(query, "brightness=80") && strings.Contains(query, "transition=1000") {
 				setBrightnessWithTransitionCalled = true
 			}
-			return map[string]any{"ison": true, "brightness": 80}, http.StatusOK
+			return map[string]any{isonKey: true, brightnessKey: 80}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8603,7 +8682,7 @@ func TestGen1Client_GetActions(t *testing.T) {
 				"actions": []any{
 					map[string]any{
 						"index":   0,
-						"name":    "relay_on_url",
+						nameKey:   "relay_on_url",
 						"enabled": true,
 						"urls":    []string{"http://example.com"},
 					},
@@ -8645,7 +8724,7 @@ func TestGen1Client_Update(t *testing.T) {
 			if strings.Contains(query, "url=") {
 				updateCalled = true
 			}
-			return map[string]any{"status": "ok"}, http.StatusOK
+			return map[string]any{statusKey: "ok"}, http.StatusOK
 		})
 
 	server := mock.start(t)
@@ -8688,7 +8767,7 @@ func TestGen2Thermostat_SetConfig(t *testing.T) {
 		}).
 		handle("Thermostat.SetConfig", func(_ map[string]any) (any, error) {
 			setConfigCalled = true
-			return map[string]any{"restart_required": false}, nil
+			return map[string]any{restartRequiredKey: false}, nil
 		})
 
 	server := mock.start(t)

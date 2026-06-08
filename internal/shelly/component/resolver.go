@@ -22,6 +22,13 @@ const (
 	TypeInput  Type = "input"
 )
 
+// Gen1 config array keys for component types.
+const (
+	gen1KeyRelays  = "relays"
+	gen1KeyLights  = "lights"
+	gen1KeyRollers = "rollers"
+)
+
 // Config holds name and ID extracted from device config.
 type Config struct {
 	ID   int
@@ -217,13 +224,13 @@ func FindComponentByName(ctx context.Context, fetcher func(ctx context.Context, 
 // GetType returns the Type from a string.
 func GetType(typeStr string) (Type, bool) {
 	switch strings.ToLower(typeStr) {
-	case "switch":
+	case string(TypeSwitch):
 		return TypeSwitch, true
-	case "light":
+	case string(TypeLight):
 		return TypeLight, true
-	case "cover":
+	case string(TypeCover):
 		return TypeCover, true
-	case "input":
+	case string(TypeInput):
 		return TypeInput, true
 	default:
 		return "", false
@@ -358,11 +365,11 @@ func ResolveGen1ComponentName(configMap map[string]json.RawMessage, componentTyp
 	var arrayKey string
 	switch componentType {
 	case TypeSwitch:
-		arrayKey = "relays"
+		arrayKey = gen1KeyRelays
 	case TypeLight:
-		arrayKey = "lights"
+		arrayKey = gen1KeyLights
 	case TypeCover:
-		arrayKey = "rollers"
+		arrayKey = gen1KeyRollers
 	default:
 		return 0, fmt.Errorf("unsupported Gen1 component type: %s", componentType)
 	}
@@ -447,7 +454,7 @@ func ResolveIDWithGen(ctx context.Context, fetcher func(ctx context.Context, dev
 
 // hasGen1Keys checks if the config map contains Gen1-specific keys.
 func hasGen1Keys(configMap map[string]json.RawMessage) bool {
-	gen1Keys := []string{"relays", "lights", "rollers", "meters", "emeters"}
+	gen1Keys := []string{gen1KeyRelays, gen1KeyLights, gen1KeyRollers, "meters", "emeters"}
 	for _, key := range gen1Keys {
 		if _, ok := configMap[key]; ok {
 			return true
@@ -490,9 +497,9 @@ func Gen1NamesFromConfig(configMap map[string]json.RawMessage) map[string]map[in
 		key     string
 		typeKey string
 	}{
-		{"relays", "switch"},
-		{"lights", "light"},
-		{"rollers", "cover"},
+		{gen1KeyRelays, string(TypeSwitch)},
+		{gen1KeyLights, string(TypeLight)},
+		{gen1KeyRollers, string(TypeCover)},
 	}
 
 	for _, mapping := range gen1Mappings {

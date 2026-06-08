@@ -30,23 +30,34 @@ const (
 	CategoryUnsupported
 )
 
+// Category name strings returned by String and parsed elsewhere.
+const (
+	nameUnknown     = "unknown"
+	nameTimeout     = "timeout"
+	nameDNS         = "dns"
+	nameNetwork     = "network"
+	nameAuth        = "auth"
+	nameDevice      = "device"
+	nameUnsupported = "unsupported"
+)
+
 // String returns a human-readable category name.
 func (c Category) String() string {
 	switch c {
 	case CategoryTimeout:
-		return "timeout"
+		return nameTimeout
 	case CategoryDNS:
-		return "dns"
+		return nameDNS
 	case CategoryNetwork:
-		return "network"
+		return nameNetwork
 	case CategoryAuth:
-		return "auth"
+		return nameAuth
 	case CategoryDevice:
-		return "device"
+		return nameDevice
 	case CategoryUnsupported:
-		return "unsupported"
+		return nameUnsupported
 	default:
-		return "unknown"
+		return nameUnknown
 	}
 }
 

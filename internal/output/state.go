@@ -139,6 +139,13 @@ const (
 	LabelRemoved = "Removed (only in source):"
 	LabelAdded   = "Added (only in target):"
 	LabelChanged = "Changed:"
+
+	// Unknown value.
+	LabelUnknown = "unknown"
+
+	// Status field labels.
+	LabelState      = "State"
+	LabelBrightness = "Brightness"
 )
 
 // =============================================================================
@@ -397,7 +404,7 @@ func RenderAuthRequired(required bool) string {
 // Returns plain text to allow table styling to take effect.
 func RenderGeneration(gen int) string {
 	if gen == 0 {
-		return "unknown"
+		return LabelUnknown
 	}
 	return fmt.Sprintf("Gen%d", gen)
 }
@@ -448,7 +455,7 @@ type StatusField struct {
 // FormatSwitchStatusFields returns the status fields for a switch component.
 func FormatSwitchStatusFields(status *model.SwitchStatus) []StatusField {
 	fields := []StatusField{
-		{Label: "State", Value: RenderOnOff(status.Output, CaseUpper, theme.FalseError)},
+		{Label: LabelState, Value: RenderOnOff(status.Output, CaseUpper, theme.FalseError)},
 	}
 	fields = appendPowerFields(fields, status.Power, status.Voltage, status.Current)
 	if status.Energy != nil {
@@ -460,10 +467,10 @@ func FormatSwitchStatusFields(status *model.SwitchStatus) []StatusField {
 // FormatLightStatusFields returns the status fields for a light component.
 func FormatLightStatusFields(status *model.LightStatus) []StatusField {
 	fields := []StatusField{
-		{Label: "State", Value: RenderOnOff(status.Output, CaseUpper, theme.FalseError)},
+		{Label: LabelState, Value: RenderOnOff(status.Output, CaseUpper, theme.FalseError)},
 	}
 	if status.Brightness != nil {
-		fields = append(fields, StatusField{Label: "Brightness", Value: fmt.Sprintf("%d%%", *status.Brightness)})
+		fields = append(fields, StatusField{Label: LabelBrightness, Value: fmt.Sprintf("%d%%", *status.Brightness)})
 	}
 	fields = appendPowerFields(fields, status.Power, status.Voltage, status.Current)
 	return fields
@@ -472,13 +479,13 @@ func FormatLightStatusFields(status *model.LightStatus) []StatusField {
 // FormatRGBStatusFields returns the status fields for an RGB component.
 func FormatRGBStatusFields(status *model.RGBStatus) []StatusField {
 	fields := []StatusField{
-		{Label: "State", Value: RenderOnOff(status.Output, CaseUpper, theme.FalseError)},
+		{Label: LabelState, Value: RenderOnOff(status.Output, CaseUpper, theme.FalseError)},
 	}
 	if status.RGB != nil {
 		fields = append(fields, StatusField{Label: "Color", Value: fmt.Sprintf("R:%d G:%d B:%d", status.RGB.Red, status.RGB.Green, status.RGB.Blue)})
 	}
 	if status.Brightness != nil {
-		fields = append(fields, StatusField{Label: "Brightness", Value: fmt.Sprintf("%d%%", *status.Brightness)})
+		fields = append(fields, StatusField{Label: LabelBrightness, Value: fmt.Sprintf("%d%%", *status.Brightness)})
 	}
 	fields = appendPowerFields(fields, status.Power, status.Voltage, status.Current)
 	return fields
@@ -487,7 +494,7 @@ func FormatRGBStatusFields(status *model.RGBStatus) []StatusField {
 // FormatRGBWStatusFields returns the status fields for an RGBW component.
 func FormatRGBWStatusFields(status *model.RGBWStatus) []StatusField {
 	fields := []StatusField{
-		{Label: "State", Value: RenderOnOff(status.Output, CaseUpper, theme.FalseError)},
+		{Label: LabelState, Value: RenderOnOff(status.Output, CaseUpper, theme.FalseError)},
 	}
 	if status.RGB != nil {
 		fields = append(fields, StatusField{Label: "Color", Value: fmt.Sprintf("R:%d G:%d B:%d", status.RGB.Red, status.RGB.Green, status.RGB.Blue)})
@@ -496,7 +503,7 @@ func FormatRGBWStatusFields(status *model.RGBWStatus) []StatusField {
 		fields = append(fields, StatusField{Label: "White", Value: fmt.Sprintf("%d", *status.White)})
 	}
 	if status.Brightness != nil {
-		fields = append(fields, StatusField{Label: "Brightness", Value: fmt.Sprintf("%d%%", *status.Brightness)})
+		fields = append(fields, StatusField{Label: LabelBrightness, Value: fmt.Sprintf("%d%%", *status.Brightness)})
 	}
 	fields = appendPowerFields(fields, status.Power, status.Voltage, status.Current)
 	return fields
@@ -505,7 +512,7 @@ func FormatRGBWStatusFields(status *model.RGBWStatus) []StatusField {
 // FormatCoverStatusFields returns the status fields for a cover component.
 func FormatCoverStatusFields(status *model.CoverStatus) []StatusField {
 	fields := []StatusField{
-		{Label: "State", Value: RenderCoverState(status.State)},
+		{Label: LabelState, Value: RenderCoverState(status.State)},
 	}
 	if status.CurrentPosition != nil {
 		fields = append(fields, StatusField{Label: "Position", Value: fmt.Sprintf("%d%%", *status.CurrentPosition)})
@@ -517,7 +524,7 @@ func FormatCoverStatusFields(status *model.CoverStatus) []StatusField {
 // FormatInputStatusFields returns the status fields for an input component.
 func FormatInputStatusFields(status *model.InputStatus) []StatusField {
 	fields := []StatusField{
-		{Label: "State", Value: RenderActive(status.State, CaseLower, theme.FalseError)},
+		{Label: LabelState, Value: RenderActive(status.State, CaseLower, theme.FalseError)},
 	}
 	if status.Type != "" {
 		fields = append(fields, StatusField{Label: "Type", Value: status.Type})

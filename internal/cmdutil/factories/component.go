@@ -27,6 +27,12 @@ const (
 	ActionToggle Action = "toggle"
 )
 
+// Enable/disable verb constants shared across toggle command factories.
+const (
+	verbEnable  = "enable"
+	verbDisable = "disable"
+)
+
 // ComponentToggleFunc is a function that toggles a component and returns the new output state.
 type ComponentToggleFunc func(ctx context.Context, svc *shelly.Service, device string, id int) (outputOn bool, err error)
 
@@ -67,7 +73,7 @@ func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command 
 	switch opts.Action {
 	case ActionOn:
 		use = "on <device>"
-		aliases = []string{"enable", "1"}
+		aliases = []string{verbEnable, "1"}
 		short = fmt.Sprintf("Turn %s on", componentLower)
 		long = fmt.Sprintf("Turn on a %s component on the specified device.", componentLower)
 		examples = fmt.Sprintf(`  # Turn on %s
@@ -81,7 +87,7 @@ func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command 
 
 	case ActionOff:
 		use = "off <device>"
-		aliases = []string{"disable", "0"}
+		aliases = []string{verbDisable, "0"}
 		short = fmt.Sprintf("Turn %s off", componentLower)
 		long = fmt.Sprintf("Turn off a %s component on the specified device.", componentLower)
 		examples = fmt.Sprintf(`  # Turn off %s
@@ -166,9 +172,9 @@ func runComponent(ctx context.Context, f *cmdutil.Factory, opts ComponentOpts, d
 				return err
 			}
 
-			state := "off"
+			state := string(QuickOff)
 			if outputOn {
-				state = "on"
+				state = string(QuickOn)
 			}
 			ios.Success("%s toggled %s", formatComponentDisplayName(opts.Component, componentID, compFlags.Name), state)
 			return nil

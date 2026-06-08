@@ -39,9 +39,9 @@ type JSONMetricsOutput struct {
 // BuildPowerPromMetrics creates power, voltage, and current Prometheus metrics.
 func BuildPowerPromMetrics(labels map[string]string, power, voltage, current float64) []PrometheusMetric {
 	return []PrometheusMetric{
-		{Name: "shelly_power_watts", Help: "Current power consumption in watts", Type: "gauge", Labels: labels, Value: power},
-		{Name: "shelly_voltage_volts", Help: "Current voltage in volts", Type: "gauge", Labels: labels, Value: voltage},
-		{Name: "shelly_current_amps", Help: "Current in amps", Type: "gauge", Labels: labels, Value: current},
+		{Name: "shelly_power_watts", Help: "Current power consumption in watts", Type: promTypeGauge, Labels: labels, Value: power},
+		{Name: "shelly_voltage_volts", Help: "Current voltage in volts", Type: promTypeGauge, Labels: labels, Value: voltage},
+		{Name: "shelly_current_amps", Help: "Current in amps", Type: promTypeGauge, Labels: labels, Value: current},
 	}
 }
 
@@ -49,7 +49,7 @@ func BuildPowerPromMetrics(labels map[string]string, power, voltage, current flo
 func ReadingsToPrometheusMetrics(readings []model.ComponentReading) []PrometheusMetric {
 	metrics := make([]PrometheusMetric, 0, len(readings)*5)
 	for _, r := range readings {
-		labels := map[string]string{"device": r.Device, "component": r.Type, "component_id": fmt.Sprintf("%d", r.ID)}
+		labels := map[string]string{tagDevice: r.Device, tagComponent: r.Type, tagComponentID: fmt.Sprintf("%d", r.ID)}
 		if r.Phase != "" {
 			labels["phase"] = r.Phase
 		}
@@ -57,13 +57,13 @@ func ReadingsToPrometheusMetrics(readings []model.ComponentReading) []Prometheus
 		if r.Energy != nil {
 			metrics = append(metrics, PrometheusMetric{
 				Name: "shelly_energy_wh_total", Help: "Total energy consumption in watt-hours",
-				Type: "counter", Labels: labels, Value: *r.Energy,
+				Type: promTypeCounter, Labels: labels, Value: *r.Energy,
 			})
 		}
 		if r.Freq != nil {
 			metrics = append(metrics, PrometheusMetric{
 				Name: "shelly_frequency_hz", Help: "AC frequency in hertz",
-				Type: "gauge", Labels: labels, Value: *r.Freq,
+				Type: promTypeGauge, Labels: labels, Value: *r.Freq,
 			})
 		}
 	}
@@ -116,7 +116,7 @@ func ExtractWifiMetrics(labels map[string]string, status map[string]any) []Prome
 	}
 	return []PrometheusMetric{{
 		Name: "shelly_wifi_rssi", Help: "WiFi signal strength in dBm",
-		Type: "gauge", Labels: labels, Value: rssi,
+		Type: promTypeGauge, Labels: labels, Value: rssi,
 	}}
 }
 
@@ -131,19 +131,19 @@ func ExtractSysPrometheusMetrics(labels map[string]string, status map[string]any
 	if uptime, ok := sys["uptime"].(float64); ok {
 		metrics = append(metrics, PrometheusMetric{
 			Name: "shelly_uptime_seconds", Help: "Device uptime in seconds",
-			Type: "counter", Labels: labels, Value: uptime,
+			Type: promTypeCounter, Labels: labels, Value: uptime,
 		})
 	}
 	if ramFree, ok := sys["ram_free"].(float64); ok {
 		metrics = append(metrics, PrometheusMetric{
 			Name: "shelly_ram_free_bytes", Help: "Free RAM in bytes",
-			Type: "gauge", Labels: labels, Value: ramFree,
+			Type: promTypeGauge, Labels: labels, Value: ramFree,
 		})
 	}
 	if ramTotal, ok := sys["ram_size"].(float64); ok {
 		metrics = append(metrics, PrometheusMetric{
 			Name: "shelly_ram_total_bytes", Help: "Total RAM in bytes",
-			Type: "gauge", Labels: labels, Value: ramTotal,
+			Type: promTypeGauge, Labels: labels, Value: ramTotal,
 		})
 	}
 	metrics = append(metrics, ExtractTempMetric(labels, sys)...)
@@ -162,7 +162,7 @@ func ExtractTempMetric(labels map[string]string, sys map[string]any) []Prometheu
 	}
 	return []PrometheusMetric{{
 		Name: "shelly_temperature_celsius", Help: "Device temperature in Celsius",
-		Type: "gauge", Labels: labels, Value: tC,
+		Type: promTypeGauge, Labels: labels, Value: tC,
 	}}
 }
 
@@ -194,7 +194,7 @@ func ExtractSwitchPrometheusMetrics(device string, status map[string]any) []Prom
 		}
 		metrics = append(metrics, PrometheusMetric{
 			Name: "shelly_switch_on", Help: "Switch state (1=on, 0=off)",
-			Type: "gauge", Labels: map[string]string{"device": device, "component": key}, Value: outputVal,
+			Type: promTypeGauge, Labels: map[string]string{tagDevice: device, tagComponent: key}, Value: outputVal,
 		})
 	}
 	return metrics
@@ -203,7 +203,7 @@ func ExtractSwitchPrometheusMetrics(device string, status map[string]any) []Prom
 // CollectSystemPrometheusMetrics collects system-level Prometheus metrics from device status.
 func CollectSystemPrometheusMetrics(device string, status map[string]any) []PrometheusMetric {
 	metrics := make([]PrometheusMetric, 0, 16)
-	deviceLabels := map[string]string{"device": device}
+	deviceLabels := map[string]string{tagDevice: device}
 
 	// WiFi RSSI
 	metrics = append(metrics, ExtractWifiMetrics(deviceLabels, status)...)
@@ -229,18 +229,18 @@ func CollectMeterPrometheusMetrics[T model.MeterReading](
 		if err != nil {
 			continue
 		}
-		labels := map[string]string{"device": device, "component": compType, "component_id": fmt.Sprintf("%d", id)}
+		labels := map[string]string{tagDevice: device, tagComponent: compType, tagComponentID: fmt.Sprintf("%d", id)}
 		metrics = append(metrics, BuildPowerPromMetrics(labels, status.GetPower(), status.GetVoltage(), status.GetCurrent())...)
 		if energy := status.GetEnergy(); energy != nil {
 			metrics = append(metrics, PrometheusMetric{
 				Name: "shelly_energy_wh_total", Help: "Total energy consumption in watt-hours",
-				Type: "counter", Labels: labels, Value: *energy,
+				Type: promTypeCounter, Labels: labels, Value: *energy,
 			})
 		}
 		if freq := status.GetFreq(); freq != nil {
 			metrics = append(metrics, PrometheusMetric{
 				Name: "shelly_frequency_hz", Help: "AC frequency in hertz",
-				Type: "gauge", Labels: labels, Value: *freq,
+				Type: promTypeGauge, Labels: labels, Value: *freq,
 			})
 		}
 	}

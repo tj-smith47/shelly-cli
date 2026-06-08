@@ -38,8 +38,8 @@ func TestNewCommand_Use(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "shell <device>" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "shell <device>")
+	if cmd.Use != useShell {
+		t.Errorf("Use = %q, want %q", cmd.Use, useShell)
 	}
 }
 
@@ -47,7 +47,7 @@ func TestNewCommand_Aliases(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expectedAliases := []string{"sh", "console"}
+	expectedAliases := []string{"sh", aliasConsole}
 	if len(cmd.Aliases) != len(expectedAliases) {
 		t.Errorf("Aliases count = %d, want %d", len(cmd.Aliases), len(expectedAliases))
 		return
@@ -63,7 +63,7 @@ func TestNewCommand_Short(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expected := "Interactive shell for a specific device"
+	expected := shortDesc
 	if cmd.Short != expected {
 		t.Errorf("Short = %q, want %q", cmd.Short, expected)
 	}
@@ -265,8 +265,8 @@ func TestNewCommand_Metadata(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Verify required metadata is present
-	if cmd.Use != "shell <device>" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "shell <device>")
+	if cmd.Use != useShell {
+		t.Errorf("Use = %q, want %q", cmd.Use, useShell)
 	}
 
 	if cmd.Short == "" {
@@ -287,7 +287,7 @@ func TestNewCommand_Metadata(t *testing.T) {
 	}
 
 	// Verify all fields match expectations
-	expectedShort := "Interactive shell for a specific device"
+	expectedShort := shortDesc
 	if cmd.Short != expectedShort {
 		t.Errorf("Short = %q, want %q", cmd.Short, expectedShort)
 	}
@@ -562,7 +562,7 @@ func TestNewCommand_AllAliasesCorrect(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Verify each expected alias is present
-	for i, expected := range []string{"sh", "console"} {
+	for i, expected := range []string{"sh", aliasConsole} {
 		if i >= len(cmd.Aliases) {
 			t.Errorf("Expected alias %q at index %d, but not found", expected, i)
 			continue

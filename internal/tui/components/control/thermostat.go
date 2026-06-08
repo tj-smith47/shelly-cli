@@ -348,7 +348,7 @@ func (m ThermostatModel) View() string {
 	// Humidity (if available)
 	if m.state.CurrentHumidity > 0 {
 		b.WriteString(m.styles.Label.Render("Humidity:"))
-		b.WriteString(fmt.Sprintf("%.0f%%", m.state.CurrentHumidity))
+		fmt.Fprintf(&b, "%.0f%%", m.state.CurrentHumidity)
 		b.WriteString("\n")
 	}
 
@@ -362,7 +362,7 @@ func (m ThermostatModel) View() string {
 	if m.state.BoostActive {
 		b.WriteString(m.styles.OnState.Render("🔥 BOOST ACTIVE"))
 		if m.state.BoostRemaining > 0 {
-			b.WriteString(fmt.Sprintf(" (%ds remaining)", m.state.BoostRemaining))
+			fmt.Fprintf(&b, " (%ds remaining)", m.state.BoostRemaining)
 		}
 		b.WriteString("\n")
 	}

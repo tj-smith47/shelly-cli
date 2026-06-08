@@ -12,6 +12,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// aliasFactoryReset is the "factory-reset" alias for the zwave reset command.
+const aliasFactoryReset = "factory-reset"
+
 // Options holds command options.
 type Options struct {
 	Model   string
@@ -24,7 +27,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "reset <model>",
-		Aliases: []string{"factory-reset", "factory"},
+		Aliases: []string{aliasFactoryReset, "factory"},
 		Short:   "Show factory reset instructions",
 		Long: `Show factory reset instructions for a Z-Wave device.
 

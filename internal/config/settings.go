@@ -11,6 +11,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Known CLI setting keys referenced by completion and tests.
+const (
+	settingKeyDefaultsTimeout = "defaults.timeout"
+	settingKeyThemeName       = "theme.name"
+)
+
 // GetSetting retrieves a CLI configuration value by key.
 // Returns the value and whether it was set.
 func GetSetting(key string) (any, bool) {
@@ -138,11 +144,11 @@ func ResetSettings() error {
 // KnownSettingKeys returns the list of known CLI setting keys for completion.
 func KnownSettingKeys() []string {
 	return []string{
-		"defaults.timeout",
+		settingKeyDefaultsTimeout,
 		"defaults.output",
 		"defaults.concurrent",
 		"editor",
-		"theme.name",
+		settingKeyThemeName,
 		"theme.colors",
 		"theme.file",
 		"log.json",
@@ -183,9 +189,9 @@ func FormatSettingValue(v any) string {
 		return val
 	case bool:
 		if val {
-			return "true"
+			return valTrue
 		}
-		return "false"
+		return valFalse
 	case nil:
 		return "(not set)"
 	default:

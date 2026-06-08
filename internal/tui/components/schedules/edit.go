@@ -119,7 +119,7 @@ func NewEditModel(ctx context.Context, svc *automation.Service) EditModel {
 	)
 
 	customMethodInput := form.NewTextInput(
-		form.WithPlaceholder("Switch.Set"),
+		form.WithPlaceholder(rpcSwitchSet),
 		form.WithCharLimit(64),
 		form.WithWidth(30),
 		form.WithHelp("Custom RPC method name"),
@@ -210,13 +210,13 @@ func (m EditModel) populateFromTimespec(timespec string) EditModel {
 
 func isWeekdaysPattern(pattern string) bool {
 	upper := strings.ToUpper(pattern)
-	return strings.Contains(upper, "MON") && strings.Contains(upper, "FRI") && !strings.Contains(upper, "SAT")
+	return strings.Contains(upper, dayMon) && strings.Contains(upper, dayFri) && !strings.Contains(upper, daySat)
 }
 
 func isWeekendsPattern(pattern string) bool {
 	upper := strings.ToUpper(pattern)
-	return (strings.Contains(upper, "SAT") || strings.Contains(upper, "SUN")) &&
-		!strings.Contains(upper, "MON") && !strings.Contains(upper, "TUE")
+	return (strings.Contains(upper, daySat) || strings.Contains(upper, daySun)) &&
+		!strings.Contains(upper, dayMon) && !strings.Contains(upper, dayTue)
 }
 
 func (m EditModel) parseCustomDays(pattern string) EditModel {
@@ -224,7 +224,7 @@ func (m EditModel) parseCustomDays(pattern string) EditModel {
 	upper := strings.ToUpper(pattern)
 
 	dayMappings := map[string]int{
-		"SUN": 0, "MON": 1, "TUE": 2, "WED": 3, "THU": 4, "FRI": 5, "SAT": 6,
+		daySun: 0, dayMon: 1, dayTue: 2, dayWed: 3, dayThu: 4, dayFri: 5, daySat: 6,
 		"0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6,
 	}
 
@@ -269,14 +269,14 @@ func (m EditModel) findMethodIndex(method string, params map[string]any) int {
 		Params map[string]any
 		Index  int
 	}{
-		{"Switch.Set", map[string]any{"on": true}, 0},
-		{"Switch.Set", map[string]any{"on": false}, 1},
+		{rpcSwitchSet, map[string]any{"on": true}, 0},
+		{rpcSwitchSet, map[string]any{"on": false}, 1},
 		{"Switch.Toggle", nil, 2},
 		{"Cover.Open", nil, 3},
 		{"Cover.Close", nil, 4},
 		{"Cover.Stop", nil, 5},
-		{"Light.Set", map[string]any{"on": true}, 6},
-		{"Light.Set", map[string]any{"on": false}, 7},
+		{rpcLightSet, map[string]any{"on": true}, 6},
+		{rpcLightSet, map[string]any{"on": false}, 7},
 		{"Script.Start", nil, 8},
 		{"Script.Stop", nil, 9},
 	}
@@ -658,7 +658,7 @@ func (m EditModel) buildTimespec(second, minute, hour string) (string, error) {
 }
 
 func (m EditModel) buildCustomDays() string {
-	dayNames := []string{"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"}
+	dayNames := []string{daySun, dayMon, dayTue, dayWed, dayThu, dayFri, daySat}
 	var selected []string
 	for i, sel := range m.selectedDays {
 		if sel {

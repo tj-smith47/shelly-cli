@@ -72,7 +72,7 @@ func TestEditorModel_SetFocused(t *testing.T) {
 func TestEditorModel_Clear(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
-		device:     "192.168.1.100",
+		device:     testDevice,
 		scriptID:   1,
 		scriptName: "test",
 		code:       "console.log('hello');",
@@ -163,7 +163,7 @@ func TestEditorModel_ScrollNavigation(t *testing.T) {
 	t.Parallel()
 	lines := make([]string, 50)
 	for i := range lines {
-		lines[i] = "code"
+		lines[i] = testCodeLine
 	}
 
 	m := EditorModel{
@@ -209,7 +209,7 @@ func TestEditorModel_PageNavigation(t *testing.T) {
 	t.Parallel()
 	lines := make([]string, 100)
 	for i := range lines {
-		lines[i] = "code"
+		lines[i] = testCodeLine
 	}
 
 	m := EditorModel{
@@ -356,7 +356,7 @@ func TestEditorModel_View_WithCode(t *testing.T) {
 	m := EditorModel{
 		Sizable:     panel.NewSizableLoaderOnly(),
 		scriptID:    1,
-		scriptName:  "test_script",
+		scriptName:  testScriptName,
 		codeLines:   []string{"let x = 1;", "let y = 2;", "// comment"},
 		showNumbers: true,
 		styles:      DefaultEditorStyles(),
@@ -364,7 +364,7 @@ func TestEditorModel_View_WithCode(t *testing.T) {
 	m = m.SetSize(60, 20)
 
 	view := m.View()
-	if !strings.Contains(view, "test_script") {
+	if !strings.Contains(view, testScriptName) {
 		t.Errorf("View() should show script name, got:\n%s", view)
 	}
 }
@@ -375,7 +375,7 @@ func TestEditorModel_View_WithStatus(t *testing.T) {
 		Sizable:    panel.NewSizableLoaderOnly(),
 		scriptID:   1,
 		scriptName: "running_script",
-		codeLines:  []string{"code"},
+		codeLines:  []string{testCodeLine},
 		status: &automation.ScriptStatus{
 			Running:  true,
 			MemUsage: 8192,
@@ -518,7 +518,7 @@ func TestDefaultEditorStyles(t *testing.T) {
 
 	// Just verify styles are created without panic
 	_ = styles.LineNumber.Render("1")
-	_ = styles.Code.Render("code")
+	_ = styles.Code.Render(testCodeLine)
 	_ = styles.Keyword.Render("let")
 	_ = styles.String.Render("hello")
 	_ = styles.Comment.Render("// comment")

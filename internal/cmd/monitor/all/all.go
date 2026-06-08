@@ -14,6 +14,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Command name and alias literals.
+const (
+	cmdName       = "all"
+	aliasOverview = "overview"
+	aliasSummary  = "summary"
+)
+
 // Options holds command options.
 type Options struct {
 	Factory  *cmdutil.Factory
@@ -25,8 +32,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "all",
-		Aliases: []string{"overview", "summary"},
+		Use:     cmdName,
+		Aliases: []string{aliasOverview, aliasSummary},
 		Short:   "Monitor all registered devices",
 		Long: `Monitor all devices in the registry.
 

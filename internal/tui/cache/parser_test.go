@@ -12,7 +12,7 @@ import (
 
 // mockPlugSStatus simulates a Shelly Plug S response (Gen2 switch with power monitoring).
 var mockPlugSStatus = map[string]json.RawMessage{
-	"switch:0": json.RawMessage(`{
+	keySwitch0: json.RawMessage(`{
 		"id": 0,
 		"source": "init",
 		"output": true,
@@ -22,7 +22,7 @@ var mockPlugSStatus = map[string]json.RawMessage{
 		"aenergy": {"total": 12345.67},
 		"temperature": {"tC": 42.3}
 	}`),
-	"sys": json.RawMessage(`{
+	ComponentSys: json.RawMessage(`{
 		"mac": "AABBCCDDEEFF",
 		"uptime": 86400,
 		"ram_free": 32768,
@@ -31,7 +31,7 @@ var mockPlugSStatus = map[string]json.RawMessage{
 		"fs_size": 204800,
 		"restart_required": false
 	}`),
-	"wifi": json.RawMessage(`{
+	ComponentWiFi: json.RawMessage(`{
 		"sta_ip": "192.168.1.100",
 		"status": "got ip",
 		"ssid": "HomeNetwork",
@@ -41,21 +41,21 @@ var mockPlugSStatus = map[string]json.RawMessage{
 
 // mockPlus2PMStatus simulates a Shelly Plus 2PM response (2 switches with PM).
 var mockPlus2PMStatus = map[string]json.RawMessage{
-	"switch:0": json.RawMessage(`{
+	keySwitch0: json.RawMessage(`{
 		"id": 0,
 		"output": true,
 		"apower": 100.0,
 		"voltage": 230.0,
 		"current": 0.435
 	}`),
-	"switch:1": json.RawMessage(`{
+	keySwitch1: json.RawMessage(`{
 		"id": 1,
 		"output": false,
 		"apower": 0.0,
 		"voltage": 230.0,
 		"current": 0.0
 	}`),
-	"sys": json.RawMessage(`{"mac": "112233445566", "uptime": 3600}`),
+	ComponentSys: json.RawMessage(`{"mac": "112233445566", "uptime": 3600}`),
 }
 
 // mockPro3EMStatus simulates a Shelly Pro 3EM response (3-phase energy meter).
@@ -74,30 +74,30 @@ var mockPro3EMStatus = map[string]json.RawMessage{
 		"total_current": 10.8,
 		"total_act_power": 2350.0
 	}`),
-	"sys": json.RawMessage(`{"mac": "FFEEDDCCBBAA", "uptime": 7200}`),
+	ComponentSys: json.RawMessage(`{"mac": "FFEEDDCCBBAA", "uptime": 7200}`),
 }
 
 // mockDimmer2Status simulates a Shelly Dimmer 2 response (light).
 var mockDimmer2Status = map[string]json.RawMessage{
-	"light:0": json.RawMessage(`{
+	keyLight0: json.RawMessage(`{
 		"id": 0,
 		"output": true,
 		"brightness": 75
 	}`),
 	"temperature:0": json.RawMessage(`{"tC": 38.5, "tF": 101.3}`),
-	"sys":           json.RawMessage(`{"mac": "AABBCC112233", "uptime": 1800}`),
+	ComponentSys:    json.RawMessage(`{"mac": "AABBCC112233", "uptime": 1800}`),
 }
 
 // mockCoverStatus simulates a Shelly 2.5 in cover mode response.
 var mockCoverStatus = map[string]json.RawMessage{
-	"cover:0": json.RawMessage(`{
+	keyCover0: json.RawMessage(`{
 		"id": 0,
 		"state": "stopped",
 		"apower": 0.0,
 		"current_pos": 50,
 		"target_pos": 50
 	}`),
-	"sys": json.RawMessage(`{"mac": "DDEEFF001122", "uptime": 600}`),
+	ComponentSys: json.RawMessage(`{"mac": "DDEEFF001122", "uptime": 600}`),
 }
 
 // mockPMOnlyStatus simulates a device with standalone PM components.
@@ -133,46 +133,46 @@ var mockEM1Status = map[string]json.RawMessage{
 
 // mockGen1PlugStatus simulates a Gen1 Shelly Plug response.
 var mockGen1PlugStatus = map[string]json.RawMessage{
-	"relays":    json.RawMessage(`[{"ison": true, "source": "http"}]`),
+	Gen1Relays:  json.RawMessage(`[{"ison": true, "source": "http"}]`),
 	"meters":    json.RawMessage(`[{"power": 55.5, "total": 1234.56}]`),
 	"wifi_sta":  json.RawMessage(`{"connected": true, "ssid": "Gen1Network", "ip": "192.168.1.50", "rssi": -60}`),
-	"uptime":    json.RawMessage(`7200`),
+	fieldUptime: json.RawMessage(`7200`),
 	"ram_total": json.RawMessage(`51200`),
 	"ram_free":  json.RawMessage(`25600`),
 	"fs_size":   json.RawMessage(`233681`),
 	"fs_free":   json.RawMessage(`156648`),
-	"mac":       json.RawMessage(`"AABBCC001122"`),
+	fieldMAC:    json.RawMessage(`"AABBCC001122"`),
 }
 
 // mockGen1EMStatus simulates a Gen1 Shelly EM response.
 var mockGen1EMStatus = map[string]json.RawMessage{
-	"relays":  json.RawMessage(`[{"ison": false}]`),
-	"emeters": json.RawMessage(`[{"power": 500.0, "voltage": 230.0, "current": 2.17, "total": 5000.0}, {"power": 300.0, "voltage": 231.0, "current": 1.3, "total": 3000.0}]`),
-	"uptime":  json.RawMessage(`3600`),
-	"mac":     json.RawMessage(`"DDEEFF334455"`),
+	Gen1Relays:  json.RawMessage(`[{"ison": false}]`),
+	"emeters":   json.RawMessage(`[{"power": 500.0, "voltage": 230.0, "current": 2.17, "total": 5000.0}, {"power": 300.0, "voltage": 231.0, "current": 1.3, "total": 3000.0}]`),
+	fieldUptime: json.RawMessage(`3600`),
+	fieldMAC:    json.RawMessage(`"DDEEFF334455"`),
 }
 
 // mockGen1RGBWStatus simulates a Gen1 Shelly RGBW2 response.
 var mockGen1RGBWStatus = map[string]json.RawMessage{
-	"lights": json.RawMessage(`[{"ison": true, "mode": "color", "brightness": 100}]`),
-	"uptime": json.RawMessage(`1800`),
-	"mac":    json.RawMessage(`"112233AABBCC"`),
+	"lights":    json.RawMessage(`[{"ison": true, "mode": "color", "brightness": 100}]`),
+	fieldUptime: json.RawMessage(`1800`),
+	fieldMAC:    json.RawMessage(`"112233AABBCC"`),
 }
 
 // mockGen1RollerStatus simulates a Gen1 Shelly 2.5 in roller mode response.
 var mockGen1RollerStatus = map[string]json.RawMessage{
-	"rollers": json.RawMessage(`[{"state": "stop", "power": 0.0, "current_pos": 75}]`),
-	"uptime":  json.RawMessage(`900`),
-	"mac":     json.RawMessage(`"FFEE00112233"`),
+	"rollers":   json.RawMessage(`[{"state": "stop", "power": 0.0, "current_pos": 75}]`),
+	fieldUptime: json.RawMessage(`900`),
+	fieldMAC:    json.RawMessage(`"FFEE00112233"`),
 }
 
 // mockGen1TempStatus simulates a Gen1 device with external temperature sensors.
 var mockGen1TempStatus = map[string]json.RawMessage{
-	"relays":          json.RawMessage(`[{"ison": false}]`),
-	"temperature":     json.RawMessage(`45.6`),
-	"ext_temperature": json.RawMessage(`{"0": {"tC": 23.5, "tF": 74.3, "is_valid": true}, "1": {"tC": 25.0, "tF": 77.0, "is_valid": true}}`),
-	"uptime":          json.RawMessage(`600`),
-	"mac":             json.RawMessage(`"AABBCCDDEE00"`),
+	Gen1Relays:           json.RawMessage(`[{"ison": false}]`),
+	ComponentTemperature: json.RawMessage(`45.6`),
+	"ext_temperature":    json.RawMessage(`{"0": {"tC": 23.5, "tF": 74.3, "is_valid": true}, "1": {"tC": 25.0, "tF": 77.0, "is_valid": true}}`),
+	fieldUptime:          json.RawMessage(`600`),
+	fieldMAC:             json.RawMessage(`"AABBCCDDEE00"`),
 }
 
 // --- ParseFullStatus Tests ---
@@ -220,7 +220,7 @@ func TestParseFullStatus_PlugS(t *testing.T) {
 	if parsed.Sys.Uptime != 86400 {
 		t.Errorf("expected uptime 86400, got %d", parsed.Sys.Uptime)
 	}
-	if parsed.MAC != "AABBCCDDEEFF" {
+	if parsed.MAC != testMACUpper {
 		t.Errorf("expected MAC 'AABBCCDDEEFF', got '%s'", parsed.MAC)
 	}
 }
@@ -438,11 +438,11 @@ func TestApplyParsedStatus_Basic(t *testing.T) {
 	t.Parallel()
 	data := &DeviceData{}
 	parsed := &ParsedStatus{
-		DeviceID: "test-device",
+		DeviceID: testDeviceName,
 		Switches: []SwitchState{{ID: 0, On: true}},
 		Power:    100.0,
 		Voltage:  230.0,
-		MAC:      "AABBCCDDEEFF",
+		MAC:      testMACUpper,
 	}
 
 	ApplyParsedStatus(data, parsed)
@@ -453,7 +453,7 @@ func TestApplyParsedStatus_Basic(t *testing.T) {
 	if data.Power != 100.0 {
 		t.Errorf("expected power 100.0, got %f", data.Power)
 	}
-	if data.Device.MAC != "AABBCCDDEEFF" {
+	if data.Device.MAC != testMACUpper {
 		t.Errorf("expected MAC 'AABBCCDDEEFF', got '%s'", data.Device.MAC)
 	}
 }
@@ -466,7 +466,7 @@ func TestApplyParsedStatus_PreservesExisting(t *testing.T) {
 	data.Device.Model = "ExistingModel"
 
 	parsed := &ParsedStatus{
-		DeviceID: "test-device",
+		DeviceID: testDeviceName,
 		// Empty switches - should preserve existing
 		Power: 50.0,
 		Model: "NewModel", // Should NOT override existing
@@ -708,7 +708,7 @@ func TestParseComponentName(t *testing.T) {
 		{"sys", ComponentSys, 0},
 		{"wifi", ComponentWiFi, 0},
 		{"temperature:3", ComponentTemperature, 3},
-		{"invalid", "invalid", 0},
+		{testInvalid, testInvalid, 0},
 		{"switch:notanumber", ComponentSwitch, 0},
 	}
 
@@ -777,14 +777,14 @@ func TestDetectComponents(t *testing.T) {
 func TestParseFullStatus_NilMap(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := ParseFullStatus("test", nil)
+	parsed, err := ParseFullStatus(testStr, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if parsed == nil {
 		t.Fatal("expected non-nil ParsedStatus")
 	}
-	if parsed.DeviceID != "test" {
+	if parsed.DeviceID != testStr {
 		t.Errorf("expected deviceID 'test', got '%s'", parsed.DeviceID)
 	}
 }
@@ -792,7 +792,7 @@ func TestParseFullStatus_NilMap(t *testing.T) {
 func TestParseFullStatus_EmptyMap(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := ParseFullStatus("test", map[string]json.RawMessage{})
+	parsed, err := ParseFullStatus(testStr, map[string]json.RawMessage{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -809,11 +809,11 @@ func TestParseFullStatus_MalformedJSON(t *testing.T) {
 
 	// Malformed JSON should not panic - parser is lenient
 	statusMap := map[string]json.RawMessage{
-		"switch:0": json.RawMessage(`{not valid json`),
-		"sys":      json.RawMessage(`{"mac": "AABBCC"}`), // Valid
+		keySwitch0:   json.RawMessage(`{not valid json`),
+		ComponentSys: json.RawMessage(`{"mac": "AABBCC"}`), // Valid
 	}
 
-	parsed, err := ParseFullStatus("test", statusMap)
+	parsed, err := ParseFullStatus(testStr, statusMap)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -842,7 +842,7 @@ func TestApplyIncrementalUpdate_EM1(t *testing.T) {
 
 // mockPlus1PMStatus simulates a Shelly Plus 1PM response (single switch with PM).
 var mockPlus1PMStatus = map[string]json.RawMessage{
-	"switch:0": json.RawMessage(`{
+	keySwitch0: json.RawMessage(`{
 		"id": 0,
 		"source": "button",
 		"output": true,
@@ -852,7 +852,7 @@ var mockPlus1PMStatus = map[string]json.RawMessage{
 		"aenergy": {"total": 5678.90},
 		"temperature": {"tC": 35.8}
 	}`),
-	"sys": json.RawMessage(`{
+	ComponentSys: json.RawMessage(`{
 		"mac": "AABB11223344",
 		"uptime": 43200,
 		"ram_free": 40960,
@@ -860,7 +860,7 @@ var mockPlus1PMStatus = map[string]json.RawMessage{
 		"fs_free": 122880,
 		"fs_size": 204800
 	}`),
-	"wifi": json.RawMessage(`{
+	ComponentWiFi: json.RawMessage(`{
 		"sta_ip": "192.168.1.75",
 		"status": "got ip",
 		"ssid": "Plus1PMNetwork",
@@ -882,7 +882,7 @@ func TestParseFullStatus_Plus1PM(t *testing.T) {
 	if !parsed.Switches[0].On {
 		t.Error("expected switch to be on")
 	}
-	if parsed.Switches[0].Source != "button" {
+	if parsed.Switches[0].Source != testInputTypeButton {
 		t.Errorf("expected source 'button', got '%s'", parsed.Switches[0].Source)
 	}
 
@@ -909,14 +909,14 @@ func TestParseFullStatus_Plus1PM(t *testing.T) {
 
 // mockPro4PMStatus simulates a Shelly Pro 4PM response (4 switches with PM).
 var mockPro4PMStatus = map[string]json.RawMessage{
-	"switch:0": json.RawMessage(`{
+	keySwitch0: json.RawMessage(`{
 		"id": 0,
 		"output": true,
 		"apower": 100.0,
 		"voltage": 230.5,
 		"current": 0.435
 	}`),
-	"switch:1": json.RawMessage(`{
+	keySwitch1: json.RawMessage(`{
 		"id": 1,
 		"output": false,
 		"apower": 0.0,
@@ -937,7 +937,7 @@ var mockPro4PMStatus = map[string]json.RawMessage{
 		"voltage": 230.5,
 		"current": 0.217
 	}`),
-	"sys": json.RawMessage(`{
+	ComponentSys: json.RawMessage(`{
 		"mac": "FFEEDD998877",
 		"uptime": 172800,
 		"ram_free": 51200,
@@ -1026,18 +1026,18 @@ func TestHTTPToWebSocketTransition(t *testing.T) {
 
 	// Start with HTTP response
 	httpStatus := map[string]json.RawMessage{
-		"switch:0": json.RawMessage(`{"id": 0, "output": false, "apower": 0.0}`),
-		"sys":      json.RawMessage(`{"mac": "AABBCCDD0011", "uptime": 100}`),
+		keySwitch0:   json.RawMessage(`{"id": 0, "output": false, "apower": 0.0}`),
+		ComponentSys: json.RawMessage(`{"mac": "AABBCCDD0011", "uptime": 100}`),
 	}
 
-	parsed, err := ParseFullStatus("test-device", httpStatus)
+	parsed, err := ParseFullStatus(testDeviceName, httpStatus)
 	if err != nil {
 		t.Fatalf("HTTP parse error: %v", err)
 	}
 
 	// Apply to DeviceData (simulating initial HTTP fetch)
 	data := &DeviceData{
-		Device: model.Device{Name: "test-device"},
+		Device: model.Device{Name: testDeviceName},
 	}
 	ApplyParsedStatus(data, parsed)
 
@@ -1122,7 +1122,7 @@ func TestCoverWebSocketUpdates(t *testing.T) {
 
 	// Cover finishes opening
 	ApplyIncrementalUpdate(data, ComponentCover, 0, json.RawMessage(`{"state": "open", "apower": 0.0}`))
-	if data.Covers[0].State != "open" {
+	if data.Covers[0].State != CoverStateOpen {
 		t.Errorf("expected state 'open', got '%s'", data.Covers[0].State)
 	}
 	assertFloat(t, "power after open", 0.0, data.Power)
@@ -1135,7 +1135,7 @@ func TestCoverWebSocketUpdates(t *testing.T) {
 
 	// Cover finishes closing
 	ApplyIncrementalUpdate(data, ComponentCover, 0, json.RawMessage(`{"state": "closed", "apower": 0.0}`))
-	if data.Covers[0].State != "closed" {
+	if data.Covers[0].State != CoverStateClosed {
 		t.Errorf("expected state 'closed', got '%s'", data.Covers[0].State)
 	}
 }
@@ -1166,11 +1166,11 @@ func TestGen1HTTPParsing(t *testing.T) {
 	t.Parallel()
 
 	gen1Status := map[string]json.RawMessage{
-		"relays":   json.RawMessage(`[{"ison": true, "source": "timer"}]`),
-		"meters":   json.RawMessage(`[{"power": 75.0, "total": 500.0}]`),
-		"wifi_sta": json.RawMessage(`{"connected": true, "ssid": "Gen1Net", "ip": "192.168.1.30", "rssi": -55}`),
-		"uptime":   json.RawMessage(`3600`),
-		"mac":      json.RawMessage(`"AABBCC112233"`),
+		Gen1Relays:  json.RawMessage(`[{"ison": true, "source": "timer"}]`),
+		"meters":    json.RawMessage(`[{"power": 75.0, "total": 500.0}]`),
+		"wifi_sta":  json.RawMessage(`{"connected": true, "ssid": "Gen1Net", "ip": "192.168.1.30", "rssi": -55}`),
+		fieldUptime: json.RawMessage(`3600`),
+		fieldMAC:    json.RawMessage(`"AABBCC112233"`),
 	}
 
 	parsed, err := ParseGen1Status("gen1-device", gen1Status)
@@ -1215,7 +1215,7 @@ func TestPreserveWiFiSysAcrossRefresh(t *testing.T) {
 
 	// Initial data with WiFi and Sys already populated
 	data := &DeviceData{
-		Device: model.Device{Name: "test"},
+		Device: model.Device{Name: testStr},
 		WiFi: &shelly.WiFiStatus{
 			SSID: "InitialNetwork",
 			RSSI: -50,
@@ -1227,7 +1227,7 @@ func TestPreserveWiFiSysAcrossRefresh(t *testing.T) {
 
 	// Parse new status that doesn't include WiFi/Sys
 	parsed := &ParsedStatus{
-		DeviceID: "test",
+		DeviceID: testStr,
 		Switches: []SwitchState{{ID: 0, On: true}},
 		Power:    100.0,
 		// WiFi and Sys are nil

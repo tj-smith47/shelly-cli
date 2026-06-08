@@ -174,7 +174,7 @@ func TestModel_Update_StatusLoaded(t *testing.T) {
 	m.loading = true
 	msg := StatusLoadedMsg{
 		Status: &network.WiFiStatusFull{
-			Status: "got ip",
+			Status: statusGotIP,
 			StaIP:  "192.168.1.50",
 			SSID:   "MyNetwork",
 			RSSI:   -45,
@@ -422,7 +422,7 @@ func TestModel_View_WithStatus(t *testing.T) {
 	m := newTestModel()
 	m.device = testDevice
 	m.status = &network.WiFiStatusFull{
-		Status:        "got ip",
+		Status:        statusGotIP,
 		StaIP:         "192.168.1.50",
 		SSID:          "MyNetwork",
 		RSSI:          -45,
@@ -451,11 +451,11 @@ func TestModel_View_WithNetworks(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.device = testDevice
-	m.status = &network.WiFiStatusFull{Status: "got ip"}
+	m.status = &network.WiFiStatusFull{Status: statusGotIP}
 	m.networks = []network.WiFiNetworkFull{
 		{SSID: "Network1", RSSI: -40, Auth: "wpa2"},
 		{SSID: "Network2", RSSI: -55, Auth: "wpa2"},
-		{SSID: "OpenNetwork", RSSI: -65, Auth: "open"},
+		{SSID: "OpenNetwork", RSSI: -65, Auth: authModeOpen},
 		{SSID: "WeakNetwork", RSSI: -80, Auth: "wpa3"},
 	}
 	m = m.SetSize(80, 40)
@@ -471,7 +471,7 @@ func TestModel_View_Scanning(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.device = testDevice
-	m.status = &network.WiFiStatusFull{Status: "got ip"}
+	m.status = &network.WiFiStatusFull{Status: statusGotIP}
 	m.scanning = true
 	m = m.SetSize(80, 24)
 
@@ -620,7 +620,7 @@ func TestModel_RenderNetworkLine_Selected(t *testing.T) {
 func TestModel_RenderNetworkLine_OpenNetwork(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	netw := network.WiFiNetworkFull{SSID: "OpenWifi", RSSI: -60, Auth: "open"}
+	netw := network.WiFiNetworkFull{SSID: "OpenWifi", RSSI: -60, Auth: authModeOpen}
 
 	line := m.renderNetworkLine(netw, false)
 

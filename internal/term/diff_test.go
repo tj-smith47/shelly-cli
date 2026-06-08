@@ -23,7 +23,7 @@ func TestDisplayConfigDiffs_Added(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	diffs := []model.ConfigDiff{
-		{Path: "sys.device.name", DiffType: model.DiffAdded, NewValue: "Kitchen Light"},
+		{Path: testConfigDeviceName, DiffType: model.DiffAdded, NewValue: testKitchenName},
 	}
 	DisplayConfigDiffs(ios, diffs, false)
 
@@ -31,7 +31,7 @@ func TestDisplayConfigDiffs_Added(t *testing.T) {
 	if !strings.Contains(output, "+") {
 		t.Error("expected + prefix for added")
 	}
-	if !strings.Contains(output, "sys.device.name") {
+	if !strings.Contains(output, testConfigDeviceName) {
 		t.Error("expected path")
 	}
 }
@@ -56,7 +56,7 @@ func TestDisplayConfigDiffs_Changed(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	diffs := []model.ConfigDiff{
-		{Path: "switch:0.name", DiffType: model.DiffChanged, OldValue: "Old", NewValue: "New"},
+		{Path: testConfigSwitchName, DiffType: model.DiffChanged, OldValue: "Old", NewValue: "New"},
 	}
 	DisplayConfigDiffs(ios, diffs, false)
 
@@ -71,9 +71,9 @@ func TestDisplayConfigDiffs_Verbose(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	diffs := []model.ConfigDiff{
-		{Path: "sys.device.name", DiffType: model.DiffAdded, NewValue: "Kitchen"},
+		{Path: testConfigDeviceName, DiffType: model.DiffAdded, NewValue: "Kitchen"},
 		{Path: "wifi.sta.ssid", DiffType: model.DiffRemoved, OldValue: "Old"},
-		{Path: "switch:0.name", DiffType: model.DiffChanged, OldValue: "A", NewValue: "B"},
+		{Path: testConfigSwitchName, DiffType: model.DiffChanged, OldValue: "A", NewValue: "B"},
 	}
 	DisplayConfigDiffs(ios, diffs, true)
 
@@ -238,10 +238,10 @@ func TestDisplayConfigMapDiff_NewKeys(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	current := map[string]any{
-		"existing": "value",
+		"existing": testValue,
 	}
 	incoming := map[string]any{
-		"existing": "value",
+		"existing": testValue,
 		"new_key":  "new_value",
 	}
 	DisplayConfigMapDiff(ios, current, incoming)
@@ -260,10 +260,10 @@ func TestDisplayConfigMapDiff_ChangedKeys(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	current := map[string]any{
-		"key": "old_value",
+		testKey: "old_value",
 	}
 	incoming := map[string]any{
-		"key": "new_value",
+		testKey: "new_value",
 	}
 	DisplayConfigMapDiff(ios, current, incoming)
 
@@ -284,10 +284,10 @@ func TestDisplayConfigMapDiff_NoChanges(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	current := map[string]any{
-		"key": "value",
+		testKey: testValue,
 	}
 	incoming := map[string]any{
-		"key": "value",
+		testKey: testValue,
 	}
 	DisplayConfigMapDiff(ios, current, incoming)
 

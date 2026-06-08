@@ -13,6 +13,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// commandName is the name of the zwave config command.
+const commandName = "config"
+
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
@@ -24,7 +27,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "config",
+		Use:     commandName,
 		Aliases: []string{"params", "parameters"},
 		Short:   "Show common configuration parameters",
 		Long: `Show common Z-Wave configuration parameters for Wave devices.

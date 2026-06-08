@@ -18,6 +18,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
+const formatYAML = "yaml"
+
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
@@ -119,7 +121,7 @@ the device name and either the response or error message.`,
 	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Target all registered devices")
 	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", 10*time.Second, "Timeout per device")
 	cmd.Flags().IntVarP(&opts.Concurrent, "concurrent", "c", 5, "Max concurrent operations")
-	flags.AddOutputFlagsNamed(cmd, &opts.OutputFlags, "output", "o", "json", "json", "yaml")
+	flags.AddOutputFlagsNamed(cmd, &opts.OutputFlags, "output", "o", "json", "json", formatYAML)
 	flags.AddDryRunFlag(cmd, &opts.DryRun)
 
 	return cmd
@@ -189,7 +191,7 @@ func run(ctx context.Context, targets []string, method string, params map[string
 
 	// Output results
 	switch opts.Format {
-	case "yaml":
+	case formatYAML:
 		if err := output.PrintYAML(results); err != nil {
 			return err
 		}

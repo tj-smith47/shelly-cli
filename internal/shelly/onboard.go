@@ -127,12 +127,12 @@ func (s *Service) DiscoverForOnboard(
 	// BLE discovery (Gen2+ in provisioning mode)
 	if !opts.APOnly {
 		wg.Go(func() {
-			report("BLE", 0, false, nil)
+			report(string(OnboardSourceBLE), 0, false, nil)
 			found, bleErr := s.discoverBLEForOnboard(ctx)
 			mu.Lock()
 			devices = append(devices, found...)
 			mu.Unlock()
-			report("BLE", len(found), true, bleErr)
+			report(string(OnboardSourceBLE), len(found), true, bleErr)
 		})
 	}
 
@@ -382,7 +382,7 @@ func (s *Service) OnboardViaBLE(
 	wifi *OnboardWiFiConfig,
 	opts *OnboardOptions,
 ) *OnboardResult {
-	result := &OnboardResult{Device: device, Method: "BLE"}
+	result := &OnboardResult{Device: device, Method: string(OnboardSourceBLE)}
 
 	// Initialize BLE transmitter
 	transmitter, err := provisioning.NewTinyGoBLETransmitter()
@@ -782,7 +782,7 @@ func extractWiFiFromBlob(data json.RawMessage) *OnboardWiFiConfig {
 	if err := json.Unmarshal(data, &wifiData); err != nil {
 		return nil
 	}
-	sta, ok := wifiData["sta"].(map[string]any)
+	sta, ok := wifiData[fieldSTA].(map[string]any)
 	if !ok {
 		return nil
 	}

@@ -28,8 +28,10 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
+const actionActivate = "activate"
+
 var footerHints = []keys.Hint{
-	{Key: "a", Desc: "activate"},
+	{Key: "a", Desc: actionActivate},
 	{Key: "v", Desc: "view"},
 	{Key: "e", Desc: "edit"},
 	{Key: "d", Desc: "del"},
@@ -399,13 +401,13 @@ func (m ListModel) activateScene() (ListModel, tea.Cmd) {
 
 		if len(errors) > 0 {
 			return ActionMsg{
-				Action:    "activate",
+				Action:    actionActivate,
 				SceneName: sceneCopy.Name,
 				Err:       fmt.Errorf("some actions failed: %s", strings.Join(errors, "; ")),
 			}
 		}
 
-		return ActionMsg{Action: "activate", SceneName: sceneCopy.Name}
+		return ActionMsg{Action: actionActivate, SceneName: sceneCopy.Name}
 	}
 }
 

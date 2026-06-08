@@ -34,8 +34,8 @@ func TestNewCommand_Structure(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test Use
-	if cmd.Use != "list <device>" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "list <device>")
+	if cmd.Use != useListDevice {
+		t.Errorf("Use = %q, want %q", cmd.Use, useListDevice)
 	}
 
 	// Test Aliases
@@ -362,7 +362,7 @@ func TestExecute_WithJSONFormat(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"json-device", "--format", "json"})
+	cmd.SetArgs([]string{"json-device", "--format", formatJSON})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -407,7 +407,7 @@ func TestExecute_WithAllAndJSONFlags(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"combo-device", "--all", "--format", "json"})
+	cmd.SetArgs([]string{"combo-device", "--all", "--format", formatJSON})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -588,7 +588,7 @@ func TestRun_WithJSONOutput(t *testing.T) {
 		All:          false,
 		OutputFlags: struct {
 			Format string
-		}{Format: "json"},
+		}{Format: formatJSON},
 	}
 
 	err = run(context.Background(), opts)
@@ -645,12 +645,12 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 		},
 		{
 			name:    "format json flag",
-			args:    []string{"device", "--format", "json"},
+			args:    []string{"device", "--format", formatJSON},
 			wantErr: false,
 		},
 		{
 			name:    "all flags combined",
-			args:    []string{"device", "--thermostat-id", "2", "--all", "--format", "json"},
+			args:    []string{"device", "--thermostat-id", "2", "--all", "--format", formatJSON},
 			wantErr: false,
 		},
 		{
@@ -708,7 +708,7 @@ func TestExecute_JSONOutputFormat(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"json-output-device", "--format", "json"})
+	cmd.SetArgs([]string{"json-output-device", "--format", formatJSON})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -819,7 +819,7 @@ func TestExecute_ThermostatIDFiltering(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"multi-trv-device", "--thermostat-id", "1", "--format", "json"})
+	cmd.SetArgs([]string{"multi-trv-device", "--thermostat-id", "1", "--format", formatJSON})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -1116,7 +1116,7 @@ func TestNewCommand_Use_ExactValue(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expectedUse := "list <device>"
+	expectedUse := useListDevice
 	if cmd.Use != expectedUse {
 		t.Errorf("Use = %q, want %q", cmd.Use, expectedUse)
 	}
@@ -1266,14 +1266,14 @@ func TestOptions_OutputFlags_Embedded(t *testing.T) {
 	opts := &Options{
 		OutputFlags: struct {
 			Format string
-		}{Format: "json"},
+		}{Format: formatJSON},
 		Factory:      nil,
 		Device:       "test",
 		ThermostatID: 1,
 		All:          true,
 	}
 
-	if opts.Format != "json" {
+	if opts.Format != formatJSON {
 		t.Errorf("OutputFlags.Format should be 'json', got %q", opts.Format)
 	}
 }

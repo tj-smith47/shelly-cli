@@ -42,7 +42,7 @@ func TestNewCommand_Structure(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "import <file>")
 	}
 
-	wantAliases := []string{"load"}
+	wantAliases := []string{aliasLoad}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
 	}
@@ -718,7 +718,7 @@ func TestNewCommand_Aliases(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expectedAliases := []string{"load"}
+	expectedAliases := []string{aliasLoad}
 
 	if len(cmd.Aliases) != len(expectedAliases) {
 		t.Errorf("expected %d aliases, got %d: %v", len(expectedAliases), len(cmd.Aliases), cmd.Aliases)

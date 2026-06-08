@@ -11,6 +11,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// sensorNameTemperature is the singular display name for a temperature sensor.
+const sensorNameTemperature = "Temperature Sensor"
+
 // SensorValueFormatter formats a sensor's value(s) for display.
 // The highlight parameter controls whether to apply theme styling.
 type SensorValueFormatter[T model.Sensor] func(s T, highlight bool) string
@@ -89,7 +92,7 @@ func displayAllSection[T any](ios *iostreams.IOStreams, items []T, title string,
 // TemperatureOpts provides configuration for temperature sensor displays.
 var TemperatureOpts = SensorOpts[model.TemperatureReading]{
 	Title:      "Temperature Sensors",
-	SingleName: "Temperature Sensor",
+	SingleName: sensorNameTemperature,
 	NoValueMsg: "No temperature reading available.",
 	HasValue:   func(s model.TemperatureReading) bool { return s.TC != nil },
 	Format: func(s model.TemperatureReading, highlight bool) string {

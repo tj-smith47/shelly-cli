@@ -116,8 +116,8 @@ func TestExtractWiFiSSID(t *testing.T) {
 		{
 			name: "valid wifi config",
 			input: map[string]any{
-				"sta": map[string]any{
-					"ssid": "MyNetwork",
+				wifiKeySta: map[string]any{
+					wifiKeySSID: "MyNetwork",
 				},
 			},
 			wantSSID: "MyNetwork",
@@ -125,8 +125,8 @@ func TestExtractWiFiSSID(t *testing.T) {
 		{
 			name: "empty ssid",
 			input: map[string]any{
-				"sta": map[string]any{
-					"ssid": "",
+				wifiKeySta: map[string]any{
+					wifiKeySSID: "",
 				},
 			},
 			wantSSID: "",
@@ -139,7 +139,7 @@ func TestExtractWiFiSSID(t *testing.T) {
 		{
 			name: "missing ssid",
 			input: map[string]any{
-				"sta": map[string]any{},
+				wifiKeySta: map[string]any{},
 			},
 			wantSSID: "",
 		},
@@ -156,7 +156,7 @@ func TestExtractWiFiSSID(t *testing.T) {
 		{
 			name: "sta is not a map",
 			input: map[string]any{
-				"sta": "not a map",
+				wifiKeySta: "not a map",
 			},
 			wantSSID: "",
 		},

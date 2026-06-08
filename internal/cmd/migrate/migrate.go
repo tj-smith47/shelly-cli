@@ -15,6 +15,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// aliasMig is the migrate command alias.
+const aliasMig = "mig"
+
 // Options holds command options.
 type Options struct {
 	Factory       *cmdutil.Factory
@@ -40,7 +43,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "migrate <source-device> <target-device>",
-		Aliases: []string{"mig"},
+		Aliases: []string{aliasMig},
 		Short:   "Migrate configuration between devices",
 		Long: `Migrate configuration from one Shelly device to another.
 

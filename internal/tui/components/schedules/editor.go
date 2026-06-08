@@ -261,7 +261,7 @@ func (m EditorModel) renderCall(index int, call automation.ScheduleCall) string 
 	var sb strings.Builder
 
 	// Method
-	sb.WriteString(fmt.Sprintf("%d. ", index))
+	fmt.Fprintf(&sb, "%d. ", index)
 	sb.WriteString(m.styles.Method.Render(call.Method))
 	sb.WriteString("\n")
 

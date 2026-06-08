@@ -12,23 +12,23 @@ func TestCloudEvent_GetDeviceID(t *testing.T) {
 	}{
 		{
 			name:   "prefer DeviceID over Device",
-			event:  CloudEvent{DeviceID: "device-123", Device: "device-456"},
-			wantID: "device-123",
+			event:  CloudEvent{DeviceID: testDeviceID123, Device: testDeviceID456},
+			wantID: testDeviceID123,
 		},
 		{
 			name:   "fall back to Device when DeviceID empty",
-			event:  CloudEvent{DeviceID: "", Device: "device-456"},
-			wantID: "device-456",
+			event:  CloudEvent{DeviceID: "", Device: testDeviceID456},
+			wantID: testDeviceID456,
 		},
 		{
 			name:   "DeviceID only",
-			event:  CloudEvent{DeviceID: "device-123"},
-			wantID: "device-123",
+			event:  CloudEvent{DeviceID: testDeviceID123},
+			wantID: testDeviceID123,
 		},
 		{
 			name:   "Device only",
-			event:  CloudEvent{Device: "device-456"},
-			wantID: "device-456",
+			event:  CloudEvent{Device: testDeviceID456},
+			wantID: testDeviceID456,
 		},
 		{
 			name:   "both empty",
@@ -53,15 +53,15 @@ func TestCloudEvent_Fields(t *testing.T) {
 
 	online := 1
 	event := CloudEvent{
-		Event:     "online",
+		Event:     testStatusOnline,
 		DeviceID:  "shelly-1pm-abc123",
 		Device:    "shellyplug-s-def456",
 		Online:    &online,
 		Timestamp: 1699999999,
 	}
 
-	if event.Event != "online" {
-		t.Errorf("Event = %q, want %q", event.Event, "online")
+	if event.Event != testStatusOnline {
+		t.Errorf("Event = %q, want %q", event.Event, testStatusOnline)
 	}
 	if event.DeviceID != "shelly-1pm-abc123" {
 		t.Errorf("DeviceID = %q, want %q", event.DeviceID, "shelly-1pm-abc123")

@@ -15,6 +15,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// Output format identifiers for the config export command.
+const (
+	formatYAML = "yaml"
+	formatYML  = "yml"
+)
+
 // Options holds command options.
 type Options struct {
 	Factory  *cmdutil.Factory
@@ -77,7 +83,7 @@ func run(ctx context.Context, opts *Options) error {
 	// Marshal based on format
 	var data []byte
 	switch opts.Format {
-	case "yaml", "yml":
+	case formatYAML, formatYML:
 		data, err = yaml.Marshal(deviceConfig)
 	default:
 		data, err = json.MarshalIndent(deviceConfig, "", "  ")

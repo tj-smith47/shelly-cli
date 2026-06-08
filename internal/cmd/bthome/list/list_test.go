@@ -11,11 +11,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
-const (
-	formatText = "text"
-	formatJSON = "json"
-)
-
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())

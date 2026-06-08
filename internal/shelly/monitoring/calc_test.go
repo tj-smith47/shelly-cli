@@ -67,7 +67,6 @@ type mockEnergyBlock struct {
 func (m mockEnergyBlock) GetPeriod() int            { return m.period }
 func (m mockEnergyBlock) GetPowerValues() []float64 { return m.powers }
 
-//nolint:gocyclo // Test function with multiple subtests is inherently complex.
 func TestCalculateMetrics(t *testing.T) {
 	t.Parallel()
 

@@ -51,10 +51,10 @@ func TestNewCommand_Args(t *testing.T) {
 	if err := cmd.Args(cmd, []string{}); err == nil {
 		t.Error("expected error with no args")
 	}
-	if err := cmd.Args(cmd, []string{"group"}); err != nil {
+	if err := cmd.Args(cmd, []string{keyGroup}); err != nil {
 		t.Errorf("unexpected error with 1 arg: %v", err)
 	}
-	if err := cmd.Args(cmd, []string{"group", "extra"}); err == nil {
+	if err := cmd.Args(cmd, []string{keyGroup, "extra"}); err == nil {
 		t.Error("expected error with 2 args")
 	}
 }

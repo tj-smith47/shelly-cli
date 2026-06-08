@@ -13,6 +13,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Short aliases for the wifi scan command.
+const (
+	aliasSearch = "search"
+	aliasFind   = "find"
+)
+
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -25,7 +31,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "scan <device>",
-		Aliases: []string{"search", "find"},
+		Aliases: []string{aliasSearch, aliasFind},
 		Short:   "Scan for available WiFi networks",
 		Long: `Scan for available WiFi networks using a device.
 

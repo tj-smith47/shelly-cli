@@ -14,6 +14,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Chroma style names reused across theme mapping and fallback.
+const (
+	chromaStyleDracula = "dracula"
+	chromaStyleGruvbox = "gruvbox"
+)
+
 // IsTTY is a package-level function for TTY detection, overridable in tests.
 var IsTTY = func() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
@@ -81,17 +87,17 @@ func GetChromaStyle() *chroma.Style {
 	// Try to match the current theme name to a chroma style
 	currentTheme := viper.GetString("theme.name")
 	if currentTheme == "" {
-		currentTheme = "dracula"
+		currentTheme = chromaStyleDracula
 	}
 
 	// Map theme names to chroma styles
 	styleMap := map[string]string{
-		"dracula":      "dracula",
-		"nord":         "nord",
-		"gruvbox":      "gruvbox",
-		"gruvbox-dark": "gruvbox",
-		"tokyo-night":  "tokyonight-night",
-		"catppuccin":   "catppuccin-mocha",
+		chromaStyleDracula: chromaStyleDracula,
+		"nord":             "nord",
+		chromaStyleGruvbox: chromaStyleGruvbox,
+		"gruvbox-dark":     chromaStyleGruvbox,
+		"tokyo-night":      "tokyonight-night",
+		"catppuccin":       "catppuccin-mocha",
 	}
 
 	if chromaStyle, ok := styleMap[strings.ToLower(currentTheme)]; ok {
@@ -101,7 +107,7 @@ func GetChromaStyle() *chroma.Style {
 	}
 
 	// Default to dracula which works well on dark terminals
-	if style := styles.Get("dracula"); style != nil {
+	if style := styles.Get(chromaStyleDracula); style != nil {
 		return style
 	}
 

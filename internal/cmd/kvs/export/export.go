@@ -17,6 +17,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 )
 
+// Supported export format identifiers.
+const (
+	formatJSON = "json"
+	formatYAML = "yaml"
+	formatYML  = "yml"
+)
+
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
@@ -59,7 +66,7 @@ The export format can be JSON (default) or YAML.`,
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "json", "json", "yaml")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, formatJSON, formatJSON, formatYAML)
 
 	return cmd
 }
@@ -73,7 +80,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Validate format
 	switch opts.Format {
-	case "json", "yaml", "yml":
+	case formatJSON, formatYAML, formatYML:
 	default:
 		return fmt.Errorf("unsupported format: %s (use json or yaml)", opts.Format)
 	}
@@ -92,7 +99,7 @@ func run(ctx context.Context, opts *Options) error {
 	// Encode data
 	var encoded []byte
 	switch opts.Format {
-	case "yaml", "yml":
+	case formatYAML, formatYML:
 		encoded, err = yaml.Marshal(data)
 	default:
 		encoded, err = json.MarshalIndent(data, "", "  ")

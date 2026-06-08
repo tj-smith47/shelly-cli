@@ -119,7 +119,7 @@ func TestNewCommand_Aliases(t *testing.T) {
 
 	found := false
 	for _, alias := range cmd.Aliases {
-		if alias == "cal" {
+		if alias == aliasCal {
 			found = true
 			break
 		}
@@ -538,7 +538,7 @@ func TestNewCommand_AllAliases(t *testing.T) {
 		aliasMap[alias] = true
 	}
 
-	if !aliasMap["cal"] {
+	if !aliasMap[aliasCal] {
 		t.Errorf("Expected 'cal' alias, got %v", cmd.Aliases)
 	}
 }
@@ -1018,8 +1018,8 @@ func TestNewCommand_HasAliasField(t *testing.T) {
 	if len(cmd.Aliases) == 0 {
 		t.Error("Aliases field is empty")
 	}
-	if cmd.Aliases[0] != "cal" {
-		t.Errorf("First alias = %q, want %q", cmd.Aliases[0], "cal")
+	if cmd.Aliases[0] != aliasCal {
+		t.Errorf("First alias = %q, want %q", cmd.Aliases[0], aliasCal)
 	}
 }
 

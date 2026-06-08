@@ -22,7 +22,7 @@ import (
 
 const testAPIModeHTTP = "http"
 
-//nolint:gocritic,unparam // helper function returns multiple values for API consistency
+//nolint:unparam // helper function returns multiple values for API consistency
 func testIOStreams() (*iostreams.IOStreams, *bytes.Buffer, *bytes.Buffer) {
 	in := strings.NewReader("")
 	out := &bytes.Buffer{}
@@ -719,7 +719,6 @@ func TestDefaultDiscoveryTimeout(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo // comprehensive test coverage
 func TestOptions_AllFieldsSet(t *testing.T) {
 	t.Parallel()
 
@@ -1470,8 +1469,6 @@ func TestCheckAndConfirmConfig_Force(t *testing.T) {
 }
 
 // TestOptions_ZeroValue tests Options zero value behavior.
-//
-//nolint:gocyclo // comprehensive test coverage
 func TestOptions_ZeroValue(t *testing.T) {
 	t.Parallel()
 

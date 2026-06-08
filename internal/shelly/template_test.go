@@ -32,7 +32,7 @@ func TestDeviceTemplate_Fields(t *testing.T) {
 	}
 }
 
-func TestSanitizeConfig(t *testing.T) { //nolint:gocyclo // comprehensive test coverage
+func TestSanitizeConfig(t *testing.T) {
 	t.Parallel()
 
 	t.Run("removes WiFi passwords", func(t *testing.T) {

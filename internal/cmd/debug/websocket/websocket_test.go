@@ -84,8 +84,8 @@ func TestNewCommand(t *testing.T) {
 		t.Fatal("NewCommand returned nil")
 	}
 
-	if cmd.Use != "websocket <device>" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "websocket <device>")
+	if cmd.Use != commandUse {
+		t.Errorf("Use = %q, want %q", cmd.Use, commandUse)
 	}
 
 	if cmd.Short != "Debug WebSocket connection and stream events" {
@@ -332,7 +332,7 @@ func TestNewCommand_Properties(t *testing.T) {
 			name: "Use field is set",
 			check: func(f *cmdutil.Factory) bool {
 				cmd := NewCommand(f)
-				return cmd.Use == "websocket <device>"
+				return cmd.Use == commandUse
 			},
 			errorMsg: "Use field not set correctly",
 		},

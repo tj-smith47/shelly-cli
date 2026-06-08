@@ -41,7 +41,7 @@ func TestNewCommand_Aliases(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	wantAliases := []string{"scan", "search", "probe"}
+	wantAliases := []string{aliasScan, aliasSearch, aliasProbe}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
 	} else {
@@ -1143,9 +1143,9 @@ func TestExecute_WithAlias(t *testing.T) {
 
 	// Verify aliases exist
 	expectedAliases := map[string]bool{
-		"scan":   true,
-		"search": true,
-		"probe":  true,
+		aliasScan:   true,
+		aliasSearch: true,
+		aliasProbe:  true,
 	}
 
 	for _, alias := range cmd.Aliases {

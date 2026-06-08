@@ -293,7 +293,7 @@ func TestGenerateFilename(t *testing.T) {
 			deviceID:   "shellyplus2pm-123",
 			encrypted:  false,
 			wantPrefix: "backup-Living-Room-",
-			wantSuffix: ".json",
+			wantSuffix: config.ExtJSON,
 		},
 		{
 			name:       "encrypted backup",
@@ -309,7 +309,7 @@ func TestGenerateFilename(t *testing.T) {
 			deviceID:   "shellyplus2pm-123",
 			encrypted:  false,
 			wantPrefix: "backup-shellyplus2pm-123-",
-			wantSuffix: ".json",
+			wantSuffix: config.ExtJSON,
 		},
 	}
 
@@ -824,7 +824,7 @@ func TestAutoSavePath(t *testing.T) {
 			mac:          "7C87CE557FA0",
 			deviceID:     "shellyplus1-7c87ce557fa0",
 			format:       "json",
-			wantContains: []string{"backups", "back-porch-7c87ce557fa0-", ".json"},
+			wantContains: []string{"backups", "back-porch-7c87ce557fa0-", config.ExtJSON},
 		},
 		{
 			name:         "short name gen1",
@@ -832,7 +832,7 @@ func TestAutoSavePath(t *testing.T) {
 			mac:          "C82B961166C0",
 			deviceID:     "C82B961166C0",
 			format:       "json",
-			wantContains: []string{"backups", "fl-c82b961166c0-", ".json"},
+			wantContains: []string{"backups", "fl-c82b961166c0-", config.ExtJSON},
 		},
 		{
 			name:         "falls back to device ID",
@@ -848,7 +848,7 @@ func TestAutoSavePath(t *testing.T) {
 			mac:          "",
 			deviceID:     "",
 			format:       "json",
-			wantContains: []string{"backups", "backup-", ".json"},
+			wantContains: []string{"backups", "backup-", config.ExtJSON},
 		},
 	}
 

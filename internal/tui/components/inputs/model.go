@@ -573,7 +573,7 @@ func (m Model) triggerInput() tea.Cmd {
 		return func() tea.Msg {
 			return TriggerResultMsg{
 				InputID:   input.ID,
-				EventType: "single_push",
+				EventType: eventTypeSinglePush,
 				Err:       fmt.Errorf("trigger only works for button type inputs"),
 			}
 		}
@@ -588,10 +588,10 @@ func (m Model) triggerInput() tea.Cmd {
 		triggerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		err := svc.InputTrigger(triggerCtx, device, inputID, "single_push")
+		err := svc.InputTrigger(triggerCtx, device, inputID, eventTypeSinglePush)
 		return TriggerResultMsg{
 			InputID:   inputID,
-			EventType: "single_push",
+			EventType: eventTypeSinglePush,
 			Err:       err,
 		}
 	}

@@ -13,6 +13,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// aliasRead is the read alias for the config get command.
+const aliasRead = "read"
+
 // Options holds the options for the config get command.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -26,7 +29,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "get [key]",
-		Aliases: []string{"read"},
+		Aliases: []string{aliasRead},
 		Short:   "Get a CLI configuration value",
 		Long: `Get a configuration value from the Shelly CLI config file.
 

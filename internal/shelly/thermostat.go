@@ -11,11 +11,30 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+// Thermostat operating modes.
+const (
+	thermostatModeHeat = "heat"
+	thermostatModeCool = "cool"
+)
+
+// Thermostat schedule RPC literals.
+const (
+	rpcThermostatSetConfig = "Thermostat.SetConfig"
+)
+
+// Shared RPC config field names.
+const (
+	fieldConfig = "config"
+	fieldEnable = "enable"
+	fieldServer = "server"
+	fieldSTA    = "sta"
+)
+
 // ValidThermostatModes contains the valid thermostat operating modes.
 var ValidThermostatModes = map[string]bool{
-	"heat": true,
-	"cool": true,
-	"auto": true,
+	thermostatModeHeat: true,
+	thermostatModeCool: true,
+	ComponentTypeAuto:  true,
 }
 
 // ValidateThermostatMode validates that a thermostat mode is one of: heat, cool, auto.
@@ -107,7 +126,7 @@ func extractThermostatParams(sched *ThermostatSchedule, params map[string]any) {
 		sched.ThermostatID = int(id)
 	}
 
-	if config, ok := params["config"].(map[string]any); ok {
+	if config, ok := params[fieldConfig].(map[string]any); ok {
 		extractConfigParams(sched, config)
 	}
 
@@ -124,7 +143,7 @@ func extractConfigParams(sched *ThermostatSchedule, config map[string]any) {
 	if mode, ok := config["thermostat_mode"].(string); ok {
 		sched.Mode = mode
 	}
-	if enable, ok := config["enable"].(bool); ok {
+	if enable, ok := config[fieldEnable].(bool); ok {
 		sched.Enable = &enable
 	}
 }
@@ -144,17 +163,17 @@ func BuildThermostatScheduleCall(params ThermostatScheduleParams) map[string]any
 	config := buildThermostatConfig(params)
 
 	call := map[string]any{
-		"method": "Thermostat.SetConfig",
+		"method": rpcThermostatSetConfig,
 		"params": map[string]any{
-			"id":     params.ThermostatID,
-			"config": config,
+			"id":        params.ThermostatID,
+			fieldConfig: config,
 		},
 	}
 
 	return map[string]any{
-		"enable":   params.Enabled,
-		"timespec": params.Timespec,
-		"calls":    []any{call},
+		fieldEnable: params.Enabled,
+		"timespec":  params.Timespec,
+		"calls":     []any{call},
 	}
 }
 
@@ -168,7 +187,7 @@ func buildThermostatConfig(params ThermostatScheduleParams) map[string]any {
 		config["thermostat_mode"] = params.Mode
 	}
 	if params.EnableState != nil {
-		config["enable"] = *params.EnableState
+		config[fieldEnable] = *params.EnableState
 	}
 	return config
 }

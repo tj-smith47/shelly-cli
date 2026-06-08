@@ -14,20 +14,20 @@ func TestDisplayDeviceList(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		devices := []model.DeviceListItem{
-			{Name: "device1", Address: "192.168.1.10", Type: "switch", Model: "SNSW-001P16EU", Generation: 2, Auth: false},
-			{Name: "device2", Address: "192.168.1.11", Type: "dimmer", Model: "SNDM-0013US", Generation: 2, Auth: true},
+			{Name: testDevice1, Address: testIP10, Type: testCompSwitch, Model: testModel1PM, Generation: 2, Auth: false},
+			{Name: testDevice2, Address: "192.168.1.11", Type: "dimmer", Model: "SNDM-0013US", Generation: 2, Auth: true},
 		}
 
 		DisplayDeviceList(ios, devices, false, false)
 
 		output := out.String()
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain 'device1'")
 		}
-		if !strings.Contains(output, "device2") {
+		if !strings.Contains(output, testDevice2) {
 			t.Error("output should contain 'device2'")
 		}
-		if !strings.Contains(output, "192.168.1.10") {
+		if !strings.Contains(output, testIP10) {
 			t.Error("output should contain address")
 		}
 	})
@@ -36,14 +36,14 @@ func TestDisplayDeviceList(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		devices := []model.DeviceListItem{
-			{Name: "device1", Address: "192.168.1.10", Platform: "shelly", Type: "switch", Model: "SNSW-001P16EU", Generation: 2},
+			{Name: testDevice1, Address: testIP10, Platform: testValueShelly, Type: testCompSwitch, Model: testModel1PM, Generation: 2},
 		}
 
 		DisplayDeviceList(ios, devices, true, false)
 
 		output := out.String()
 		// Platform value should appear in output when showPlatform is true
-		if !strings.Contains(output, "shelly") {
+		if !strings.Contains(output, testValueShelly) {
 			t.Error("output should contain platform value")
 		}
 	})
@@ -52,14 +52,14 @@ func TestDisplayDeviceList(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		devices := []model.DeviceListItem{
-			{Name: "device1", Address: "192.168.1.10", Type: "switch", Model: "SNSW-001P16EU", Generation: 2, CurrentVersion: "1.0.0", AvailableVersion: "1.1.0", HasUpdate: true},
+			{Name: testDevice1, Address: testIP10, Type: testCompSwitch, Model: testModel1PM, Generation: 2, CurrentVersion: testFWVersion, AvailableVersion: testFWVersionNew, HasUpdate: true},
 		}
 
 		DisplayDeviceList(ios, devices, false, true)
 
 		output := out.String()
 		// Current version should appear in output when showVersion is true
-		if !strings.Contains(output, "1.0.0") {
+		if !strings.Contains(output, testFWVersion) {
 			t.Error("output should contain current version")
 		}
 	})
@@ -68,13 +68,13 @@ func TestDisplayDeviceList(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		devices := []model.DeviceListItem{
-			{Name: "device1", Address: "192.168.1.10", Type: "switch", Generation: 2, HasUpdate: true, AvailableVersion: "1.1.0"},
+			{Name: testDevice1, Address: testIP10, Type: testCompSwitch, Generation: 2, HasUpdate: true, AvailableVersion: testFWVersionNew},
 		}
 
 		DisplayDeviceList(ios, devices, false, true)
 
 		output := out.String()
-		if !strings.Contains(output, "1.1.0") {
+		if !strings.Contains(output, testFWVersionNew) {
 			t.Error("output should contain available version")
 		}
 	})
@@ -83,7 +83,7 @@ func TestDisplayDeviceList(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		devices := []model.DeviceListItem{
-			{Name: "device1", Address: "192.168.1.10", Type: "switch", Generation: 2, CurrentVersion: ""},
+			{Name: testDevice1, Address: testIP10, Type: testCompSwitch, Generation: 2, CurrentVersion: ""},
 		}
 
 		DisplayDeviceList(ios, devices, false, true)
@@ -112,15 +112,15 @@ func TestDisplayDeviceList(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		devices := []model.DeviceListItem{
 			{
-				Name:             "device1",
-				Address:          "192.168.1.10",
-				Platform:         "shelly",
-				Type:             "switch",
-				Model:            "SNSW-001P16EU",
+				Name:             testDevice1,
+				Address:          testIP10,
+				Platform:         testValueShelly,
+				Type:             testCompSwitch,
+				Model:            testModel1PM,
 				Generation:       2,
 				Auth:             true,
-				CurrentVersion:   "1.0.0",
-				AvailableVersion: "1.1.0",
+				CurrentVersion:   testFWVersion,
+				AvailableVersion: testFWVersionNew,
 				HasUpdate:        true,
 			},
 		}
@@ -129,13 +129,13 @@ func TestDisplayDeviceList(t *testing.T) {
 
 		output := out.String()
 		// Check that the output contains the device data
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain device name")
 		}
-		if !strings.Contains(output, "shelly") {
+		if !strings.Contains(output, testValueShelly) {
 			t.Error("output should contain platform value")
 		}
-		if !strings.Contains(output, "1.0.0") {
+		if !strings.Contains(output, testFWVersion) {
 			t.Error("output should contain version")
 		}
 	})
@@ -148,14 +148,14 @@ func TestDisplayQuickDeviceStatus(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		states := []ComponentState{
-			{Type: "Switch 0", Name: "Main", State: "ON"},
-			{Type: "Input 0", Name: "", State: "inactive"},
+			{Type: testSwitch0, Name: "Main", State: "ON"},
+			{Type: testInput0, Name: "", State: "inactive"},
 		}
 
 		DisplayQuickDeviceStatus(ios, states)
 
 		output := out.String()
-		if !strings.Contains(output, "Switch 0") {
+		if !strings.Contains(output, testSwitch0) {
 			t.Error("output should contain component type")
 		}
 		if !strings.Contains(output, "ON") {
@@ -183,17 +183,17 @@ func TestDisplayAllDevicesQuickStatus(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		statuses := []QuickDeviceStatus{
-			{Name: "device1", Model: "Shelly Pro 1PM", Online: true},
-			{Name: "device2", Model: "Shelly Plus 1", Online: false},
+			{Name: testDevice1, Model: testModelNamePro1, Online: true},
+			{Name: testDevice2, Model: testShellyPlus1, Online: false},
 		}
 
 		DisplayAllDevicesQuickStatus(ios, statuses)
 
 		output := out.String()
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain 'device1'")
 		}
-		if !strings.Contains(output, "device2") {
+		if !strings.Contains(output, testDevice2) {
 			t.Error("output should contain 'device2'")
 		}
 	})
@@ -202,7 +202,7 @@ func TestDisplayAllDevicesQuickStatus(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		statuses := []QuickDeviceStatus{
-			{Name: "device1", Model: "Shelly Pro 1PM", Online: false},
+			{Name: testDevice1, Model: testModelNamePro1, Online: false},
 		}
 
 		DisplayAllDevicesQuickStatus(ios, statuses)

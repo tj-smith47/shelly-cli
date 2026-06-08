@@ -11,6 +11,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// zigbeeStateJoined is the Zigbee network state for a joined coordinator.
+const zigbeeStateJoined = "joined"
+
 // DisplayZigbeeDevices displays a list of Zigbee-capable devices.
 func DisplayZigbeeDevices(ios *iostreams.IOStreams, devices []model.ZigbeeDevice) {
 	if len(devices) == 0 {
@@ -67,7 +70,7 @@ func DisplayZigbeeStatus(ios *iostreams.IOStreams, status model.ZigbeeStatus) {
 		ios.Printf("  EUI64: %s\n", status.EUI64)
 	}
 
-	if status.NetworkState == "joined" {
+	if status.NetworkState == zigbeeStateJoined {
 		displayZigbeeNetworkInfo(ios, status)
 	}
 }
@@ -79,7 +82,7 @@ func displayZigbeeNetworkState(ios *iostreams.IOStreams, state string) {
 
 	stateStyle := theme.Dim()
 	switch state {
-	case "joined":
+	case zigbeeStateJoined:
 		stateStyle = theme.StatusOK()
 	case "steering":
 		stateStyle = theme.StatusWarn()

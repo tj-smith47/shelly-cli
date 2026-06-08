@@ -15,6 +15,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// aliasShow is the "show" alias for the zwave info command.
+const aliasShow = "show"
+
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
@@ -28,7 +31,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "info <model>",
-		Aliases: []string{"show", "i"},
+		Aliases: []string{aliasShow, "i"},
 		Short:   "Show Z-Wave device information",
 		Long: `Show Z-Wave device information for a Shelly Wave model.
 

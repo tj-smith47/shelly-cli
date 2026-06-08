@@ -83,8 +83,10 @@ func run(ctx context.Context, opts *Options) error {
 		enable = &f
 	}
 
-	// Validate flags
-	if opts.SSID == "" && !opts.Disable && enable == nil {
+	// Validate flags: configuring or enabling WiFi station mode needs an SSID;
+	// only --disable may omit it. (Without this, --enable with no --ssid would
+	// silently push an empty SSID to the device.)
+	if opts.SSID == "" && !opts.Disable {
 		return fmt.Errorf("--ssid is required (or use --disable to disable WiFi)")
 	}
 

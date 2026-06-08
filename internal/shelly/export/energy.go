@@ -28,7 +28,7 @@ var EMDataCSVHeaders = []string{
 // EM1DataCSVHeaders defines the CSV header row for single-phase energy meter data.
 var EM1DataCSVHeaders = []string{
 	"timestamp",
-	"voltage", "current", "act_power", "aprt_power", "pf", "freq",
+	fieldVoltage, fieldCurrent, "act_power", "aprt_power", "pf", "freq",
 	"act_energy", "act_ret_energy",
 }
 
@@ -166,6 +166,7 @@ const (
 	FormatCSV  = "csv"
 	FormatJSON = "json"
 	FormatYAML = "yaml"
+	FormatYML  = "yml" // Alternate YAML file extension accepted on input.
 )
 
 // EMDataFetcher retrieves EM data history for a device.

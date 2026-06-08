@@ -16,6 +16,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// defaultFormat is the default backup output format.
+const defaultFormat = "json"
+
 // Options holds the command options.
 type Options struct {
 	Factory       *cmdutil.Factory
@@ -32,7 +35,7 @@ type Options struct {
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
 		Factory: f,
-		Format:  "json",
+		Format:  defaultFormat,
 	}
 
 	cmd := &cobra.Command{
@@ -75,7 +78,7 @@ sensitive data is not encrypted in the file).`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Format, "format", "f", "json", "Output format (json, yaml)")
+	cmd.Flags().StringVarP(&opts.Format, "format", "f", defaultFormat, "Output format (json, yaml)")
 	cmd.Flags().StringVarP(&opts.Encrypt, "encrypt", "e", "", "Password to protect backup")
 	cmd.Flags().BoolVar(&opts.SkipScripts, "skip-scripts", false, "Exclude scripts from backup")
 	cmd.Flags().BoolVar(&opts.SkipSchedules, "skip-schedules", false, "Exclude schedules from backup")

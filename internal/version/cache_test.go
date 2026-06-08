@@ -12,8 +12,18 @@ import (
 )
 
 const (
-	testVersion1 = "1.0.0"
-	testVersion2 = "2.0.0"
+	testVersion1   = "1.0.0"
+	testVersion2   = "2.0.0"
+	testVersionV1  = "v1.0.0"
+	testCommitAbc  = "abc"
+	testDate       = "2024-01-01"
+	testBuiltBy    = "test"
+	testGoVersion  = "go1.21.0"
+	testOS         = "linux"
+	testArch       = "amd64"
+	testVersion051 = "0.5.11"
+	testVersion061 = "0.6.1"
+	testBinaryName = "shelly"
 )
 
 func TestCachePath(t *testing.T) {

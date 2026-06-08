@@ -22,6 +22,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
+// footerDescRefresh labels the refresh keybinding in panel footers.
+const footerDescRefresh = "refresh"
+
 // DevicesDeps holds the dependencies for the Devices component.
 type DevicesDeps struct {
 	Ctx context.Context
@@ -242,7 +245,7 @@ func (m DevicesModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "j/k", Desc: "nav"}, {Key: "g/G", Desc: "top/btm"}, {Key: "r", Desc: "refresh"}}, keys.FooterHintWidth(m.Width))))
+		r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "j/k", Desc: "nav"}, {Key: "g/G", Desc: "top/btm"}, {Key: "r", Desc: footerDescRefresh}}, keys.FooterHintWidth(m.Width))))
 	}
 
 	// Handle early return cases

@@ -20,8 +20,8 @@ func TestNew(t *testing.T) {
 func TestNewWithTabs(t *testing.T) {
 	t.Parallel()
 	tabs := []Tab{
-		{ID: TabDashboard, Label: "Dashboard", Enabled: true},
-		{ID: TabFleet, Label: "Fleet", Enabled: true},
+		{ID: TabDashboard, Label: labelDashboard, Enabled: true},
+		{ID: TabFleet, Label: labelFleet, Enabled: true},
 	}
 	m := NewWithTabs(tabs)
 	if m.TabCount() != 2 {
@@ -144,12 +144,12 @@ func TestTabID_String(t *testing.T) {
 		tab  TabID
 		want string
 	}{
-		{TabDashboard, "Dashboard"},
+		{TabDashboard, labelDashboard},
 		{TabAutomation, "Automation"},
 		{TabConfig, "Config"},
 		{TabManage, "Manage"},
 		{TabMonitor, "Monitor"},
-		{TabFleet, "Fleet"},
+		{TabFleet, labelFleet},
 		{TabID(99), "Unknown"},
 	}
 

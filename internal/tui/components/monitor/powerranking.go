@@ -290,7 +290,7 @@ func (m PowerRankingModel) View() string {
 	content := m.renderContent()
 
 	footer := keys.FormatHints([]keys.Hint{
-		{Key: "j/k", Desc: "scroll"},
+		{Key: hintScrollKeys, Desc: hintScrollDesc},
 		{Key: "t", Desc: "toggle"},
 		{Key: "c", Desc: "control"},
 		{Key: "d", Desc: "detail"},
@@ -512,11 +512,11 @@ func (m PowerRankingModel) healthBadges(d RankedDevice) string {
 // FooterText returns keybinding hints for the footer.
 func (m PowerRankingModel) FooterText() string {
 	return keys.FormatHints([]keys.Hint{
-		{Key: "j/k", Desc: "scroll"},
+		{Key: hintScrollKeys, Desc: hintScrollDesc},
 		{Key: "t", Desc: "toggle"},
 		{Key: "c", Desc: "control"},
 		{Key: "d", Desc: "detail"},
-		{Key: "x", Desc: "csv"},
-		{Key: "X", Desc: "json"},
+		{Key: "x", Desc: formatCSV},
+		{Key: "X", Desc: formatJSON},
 	}, keys.FooterHintWidth(m.Width))
 }

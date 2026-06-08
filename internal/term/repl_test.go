@@ -39,7 +39,7 @@ func TestDisplayREPLHelp(t *testing.T) {
 	if !strings.Contains(output, "disconnect") {
 		t.Error("expected disconnect command")
 	}
-	if !strings.Contains(output, "status") {
+	if !strings.Contains(output, cmdStatus) {
 		t.Error("expected status command")
 	}
 	if !strings.Contains(output, "rpc") {
@@ -54,7 +54,7 @@ func TestDisplayRPCMethods(t *testing.T) {
 	methods := []string{
 		"Shelly.GetDeviceInfo",
 		"Switch.GetStatus",
-		"Switch.Set",
+		testSwitchSet,
 		"Script.List",
 	}
 	DisplayRPCMethods(ios, methods)
@@ -76,8 +76,8 @@ func TestDisplayControlResults_AllSuccess(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	results := []shelly.ComponentControlResult{
-		{Type: "switch", ID: 0, Success: true},
-		{Type: "switch", ID: 1, Success: true},
+		{Type: testCompSwitch, ID: 0, Success: true},
+		{Type: testCompSwitch, ID: 1, Success: true},
 	}
 	DisplayControlResults(ios, results, "turned on")
 
@@ -95,8 +95,8 @@ func TestDisplayControlResults_WithFailures(t *testing.T) {
 
 	ios, out, errOut := testIOStreams()
 	results := []shelly.ComponentControlResult{
-		{Type: "switch", ID: 0, Success: true},
-		{Type: "switch", ID: 1, Success: false},
+		{Type: testCompSwitch, ID: 0, Success: true},
+		{Type: testCompSwitch, ID: 1, Success: false},
 	}
 	DisplayControlResults(ios, results, "toggled")
 
@@ -134,7 +134,7 @@ func TestREPLSession_ExecuteCommand_Exit(t *testing.T) {
 	session := NewREPLSession(ios, nil, "")
 
 	ctx := context.Background()
-	exitCommands := []string{"exit", "quit", "q"}
+	exitCommands := []string{"exit", cmdQuit, "q"}
 	for _, cmd := range exitCommands {
 		shouldExit := session.ExecuteCommand(ctx, cmd, nil)
 		if !shouldExit {

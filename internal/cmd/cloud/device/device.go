@@ -14,6 +14,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+const (
+	// commandUse is the cobra Use string for the cloud device command.
+	commandUse = "device <id>"
+	// aliasGet is the command alias for fetching a single device.
+	aliasGet = "get"
+)
+
 // Options holds the command options.
 type Options struct {
 	Factory  *cmdutil.Factory
@@ -26,8 +33,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "device <id>",
-		Aliases: []string{"get"},
+		Use:     commandUse,
+		Aliases: []string{aliasGet},
 		Short:   "Show cloud device details",
 		Long: `Show details for a specific device from Shelly Cloud.
 

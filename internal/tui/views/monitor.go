@@ -729,9 +729,9 @@ func (m *Monitor) saveAlert(msg alerts.AlertFormSubmitMsg) tea.Cmd {
 	return func() tea.Msg {
 		err := config.CreateAlert(msg.Name, msg.Description, msg.Device, msg.Condition, msg.Action, msg.Enabled)
 		if err != nil {
-			return alerts.AlertActionResultMsg{Action: "save", Name: msg.Name, Err: err}
+			return alerts.AlertActionResultMsg{Action: actionSave, Name: msg.Name, Err: err}
 		}
-		return alerts.AlertActionResultMsg{Action: "save", Name: msg.Name}
+		return alerts.AlertActionResultMsg{Action: actionSave, Name: msg.Name}
 	}
 }
 

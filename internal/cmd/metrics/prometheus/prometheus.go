@@ -152,8 +152,9 @@ func run(ctx context.Context, opts *Options) error {
 	// Handle shutdown
 	go func() {
 		<-ctx.Done()
-		// Use fresh context for shutdown since parent context is already cancelled
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		// Derive an uncancelled context for shutdown: ctx is already cancelled here
+		// (that is what woke this goroutine), but graceful shutdown needs a live deadline.
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		if shutdownErr := server.Shutdown(shutdownCtx); shutdownErr != nil {
 			ios.DebugErr("server shutdown", shutdownErr)

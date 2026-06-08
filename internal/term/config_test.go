@@ -16,8 +16,8 @@ func TestDisplayConfigTable(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		configData := map[string]any{
 			"defaults": map[string]any{
-				"timeout": 30,
-				"output":  "table",
+				"timeout":       30,
+				testValueOutput: "table",
 			},
 			"editor": "vim",
 		}
@@ -61,7 +61,7 @@ func TestDisplayConfigTable(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		configData := map[string]any{
-			"component": []string{"value1", "value2"},
+			"component": []string{testVal1, "value2"},
 		}
 
 		err := DisplayConfigTable(ios, configData)
@@ -161,7 +161,7 @@ func TestDisplayResetableComponents(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	configKeys := []string{"switch:0", "light:0", "input:0"}
 
-	DisplayResetableComponents(ios, "device1", configKeys)
+	DisplayResetableComponents(ios, testDevice1, configKeys)
 
 	output := out.String()
 	if !strings.Contains(output, "Available components") {
@@ -170,7 +170,7 @@ func TestDisplayResetableComponents(t *testing.T) {
 	if !strings.Contains(output, "switch:0") {
 		t.Error("output should contain 'switch:0'")
 	}
-	if !strings.Contains(output, "device1") {
+	if !strings.Contains(output, testDevice1) {
 		t.Error("output should contain device name")
 	}
 }
@@ -182,11 +182,11 @@ func TestDisplayTemplateDiffs(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		diffs := []model.ConfigDiff{
-			{Path: "switch:0.name", DiffType: "changed", OldValue: "Switch", NewValue: "Living Room"},
+			{Path: testConfigSwitchName, DiffType: "changed", OldValue: "Switch", NewValue: "Living Room"},
 			{Path: "light:0.brightness", DiffType: "added", OldValue: nil, NewValue: 80},
 		}
 
-		DisplayTemplateDiffs(ios, "my-template", "device1", diffs)
+		DisplayTemplateDiffs(ios, "my-template", testDevice1, diffs)
 
 		output := out.String()
 		if !strings.Contains(output, "Configuration Differences") {
@@ -195,7 +195,7 @@ func TestDisplayTemplateDiffs(t *testing.T) {
 		if !strings.Contains(output, "my-template") {
 			t.Error("output should contain template name")
 		}
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain device name")
 		}
 		if !strings.Contains(output, "2 difference(s)") {
@@ -207,7 +207,7 @@ func TestDisplayTemplateDiffs(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 
-		DisplayTemplateDiffs(ios, "my-template", "device1", []model.ConfigDiff{})
+		DisplayTemplateDiffs(ios, "my-template", testDevice1, []model.ConfigDiff{})
 
 		output := out.String()
 		if !strings.Contains(output, "No differences") {
@@ -223,7 +223,7 @@ func TestDisplayDeviceTemplateList(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		templates := []config.DeviceTemplate{
-			{Name: "pro1pm-switch", Model: "SNSW-001P16EU", Generation: 2, SourceDevice: "device1", CreatedAt: "2024-01-15T10:30:00Z"},
+			{Name: "pro1pm-switch", Model: testModel1PM, Generation: 2, SourceDevice: testDevice1, CreatedAt: "2024-01-15T10:30:00Z"},
 			{Name: "dimmer-default", Model: "SNDM-0013US", Generation: 2, SourceDevice: "", CreatedAt: "2024-01-20"},
 		}
 
@@ -245,7 +245,7 @@ func TestDisplayDeviceTemplateList(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		templates := []config.DeviceTemplate{
-			{Name: "manual-template", Model: "SNSW-001X16EU", Generation: 2, SourceDevice: ""},
+			{Name: "manual-template", Model: testModel1X, Generation: 2, SourceDevice: ""},
 		}
 
 		DisplayDeviceTemplateList(ios, templates)

@@ -14,6 +14,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// commandUse is the cobra Use string for the power status command.
+const commandUse = "status <device> [id]"
+
 // Options holds the command options.
 type Options struct {
 	Factory       *cmdutil.Factory
@@ -30,7 +33,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "status <device> [id]",
+		Use:   commandUse,
 		Short: "Show power meter status",
 		Long: `Show current status of a power meter component.
 

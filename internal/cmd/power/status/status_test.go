@@ -36,8 +36,8 @@ func TestNewCommand_Structure(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test Use
-	if cmd.Use != "status <device> [id]" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "status <device> [id]")
+	if cmd.Use != commandUse {
+		t.Errorf("Use = %q, want %q", cmd.Use, commandUse)
 	}
 
 	// Test Aliases
@@ -918,7 +918,7 @@ func TestNewCommand_Use(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expected := "status <device> [id]"
+	expected := commandUse
 	if cmd.Use != expected {
 		t.Errorf("Use = %q, want %q", cmd.Use, expected)
 	}

@@ -46,7 +46,7 @@ Feature requests are welcome! Please:
 
 ### Prerequisites
 
-- Go 1.25.5 or later
+- Go 1.26.4 or later
 - golangci-lint v2.7.1 or later
 - Make
 

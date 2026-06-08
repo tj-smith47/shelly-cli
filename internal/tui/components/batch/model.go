@@ -53,17 +53,24 @@ const (
 	OpCheckFirmware
 )
 
+// Operation display labels.
+const (
+	labelToggle = "Toggle"
+	labelOff    = "Off"
+	labelReboot = "Reboot"
+)
+
 // String returns the operation name.
 func (o Operation) String() string {
 	switch o {
 	case OpToggle:
-		return "Toggle"
+		return labelToggle
 	case OpOn:
 		return "On"
 	case OpOff:
-		return "Off"
+		return labelOff
 	case OpReboot:
-		return "Reboot"
+		return labelReboot
 	case OpCheckFirmware:
 		return "Check Firmware"
 	default:
@@ -453,10 +460,10 @@ func (m Model) renderOperationSelector() string {
 		key  string
 		name string
 	}{
-		{OpToggle, "1", "Toggle"},
+		{OpToggle, "1", labelToggle},
 		{OpOn, "2", "On"},
-		{OpOff, "3", "Off"},
-		{OpReboot, "4", "Reboot"},
+		{OpOff, "3", labelOff},
+		{OpReboot, "4", labelReboot},
 		{OpCheckFirmware, "5", "Firmware"},
 	}
 

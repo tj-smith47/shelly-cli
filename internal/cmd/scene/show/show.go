@@ -61,9 +61,9 @@ func run(opts *Options) error {
 	}
 
 	switch opts.Format {
-	case "json":
+	case string(output.FormatJSON):
 		return output.PrintJSON(scene)
-	case "yaml":
+	case string(output.FormatYAML):
 		return output.PrintYAML(scene)
 	default:
 		term.DisplaySceneDetails(opts.Factory.IOStreams(), scene)

@@ -91,7 +91,6 @@ func TestRGBWSetParams_Fields(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo // table-driven test with multiple validation checks
 func TestBuildRGBWSetParams(t *testing.T) {
 	t.Parallel()
 

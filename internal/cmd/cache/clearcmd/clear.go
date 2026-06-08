@@ -10,6 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+const commandUse = "clear"
+
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -25,7 +27,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "clear",
+		Use:   commandUse,
 		Short: "Clear the cache",
 		Long: `Clear cached device data.
 

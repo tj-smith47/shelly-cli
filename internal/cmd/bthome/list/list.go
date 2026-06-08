@@ -13,6 +13,11 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+const (
+	formatText = "text"
+	formatJSON = "json"
+)
+
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
@@ -70,7 +75,7 @@ structured output suitable for scripting.`,
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, formatText, formatText, formatJSON)
 
 	return cmd
 }
@@ -87,7 +92,7 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.Format == "json" {
+	if opts.Format == formatJSON {
 		return output.JSON(ios.Out, devices)
 	}
 

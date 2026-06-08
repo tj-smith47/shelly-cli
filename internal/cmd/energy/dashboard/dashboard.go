@@ -12,6 +12,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// defaultCurrency is the default currency for cost display.
+const defaultCurrency = "USD"
+
 // Options holds command options.
 type Options struct {
 	Factory      *cmdutil.Factory
@@ -24,7 +27,7 @@ type Options struct {
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
 		Factory:      f,
-		CostCurrency: "USD",
+		CostCurrency: defaultCurrency,
 	}
 
 	cmd := &cobra.Command{
@@ -63,7 +66,7 @@ Examples:
 
 	cmd.Flags().StringSliceVar(&opts.Devices, "devices", nil, "Devices to include (default: all registered)")
 	cmd.Flags().Float64Var(&opts.CostPerKwh, "cost", 0, "Cost per kWh for estimation")
-	cmd.Flags().StringVar(&opts.CostCurrency, "currency", "USD", "Currency for cost display")
+	cmd.Flags().StringVar(&opts.CostCurrency, "currency", defaultCurrency, "Currency for cost display")
 
 	return cmd
 }

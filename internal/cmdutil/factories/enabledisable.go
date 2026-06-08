@@ -51,9 +51,9 @@ func NewEnableDisableCommand(f *cmdutil.Factory, opts EnableDisableOpts) *cobra.
 	aliases := opts.Aliases
 	if len(aliases) == 0 {
 		if opts.Enable {
-			aliases = []string{"on"}
+			aliases = []string{string(QuickOn)}
 		} else {
-			aliases = []string{"off"}
+			aliases = []string{string(QuickOff)}
 		}
 	}
 

@@ -13,7 +13,20 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
-const methodHTTP = "http"
+// Discovery method identifiers and the flag aliases that map onto them.
+const (
+	methodHTTP  = "http"
+	methodMDNS  = "mdns"
+	methodCoIoT = "coiot"
+	methodBLE   = "ble"
+
+	modeAll        = "all"
+	aliasScan      = "scan"
+	aliasBonjour   = "bonjour"
+	aliasZeroconf  = "zeroconf"
+	aliasCoAP      = "coap"
+	aliasBluetooth = "bluetooth"
+)
 
 // selectDiscoveryMethods selects which discovery methods to use.
 func selectDiscoveryMethods(ios *iostreams.IOStreams, opts *Options) []string {
@@ -43,11 +56,11 @@ func selectDiscoveryMethods(ios *iostreams.IOStreams, opts *Options) []string {
 		case strings.HasPrefix(s, "HTTP"):
 			methods = append(methods, methodHTTP)
 		case strings.HasPrefix(s, "mDNS"):
-			methods = append(methods, "mdns")
+			methods = append(methods, methodMDNS)
 		case strings.HasPrefix(s, "CoIoT"):
-			methods = append(methods, "coiot")
+			methods = append(methods, methodCoIoT)
 		case strings.HasPrefix(s, "BLE"):
-			methods = append(methods, "ble")
+			methods = append(methods, methodBLE)
 		}
 	}
 
@@ -59,22 +72,22 @@ func selectDiscoveryMethods(ios *iostreams.IOStreams, opts *Options) []string {
 
 // parseDiscoverModes parses the --discover-modes flag value.
 func parseDiscoverModes(modes string) []string {
-	if modes == "" || modes == "all" {
-		return []string{methodHTTP, "mdns", "coiot"}
+	if modes == "" || modes == modeAll {
+		return []string{methodHTTP, methodMDNS, methodCoIoT}
 	}
 
 	var result []string
 	for _, m := range strings.Split(modes, ",") {
 		m = strings.TrimSpace(strings.ToLower(m))
 		switch m {
-		case methodHTTP, "scan":
+		case methodHTTP, aliasScan:
 			result = append(result, methodHTTP)
-		case "mdns", "zeroconf", "bonjour":
-			result = append(result, "mdns")
-		case "coiot", "coap":
-			result = append(result, "coiot")
-		case "ble", "bluetooth":
-			result = append(result, "ble")
+		case methodMDNS, aliasZeroconf, aliasBonjour:
+			result = append(result, methodMDNS)
+		case methodCoIoT, aliasCoAP:
+			result = append(result, methodCoIoT)
+		case methodBLE, aliasBluetooth:
+			result = append(result, methodBLE)
 		}
 	}
 
@@ -92,13 +105,13 @@ func runDiscoveryMethod(ctx context.Context, ios *iostreams.IOStreams, method st
 	switch method {
 	case methodHTTP:
 		return runHTTPDiscovery(ctx, ios, timeout, subnets)
-	case "mdns":
+	case methodMDNS:
 		// mDNS is a fast multicast sweep, not a per-host scan, so it uses the
 		// helper's short default rather than the 2-minute HTTP scan timeout.
 		return cmdutil.RunMDNSDiscovery(ctx, ios, timeout)
-	case "coiot":
+	case methodCoIoT:
 		return cmdutil.RunCoIoTDiscovery(ctx, ios, timeout)
-	case "ble":
+	case methodBLE:
 		return cmdutil.RunBLEDiscovery(ctx, ios, timeout)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)

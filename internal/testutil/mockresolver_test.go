@@ -174,21 +174,21 @@ func TestNewMockSwitchStatus(t *testing.T) {
 			id:         0,
 			output:     true,
 			power:      100.5,
-			wantSource: "switch",
+			wantSource: SourceSwitch,
 		},
 		{
 			name:       "off with zero power",
 			id:         1,
 			output:     false,
 			power:      0.0,
-			wantSource: "switch",
+			wantSource: SourceSwitch,
 		},
 		{
 			name:       "high power",
 			id:         2,
 			output:     true,
 			power:      2500.75,
-			wantSource: "switch",
+			wantSource: SourceSwitch,
 		},
 	}
 
@@ -277,21 +277,21 @@ func TestNewMockCoverStatus(t *testing.T) {
 			id:         0,
 			state:      "open",
 			position:   100,
-			wantSource: "cover",
+			wantSource: SourceCover,
 		},
 		{
 			name:       "closed position",
 			id:         0,
 			state:      "closed",
 			position:   0,
-			wantSource: "cover",
+			wantSource: SourceCover,
 		},
 		{
 			name:       "half open",
 			id:         1,
 			state:      "stopped",
 			position:   50,
-			wantSource: "cover",
+			wantSource: SourceCover,
 		},
 	}
 
@@ -380,21 +380,21 @@ func TestNewMockLightStatus(t *testing.T) {
 			id:         0,
 			output:     true,
 			brightness: 100,
-			wantSource: "light",
+			wantSource: SourceLight,
 		},
 		{
 			name:       "off",
 			id:         0,
 			output:     false,
 			brightness: 0,
-			wantSource: "light",
+			wantSource: SourceLight,
 		},
 		{
 			name:       "dimmed",
 			id:         1,
 			output:     true,
 			brightness: 50,
-			wantSource: "light",
+			wantSource: SourceLight,
 		},
 	}
 
@@ -487,7 +487,7 @@ func TestNewMockRGBStatus(t *testing.T) {
 			g:          0,
 			b:          0,
 			brightness: 100,
-			wantSource: "rgb",
+			wantSource: SourceRGB,
 		},
 		{
 			name:       "white dimmed",
@@ -497,7 +497,7 @@ func TestNewMockRGBStatus(t *testing.T) {
 			g:          255,
 			b:          255,
 			brightness: 50,
-			wantSource: "rgb",
+			wantSource: SourceRGB,
 		},
 		{
 			name:       "off",
@@ -507,7 +507,7 @@ func TestNewMockRGBStatus(t *testing.T) {
 			g:          0,
 			b:          0,
 			brightness: 0,
-			wantSource: "rgb",
+			wantSource: SourceRGB,
 		},
 		{
 			name:       "custom color",
@@ -517,7 +517,7 @@ func TestNewMockRGBStatus(t *testing.T) {
 			g:          64,
 			b:          192,
 			brightness: 75,
-			wantSource: "rgb",
+			wantSource: SourceRGB,
 		},
 	}
 
@@ -622,7 +622,7 @@ func TestNewMockInputStatus(t *testing.T) {
 			name:      "switch off",
 			id:        0,
 			state:     false,
-			inputType: "switch",
+			inputType: SourceSwitch,
 		},
 		{
 			name:      "different id",

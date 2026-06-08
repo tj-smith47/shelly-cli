@@ -21,7 +21,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-const methodHTTP = "http"
+// Discovery method identifiers selectable via the --method flag.
+const (
+	methodHTTP  = "http"
+	methodMDNS  = "mdns"
+	methodCoIoT = "coiot"
+	methodBLE   = "ble"
+)
 
 // Options holds all discovery options.
 type Options struct {
@@ -154,11 +160,11 @@ func run(ctx context.Context, opts *Options) error {
 	switch opts.Method {
 	case methodHTTP, "scan", "":
 		shellyDevices, err = cmdutil.RunHTTPDiscovery(ctx, ios, opts.Timeout, subnets)
-	case "mdns":
+	case methodMDNS:
 		shellyDevices, err = cmdutil.RunMDNSDiscovery(ctx, ios, opts.Timeout)
-	case "coiot":
+	case methodCoIoT:
 		shellyDevices, err = cmdutil.RunCoIoTDiscovery(ctx, ios, opts.Timeout)
-	case "ble":
+	case methodBLE:
 		shellyDevices, err = cmdutil.RunBLEDiscovery(ctx, ios, opts.Timeout)
 	default:
 		return fmt.Errorf("unknown discovery method: %s (valid: http, mdns, ble, coiot)", opts.Method)

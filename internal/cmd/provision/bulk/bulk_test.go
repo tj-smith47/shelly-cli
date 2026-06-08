@@ -85,7 +85,7 @@ func TestNewCommand_Aliases(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expectedAliases := []string{"batch", "mass"}
+	expectedAliases := []string{aliasBatch, aliasMass}
 	if len(cmd.Aliases) != len(expectedAliases) {
 		t.Errorf("Aliases count = %d, want %d", len(cmd.Aliases), len(expectedAliases))
 		return
@@ -562,10 +562,10 @@ devices:
 
 	cmd := NewCommand(tf.Factory)
 
-	// Verify aliases include "batch"
+	// Verify aliases include the batch alias
 	found := false
 	for _, alias := range cmd.Aliases {
-		if alias == "batch" {
+		if alias == aliasBatch {
 			found = true
 			break
 		}

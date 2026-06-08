@@ -41,7 +41,7 @@ func TestCategorize_Timeout(t *testing.T) {
 				t.Errorf("Categorize(%q).Category = %d, want %d (Timeout)",
 					tt.err.Error(), result.Category, CategoryTimeout)
 			}
-			if result.Message != "Request timed out" {
+			if result.Message != MsgTimeout {
 				t.Errorf("Categorize(%q).Message = %q, want 'Request timed out'",
 					tt.err.Error(), result.Message)
 			}
@@ -76,7 +76,7 @@ func TestCategorize_Network(t *testing.T) {
 				t.Errorf("Categorize(%q).Category = %d, want %d (Network)",
 					tt.err.Error(), result.Category, CategoryNetwork)
 			}
-			if result.Message != "Network error" {
+			if result.Message != MsgNetwork {
 				t.Errorf("Categorize(%q).Message = %q, want 'Network error'",
 					tt.err.Error(), result.Message)
 			}
@@ -108,7 +108,7 @@ func TestCategorize_Auth(t *testing.T) {
 				t.Errorf("Categorize(%q).Category = %d, want %d (Auth)",
 					tt.err.Error(), result.Category, CategoryAuth)
 			}
-			if result.Message != "Authentication failed" {
+			if result.Message != MsgAuth {
 				t.Errorf("Categorize(%q).Message = %q, want 'Authentication failed'",
 					tt.err.Error(), result.Message)
 			}
@@ -160,12 +160,12 @@ func TestCategorizedError_Error(t *testing.T) {
 	ce := CategorizedError{
 		Category: CategoryNetwork,
 		Original: errors.New("original"),
-		Message:  "Network error",
+		Message:  MsgNetwork,
 		Hint:     "Check network",
 	}
 
-	if ce.Error() != "Network error" {
-		t.Errorf("Error() = %q, want %q", ce.Error(), "Network error")
+	if ce.Error() != MsgNetwork {
+		t.Errorf("Error() = %q, want %q", ce.Error(), MsgNetwork)
 	}
 }
 
@@ -176,7 +176,7 @@ func TestCategorizedError_Unwrap(t *testing.T) {
 	ce := CategorizedError{
 		Category: CategoryNetwork,
 		Original: original,
-		Message:  "Network error",
+		Message:  MsgNetwork,
 	}
 
 	if !errors.Is(ce.Unwrap(), original) {
@@ -201,19 +201,19 @@ func TestFormatError(t *testing.T) {
 		{
 			name:        "timeout error",
 			err:         context.DeadlineExceeded,
-			wantMessage: "Request timed out",
+			wantMessage: MsgTimeout,
 			wantHint:    true,
 		},
 		{
 			name:        "network error",
 			err:         errors.New("connection refused"),
-			wantMessage: "Network error",
+			wantMessage: MsgNetwork,
 			wantHint:    true,
 		},
 		{
 			name:        "auth error",
 			err:         errors.New("unauthorized"),
-			wantMessage: "Authentication failed",
+			wantMessage: MsgAuth,
 			wantHint:    true,
 		},
 	}

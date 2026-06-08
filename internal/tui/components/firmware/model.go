@@ -28,6 +28,10 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
+// platformShelly is the platform identifier for native Shelly firmware (as opposed
+// to plugin-managed platforms like Tasmota or ESPHome).
+const platformShelly = "shelly"
+
 // Deps holds the dependencies for the Firmware component.
 type Deps struct {
 	Ctx       context.Context
@@ -65,7 +69,7 @@ type DeviceFirmware struct {
 
 // IsPluginManaged returns true if this device is managed by a plugin (non-Shelly platform).
 func (d *DeviceFirmware) IsPluginManaged() bool {
-	return d.Platform != "" && d.Platform != "shelly"
+	return d.Platform != "" && d.Platform != platformShelly
 }
 
 // IsSelected implements generics.Selectable.

@@ -10,8 +10,8 @@ func TestAuditResult(t *testing.T) {
 	t.Parallel()
 
 	result := AuditResult{
-		Device:    "kitchen-switch",
-		Address:   "192.168.1.100",
+		Device:    testDeviceKitchenSwitch,
+		Address:   testReportIP,
 		Issues:    []string{"no auth"},
 		Warnings:  []string{"firmware outdated"},
 		InfoItems: []string{"Gen2 device"},
@@ -23,17 +23,17 @@ func TestAuditResult(t *testing.T) {
 			Connected: true,
 		},
 		FWAudit: &FirmwareAudit{
-			Current:   "1.0.0",
-			Available: "1.1.0",
+			Current:   testFW100,
+			Available: testFW110,
 			HasUpdate: true,
 		},
 	}
 
-	if result.Device != "kitchen-switch" {
-		t.Errorf("Device = %q, want %q", result.Device, "kitchen-switch")
+	if result.Device != testDeviceKitchenSwitch {
+		t.Errorf("Device = %q, want %q", result.Device, testDeviceKitchenSwitch)
 	}
-	if result.Address != "192.168.1.100" { //nolint:goconst // test data in different file
-		t.Errorf("Address = %q, want %q", result.Address, "192.168.1.100")
+	if result.Address != testReportIP {
+		t.Errorf("Address = %q, want %q", result.Address, testReportIP)
 	}
 	if len(result.Issues) != 1 {
 		t.Errorf("Issues len = %d, want 1", len(result.Issues))
@@ -90,7 +90,7 @@ func TestCloudAudit(t *testing.T) {
 		connected bool
 	}{
 		{"connected", true},
-		{"disconnected", false},
+		{testStatusDisconnected, false},
 	}
 
 	for _, tt := range tests {
@@ -109,16 +109,16 @@ func TestFirmwareAudit(t *testing.T) {
 	t.Parallel()
 
 	audit := FirmwareAudit{
-		Current:   "1.0.0",
-		Available: "1.1.0",
+		Current:   testFW100,
+		Available: testFW110,
 		HasUpdate: true,
 	}
 
-	if audit.Current != "1.0.0" {
-		t.Errorf("Current = %q, want %q", audit.Current, "1.0.0")
+	if audit.Current != testFW100 {
+		t.Errorf("Current = %q, want %q", audit.Current, testFW100)
 	}
-	if audit.Available != "1.1.0" {
-		t.Errorf("Available = %q, want %q", audit.Available, "1.1.0")
+	if audit.Available != testFW110 {
+		t.Errorf("Available = %q, want %q", audit.Available, testFW110)
 	}
 	if !audit.HasUpdate {
 		t.Error("HasUpdate = false, want true")
@@ -246,7 +246,7 @@ func TestBTHomeDeviceInfo(t *testing.T) {
 	info := BTHomeDeviceInfo{
 		ID:         0,
 		Name:       "Sensor1",
-		Addr:       "AA:BB:CC:DD:EE:FF",
+		Addr:       testReportMAC,
 		RSSI:       &rssi,
 		Battery:    &battery,
 		LastUpdate: 1700000000.0,
@@ -258,8 +258,8 @@ func TestBTHomeDeviceInfo(t *testing.T) {
 	if info.Name != "Sensor1" {
 		t.Errorf("Name = %q, want %q", info.Name, "Sensor1")
 	}
-	if info.Addr != "AA:BB:CC:DD:EE:FF" {
-		t.Errorf("Addr = %q, want %q", info.Addr, "AA:BB:CC:DD:EE:FF")
+	if info.Addr != testReportMAC {
+		t.Errorf("Addr = %q, want %q", info.Addr, testReportMAC)
 	}
 	if info.RSSI == nil || *info.RSSI != -55 {
 		t.Errorf("RSSI = %v, want -55", info.RSSI)
@@ -374,20 +374,20 @@ func TestDeviceListItem(t *testing.T) {
 	t.Parallel()
 
 	item := DeviceListItem{
-		Name:             "Kitchen Switch",
-		Address:          "192.168.1.100",
+		Name:             testKitchenSwitch,
+		Address:          testReportIP,
 		Platform:         PlatformShelly,
-		Model:            "Plus 1PM",
-		Type:             "SHSW-PM",
+		Model:            testPlus1PM,
+		Type:             testModelSHSWPM,
 		Generation:       2,
 		Auth:             true,
-		CurrentVersion:   "1.0.0",
-		AvailableVersion: "1.1.0",
+		CurrentVersion:   testFW100,
+		AvailableVersion: testFW110,
 		HasUpdate:        true,
 	}
 
-	if item.Name != "Kitchen Switch" {
-		t.Errorf("Name = %q, want %q", item.Name, "Kitchen Switch")
+	if item.Name != testKitchenSwitch {
+		t.Errorf("Name = %q, want %q", item.Name, testKitchenSwitch)
 	}
 	if item.Platform != PlatformShelly {
 		t.Errorf("Platform = %q, want %q", item.Platform, PlatformShelly)
@@ -410,7 +410,7 @@ func TestGroupInfo(t *testing.T) {
 	info := GroupInfo{
 		Name:        "Living Room",
 		DeviceCount: 3,
-		Devices:     []string{"switch1", "switch2", "light1"},
+		Devices:     []string{testSwitch1, "switch2", "light1"},
 	}
 
 	if info.Name != "Living Room" {
@@ -455,7 +455,7 @@ func TestZigbeeDevice(t *testing.T) {
 
 	device := ZigbeeDevice{
 		Name:         "Zigbee Hub",
-		Address:      "192.168.1.50",
+		Address:      testIP50,
 		Model:        "Plus Zigbee",
 		Enabled:      true,
 		NetworkState: "running",
@@ -635,27 +635,27 @@ func TestDeviceQRInfo(t *testing.T) {
 	t.Parallel()
 
 	info := DeviceQRInfo{
-		Device:    "kitchen-switch",
-		IP:        "192.168.1.100",
-		MAC:       "AA:BB:CC:DD:EE:FF",
-		Model:     "Plus 1PM",
-		Firmware:  "1.0.0",
-		WebURL:    "http://192.168.1.100",
-		WiFiSSID:  "MyNetwork",
-		QRContent: "http://192.168.1.100",
+		Device:    testDeviceKitchenSwitch,
+		IP:        testReportIP,
+		MAC:       testReportMAC,
+		Model:     testPlus1PM,
+		Firmware:  testFW100,
+		WebURL:    testURL,
+		WiFiSSID:  testSSID,
+		QRContent: testURL,
 	}
 
-	if info.Device != "kitchen-switch" {
-		t.Errorf("Device = %q, want %q", info.Device, "kitchen-switch")
+	if info.Device != testDeviceKitchenSwitch {
+		t.Errorf("Device = %q, want %q", info.Device, testDeviceKitchenSwitch)
 	}
-	if info.IP != "192.168.1.100" {
-		t.Errorf("IP = %q, want %q", info.IP, "192.168.1.100")
+	if info.IP != testReportIP {
+		t.Errorf("IP = %q, want %q", info.IP, testReportIP)
 	}
-	if info.MAC != "AA:BB:CC:DD:EE:FF" {
-		t.Errorf("MAC = %q, want %q", info.MAC, "AA:BB:CC:DD:EE:FF")
+	if info.MAC != testReportMAC {
+		t.Errorf("MAC = %q, want %q", info.MAC, testReportMAC)
 	}
-	if info.WebURL != "http://192.168.1.100" {
-		t.Errorf("WebURL = %q, want %q", info.WebURL, "http://192.168.1.100")
+	if info.WebURL != testURL {
+		t.Errorf("WebURL = %q, want %q", info.WebURL, testURL)
 	}
 }
 
@@ -665,21 +665,21 @@ func TestBulkProvisionConfig(t *testing.T) {
 
 	cfg := BulkProvisionConfig{
 		WiFi: &ProvisionWiFiConfig{
-			SSID:     "MyNetwork",
-			Password: "secret123",
+			SSID:     testSSID,
+			Password: testPasswordValue,
 		},
 		Devices: []DeviceProvisionConfig{
 			{
-				Name:    "device1",
-				Address: "192.168.1.100",
+				Name:    testDevice1,
+				Address: testReportIP,
 				WiFi: &ProvisionWiFiConfig{
 					SSID:     "DeviceNetwork",
 					Password: "devicepass",
 				},
-				DevName: "Kitchen Switch",
+				DevName: testKitchenSwitch,
 			},
 			{
-				Name:    "device2",
+				Name:    testDevice2,
 				Address: "192.168.1.101",
 			},
 		},
@@ -688,14 +688,14 @@ func TestBulkProvisionConfig(t *testing.T) {
 	if cfg.WiFi == nil {
 		t.Fatal("WiFi should not be nil")
 	}
-	if cfg.WiFi.SSID != "MyNetwork" {
-		t.Errorf("WiFi.SSID = %q, want %q", cfg.WiFi.SSID, "MyNetwork")
+	if cfg.WiFi.SSID != testSSID {
+		t.Errorf("WiFi.SSID = %q, want %q", cfg.WiFi.SSID, testSSID)
 	}
 	if len(cfg.Devices) != 2 {
 		t.Fatalf("Devices len = %d, want 2", len(cfg.Devices))
 	}
-	if cfg.Devices[0].DevName != "Kitchen Switch" {
-		t.Errorf("Devices[0].DevName = %q, want %q", cfg.Devices[0].DevName, "Kitchen Switch")
+	if cfg.Devices[0].DevName != testKitchenSwitch {
+		t.Errorf("Devices[0].DevName = %q, want %q", cfg.Devices[0].DevName, testKitchenSwitch)
 	}
 }
 
@@ -721,26 +721,26 @@ func TestDeviceProvisionConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := DeviceProvisionConfig{
-		Name:    "switch1",
-		Address: "192.168.1.100",
+		Name:    testSwitch1,
+		Address: testReportIP,
 		WiFi: &ProvisionWiFiConfig{
 			SSID:     "Override",
 			Password: "override123",
 		},
-		DevName: "Living Room Switch",
+		DevName: testLivingRoomSwitch,
 	}
 
-	if cfg.Name != "switch1" {
-		t.Errorf("Name = %q, want %q", cfg.Name, "switch1")
+	if cfg.Name != testSwitch1 {
+		t.Errorf("Name = %q, want %q", cfg.Name, testSwitch1)
 	}
-	if cfg.Address != "192.168.1.100" {
-		t.Errorf("Address = %q, want %q", cfg.Address, "192.168.1.100")
+	if cfg.Address != testReportIP {
+		t.Errorf("Address = %q, want %q", cfg.Address, testReportIP)
 	}
 	if cfg.WiFi == nil {
 		t.Fatal("WiFi should not be nil")
 	}
-	if cfg.DevName != "Living Room Switch" {
-		t.Errorf("DevName = %q, want %q", cfg.DevName, "Living Room Switch")
+	if cfg.DevName != testLivingRoomSwitch {
+		t.Errorf("DevName = %q, want %q", cfg.DevName, testLivingRoomSwitch)
 	}
 }
 
@@ -750,12 +750,12 @@ func TestProvisionResult(t *testing.T) {
 
 	// Success case
 	result := ProvisionResult{
-		Device: "device1",
+		Device: testDevice1,
 		Err:    nil,
 	}
 
-	if result.Device != "device1" {
-		t.Errorf("Device = %q, want %q", result.Device, "device1")
+	if result.Device != testDevice1 {
+		t.Errorf("Device = %q, want %q", result.Device, testDevice1)
 	}
 	if result.Err != nil {
 		t.Errorf("Err = %v, want nil", result.Err)
@@ -763,7 +763,7 @@ func TestProvisionResult(t *testing.T) {
 
 	// Error case
 	errResult := ProvisionResult{
-		Device: "device2",
+		Device: testDevice2,
 		Err:    ErrConnectionFailed,
 	}
 
@@ -780,8 +780,8 @@ func TestBackupFileInfo(t *testing.T) {
 	info := BackupFileInfo{
 		Filename:    "backup_20240101.json",
 		DeviceID:    "shellyplus1pm-123456",
-		DeviceModel: "Plus 1PM",
-		FWVersion:   "1.0.0",
+		DeviceModel: testPlus1PM,
+		FWVersion:   testFW100,
 		CreatedAt:   now,
 		Encrypted:   true,
 		Size:        1024,
@@ -793,8 +793,8 @@ func TestBackupFileInfo(t *testing.T) {
 	if info.DeviceID != "shellyplus1pm-123456" {
 		t.Errorf("DeviceID = %q, want %q", info.DeviceID, "shellyplus1pm-123456")
 	}
-	if info.DeviceModel != "Plus 1PM" {
-		t.Errorf("DeviceModel = %q, want %q", info.DeviceModel, "Plus 1PM")
+	if info.DeviceModel != testPlus1PM {
+		t.Errorf("DeviceModel = %q, want %q", info.DeviceModel, testPlus1PM)
 	}
 	if !info.Encrypted {
 		t.Error("Encrypted = false, want true")

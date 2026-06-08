@@ -29,8 +29,8 @@ func (s *Service) LoRaSendBytes(ctx context.Context, identifier string, componen
 func (s *Service) LoRaSetConfig(ctx context.Context, identifier string, componentID int, config map[string]any) error {
 	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		params := map[string]any{
-			"id":     componentID,
-			"config": config,
+			"id":      componentID,
+			keyConfig: config,
 		}
 		_, err := conn.Call(ctx, "LoRa.SetConfig", params)
 		if err != nil {

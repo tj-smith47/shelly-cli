@@ -14,6 +14,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Command and entity names reused across reserved-command checks and config keys.
+const (
+	cmdHelp    = "help"
+	cmdVersion = "version"
+	cmdAlias   = "alias"
+	cmdDevice  = "device"
+	cmdSwitch  = "switch"
+	cmdInput   = "input"
+	cmdScene   = "scene"
+	cmdCloud   = "cloud"
+	cmdOff     = "off"
+)
+
 // NamedAlias combines an alias name with its definition for listing/display.
 type NamedAlias struct {
 	Name string
@@ -22,31 +35,31 @@ type NamedAlias struct {
 
 // ReservedCommands are built-in commands that cannot be aliased.
 var ReservedCommands = map[string]bool{
-	"help":       true,
-	"version":    true,
+	cmdHelp:      true,
+	cmdVersion:   true,
 	"completion": true,
-	"alias":      true,
+	cmdAlias:     true,
 	"extension":  true,
 	"config":     true,
-	"device":     true,
+	cmdDevice:    true,
 	"discover":   true,
-	"switch":     true,
+	cmdSwitch:    true,
 	"cover":      true,
 	"light":      true,
 	"rgb":        true,
-	"input":      true,
+	cmdInput:     true,
 	"batch":      true,
-	"scene":      true,
+	cmdScene:     true,
 	"firmware":   true,
 	"script":     true,
 	"schedule":   true,
-	"cloud":      true,
+	cmdCloud:     true,
 	"backup":     true,
 	"monitor":    true,
 	"dash":       true,
 	"theme":      true,
 	"on":         true,
-	"off":        true,
+	cmdOff:       true,
 	"toggle":     true,
 	"status":     true,
 }

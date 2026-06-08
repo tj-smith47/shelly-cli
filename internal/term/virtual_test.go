@@ -211,7 +211,7 @@ func TestDisplayVirtualComponent_NoValue(t *testing.T) {
 		Key:  "boolean:106",
 		Type: shelly.VirtualBoolean,
 		ID:   106,
-		Name: "Unknown",
+		Name: unknownLabel,
 	}
 	DisplayVirtualComponent(ios, comp)
 
@@ -267,7 +267,7 @@ func TestDisplayVirtualComponent_RawValue(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	comp := &shelly.VirtualComponent{
 		Key:   "unknown:109",
-		Type:  "custom",
+		Type:  testTypeCustom,
 		ID:    109,
 		Value: "raw-value",
 	}

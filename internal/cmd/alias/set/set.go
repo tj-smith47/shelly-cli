@@ -11,6 +11,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// aliasTypeCommand labels an alias that runs a shelly subcommand.
+const aliasTypeCommand = "command"
+
 // Options holds the options for the set command.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -86,7 +89,7 @@ func run(opts *Options) error {
 	}
 
 	// Show the alias
-	aliasType := "command"
+	aliasType := aliasTypeCommand
 	if shell {
 		aliasType = "shell"
 	}

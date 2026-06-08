@@ -68,7 +68,7 @@ func TestNewCommand_Structure(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test Aliases
-	wantAliases := []string{"zeroconf", "bonjour"}
+	wantAliases := []string{aliasZeroconf, aliasBonjour}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
 	} else {
@@ -733,8 +733,8 @@ func TestAliasExecution(t *testing.T) {
 		name  string
 		alias string
 	}{
-		{"zeroconf alias", "zeroconf"},
-		{"bonjour alias", "bonjour"},
+		{"zeroconf alias", aliasZeroconf},
+		{"bonjour alias", aliasBonjour},
 	}
 
 	for _, tt := range tests {

@@ -8,7 +8,10 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
-const unknownStr = "unknown"
+const (
+	unknownStr = "unknown"
+	noneStr    = "none"
+)
 
 // Mode represents the current keyboard input routing mode.
 type Mode int
@@ -85,7 +88,7 @@ const (
 // String returns the overlay name.
 func (o OverlayID) String() string {
 	names := map[OverlayID]string{
-		OverlayNone:           "none",
+		OverlayNone:           noneStr,
 		OverlayHelp:           "help",
 		OverlayJSONViewer:     "json",
 		OverlayConfirm:        "confirm",

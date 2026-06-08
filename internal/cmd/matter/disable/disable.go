@@ -10,6 +10,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// shortDesc is the one-line command summary, reused by tests.
+const shortDesc = "Disable Matter on a device"
+
 // Options holds command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -23,7 +26,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "disable <device>",
 		Aliases: []string{"off", "deactivate"},
-		Short:   "Disable Matter on a device",
+		Short:   shortDesc,
 		Long: `Disable Matter connectivity on a Shelly device.
 
 When Matter is disabled, the device will no longer be controllable

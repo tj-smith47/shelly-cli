@@ -33,6 +33,13 @@ const (
 	FormatTemplate Format = "template"
 )
 
+// Format aliases accepted on input but not canonical Format values.
+const (
+	formatAliasYML        = "yml"
+	formatAliasPlain      = "plain"
+	formatAliasGoTemplate = "go-template"
+)
+
 // Formatter defines the interface for output formatters.
 type Formatter interface {
 	Format(w io.Writer, data any) error
@@ -42,15 +49,15 @@ type Formatter interface {
 func GetFormat() Format {
 	format := viper.GetString("output")
 	switch strings.ToLower(format) {
-	case "json":
+	case string(FormatJSON):
 		return FormatJSON
-	case "yaml", "yml":
+	case string(FormatYAML), formatAliasYML:
 		return FormatYAML
-	case "table":
+	case string(FormatTable):
 		return FormatTable
-	case "text", "plain":
+	case string(FormatText), formatAliasPlain:
 		return FormatText
-	case "template", "go-template":
+	case string(FormatTemplate), formatAliasGoTemplate:
 		return FormatTemplate
 	default:
 		return FormatTable
@@ -178,15 +185,15 @@ func (f *TableFormatter) buildTable(data any) *table.Table {
 // ParseFormat parses a format string into a Format.
 func ParseFormat(s string) (Format, error) {
 	switch strings.ToLower(s) {
-	case "json":
+	case string(FormatJSON):
 		return FormatJSON, nil
-	case "yaml", "yml":
+	case string(FormatYAML), formatAliasYML:
 		return FormatYAML, nil
-	case "table":
+	case string(FormatTable):
 		return FormatTable, nil
-	case "text", "plain":
+	case string(FormatText), formatAliasPlain:
 		return FormatText, nil
-	case "template", "go-template":
+	case string(FormatTemplate), formatAliasGoTemplate:
 		return FormatTemplate, nil
 	default:
 		return "", fmt.Errorf("unknown format: %s", s)
@@ -195,7 +202,7 @@ func ParseFormat(s string) (Format, error) {
 
 // ValidFormats returns a list of valid format strings.
 func ValidFormats() []string {
-	return []string{"json", "yaml", "table", "text", "template"}
+	return []string{string(FormatJSON), string(FormatYAML), string(FormatTable), string(FormatText), string(FormatTemplate)}
 }
 
 // Template outputs data using the specified template to the given writer.
@@ -366,6 +373,51 @@ const ValueTruncateTable = 40
 // valueNull is the standard null representation.
 const valueNull = "null"
 
+// Value type names returned by ValueType.
+const (
+	valueTypeString  = "string"
+	valueTypeBoolean = "boolean"
+	valueTypeNumber  = "number"
+	valueTypeObject  = "object"
+	valueTypeArray   = "array"
+)
+
+// WiFi signal-strength labels.
+const (
+	signalExcellent = "excellent"
+	signalGood      = "good"
+	signalFair      = "fair"
+	signalWeak      = "weak"
+)
+
+// Component type keys used for status formatter dispatch.
+const (
+	compTypeSwitch      = "switch"
+	compTypeLight       = "light"
+	compTypeCover       = "cover"
+	compTypeInput       = "input"
+	compTypePM1         = "pm1"
+	compTypeTemperature = "temperature"
+	compTypeHumidity    = "humidity"
+	compTypeIlluminance = "illuminance"
+	compTypeDevicePower = "devicepower"
+	compTypeSys         = "sys"
+	compTypeWiFi        = "wifi"
+	compTypeCloud       = "cloud"
+	compTypeMQTT        = "mqtt"
+	compTypeBLE         = "ble"
+	compTypeEth         = "eth"
+)
+
+// Cover state transition labels.
+const (
+	labelCoverOpening = "opening"
+	labelCoverClosing = "closing"
+)
+
+// ellipsis is the truncation marker appended to shortened text.
+const ellipsis = "..."
+
 // FormatJSONValue formats a value for JSON-like display.
 // Strings are quoted, numbers are formatted cleanly, nil becomes "null".
 func FormatJSONValue(v any) string {
@@ -461,17 +513,17 @@ func ValueType(v any) string {
 	}
 	switch v.(type) {
 	case string:
-		return "string"
+		return valueTypeString
 	case bool:
-		return "boolean"
+		return valueTypeBoolean
 	case float64:
-		return "number"
+		return valueTypeNumber
 	case map[string]any:
-		return "object"
+		return valueTypeObject
 	case []any:
-		return "array"
+		return valueTypeArray
 	default:
-		return "unknown"
+		return LabelUnknown
 	}
 }
 
@@ -559,7 +611,7 @@ func Truncate(s string, maxLen int) string {
 	if maxLen <= 3 {
 		return ansi.Truncate(s, maxLen, "")
 	}
-	return ansi.Truncate(s, maxLen, "...")
+	return ansi.Truncate(s, maxLen, ellipsis)
 }
 
 // SplitWidth divides available width between two fields based on percentage.
@@ -638,13 +690,13 @@ func EscapeWiFiQR(s string) string {
 func FormatWiFiSignalStrength(rssi int) string {
 	switch {
 	case rssi >= -50:
-		return "excellent"
+		return signalExcellent
 	case rssi >= -60:
-		return "good"
+		return signalGood
 	case rssi >= -70:
-		return "fair"
+		return signalFair
 	default:
-		return "weak"
+		return signalWeak
 	}
 }
 
@@ -653,7 +705,7 @@ func FormatWiFiSignalStrength(rssi int) string {
 func FormatReleaseNotes(body string) string {
 	const maxLen = 500
 	if len(body) > maxLen {
-		body = body[:maxLen] + "..."
+		body = body[:maxLen] + ellipsis
 	}
 
 	lines := strings.Split(body, "\n")
@@ -701,30 +753,30 @@ type StatusFormatter interface {
 // statusFormatterRegistry maps component types to their formatters.
 var statusFormatterRegistry = map[string]StatusFormatter{
 	// Device components
-	"switch": switchStatusFormatter{},
-	"light":  lightStatusFormatter{},
-	"cover":  coverStatusFormatter{},
-	"input":  inputStatusFormatter{},
+	compTypeSwitch: switchStatusFormatter{},
+	compTypeLight:  lightStatusFormatter{},
+	compTypeCover:  coverStatusFormatter{},
+	compTypeInput:  inputStatusFormatter{},
 
 	// Power meters
-	"pm1": powerMeterStatusFormatter{},
-	"pm":  powerMeterStatusFormatter{},
+	compTypePM1: powerMeterStatusFormatter{},
+	"pm":        powerMeterStatusFormatter{},
 
 	// Sensors (all use the same formatter with type dispatch)
-	"temperature": sensorStatusFormatter{},
-	"humidity":    sensorStatusFormatter{},
-	"illuminance": sensorStatusFormatter{},
-	"devicepower": sensorStatusFormatter{},
+	compTypeTemperature: sensorStatusFormatter{},
+	compTypeHumidity:    sensorStatusFormatter{},
+	compTypeIlluminance: sensorStatusFormatter{},
+	compTypeDevicePower: sensorStatusFormatter{},
 
 	// System
-	"sys": sysStatusFormatter{},
+	compTypeSys: sysStatusFormatter{},
 
 	// Network (all use the same formatter with type dispatch)
-	"wifi":  networkStatusFormatter{},
-	"cloud": networkStatusFormatter{},
-	"mqtt":  networkStatusFormatter{},
-	"ble":   networkStatusFormatter{},
-	"eth":   networkStatusFormatter{},
+	compTypeWiFi:  networkStatusFormatter{},
+	compTypeCloud: networkStatusFormatter{},
+	compTypeMQTT:  networkStatusFormatter{},
+	compTypeBLE:   networkStatusFormatter{},
+	compTypeEth:   networkStatusFormatter{},
 
 	// System components (all use the same formatter with type dispatch)
 	"ws":   systemComponentStatusFormatter{},
@@ -840,14 +892,14 @@ func (coverStatusFormatter) Format(_ string, status map[string]any) string {
 	// State (open, closed, opening, closing, stopped)
 	if state, ok := status["state"].(string); ok {
 		switch state {
-		case "open":
-			parts = append(parts, theme.StatusOK().Render("open"))
-		case "closed":
-			parts = append(parts, theme.Dim().Render("closed"))
-		case "opening":
-			parts = append(parts, theme.StatusWarn().Render("opening"))
-		case "closing":
-			parts = append(parts, theme.StatusWarn().Render("closing"))
+		case LabelCoverOpen:
+			parts = append(parts, theme.StatusOK().Render(LabelCoverOpen))
+		case LabelCoverClosed:
+			parts = append(parts, theme.Dim().Render(LabelCoverClosed))
+		case labelCoverOpening:
+			parts = append(parts, theme.StatusWarn().Render(labelCoverOpening))
+		case labelCoverClosing:
+			parts = append(parts, theme.StatusWarn().Render(labelCoverClosing))
 		default:
 			parts = append(parts, state)
 		}
@@ -913,19 +965,19 @@ type sensorStatusFormatter struct{}
 
 func (sensorStatusFormatter) Format(compType string, status map[string]any) string {
 	switch compType {
-	case "temperature":
+	case compTypeTemperature:
 		if tC, ok := status["tC"].(float64); ok {
 			return fmt.Sprintf("%.1f°C", tC)
 		}
-	case "humidity":
+	case compTypeHumidity:
 		if rh, ok := status["rh"].(float64); ok {
 			return fmt.Sprintf("%.1f%%", rh)
 		}
-	case "illuminance":
+	case compTypeIlluminance:
 		if lux, ok := status["lux"].(float64); ok {
 			return fmt.Sprintf("%.0f lux", lux)
 		}
-	case "devicepower":
+	case compTypeDevicePower:
 		var parts []string
 		if battery, ok := status["battery"].(map[string]any); ok {
 			if percent, ok := battery["percent"].(float64); ok {
@@ -986,7 +1038,7 @@ type networkStatusFormatter struct{}
 //nolint:gocyclo // Component-specific formatting requires many cases
 func (networkStatusFormatter) Format(compType string, status map[string]any) string {
 	switch compType {
-	case "wifi":
+	case compTypeWiFi:
 		if ssid, ok := status["ssid"].(string); ok {
 			result := ssid
 			if rssi, ok := status["rssi"].(float64); ok {
@@ -997,28 +1049,28 @@ func (networkStatusFormatter) Format(compType string, status map[string]any) str
 		if sta, ok := status["sta_ip"].(string); ok {
 			return sta
 		}
-	case "cloud":
+	case compTypeCloud:
 		if connected, ok := status["connected"].(bool); ok {
 			if connected {
 				return theme.StatusOK().Render("connected")
 			}
 			return theme.Dim().Render("disconnected")
 		}
-	case "mqtt":
+	case compTypeMQTT:
 		if connected, ok := status["connected"].(bool); ok {
 			if connected {
 				return theme.StatusOK().Render("connected")
 			}
 			return theme.Dim().Render("disconnected")
 		}
-	case "ble":
+	case compTypeBLE:
 		if enabled, ok := status["enabled"].(bool); ok {
 			if enabled {
 				return theme.StatusOK().Render("enabled")
 			}
 			return theme.Dim().Render("disabled")
 		}
-	case "eth":
+	case compTypeEth:
 		if ip, ok := status["ip"].(string); ok && ip != "" {
 			return ip
 		}
@@ -1086,15 +1138,15 @@ func formatSimpleValueInternal(v any) string {
 		return fmt.Sprintf("%.2f", val)
 	case string:
 		if len(val) > 20 {
-			return val[:17] + "..."
+			return val[:17] + ellipsis
 		}
 		return val
 	case map[string]any, []any:
-		return "..."
+		return ellipsis
 	default:
 		s := fmt.Sprintf("%v", val)
 		if len(s) > 20 {
-			return s[:17] + "..."
+			return s[:17] + ellipsis
 		}
 		return s
 	}

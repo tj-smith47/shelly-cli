@@ -17,8 +17,8 @@ func TestDisplayCloudEvent(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		online := 1
 		event := &model.CloudEvent{
-			Event:     "Shelly:Online",
-			DeviceID:  "shellyplus1-123456",
+			Event:     eventShellyOnline,
+			DeviceID:  testDeviceIDPlus1,
 			Timestamp: 1700000000,
 			Online:    &online,
 		}
@@ -26,13 +26,13 @@ func TestDisplayCloudEvent(t *testing.T) {
 		DisplayCloudEvent(ios, event)
 
 		output := out.String()
-		if !strings.Contains(output, "Shelly:Online") {
+		if !strings.Contains(output, eventShellyOnline) {
 			t.Error("output should contain event name")
 		}
 		if !strings.Contains(output, "online") {
 			t.Error("output should contain 'online' status")
 		}
-		if !strings.Contains(output, "shellyplus1-123456") {
+		if !strings.Contains(output, testDeviceIDPlus1) {
 			t.Error("output should contain device ID")
 		}
 	})
@@ -43,8 +43,8 @@ func TestDisplayCloudEvent(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		offline := 0
 		event := &model.CloudEvent{
-			Event:     "Shelly:Online",
-			DeviceID:  "shellyplus1-123456",
+			Event:     eventShellyOnline,
+			DeviceID:  testDeviceIDPlus1,
 			Timestamp: 1700000000,
 			Online:    &offline,
 		}
@@ -63,7 +63,7 @@ func TestDisplayCloudEvent(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		event := &model.CloudEvent{
 			Event:    "Shelly:StatusOnChange",
-			DeviceID: "shellyplus1-123456",
+			DeviceID: testDeviceIDPlus1,
 			Status:   json.RawMessage(`{"switch:0":{"output":true}}`),
 		}
 
@@ -84,7 +84,7 @@ func TestDisplayCloudEvent(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		event := &model.CloudEvent{
 			Event:    "Shelly:Settings",
-			DeviceID: "shellyplus1-123456",
+			DeviceID: testDeviceIDPlus1,
 			Settings: json.RawMessage(`{"name":"My Device"}`),
 		}
 
@@ -105,7 +105,7 @@ func TestDisplayCloudEvent(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		event := &model.CloudEvent{
 			Event:    "Shelly:CustomEvent",
-			DeviceID: "shellyplus1-123456",
+			DeviceID: testDeviceIDPlus1,
 		}
 
 		DisplayCloudEvent(ios, event)
@@ -121,7 +121,7 @@ func TestDisplayCloudEvent(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		event := &model.CloudEvent{
-			Event: "Shelly:Online",
+			Event: eventShellyOnline,
 		}
 
 		DisplayCloudEvent(ios, event)
@@ -137,8 +137,8 @@ func TestDisplayCloudEvent(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		event := &model.CloudEvent{
-			Event:     "Shelly:Online",
-			DeviceID:  "device1",
+			Event:     eventShellyOnline,
+			DeviceID:  testDevice1,
 			Timestamp: 0,
 		}
 
@@ -164,10 +164,10 @@ func TestDisplayIndentedJSON(t *testing.T) {
 		DisplayIndentedJSON(ios, data)
 
 		output := out.String()
-		if !strings.Contains(output, "key") {
+		if !strings.Contains(output, testKey) {
 			t.Error("output should contain key")
 		}
-		if !strings.Contains(output, "value") {
+		if !strings.Contains(output, testValue) {
 			t.Error("output should contain value")
 		}
 	})

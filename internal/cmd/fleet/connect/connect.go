@@ -19,9 +19,12 @@ type Options struct {
 	Region  string
 }
 
+// hostEU13 is the primary EU cloud host, referenced in examples and tests.
+const hostEU13 = "shelly-13-eu.shelly.cloud"
+
 // Cloud hosts by region.
 var cloudHosts = map[string][]string{
-	"eu": {"shelly-13-eu.shelly.cloud", "shelly-14-eu.shelly.cloud"},
+	"eu": {hostEU13, "shelly-14-eu.shelly.cloud"},
 	"us": {"shelly-15-us.shelly.cloud", "shelly-16-us.shelly.cloud"},
 }
 

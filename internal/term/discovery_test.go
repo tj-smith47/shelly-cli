@@ -27,13 +27,13 @@ func TestDisplayDiscoveredDevices_WithDevices(t *testing.T) {
 	devices := []discovery.DiscoveredDevice{
 		{
 			Name:    "shellyplus1-abc123",
-			Model:   "SNSW-001X16EU",
-			Address: net.ParseIP("192.168.1.100"),
+			Model:   testModel1X,
+			Address: net.ParseIP(testIP100),
 		},
 		{
 			Name:    "shellyplus2pm-def456",
-			Model:   "SNSW-002P16EU",
-			Address: net.ParseIP("192.168.1.101"),
+			Model:   testModel2PM,
+			Address: net.ParseIP(testIP101),
 		},
 	}
 	DisplayDiscoveredDevices(ios, devices)
@@ -63,14 +63,14 @@ func TestDisplayBLEDevices_WithDevices(t *testing.T) {
 	t.Parallel()
 
 	ios, out, _ := testIOStreams()
-	mac, err := net.ParseMAC("AA:BB:CC:DD:EE:FF")
+	mac, err := net.ParseMAC(testMAC)
 	if err != nil {
 		t.Fatalf("ParseMAC error: %v", err)
 	}
 	devices := []discovery.BLEDiscoveredDevice{
 		{
 			DiscoveredDevice: discovery.DiscoveredDevice{
-				ID:    "device1",
+				ID:    testDevice1,
 				Model: "Shelly BLU",
 			},
 			LocalName:   "BTHome Sensor",
@@ -80,8 +80,8 @@ func TestDisplayBLEDevices_WithDevices(t *testing.T) {
 		},
 		{
 			DiscoveredDevice: discovery.DiscoveredDevice{
-				ID:    "device2",
-				Model: "Unknown",
+				ID:    testDevice2,
+				Model: unknownLabel,
 			},
 			LocalName:   "",
 			RSSI:        -75,
@@ -90,7 +90,7 @@ func TestDisplayBLEDevices_WithDevices(t *testing.T) {
 		},
 		{
 			DiscoveredDevice: discovery.DiscoveredDevice{
-				ID:    "device3",
+				ID:    testDevice3,
 				Model: "Sensor",
 			},
 			LocalName:   "Weak Signal",
@@ -133,11 +133,11 @@ func TestDisplayPluginDiscoveredDevices_WithDevices(t *testing.T) {
 			ID:       "tasmota-abc123",
 			Name:     "Living Room Light",
 			Model:    "Generic",
-			Address:  "192.168.1.50",
+			Address:  testIP50,
 			Platform: "tasmota",
 			Firmware: "12.0.0",
 			Components: []PluginComponentInfo{
-				{Type: "switch", ID: 0, Name: "Light"},
+				{Type: testCompSwitch, ID: 0, Name: "Light"},
 				{Type: "sensor", ID: 1, Name: ""},
 			},
 		},
@@ -151,7 +151,7 @@ func TestDisplayPluginDiscoveredDevices_WithDevices(t *testing.T) {
 	if !strings.Contains(output, "Living Room Light") {
 		t.Error("expected device name")
 	}
-	if !strings.Contains(output, "192.168.1.50") {
+	if !strings.Contains(output, testIP50) {
 		t.Error("expected address")
 	}
 	if !strings.Contains(output, "tasmota") {
@@ -198,7 +198,7 @@ func TestDisplayPluginDiscoveredDevices_OnlyAddress(t *testing.T) {
 			ID:       "",
 			Name:     "",
 			Address:  "192.168.1.70",
-			Platform: "custom",
+			Platform: testTypeCustom,
 		},
 	}
 	DisplayPluginDiscoveredDevices(ios, devices)

@@ -11,6 +11,9 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 )
 
+// defaultHexColor is the fallback hex color used when a color is nil.
+const defaultHexColor = "#ffffff"
+
 // SyntaxColors holds the colors for syntax highlighting tokens.
 // These are derived from the current bubbletint theme.
 type SyntaxColors struct {
@@ -173,7 +176,7 @@ func HighlightJSON(code string) string {
 // colorToHex converts a color.Color to a hex string for lipgloss.
 func colorToHex(c color.Color) string {
 	if c == nil {
-		return "#ffffff"
+		return defaultHexColor
 	}
 	r, g, b, _ := c.RGBA()
 	// RGBA returns 16-bit values (0-65535), convert to 8-bit (0-255)

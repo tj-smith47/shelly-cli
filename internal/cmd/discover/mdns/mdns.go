@@ -18,6 +18,12 @@ import (
 // DefaultTimeout is the default mDNS discovery timeout.
 const DefaultTimeout = 10 * time.Second
 
+// aliasZeroconf is the Zeroconf command alias for mDNS discovery.
+const aliasZeroconf = "zeroconf"
+
+// aliasBonjour is the Bonjour command alias for mDNS discovery.
+const aliasBonjour = "bonjour"
+
 // Discoverer is the interface for mDNS device discovery.
 type Discoverer interface {
 	Discover(timeout time.Duration) ([]discovery.DiscoveredDevice, error)
@@ -44,7 +50,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "mdns",
-		Aliases: []string{"zeroconf", "bonjour"},
+		Aliases: []string{aliasZeroconf, aliasBonjour},
 		Short:   "Discover devices using mDNS/Zeroconf",
 		Long: `Discover Shelly devices using mDNS/Zeroconf.
 

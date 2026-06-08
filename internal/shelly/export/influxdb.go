@@ -10,6 +10,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+// Shared tag, field, and measurement name constants for metric exporters.
+const (
+	tagDevice      = "device"
+	tagComponent   = "component"
+	tagComponentID = "component_id"
+	tagPhase       = "phase"
+	fieldPower     = "power"
+	fieldVoltage   = "voltage"
+	fieldCurrent   = "current"
+
+	measurementPower = "shelly_power"
+	promTypeGauge    = "gauge"
+	promTypeCounter  = "counter"
+)
+
 // InfluxDBPoint represents a single InfluxDB line protocol point.
 type InfluxDBPoint struct {
 	Measurement string
@@ -22,11 +37,11 @@ type InfluxDBPoint struct {
 func ReadingsToInfluxDBPoints(readings []model.ComponentReading, timestamp time.Time) []InfluxDBPoint {
 	points := make([]InfluxDBPoint, 0, len(readings))
 	for _, r := range readings {
-		tags := map[string]string{"device": r.Device, "component": r.Type, "component_id": fmt.Sprintf("%d", r.ID)}
+		tags := map[string]string{tagDevice: r.Device, tagComponent: r.Type, tagComponentID: fmt.Sprintf("%d", r.ID)}
 		if r.Phase != "" {
-			tags["phase"] = r.Phase
+			tags[tagPhase] = r.Phase
 		}
-		fields := map[string]float64{"power": r.Power, "voltage": r.Voltage, "current": r.Current}
+		fields := map[string]float64{fieldPower: r.Power, fieldVoltage: r.Voltage, fieldCurrent: r.Current}
 		if r.Energy != nil {
 			fields["energy"] = *r.Energy
 		}
@@ -102,30 +117,30 @@ func EMReadingsToInfluxDBPoints(emStatuses []*model.EMStatus, device string, tim
 		points = append(points,
 			// Phase A
 			InfluxDBPoint{
-				Measurement: "shelly_power",
-				Tags:        map[string]string{"device": device, "component": "em", "component_id": compID, "phase": "a"},
-				Fields:      map[string]float64{"power": status.AActivePower, "voltage": status.AVoltage, "current": status.ACurrent},
+				Measurement: measurementPower,
+				Tags:        map[string]string{tagDevice: device, tagComponent: "em", tagComponentID: compID, tagPhase: "a"},
+				Fields:      map[string]float64{fieldPower: status.AActivePower, fieldVoltage: status.AVoltage, fieldCurrent: status.ACurrent},
 				Timestamp:   timestamp,
 			},
 			// Phase B
 			InfluxDBPoint{
-				Measurement: "shelly_power",
-				Tags:        map[string]string{"device": device, "component": "em", "component_id": compID, "phase": "b"},
-				Fields:      map[string]float64{"power": status.BActivePower, "voltage": status.BVoltage, "current": status.BCurrent},
+				Measurement: measurementPower,
+				Tags:        map[string]string{tagDevice: device, tagComponent: "em", tagComponentID: compID, tagPhase: "b"},
+				Fields:      map[string]float64{fieldPower: status.BActivePower, fieldVoltage: status.BVoltage, fieldCurrent: status.BCurrent},
 				Timestamp:   timestamp,
 			},
 			// Phase C
 			InfluxDBPoint{
-				Measurement: "shelly_power",
-				Tags:        map[string]string{"device": device, "component": "em", "component_id": compID, "phase": "c"},
-				Fields:      map[string]float64{"power": status.CActivePower, "voltage": status.CVoltage, "current": status.CCurrent},
+				Measurement: measurementPower,
+				Tags:        map[string]string{tagDevice: device, tagComponent: "em", tagComponentID: compID, tagPhase: "c"},
+				Fields:      map[string]float64{fieldPower: status.CActivePower, fieldVoltage: status.CVoltage, fieldCurrent: status.CCurrent},
 				Timestamp:   timestamp,
 			},
 			// Total
 			InfluxDBPoint{
-				Measurement: "shelly_power",
-				Tags:        map[string]string{"device": device, "component": "em", "component_id": compID, "phase": "total"},
-				Fields:      map[string]float64{"power": status.TotalActivePower, "current": status.TotalCurrent},
+				Measurement: measurementPower,
+				Tags:        map[string]string{tagDevice: device, tagComponent: "em", tagComponentID: compID, tagPhase: "total"},
+				Fields:      map[string]float64{fieldPower: status.TotalActivePower, fieldCurrent: status.TotalCurrent},
 				Timestamp:   timestamp,
 			},
 		)

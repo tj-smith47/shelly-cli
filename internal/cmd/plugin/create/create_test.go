@@ -104,7 +104,7 @@ func TestNewCommand_Flags(t *testing.T) {
 		shorthand string
 		defValue  string
 	}{
-		{"lang", "l", "bash"},
+		{"lang", "l", langBash},
 		{"output", "o", "."},
 	}
 
@@ -165,9 +165,9 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	wantPatterns := []string{
-		"bash",
+		langBash,
 		"go",
-		"python",
+		langPython,
 	}
 
 	for _, pattern := range wantPatterns {
@@ -231,7 +231,7 @@ func TestExecute_BashScaffold(t *testing.T) {
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"mytest", "--lang", "bash", "--output", testOutputDir})
+	cmd.SetArgs([]string{"mytest", "--lang", langBash, "--output", testOutputDir})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -301,7 +301,7 @@ func TestExecute_PythonScaffold(t *testing.T) {
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"pyext", "--lang", "python", "--output", testOutputDir})
+	cmd.SetArgs([]string{"pyext", "--lang", langPython, "--output", testOutputDir})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -349,7 +349,7 @@ func TestExecute_LanguageAliases(t *testing.T) {
 		lang string
 	}{
 		{"sh alias", "sh"},
-		{"golang alias", "golang"},
+		{"golang alias", langGo},
 		{"py alias", "py"},
 	}
 
@@ -525,7 +525,7 @@ func TestRun_BashLanguage(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, Name: "testbash", Lang: "bash", OutputDir: testOutputDir}
+	opts := &Options{Factory: tf.Factory, Name: "testbash", Lang: langBash, OutputDir: testOutputDir}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
@@ -571,7 +571,7 @@ func TestRun_PythonLanguage(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, Name: "testpy", Lang: "python", OutputDir: testOutputDir}
+	opts := &Options{Factory: tf.Factory, Name: "testpy", Lang: langPython, OutputDir: testOutputDir}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
@@ -613,7 +613,7 @@ func TestRun_GolangAlias(t *testing.T) {
 	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, Name: "testgolang", Lang: "golang", OutputDir: testOutputDir}
+	opts := &Options{Factory: tf.Factory, Name: "testgolang", Lang: langGo, OutputDir: testOutputDir}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
@@ -672,7 +672,7 @@ func TestRun_DirectoryCreationError(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 	// Use a path that cannot be created
-	opts := &Options{Factory: tf.Factory, Name: "test", Lang: "bash", OutputDir: "/dev/null/invalid"}
+	opts := &Options{Factory: tf.Factory, Name: "test", Lang: langBash, OutputDir: "/dev/null/invalid"}
 	err := run(opts)
 	if err == nil {
 		t.Error("expected error for invalid output directory")

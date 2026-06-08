@@ -16,6 +16,14 @@ const (
 	ComponentTypeEM1  = "em1"
 )
 
+// Energy aggregation period names.
+const (
+	periodHour  = "hour"
+	periodDay   = "day"
+	periodWeek  = "week"
+	periodMonth = "month"
+)
+
 // DetectEnergyComponentByID auto-detects the energy component type by checking
 // which component list contains the given ID. Returns ComponentTypeAuto if no match found.
 // If detection fails, a warning is logged via ios.
@@ -94,13 +102,13 @@ func CalculateTimeRange(period, from, to string) (startTS, endTS *int64, err err
 	var start time.Time
 
 	switch period {
-	case "hour":
+	case periodHour:
 		start = now.Add(-1 * time.Hour)
-	case "day", "":
+	case periodDay, "":
 		start = now.Add(-24 * time.Hour)
-	case "week":
+	case periodWeek:
 		start = now.Add(-7 * 24 * time.Hour)
-	case "month":
+	case periodMonth:
 		start = now.Add(-30 * 24 * time.Hour)
 	default:
 		return nil, nil, fmt.Errorf("invalid period: %s (use: hour, day, week, month)", period)

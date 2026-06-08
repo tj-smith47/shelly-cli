@@ -187,7 +187,7 @@ func (m CreateModel) handleNavigation(msg messages.NavigationMsg) (CreateModel, 
 func (m CreateModel) handleKey(msg tea.KeyPressMsg) (CreateModel, tea.Cmd) {
 	// Modal-specific keys not covered by action messages
 	switch msg.String() {
-	case "esc", "ctrl+[":
+	case keyconst.KeyEsc, keyconst.KeyCtrlOpenBracket:
 		m = m.Hide()
 		return m, func() tea.Msg { return messages.EditClosedMsg{Saved: false} }
 

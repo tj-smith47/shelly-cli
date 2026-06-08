@@ -13,10 +13,10 @@ import (
 
 // Test constants for peripheral types.
 const (
-	testTypeDS18B20   = "ds18b20"
-	testTypeDHT22     = "dht22"
-	testTypeDigitalIn = "digital_in"
-	testTypeAnalogIn  = "analog_in"
+	testTypeDS18B20   = typeDS18B20
+	testTypeDHT22     = typeDHT22
+	testTypeDigitalIn = typeDigitalIn
+	testTypeAnalogIn  = typeAnalogIn
 )
 
 func TestNewCommand(t *testing.T) {

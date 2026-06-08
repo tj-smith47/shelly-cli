@@ -96,7 +96,7 @@ func TestDisplayCommissioningInfo_Available(t *testing.T) {
 		Discriminator: 3840,
 		SetupPINCode:  12345678,
 	}
-	DisplayCommissioningInfo(ios, info, "192.168.1.100")
+	DisplayCommissioningInfo(ios, info, testIP100)
 
 	output := out.String()
 	if !strings.Contains(output, "Matter Pairing Code") {
@@ -118,7 +118,7 @@ func TestDisplayCommissioningInfo_NotAvailable(t *testing.T) {
 		Available:  false,
 		ManualCode: "",
 	}
-	DisplayCommissioningInfo(ios, info, "192.168.1.100")
+	DisplayCommissioningInfo(ios, info, testIP100)
 
 	output := out.String()
 	if !strings.Contains(output, "not available via API") {
@@ -179,7 +179,7 @@ func TestDisplayNotAvailable_WithIP(t *testing.T) {
 	t.Parallel()
 
 	ios, out, _ := testIOStreams()
-	DisplayNotAvailable(ios, "192.168.1.50")
+	DisplayNotAvailable(ios, testIP50)
 
 	output := out.String()
 	if !strings.Contains(output, "Pairing Information") {

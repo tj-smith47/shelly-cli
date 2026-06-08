@@ -38,7 +38,6 @@ func TestDeviceData_Fields(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo // table-driven test with multiple validation checks
 func TestSplitDevicesAndFile(t *testing.T) {
 	t.Parallel()
 

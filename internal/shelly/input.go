@@ -21,7 +21,7 @@ type InputInfo struct {
 
 // ListHeaders returns the column headers for the table.
 func (i InputInfo) ListHeaders() []string {
-	return []string{"ID", "Name", "Type", "State"}
+	return []string{"ID", headerName, "Type", headerState}
 }
 
 // ListRow returns the formatted row values for the table.

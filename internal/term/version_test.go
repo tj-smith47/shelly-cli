@@ -13,17 +13,17 @@ func TestDisplayUpdateAvailable(t *testing.T) {
 	t.Parallel()
 
 	ios, out, errOut := testIOStreams()
-	DisplayUpdateAvailable(ios, "1.0.0", "2.0.0")
+	DisplayUpdateAvailable(ios, testFWVersion, testFWVersion2)
 
 	// Warning goes to stderr, success message goes to stdout
 	output := out.String() + errOut.String()
 	if output == "" {
 		t.Error("DisplayUpdateAvailable should produce output")
 	}
-	if !strings.Contains(output, "1.0.0") {
+	if !strings.Contains(output, testFWVersion) {
 		t.Error("output should contain current version")
 	}
-	if !strings.Contains(output, "2.0.0") {
+	if !strings.Contains(output, testFWVersion2) {
 		t.Error("output should contain available version")
 	}
 }
@@ -47,14 +47,14 @@ func TestDisplayUpdateResult_UpdateAvailable(t *testing.T) {
 	t.Parallel()
 
 	ios, out, errOut := testIOStreams()
-	DisplayUpdateResult(ios, "1.0.0", "2.0.0", true, nil)
+	DisplayUpdateResult(ios, testFWVersion, testFWVersion2, true, nil)
 
 	// Warning goes to stderr, other messages go to stdout
 	output := out.String() + errOut.String()
 	if output == "" {
 		t.Error("DisplayUpdateResult should produce output")
 	}
-	if !strings.Contains(output, "1.0.0") || !strings.Contains(output, "2.0.0") {
+	if !strings.Contains(output, testFWVersion) || !strings.Contains(output, testFWVersion2) {
 		t.Error("output should contain version info")
 	}
 }
@@ -63,7 +63,7 @@ func TestDisplayUpdateResult_UpToDate(t *testing.T) {
 	t.Parallel()
 
 	ios, out, _ := testIOStreams()
-	DisplayUpdateResult(ios, "1.0.0", "1.0.0", false, nil)
+	DisplayUpdateResult(ios, testFWVersion, testFWVersion, false, nil)
 
 	output := out.String()
 	if output == "" {
@@ -79,7 +79,7 @@ func TestDisplayUpdateResult_WithCacheError(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	cacheErr := errors.New("cache write failed")
-	DisplayUpdateResult(ios, "1.0.0", "2.0.0", true, cacheErr)
+	DisplayUpdateResult(ios, testFWVersion, testFWVersion2, true, cacheErr)
 
 	output := out.String()
 	if output == "" {
@@ -91,13 +91,13 @@ func TestDisplayVersionInfo_Full(t *testing.T) {
 	t.Parallel()
 
 	ios, out, _ := testIOStreams()
-	DisplayVersionInfo(ios, "1.0.0", "abc123", "2024-01-01", "goreleaser", "go1.21", "linux", "amd64")
+	DisplayVersionInfo(ios, testFWVersion, "abc123", "2024-01-01", "goreleaser", "go1.21", "linux", "amd64")
 
 	output := out.String()
 	if output == "" {
 		t.Error("DisplayVersionInfo should produce output")
 	}
-	if !strings.Contains(output, "1.0.0") {
+	if !strings.Contains(output, testFWVersion) {
 		t.Error("output should contain version")
 	}
 	if !strings.Contains(output, "abc123") {
@@ -124,7 +124,7 @@ func TestDisplayVersionInfo_Unknown(t *testing.T) {
 	t.Parallel()
 
 	ios, out, _ := testIOStreams()
-	DisplayVersionInfo(ios, "1.0.0", "unknown", "unknown", "unknown", "go1.21", "darwin", "arm64")
+	DisplayVersionInfo(ios, testFWVersion, "unknown", "unknown", "unknown", "go1.21", "darwin", "arm64")
 
 	output := out.String()
 	if output == "" {
@@ -140,7 +140,7 @@ func TestDisplayVersionInfo_Empty(t *testing.T) {
 	t.Parallel()
 
 	ios, out, _ := testIOStreams()
-	DisplayVersionInfo(ios, "1.0.0", "", "", "", "go1.21", "windows", "386")
+	DisplayVersionInfo(ios, testFWVersion, "", "", "", "go1.21", "windows", "386")
 
 	output := out.String()
 	if output == "" {
@@ -158,8 +158,8 @@ func TestRunUpdateCheck_Success(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	checker := func(_ context.Context) (*version.UpdateResult, error) {
 		return &version.UpdateResult{
-			CurrentVersion:  "1.0.0",
-			LatestVersion:   "2.0.0",
+			CurrentVersion:  testFWVersion,
+			LatestVersion:   testFWVersion2,
 			UpdateAvailable: true,
 		}, nil
 	}
@@ -212,7 +212,7 @@ func TestDisplayUpdateStatus_HasUpdate(t *testing.T) {
 	t.Parallel()
 
 	ios, out, errOut := testIOStreams()
-	DisplayUpdateStatus(ios, "1.0.0", "2.0.0", true, "https://github.com/releases/v2.0.0")
+	DisplayUpdateStatus(ios, testFWVersion, testFWVersion2, true, "https://github.com/releases/v2.0.0")
 
 	// Warning goes to stderr, other output to stdout
 	errOutput := errOut.String()
@@ -235,7 +235,7 @@ func TestDisplayUpdateStatus_NoUpdate(t *testing.T) {
 	t.Parallel()
 
 	ios, out, _ := testIOStreams()
-	DisplayUpdateStatus(ios, "1.0.0", "1.0.0", false, "")
+	DisplayUpdateStatus(ios, testFWVersion, testFWVersion, false, "")
 
 	output := out.String()
 	if output == "" {

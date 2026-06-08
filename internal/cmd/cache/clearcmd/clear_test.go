@@ -36,8 +36,8 @@ func TestNewCommand_Use(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "clear" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "clear")
+	if cmd.Use != commandUse {
+		t.Errorf("Use = %q, want %q", cmd.Use, commandUse)
 	}
 }
 
@@ -203,8 +203,8 @@ func TestNewCommand_NoFlags(t *testing.T) {
 
 	// The clear command doesn't add its own flags
 	// Just verify the command is properly set up
-	if cmd.Use != "clear" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "clear")
+	if cmd.Use != commandUse {
+		t.Errorf("Use = %q, want %q", cmd.Use, commandUse)
 	}
 }
 

@@ -5,6 +5,14 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+// Component source identifiers used by mock device statuses.
+const (
+	SourceSwitch = "switch"
+	SourceCover  = "cover"
+	SourceLight  = "light"
+	SourceRGB    = "rgb"
+)
+
 // MockDeviceResolver implements the DeviceResolver interface for testing.
 type MockDeviceResolver struct {
 	Device model.Device
@@ -45,7 +53,7 @@ func NewMockSwitchStatus(id int, output bool, power float64) *model.SwitchStatus
 	return &model.SwitchStatus{
 		ID:     id,
 		Output: output,
-		Source: "switch",
+		Source: SourceSwitch,
 		Power:  &power,
 	}
 }
@@ -63,7 +71,7 @@ func NewMockCoverStatus(id int, state string, position int) *model.CoverStatus {
 	return &model.CoverStatus{
 		ID:              id,
 		State:           state,
-		Source:          "cover",
+		Source:          SourceCover,
 		CurrentPosition: &position,
 	}
 }
@@ -82,7 +90,7 @@ func NewMockLightStatus(id int, output bool, brightness int) *model.LightStatus 
 		ID:         id,
 		Output:     output,
 		Brightness: &brightness,
-		Source:     "light",
+		Source:     SourceLight,
 	}
 }
 
@@ -105,7 +113,7 @@ func NewMockRGBStatus(id int, output bool, r, g, b, brightness int) *model.RGBSt
 			Green: g,
 			Blue:  b,
 		},
-		Source: "rgb",
+		Source: SourceRGB,
 	}
 }
 

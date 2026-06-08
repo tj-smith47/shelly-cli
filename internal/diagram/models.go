@@ -28,6 +28,21 @@ const (
 	RGBW
 )
 
+// Style name strings accepted by ParseStyle and listed by ValidStyles.
+const (
+	styleNameSchematic = "schematic"
+	styleNameCompact   = "compact"
+	styleNameDetailed  = "detailed"
+)
+
+// Generation name strings accepted by ParseGeneration and listed by ValidGenerations.
+const (
+	genName1 = "gen1"
+	genName2 = "gen2"
+	genName3 = "gen3"
+	genName4 = "gen4"
+)
+
 // Style represents the rendering style for a wiring diagram.
 type Style int
 
@@ -64,11 +79,11 @@ type DeviceModel struct {
 // Valid values: "schematic", "compact", "detailed" (case-insensitive).
 func ParseStyle(s string) (Style, error) {
 	switch strings.ToLower(s) {
-	case "schematic":
+	case styleNameSchematic:
 		return StyleSchematic, nil
-	case "compact":
+	case styleNameCompact:
 		return StyleCompact, nil
-	case "detailed":
+	case styleNameDetailed:
 		return StyleDetailed, nil
 	default:
 		return 0, fmt.Errorf("invalid style %q: valid styles are %s", s, strings.Join(ValidStyles(), ", "))
@@ -77,20 +92,20 @@ func ParseStyle(s string) (Style, error) {
 
 // ValidStyles returns all valid style names for flag completion.
 func ValidStyles() []string {
-	return []string{"schematic", "compact", "detailed"}
+	return []string{styleNameSchematic, styleNameCompact, styleNameDetailed}
 }
 
 // ParseGeneration converts a string to a generation number.
 // Valid values: "1", "2", "3", "4", "gen1", "gen2", "gen3", "gen4" (case-insensitive).
 func ParseGeneration(s string) (int, error) {
 	switch strings.ToLower(s) {
-	case "1", "gen1":
+	case "1", genName1:
 		return 1, nil
-	case "2", "gen2":
+	case "2", genName2:
 		return 2, nil
-	case "3", "gen3":
+	case "3", genName3:
 		return 3, nil
-	case "4", "gen4":
+	case "4", genName4:
 		return 4, nil
 	default:
 		return 0, fmt.Errorf("invalid generation %q: valid generations are %s", s, strings.Join(ValidGenerations(), ", "))
@@ -99,5 +114,5 @@ func ParseGeneration(s string) (int, error) {
 
 // ValidGenerations returns all valid generation values for flag completion.
 func ValidGenerations() []string {
-	return []string{"1", "2", "3", "4", "gen1", "gen2", "gen3", "gen4"}
+	return []string{"1", "2", "3", "4", genName1, genName2, genName3, genName4}
 }

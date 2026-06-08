@@ -70,7 +70,7 @@ func TestInfo_Fields(t *testing.T) {
 		DeviceModel: "SNSW-002P16EU",
 		DeviceID:    "shellyplus2pm-123456",
 		Generation:  2,
-		Platform:    "shelly",
+		Platform:    platformShelly,
 	}
 
 	if info.Current != "1.0.0" {
@@ -94,8 +94,8 @@ func TestInfo_Fields(t *testing.T) {
 	if info.Generation != 2 {
 		t.Errorf("got Generation=%d, want 2", info.Generation)
 	}
-	if info.Platform != "shelly" {
-		t.Errorf("got Platform=%q, want %q", info.Platform, "shelly")
+	if info.Platform != platformShelly {
+		t.Errorf("got Platform=%q, want %q", info.Platform, platformShelly)
 	}
 }
 
@@ -467,9 +467,9 @@ func TestFilterDevicesByNameAndPlatform(t *testing.T) {
 	t.Parallel()
 
 	devices := map[string]model.Device{
-		"device1": {Address: "192.168.1.101", Platform: "shelly"},
+		"device1": {Address: "192.168.1.101", Platform: platformShelly},
 		"device2": {Address: "192.168.1.102", Platform: "tasmota"},
-		"device3": {Address: "192.168.1.103", Platform: "shelly"},
+		"device3": {Address: "192.168.1.103", Platform: platformShelly},
 		"device4": {Address: "192.168.1.104", Platform: ""}, // empty defaults to shelly
 	}
 
@@ -485,7 +485,7 @@ func TestFilterDevicesByNameAndPlatform(t *testing.T) {
 		},
 		{
 			name:      "filter by shelly platform",
-			platform:  "shelly",
+			platform:  platformShelly,
 			wantCount: 3, // device1, device3, device4
 		},
 		{
@@ -501,7 +501,7 @@ func TestFilterDevicesByNameAndPlatform(t *testing.T) {
 		{
 			name:      "filter by both",
 			devices:   "device1,device2,device3",
-			platform:  "shelly",
+			platform:  platformShelly,
 			wantCount: 2, // device1, device3
 		},
 	}

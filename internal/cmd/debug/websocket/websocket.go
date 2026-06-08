@@ -18,6 +18,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// commandUse is the Use string for the debug websocket command.
+const commandUse = "websocket <device>"
+
 // Options holds command options.
 type Options struct {
 	Factory  *cmdutil.Factory
@@ -31,7 +34,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "websocket <device>",
+		Use:     commandUse,
 		Aliases: []string{"ws", "events"},
 		Short:   "Debug WebSocket connection and stream events",
 		Long: `Debug WebSocket connection and stream real-time events from a Shelly device.

@@ -49,8 +49,8 @@ type MatterConfig struct {
 func (s *Service) MatterEnable(ctx context.Context, identifier string) error {
 	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Matter.SetConfig", map[string]any{
-			"config": map[string]any{
-				"enable": true,
+			keyConfig: map[string]any{
+				keyEnable: true,
 			},
 		})
 		if err != nil {
@@ -64,8 +64,8 @@ func (s *Service) MatterEnable(ctx context.Context, identifier string) error {
 func (s *Service) MatterDisable(ctx context.Context, identifier string) error {
 	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Matter.SetConfig", map[string]any{
-			"config": map[string]any{
-				"enable": false,
+			keyConfig: map[string]any{
+				keyEnable: false,
 			},
 		})
 		if err != nil {
@@ -141,7 +141,7 @@ func (s *Service) MatterGetConfig(ctx context.Context, identifier string) (Matte
 			return fmt.Errorf("unexpected response type")
 		}
 
-		if enable, ok := resultMap["enable"].(bool); ok {
+		if enable, ok := resultMap[keyEnable].(bool); ok {
 			cfg.Enable = enable
 		}
 		return nil

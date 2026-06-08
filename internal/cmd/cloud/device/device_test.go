@@ -59,12 +59,12 @@ func TestNewCommand_Structure(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test Use
-	if cmd.Use != "device <id>" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "device <id>")
+	if cmd.Use != commandUse {
+		t.Errorf("Use = %q, want %q", cmd.Use, commandUse)
 	}
 
 	// Test Aliases
-	wantAliases := []string{"get"}
+	wantAliases := []string{aliasGet}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
 	} else {
@@ -690,7 +690,7 @@ func TestNewCommand_AliasGet(t *testing.T) {
 
 	hasGet := false
 	for _, alias := range cmd.Aliases {
-		if alias == "get" {
+		if alias == aliasGet {
 			hasGet = true
 			break
 		}
@@ -894,7 +894,7 @@ func TestNewCommand_UseField(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "device <id>" {
+	if cmd.Use != commandUse {
 		t.Errorf("Use = %q, want 'device <id>'", cmd.Use)
 	}
 }

@@ -16,6 +16,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// commandUse is the command's Use string.
+const commandUse = "updates"
+
 // NewCommand creates the firmware updates command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
@@ -24,7 +27,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "updates",
+		Use:     commandUse,
 		Aliases: []string{"upd"},
 		Short:   "Interactive firmware update workflow",
 		Long: `Check for and apply firmware updates with an interactive workflow.

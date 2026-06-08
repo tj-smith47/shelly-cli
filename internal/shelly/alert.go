@@ -25,6 +25,17 @@ const (
 	ActionTypeUnknown = "unknown"
 )
 
+// Alert evaluation literals.
+const (
+	alertValueInvalid     = "invalid"
+	componentPrefixSwitch = "switch:0"
+	componentPrefixEM     = "em:0"
+	componentPrefixTemp   = "temperature:0"
+	metricPower           = "power"
+	metricApower          = "apower"
+	metricTemperature     = "temperature"
+)
+
 // AlertConditionResult holds the result of evaluating an alert condition.
 type AlertConditionResult struct {
 	Triggered bool
@@ -167,7 +178,7 @@ func (s *Service) evaluateThreshold(ctx context.Context, device, condition strin
 
 	status, ok := result.(map[string]any)
 	if !ok {
-		return AlertConditionResult{Triggered: false, Value: "invalid"}
+		return AlertConditionResult{Triggered: false, Value: alertValueInvalid}
 	}
 
 	return parseThresholdCondition(status, condition)
@@ -213,7 +224,7 @@ func checkThreshold(status map[string]any, condition, separator string, compare 
 // getMetricValue extracts a metric value from device status.
 func getMetricValue(status map[string]any, metric string) float64 {
 	metric = strings.ToLower(metric)
-	componentPrefixes := []string{"switch:0", "pm1:0", "em:0", "temperature:0", "cover:0"}
+	componentPrefixes := []string{componentPrefixSwitch, "pm1:0", componentPrefixEM, componentPrefixTemp, "cover:0"}
 
 	for _, prefix := range componentPrefixes {
 		comp, ok := status[prefix].(map[string]any)
@@ -230,11 +241,11 @@ func getMetricValue(status map[string]any, metric string) float64 {
 // extractMetric extracts a specific metric from a component.
 func extractMetric(comp map[string]any, metric string) float64 {
 	switch metric {
-	case "power", "apower":
-		if v, ok := comp["apower"].(float64); ok {
+	case metricPower, metricApower:
+		if v, ok := comp[metricApower].(float64); ok {
 			return v
 		}
-	case "temperature", "temp":
+	case metricTemperature, "temp":
 		return extractTemperature(comp)
 	case "voltage":
 		if v, ok := comp["voltage"].(float64); ok {
@@ -250,7 +261,7 @@ func extractMetric(comp map[string]any, metric string) float64 {
 
 // extractTemperature extracts temperature from a component.
 func extractTemperature(comp map[string]any) float64 {
-	if v, ok := comp["temperature"].(map[string]any); ok {
+	if v, ok := comp[metricTemperature].(map[string]any); ok {
 		if tC, ok := v["tC"].(float64); ok {
 			return tC
 		}
@@ -325,6 +336,7 @@ func (s *Service) CheckAlerts(ctx context.Context, alerts map[string]config.Aler
 
 // ExecuteCommand runs a shell command.
 func ExecuteCommand(ctx context.Context, command string) CommandResult {
+	//nolint:gosec // G204: alert commands are user-configured shell actions executed by design.
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

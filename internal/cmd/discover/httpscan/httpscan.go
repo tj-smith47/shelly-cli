@@ -14,6 +14,13 @@ import (
 // DefaultTimeout is the default scan timeout.
 const DefaultTimeout = 2 * time.Minute
 
+// Aliases for the discover http command.
+const (
+	aliasScan   = "scan"
+	aliasSearch = "search"
+	aliasProbe  = "probe"
+)
+
 // Options holds the command options.
 type Options struct {
 	Factory      *cmdutil.Factory
@@ -30,7 +37,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "http [subnet...]",
-		Aliases: []string{"scan", "search", "probe"},
+		Aliases: []string{aliasScan, aliasSearch, aliasProbe},
 		Short:   "Discover devices via HTTP subnet scanning",
 		Long: `Discover Shelly devices by probing HTTP endpoints on a subnet.
 

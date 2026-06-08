@@ -48,10 +48,10 @@ func (s *ShellSession) ExecuteCommand(ctx context.Context, line string) bool {
 
 	// Handle built-in commands (case-insensitive)
 	switch strings.ToLower(cmd) {
-	case "exit", "quit", "q":
+	case cmdExit, cmdQuit, "q":
 		return true
 
-	case "help", "h", "?":
+	case cmdHelp, "h", "?":
 		DisplayShellHelp(s.IOS)
 		return false
 
@@ -59,7 +59,7 @@ func (s *ShellSession) ExecuteCommand(ctx context.Context, line string) bool {
 		s.showInfo()
 		return false
 
-	case "status":
+	case cmdStatus:
 		s.showStatus(ctx)
 		return false
 
@@ -234,7 +234,7 @@ func (s *ShellSession) RunShellLoop(ctx context.Context) error {
 		Prompt:          output.FormatShellPrompt(s.Device),
 		HistoryFile:     historyFile,
 		InterruptPrompt: "^C",
-		EOFPrompt:       "exit",
+		EOFPrompt:       cmdExit,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize readline: %w", err)

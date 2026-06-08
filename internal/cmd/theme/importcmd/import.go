@@ -14,6 +14,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// aliasLoad is the "load" alias for the import command.
+const aliasLoad = "load"
+
 // Options holds the options for the import command.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -27,7 +30,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "import <file>",
-		Aliases: []string{"load"},
+		Aliases: []string{aliasLoad},
 		Short:   "Import theme from file",
 		Long: `Import a theme configuration from a file.
 

@@ -15,6 +15,11 @@ import (
 type TabID int
 
 const (
+	labelDashboard = "Dashboard"
+	labelFleet     = "Fleet"
+)
+
+const (
 	// TabDashboard is the main dashboard tab showing devices, events, and status.
 	TabDashboard TabID = iota
 	// TabAutomation is the automation tab for scripts, schedules, and webhooks.
@@ -33,7 +38,7 @@ const (
 func (t TabID) String() string {
 	switch t {
 	case TabDashboard:
-		return "Dashboard"
+		return labelDashboard
 	case TabAutomation:
 		return "Automation"
 	case TabConfig:
@@ -43,7 +48,7 @@ func (t TabID) String() string {
 	case TabMonitor:
 		return "Monitor"
 	case TabFleet:
-		return "Fleet"
+		return labelFleet
 	default:
 		return "Unknown"
 	}

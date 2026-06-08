@@ -57,16 +57,16 @@ func TestDisplayAllDevicesQuickStatus_SingleOnline(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	statuses := []QuickDeviceStatus{
-		{Name: "device1", Model: "Shelly Pro 1PM", Online: true},
+		{Name: testDevice1, Model: testModelNamePro1, Online: true},
 	}
 
 	DisplayAllDevicesQuickStatus(ios, statuses)
 
 	output := out.String()
-	if !strings.Contains(output, "device1") {
+	if !strings.Contains(output, testDevice1) {
 		t.Error("output should contain 'device1'")
 	}
-	if !strings.Contains(output, "Shelly Pro 1PM") {
+	if !strings.Contains(output, testModelNamePro1) {
 		t.Error("output should contain model for online device")
 	}
 }
@@ -76,21 +76,21 @@ func TestDisplayAllDevicesQuickStatus_MixedStatus(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	statuses := []QuickDeviceStatus{
-		{Name: "device1", Model: "Shelly Pro 1PM", Online: true},
-		{Name: "device2", Model: "Shelly Plus 1", Online: false},
-		{Name: "device3", Model: "Shelly Pro 2PM", Online: true},
+		{Name: testDevice1, Model: testModelNamePro1, Online: true},
+		{Name: testDevice2, Model: testShellyPlus1, Online: false},
+		{Name: testDevice3, Model: "Shelly Pro 2PM", Online: true},
 	}
 
 	DisplayAllDevicesQuickStatus(ios, statuses)
 
 	output := out.String()
-	if !strings.Contains(output, "device1") {
+	if !strings.Contains(output, testDevice1) {
 		t.Error("output should contain 'device1'")
 	}
-	if !strings.Contains(output, "device2") {
+	if !strings.Contains(output, testDevice2) {
 		t.Error("output should contain 'device2'")
 	}
-	if !strings.Contains(output, "device3") {
+	if !strings.Contains(output, testDevice3) {
 		t.Error("output should contain 'device3'")
 	}
 }
@@ -103,9 +103,9 @@ func TestFormatComponentType(t *testing.T) {
 		id       int
 		want     string
 	}{
-		{model.ComponentSwitch, 0, "Switch 0"},
+		{model.ComponentSwitch, 0, testSwitch0},
 		{model.ComponentSwitch, 1, "Switch 1"},
-		{model.ComponentInput, 0, "Input 0"},
+		{model.ComponentInput, 0, testInput0},
 		{model.ComponentLight, 2, "Light 2"},
 		{model.ComponentCover, 0, "Cover 0"},
 		{model.ComponentRGB, 0, "Rgb 0"},

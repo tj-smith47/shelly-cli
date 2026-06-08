@@ -18,6 +18,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
+// sectionGlobal is the name of the help section listing global keybindings.
+const sectionGlobal = "Global"
+
 // CloseMsg is sent when help is closed.
 type CloseMsg struct{}
 
@@ -355,7 +358,7 @@ func (m Model) getContextBindings() []BindingSection {
 	globalBindings := m.keyMap.GetGlobalBindings()
 	if len(globalBindings) > 0 {
 		sections = append(sections, BindingSection{
-			Name:     "Global",
+			Name:     sectionGlobal,
 			Bindings: m.sortBindings(globalBindings),
 		})
 	}

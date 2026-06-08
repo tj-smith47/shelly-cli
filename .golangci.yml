@@ -13,6 +13,15 @@ linters:
         linters:
           - revive
         text: 'var-naming: avoid meaningless package names'
+      # Test fixtures legitimately repeat literals and trip complexity/style
+      # linters; mirror shelly-go's test-exclusion convention.
+      - path: '_test\.go'
+        linters:
+          - goconst
+          - gocyclo
+          - gocritic
+          - dupl
+          - funlen
 
   enable:
     # Core linters
@@ -152,3 +161,9 @@ formatters:
         - standard
         - default
         - prefix(github.com/tj-smith47/shelly-cli)
+
+# No hidden lint debt: report every finding (mirror shelly-go), not the
+# default cap of 50 per linter / 3 per identical issue.
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

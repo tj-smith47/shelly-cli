@@ -47,7 +47,7 @@ func TestShowUpdateNotification_DevBuild(t *testing.T) {
 
 	// Save original version and set to dev
 	originalVersion := Version
-	Version = "dev"
+	Version = DevVersion
 	defer func() { Version = originalVersion }()
 
 	// Should return early for dev builds without panic
@@ -79,7 +79,7 @@ func TestShowUpdateNotification_SkippedCommands(t *testing.T) {
 	//nolint:paralleltest // Subtests modify global os.Args and can't run in parallel
 	for _, cmd := range skippedCommands {
 		t.Run("skip_"+cmd, func(t *testing.T) {
-			os.Args = []string{"shelly", cmd}
+			os.Args = []string{testBinaryName, cmd}
 			// Should return early without panic
 			ShowUpdateNotification()
 		})
@@ -97,7 +97,7 @@ func TestShowUpdateNotification_NoArgs(t *testing.T) {
 	defer func() { os.Args = originalArgs }()
 
 	// Test with no args (just program name)
-	os.Args = []string{"shelly"}
+	os.Args = []string{testBinaryName}
 
 	// Should not panic with no args
 	ShowUpdateNotification()
@@ -121,7 +121,7 @@ func TestShowUpdateNotification_UpdateAvailable(t *testing.T) {
 
 	// Save original version and set to a release version
 	originalVersion := Version
-	Version = "v1.0.0"
+	Version = testVersionV1
 	defer func() { Version = originalVersion }()
 
 	// Save original args
@@ -129,7 +129,7 @@ func TestShowUpdateNotification_UpdateAvailable(t *testing.T) {
 	defer func() { os.Args = originalArgs }()
 
 	// Use a command that's not skipped
-	os.Args = []string{"shelly", "device", "list"}
+	os.Args = []string{testBinaryName, "device", "list"}
 
 	// Should execute the full path including showing notification
 	// (we can't easily verify the output, but we ensure it doesn't panic)
@@ -179,14 +179,14 @@ func TestShowUpdateNotification_NoUpdate(t *testing.T) {
 
 	// Save original version
 	originalVersion := Version
-	Version = "v1.0.0"
+	Version = testVersionV1
 	defer func() { Version = originalVersion }()
 
 	// Save original args
 	originalArgs := os.Args
 	defer func() { os.Args = originalArgs }()
 
-	os.Args = []string{"shelly", "device", "list"}
+	os.Args = []string{testBinaryName, "device", "list"}
 
 	// Should not show notification when versions are equal
 	ShowUpdateNotification()

@@ -19,6 +19,12 @@ type Parent interface {
 	RawRPC(ctx context.Context, identifier, method string, params map[string]any) (any, error)
 }
 
+// RPC parameter keys shared across wireless protocol calls.
+const (
+	keyConfig = "config"
+	keyEnable = "enable"
+)
+
 // Service provides wireless protocol operations for Shelly devices.
 type Service struct {
 	parent Parent

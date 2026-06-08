@@ -27,7 +27,7 @@ type RGBInfo struct {
 
 // ListHeaders returns the column headers for the table.
 func (r RGBInfo) ListHeaders() []string {
-	return []string{"ID", "Name", "State", "Color", "Brightness", "Power"}
+	return []string{"ID", headerName, headerState, "Color", headerBrightness, headerPower}
 }
 
 // ListRow returns the formatted row values for the table.

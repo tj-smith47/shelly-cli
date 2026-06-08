@@ -8,6 +8,19 @@ import (
 	"strings"
 )
 
+// Cloud control action names.
+const (
+	actionOff         = "off"
+	actionToggle      = "toggle"
+	actionOpen        = "open"
+	actionClose       = "close"
+	actionStop        = "stop"
+	actionLightOn     = "light-on"
+	actionLightOff    = "light-off"
+	actionLightToggle = "light-toggle"
+	msgSwitchTurnedOn = "Switch turned on"
+)
+
 // CloudControlResult holds the result of a cloud control action.
 type CloudControlResult struct {
 	Success bool
@@ -43,59 +56,59 @@ func buildCloudActionHandlers() map[string]actionHandler {
 			fn: func(ctx context.Context, c *CloudClient, d string, ch int) error {
 				return c.SetSwitch(ctx, d, ch, true)
 			},
-			success: "Switch turned on",
+			success: msgSwitchTurnedOn,
 			errMsg:  "failed to turn on switch",
 		},
-		"off": {
+		actionOff: {
 			fn: func(ctx context.Context, c *CloudClient, d string, ch int) error {
 				return c.SetSwitch(ctx, d, ch, false)
 			},
 			success: "Switch turned off",
 			errMsg:  "failed to turn off switch",
 		},
-		"toggle": {
+		actionToggle: {
 			fn: func(ctx context.Context, c *CloudClient, d string, ch int) error {
 				return c.ToggleSwitch(ctx, d, ch)
 			},
 			success: "Switch toggled",
 			errMsg:  "failed to toggle switch",
 		},
-		"open": {
+		actionOpen: {
 			fn: func(ctx context.Context, c *CloudClient, d string, ch int) error {
 				return c.OpenCover(ctx, d, ch)
 			},
 			success: "Cover opening",
 			errMsg:  "failed to open cover",
 		},
-		"close": {
+		actionClose: {
 			fn: func(ctx context.Context, c *CloudClient, d string, ch int) error {
 				return c.CloseCover(ctx, d, ch)
 			},
 			success: "Cover closing",
 			errMsg:  "failed to close cover",
 		},
-		"stop": {
+		actionStop: {
 			fn: func(ctx context.Context, c *CloudClient, d string, ch int) error {
 				return c.StopCover(ctx, d, ch)
 			},
 			success: "Cover stopped",
 			errMsg:  "failed to stop cover",
 		},
-		"light-on": {
+		actionLightOn: {
 			fn: func(ctx context.Context, c *CloudClient, d string, ch int) error {
 				return c.SetLight(ctx, d, ch, true)
 			},
 			success: "Light turned on",
 			errMsg:  "failed to turn on light",
 		},
-		"light-off": {
+		actionLightOff: {
 			fn: func(ctx context.Context, c *CloudClient, d string, ch int) error {
 				return c.SetLight(ctx, d, ch, false)
 			},
 			success: "Light turned off",
 			errMsg:  "failed to turn off light",
 		},
-		"light-toggle": {
+		actionLightToggle: {
 			fn: func(ctx context.Context, c *CloudClient, d string, ch int) error {
 				return c.ToggleLight(ctx, d, ch)
 			},

@@ -19,16 +19,16 @@ func TestDisplayBackupsTable(t *testing.T) {
 		backups := []model.BackupFileInfo{
 			{
 				Filename:    "backup1.json",
-				DeviceID:    "shellyplus1-123456",
-				DeviceModel: "SNSW-001P16EU",
-				FWVersion:   "1.0.0",
+				DeviceID:    testDeviceIDPlus1,
+				DeviceModel: testModel1PM,
+				FWVersion:   testFWVersion,
 				CreatedAt:   time.Now(),
 			},
 			{
 				Filename:    "backup2.json",
 				DeviceID:    "shellyplus2pm-654321",
-				DeviceModel: "SNSW-002P16EU",
-				FWVersion:   "1.1.0",
+				DeviceModel: testModel2PM,
+				FWVersion:   testFWVersionNew,
 				CreatedAt:   time.Now(),
 			},
 		}
@@ -66,14 +66,14 @@ func TestDisplayBackupExportResults(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		results := []shelly.BackupResult{
-			{DeviceName: "device1", Address: "192.168.1.101", Success: true},
-			{DeviceName: "device2", Address: "192.168.1.102", Success: true},
+			{DeviceName: testDevice1, Address: testIP101, Success: true},
+			{DeviceName: testDevice2, Address: "192.168.1.102", Success: true},
 		}
 
 		DisplayBackupExportResults(ios, results)
 
 		output := out.String()
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain 'device1'")
 		}
 		if !strings.Contains(output, "OK") {
@@ -86,8 +86,8 @@ func TestDisplayBackupExportResults(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		results := []shelly.BackupResult{
-			{DeviceName: "device1", Address: "192.168.1.101", Success: true},
-			{DeviceName: "device2", Address: "192.168.1.102", Success: false},
+			{DeviceName: testDevice1, Address: testIP101, Success: true},
+			{DeviceName: testDevice2, Address: "192.168.1.102", Success: false},
 		}
 
 		DisplayBackupExportResults(ios, results)
@@ -117,9 +117,9 @@ func TestBackupFileInfo_Fields(t *testing.T) {
 
 	info := model.BackupFileInfo{
 		Filename:    "backup.json",
-		DeviceID:    "shellyplus1-123456",
-		DeviceModel: "SNSW-001P16EU",
-		FWVersion:   "1.0.0",
+		DeviceID:    testDeviceIDPlus1,
+		DeviceModel: testModel1PM,
+		FWVersion:   testFWVersion,
 		Encrypted:   true,
 		Size:        1024,
 	}
@@ -127,13 +127,13 @@ func TestBackupFileInfo_Fields(t *testing.T) {
 	if info.Filename != "backup.json" {
 		t.Errorf("got Filename=%q, want backup.json", info.Filename)
 	}
-	if info.DeviceID != "shellyplus1-123456" {
+	if info.DeviceID != testDeviceIDPlus1 {
 		t.Errorf("got DeviceID=%q, want shellyplus1-123456", info.DeviceID)
 	}
-	if info.DeviceModel != "SNSW-001P16EU" {
+	if info.DeviceModel != testModel1PM {
 		t.Errorf("got DeviceModel=%q, want SNSW-001P16EU", info.DeviceModel)
 	}
-	if info.FWVersion != "1.0.0" { //nolint:goconst // test value
+	if info.FWVersion != testFWVersion {
 		t.Errorf("got FWVersion=%q, want 1.0.0", info.FWVersion)
 	}
 	if !info.Encrypted {
@@ -151,15 +151,15 @@ func TestBackupResult_Fields(t *testing.T) {
 		t.Parallel()
 
 		result := shelly.BackupResult{
-			DeviceName: "device1",
-			Address:    "192.168.1.100",
+			DeviceName: testDevice1,
+			Address:    testIP100,
 			Success:    true,
 		}
 
-		if result.DeviceName != "device1" { //nolint:goconst // different test file
+		if result.DeviceName != testDevice1 {
 			t.Errorf("got DeviceName=%q, want device1", result.DeviceName)
 		}
-		if result.Address != "192.168.1.100" {
+		if result.Address != testIP100 {
 			t.Errorf("got Address=%q, want 192.168.1.100", result.Address)
 		}
 		if !result.Success {
@@ -171,8 +171,8 @@ func TestBackupResult_Fields(t *testing.T) {
 		t.Parallel()
 
 		result := shelly.BackupResult{
-			DeviceName: "device2",
-			Address:    "192.168.1.101",
+			DeviceName: testDevice2,
+			Address:    testIP101,
 			Success:    false,
 		}
 

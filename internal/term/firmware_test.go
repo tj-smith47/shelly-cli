@@ -19,25 +19,25 @@ func TestUpdateTarget_Fields(t *testing.T) {
 	t.Parallel()
 
 	target := UpdateTarget{
-		DeviceID:    "shellypro1pm-123456",
-		DeviceModel: "SNSW-001P16EU",
-		Current:     "1.0.0",
-		Available:   "1.1.0",
-		Beta:        "1.2.0-beta1",
+		DeviceID:    testDeviceIDPro1,
+		DeviceModel: testModel1PM,
+		Current:     testFWVersion,
+		Available:   testFWVersionNew,
+		Beta:        testFWVersionBeta,
 		CustomURL:   "",
 		UseBeta:     false,
 	}
 
-	if target.DeviceID != "shellypro1pm-123456" {
+	if target.DeviceID != testDeviceIDPro1 {
 		t.Errorf("DeviceID = %q, want shellypro1pm-123456", target.DeviceID)
 	}
-	if target.DeviceModel != "SNSW-001P16EU" {
+	if target.DeviceModel != testModel1PM {
 		t.Errorf("DeviceModel = %q, want SNSW-001P16EU", target.DeviceModel)
 	}
-	if target.Current != "1.0.0" {
+	if target.Current != testFWVersion {
 		t.Errorf("Current = %q, want 1.0.0", target.Current)
 	}
-	if target.Available != "1.1.0" {
+	if target.Available != testFWVersionNew {
 		t.Errorf("Available = %q, want 1.1.0", target.Available)
 	}
 }
@@ -48,11 +48,11 @@ func TestUpdateResult_Fields(t *testing.T) {
 	t.Run("success result", func(t *testing.T) {
 		t.Parallel()
 		result := UpdateResult{
-			Name:    "device1",
+			Name:    testDevice1,
 			Success: true,
 			Err:     nil,
 		}
-		if result.Name != "device1" {
+		if result.Name != testDevice1 {
 			t.Errorf("Name = %q, want device1", result.Name)
 		}
 		if !result.Success {
@@ -64,7 +64,7 @@ func TestUpdateResult_Fields(t *testing.T) {
 		t.Parallel()
 		err := errors.New("update failed")
 		result := UpdateResult{
-			Name:    "device2",
+			Name:    testDevice2,
 			Success: false,
 			Err:     err,
 		}
@@ -81,8 +81,8 @@ func TestConvertToTermResults(t *testing.T) {
 	t.Parallel()
 
 	shellyResults := []shelly.UpdateResult{
-		{Name: "device1", Success: true, Err: nil},
-		{Name: "device2", Success: false, Err: errors.New("failed")},
+		{Name: testDevice1, Success: true, Err: nil},
+		{Name: testDevice2, Success: false, Err: errors.New("failed")},
 	}
 
 	termResults := ConvertToTermResults(shellyResults)
@@ -91,11 +91,11 @@ func TestConvertToTermResults(t *testing.T) {
 		t.Fatalf("len(termResults) = %d, want 2", len(termResults))
 	}
 
-	if termResults[0].Name != "device1" || !termResults[0].Success {
+	if termResults[0].Name != testDevice1 || !termResults[0].Success {
 		t.Errorf("termResults[0] = %+v, want Name=device1 Success=true", termResults[0])
 	}
 
-	if termResults[1].Name != "device2" || termResults[1].Success {
+	if termResults[1].Name != testDevice2 || termResults[1].Success {
 		t.Errorf("termResults[1] = %+v, want Name=device2 Success=false", termResults[1])
 	}
 }
@@ -104,18 +104,18 @@ func TestFirmwareUpdateEntry_Fields(t *testing.T) {
 	t.Parallel()
 
 	entry := FirmwareUpdateEntry{
-		Name: "device1",
+		Name: testDevice1,
 		FwInfo: &shelly.FirmwareInfo{
-			Current:   "1.0.0",
-			Available: "1.1.0",
-			Beta:      "1.2.0-beta1",
+			Current:   testFWVersion,
+			Available: testFWVersionNew,
+			Beta:      testFWVersionBeta,
 			HasUpdate: true,
 		},
 		HasUpdate: true,
 		HasBeta:   true,
 	}
 
-	if entry.Name != "device1" {
+	if entry.Name != testDevice1 {
 		t.Errorf("Name = %q, want device1", entry.Name)
 	}
 	if !entry.HasUpdate {
@@ -130,8 +130,8 @@ func TestConvertToTermEntries(t *testing.T) {
 	t.Parallel()
 
 	shellyEntries := []shelly.FirmwareUpdateEntry{
-		{Name: "device1", HasUpdate: true, HasBeta: false},
-		{Name: "device2", HasUpdate: true, HasBeta: true},
+		{Name: testDevice1, HasUpdate: true, HasBeta: false},
+		{Name: testDevice2, HasUpdate: true, HasBeta: true},
 	}
 
 	termEntries := ConvertToTermEntries(shellyEntries)
@@ -140,7 +140,7 @@ func TestConvertToTermEntries(t *testing.T) {
 		t.Fatalf("len(termEntries) = %d, want 2", len(termEntries))
 	}
 
-	if termEntries[0].Name != "device1" {
+	if termEntries[0].Name != testDevice1 {
 		t.Errorf("termEntries[0].Name = %q, want device1", termEntries[0].Name)
 	}
 
@@ -153,32 +153,32 @@ func TestBuildFirmwareCheckRow_Success(t *testing.T) {
 	t.Parallel()
 
 	result := shelly.FirmwareCheckResult{
-		Name: "device1",
+		Name: testDevice1,
 		Info: &shelly.FirmwareInfo{
-			Current:   "1.0.0",
-			Available: "1.1.0",
-			Beta:      "1.2.0-beta1",
+			Current:   testFWVersion,
+			Available: testFWVersionNew,
+			Beta:      testFWVersionBeta,
 			HasUpdate: true,
-			Platform:  "shelly",
+			Platform:  testValueShelly,
 		},
 		Err: nil,
 	}
 
 	row := buildFirmwareCheckRow(result)
 
-	if row.name != "device1" {
+	if row.name != testDevice1 {
 		t.Errorf("name = %q, want device1", row.name)
 	}
-	if row.platform != "shelly" {
+	if row.platform != testValueShelly {
 		t.Errorf("platform = %q, want shelly", row.platform)
 	}
-	if row.current != "1.0.0" {
+	if row.current != testFWVersion {
 		t.Errorf("current = %q, want 1.0.0", row.current)
 	}
-	if row.stable != "1.1.0" {
+	if row.stable != testFWVersionNew {
 		t.Errorf("stable = %q, want 1.1.0", row.stable)
 	}
-	if row.beta != "1.2.0-beta1" {
+	if row.beta != testFWVersionBeta {
 		t.Errorf("beta = %q, want 1.2.0-beta1", row.beta)
 	}
 	if !row.hasUpdate {
@@ -190,14 +190,14 @@ func TestBuildFirmwareCheckRow_Error(t *testing.T) {
 	t.Parallel()
 
 	result := shelly.FirmwareCheckResult{
-		Name: "device1",
+		Name: testDevice1,
 		Info: nil,
 		Err:  errors.New("connection failed"),
 	}
 
 	row := buildFirmwareCheckRow(result)
 
-	if row.name != "device1" {
+	if row.name != testDevice1 {
 		t.Errorf("name = %q, want device1", row.name)
 	}
 	if row.hasUpdate {
@@ -212,9 +212,9 @@ func TestBuildFirmwareCheckRow_EmptyPlatform(t *testing.T) {
 	t.Parallel()
 
 	result := shelly.FirmwareCheckResult{
-		Name: "device1",
+		Name: testDevice1,
 		Info: &shelly.FirmwareInfo{
-			Current:  "1.0.0",
+			Current:  testFWVersion,
 			Platform: "",
 		},
 		Err: nil,
@@ -222,7 +222,7 @@ func TestBuildFirmwareCheckRow_EmptyPlatform(t *testing.T) {
 
 	row := buildFirmwareCheckRow(result)
 
-	if row.platform != "shelly" {
+	if row.platform != testValueShelly {
 		t.Errorf("platform = %q, want shelly (default)", row.platform)
 	}
 }
@@ -234,7 +234,7 @@ func TestDisplayFirmwareStatus(t *testing.T) {
 	status := &shelly.FirmwareStatus{
 		Status:      "idle",
 		HasUpdate:   true,
-		NewVersion:  "1.1.0",
+		NewVersion:  testFWVersionNew,
 		CanRollback: true,
 		Progress:    0,
 	}
@@ -255,12 +255,12 @@ func TestDisplayFirmwareInfo(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	info := &shelly.FirmwareInfo{
-		DeviceID:    "shellypro1pm-123456",
-		DeviceModel: "SNSW-001P16EU",
+		DeviceID:    testDeviceIDPro1,
+		DeviceModel: testModel1PM,
 		Generation:  2,
-		Current:     "1.0.0",
-		Available:   "1.1.0",
-		Beta:        "1.2.0-beta1",
+		Current:     testFWVersion,
+		Available:   testFWVersionNew,
+		Beta:        testFWVersionBeta,
 		HasUpdate:   true,
 	}
 
@@ -284,18 +284,18 @@ func TestDisplayFirmwareCheckAll(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	results := []shelly.FirmwareCheckResult{
 		{
-			Name: "device1",
+			Name: testDevice1,
 			Info: &shelly.FirmwareInfo{
-				Current:   "1.0.0",
-				Available: "1.1.0",
+				Current:   testFWVersion,
+				Available: testFWVersionNew,
 				HasUpdate: true,
 			},
 		},
 		{
-			Name: "device2",
+			Name: testDevice2,
 			Info: &shelly.FirmwareInfo{
-				Current:   "1.1.0",
-				Available: "1.1.0",
+				Current:   testFWVersionNew,
+				Available: testFWVersionNew,
 				HasUpdate: false,
 			},
 		},
@@ -307,7 +307,7 @@ func TestDisplayFirmwareCheckAll(t *testing.T) {
 	if output == "" {
 		t.Error("DisplayFirmwareCheckAll should produce output")
 	}
-	if !strings.Contains(output, "device1") {
+	if !strings.Contains(output, testDevice1) {
 		t.Error("output should contain 'device1'")
 	}
 }
@@ -319,19 +319,19 @@ func TestDisplayUpdateTarget(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		target := UpdateTarget{
-			DeviceID:    "shellypro1pm-123456",
-			DeviceModel: "SNSW-001P16EU",
-			Current:     "1.0.0",
-			Available:   "1.1.0",
+			DeviceID:    testDeviceIDPro1,
+			DeviceModel: testModel1PM,
+			Current:     testFWVersion,
+			Available:   testFWVersionNew,
 		}
 
 		DisplayUpdateTarget(ios, target)
 
 		output := out.String()
-		if !strings.Contains(output, "1.0.0") {
+		if !strings.Contains(output, testFWVersion) {
 			t.Error("output should contain current version")
 		}
-		if !strings.Contains(output, "1.1.0") {
+		if !strings.Contains(output, testFWVersionNew) {
 			t.Error("output should contain target version")
 		}
 	})
@@ -340,10 +340,10 @@ func TestDisplayUpdateTarget(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		target := UpdateTarget{
-			DeviceID:    "shellypro1pm-123456",
-			DeviceModel: "SNSW-001P16EU",
-			Current:     "1.0.0",
-			Beta:        "1.2.0-beta1",
+			DeviceID:    testDeviceIDPro1,
+			DeviceModel: testModel1PM,
+			Current:     testFWVersion,
+			Beta:        testFWVersionBeta,
 			UseBeta:     true,
 		}
 
@@ -359,9 +359,9 @@ func TestDisplayUpdateTarget(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		target := UpdateTarget{
-			DeviceID:    "shellypro1pm-123456",
-			DeviceModel: "SNSW-001P16EU",
-			Current:     "1.0.0",
+			DeviceID:    testDeviceIDPro1,
+			DeviceModel: testModel1PM,
+			Current:     testFWVersion,
 			CustomURL:   "http://example.com/firmware.bin",
 		}
 
@@ -381,8 +381,8 @@ func TestDisplayUpdateResults(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		results := []UpdateResult{
-			{Name: "device1", Success: true},
-			{Name: "device2", Success: true},
+			{Name: testDevice1, Success: true},
+			{Name: testDevice2, Success: true},
 		}
 
 		DisplayUpdateResults(ios, results)
@@ -397,8 +397,8 @@ func TestDisplayUpdateResults(t *testing.T) {
 		t.Parallel()
 		ios, _, errOut := testIOStreams()
 		results := []UpdateResult{
-			{Name: "device1", Success: true},
-			{Name: "device2", Success: false, Err: errors.New("connection failed")},
+			{Name: testDevice1, Success: true},
+			{Name: testDevice2, Success: false, Err: errors.New("connection failed")},
 		}
 
 		DisplayUpdateResults(ios, results)
@@ -417,10 +417,10 @@ func TestDisplayDevicesToUpdate(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	devices := []shelly.DeviceUpdateStatus{
 		{
-			Name: "device1",
+			Name: testDevice1,
 			Info: &shelly.FirmwareInfo{
-				Current:   "1.0.0",
-				Available: "1.1.0",
+				Current:   testFWVersion,
+				Available: testFWVersionNew,
 			},
 		},
 	}
@@ -431,7 +431,7 @@ func TestDisplayDevicesToUpdate(t *testing.T) {
 	if output == "" {
 		t.Error("DisplayDevicesToUpdate should produce output")
 	}
-	if !strings.Contains(output, "device1") {
+	if !strings.Contains(output, testDevice1) {
 		t.Error("output should contain 'device1'")
 	}
 }
@@ -441,23 +441,23 @@ func TestDisplayFirmwareUpdateInfo(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	info := &shelly.FirmwareInfo{
-		DeviceModel: "SNSW-001P16EU",
-		Current:     "1.0.0",
-		Available:   "1.1.0",
-		Beta:        "1.2.0-beta1",
+		DeviceModel: testModel1PM,
+		Current:     testFWVersion,
+		Available:   testFWVersionNew,
+		Beta:        testFWVersionBeta,
 		HasUpdate:   true,
 	}
 
-	DisplayFirmwareUpdateInfo(ios, info, "device1", "shelly")
+	DisplayFirmwareUpdateInfo(ios, info, testDevice1, testValueShelly)
 
 	output := out.String()
 	if output == "" {
 		t.Error("DisplayFirmwareUpdateInfo should produce output")
 	}
-	if !strings.Contains(output, "device1") {
+	if !strings.Contains(output, testDevice1) {
 		t.Error("output should contain device name")
 	}
-	if !strings.Contains(output, "shelly") {
+	if !strings.Contains(output, testValueShelly) {
 		t.Error("output should contain platform")
 	}
 }
@@ -468,11 +468,11 @@ func TestDisplayFirmwareUpdatesTable(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	devices := []FirmwareUpdateEntry{
 		{
-			Name: "device1",
+			Name: testDevice1,
 			FwInfo: &shelly.FirmwareInfo{
-				Current:   "1.0.0",
-				Available: "1.1.0",
-				Platform:  "shelly",
+				Current:   testFWVersion,
+				Available: testFWVersionNew,
+				Platform:  testValueShelly,
 			},
 			HasUpdate: true,
 		},
@@ -484,7 +484,7 @@ func TestDisplayFirmwareUpdatesTable(t *testing.T) {
 	if output == "" {
 		t.Error("DisplayFirmwareUpdatesTable should produce output")
 	}
-	if !strings.Contains(output, "device1") {
+	if !strings.Contains(output, testDevice1) {
 		t.Error("output should contain 'device1'")
 	}
 }

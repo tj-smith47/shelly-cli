@@ -27,6 +27,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
+// Export format identifiers and shared keybinding hints.
+const (
+	formatJSON = "json"
+	formatCSV  = "csv"
+
+	hintScrollKeys = "j/k"
+	hintScrollDesc = "scroll"
+)
+
 // Deps holds the dependencies for the monitor component.
 type Deps struct {
 	Ctx             context.Context
@@ -667,7 +676,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // resolveExportFormat converts a string format to ExportFormat.
 func (m Model) resolveExportFormat(format string) ExportFormat {
-	if format == "json" {
+	if format == formatJSON {
 		return ExportJSON
 	}
 	return ExportCSV
@@ -698,9 +707,9 @@ func (m Model) exportData(format ExportFormat) tea.Cmd {
 
 		// Generate filename
 		timestamp := time.Now().Format("2006-01-02_15-04-05")
-		ext := "csv"
+		ext := formatCSV
 		if format == ExportJSON {
-			ext = "json"
+			ext = formatJSON
 		}
 		filename := fmt.Sprintf("monitor_%s.%s", timestamp, ext)
 		path := filepath.Join(exportDir, filename)
@@ -980,10 +989,10 @@ func (m Model) IsLoading() bool {
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
 	return keys.FormatHints([]keys.Hint{
-		{Key: "j/k", Desc: "scroll"},
+		{Key: hintScrollKeys, Desc: hintScrollDesc},
 		{Key: "g/G", Desc: "top/btm"},
 		{Key: "r", Desc: "refresh"},
-		{Key: "x", Desc: "csv"},
-		{Key: "X", Desc: "json"},
+		{Key: "x", Desc: formatCSV},
+		{Key: "X", Desc: formatJSON},
 	}, keys.FooterHintWidth(m.Width))
 }

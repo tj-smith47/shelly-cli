@@ -90,8 +90,8 @@ func TestNewCommand_Flags(t *testing.T) {
 	if currencyFlag == nil {
 		t.Fatal("--currency flag not found")
 	}
-	if currencyFlag.DefValue != "USD" {
-		t.Errorf("--currency default = %q, want %q", currencyFlag.DefValue, "USD")
+	if currencyFlag.DefValue != defaultCurrency {
+		t.Errorf("--currency default = %q, want %q", currencyFlag.DefValue, defaultCurrency)
 	}
 }
 
@@ -345,7 +345,7 @@ func TestRun_WithCostEstimationAndMock(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--cost", "0.12", "--currency", "USD"})
+	cmd.SetArgs([]string{"--cost", "0.12", "--currency", defaultCurrency})
 
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)

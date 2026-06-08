@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/errorview"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
@@ -437,7 +438,7 @@ func (m EditorModel) View() string {
 		SetTitle(title).
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex).
-		SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "j/k", Desc: "scroll"}, {Key: "g/G", Desc: "top/end"}, {Key: "d", Desc: "download"}, {Key: "u", Desc: "upload"}, {Key: "esc", Desc: "close"}}, keys.FooterHintWidth(m.Width))))
+		SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "j/k", Desc: "scroll"}, {Key: "g/G", Desc: "top/end"}, {Key: "d", Desc: "download"}, {Key: "u", Desc: "upload"}, {Key: keyconst.KeyEsc, Desc: "close"}}, keys.FooterHintWidth(m.Width))))
 
 	if m.scriptID == 0 {
 		r.SetContent(styles.EmptyStateWithBorder("No script selected", m.Width, m.Height))

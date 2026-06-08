@@ -407,7 +407,7 @@ func (f AlertForm) View() string {
 	if f.focused == FormFieldEnabled {
 		enabledLabel = f.styles.ButtonSel.Render("Enabled")
 	}
-	b.WriteString(fmt.Sprintf("%s  %s\n", enabledLabel, enabledValue))
+	fmt.Fprintf(&b, "%s  %s\n", enabledLabel, enabledValue)
 	b.WriteString(f.styles.Help.Render("Press Space to toggle"))
 	b.WriteString("\n\n")
 

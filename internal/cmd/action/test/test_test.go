@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -530,7 +531,7 @@ func TestRun_WithDifferentIndexes(t *testing.T) {
 	indexes := []int{0, 1, 2, 3}
 
 	for _, index := range indexes {
-		t.Run("index_"+string(rune('0'+index)), func(t *testing.T) {
+		t.Run("index_"+strconv.Itoa(index), func(t *testing.T) {
 			t.Parallel()
 			tf := factory.NewTestFactory(t)
 

@@ -18,6 +18,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
+// Firmware platform and update-stage identifiers.
+const (
+	platformShelly = "shelly"
+	stageStable    = "stable"
+	stageBeta      = "beta"
+)
+
 // Info contains firmware update information.
 type Info struct {
 	Current     string
@@ -131,7 +138,7 @@ func (s *Service) Check(ctx context.Context, identifier string) (*Info, error) {
 			DeviceModel: deviceInfo.Model,
 			DeviceID:    deviceInfo.ID,
 			Generation:  deviceInfo.Generation,
-			Platform:    "shelly", // Native Shelly device
+			Platform:    platformShelly, // Native Shelly device
 		}
 		return nil
 	})
@@ -177,12 +184,12 @@ func (s *Service) Update(ctx context.Context, identifier string, opts *firmware.
 
 // UpdateStable updates to the latest stable firmware.
 func (s *Service) UpdateStable(ctx context.Context, identifier string) error {
-	return s.Update(ctx, identifier, &firmware.UpdateOptions{Stage: "stable"})
+	return s.Update(ctx, identifier, &firmware.UpdateOptions{Stage: stageStable})
 }
 
 // UpdateBeta updates to the latest beta firmware.
 func (s *Service) UpdateBeta(ctx context.Context, identifier string) error {
-	return s.Update(ctx, identifier, &firmware.UpdateOptions{Stage: "beta"})
+	return s.Update(ctx, identifier, &firmware.UpdateOptions{Stage: stageBeta})
 }
 
 // UpdateFromURL updates from a custom firmware URL.
@@ -369,9 +376,9 @@ func (s *Service) CheckDevice(ctx context.Context, device model.Device) (*Info, 
 // appropriate update method. Returns nil on success.
 func (s *Service) UpdateDevice(ctx context.Context, device model.Device, useBeta bool, customURL string) error {
 	if device.IsPluginManaged() {
-		stage := "stable"
+		stage := stageStable
 		if useBeta {
-			stage = "beta"
+			stage = stageBeta
 		}
 		return s.UpdatePlugin(ctx, device, stage, customURL)
 	}
@@ -546,7 +553,7 @@ func FilterDevicesByNameAndPlatform(devices map[string]model.Device, devicesList
 		if platform != "" {
 			devicePlatform := device.Platform
 			if devicePlatform == "" {
-				devicePlatform = "shelly"
+				devicePlatform = platformShelly
 			}
 			if devicePlatform != platform {
 				continue
@@ -584,9 +591,9 @@ func AnyHasBeta(entries []UpdateEntry) bool {
 
 // SelectEntriesByStage selects entry indices based on the beta flag and returns the stage name.
 func SelectEntriesByStage(entries []UpdateEntry, beta bool) (indices []int, stage string) {
-	stage = "stable"
+	stage = stageStable
 	if beta {
-		stage = "beta"
+		stage = stageBeta
 	}
 	filtered := FilterEntriesByStage(entries, beta)
 	nameSet := make(map[string]bool, len(filtered))

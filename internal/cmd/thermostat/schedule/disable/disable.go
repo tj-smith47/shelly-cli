@@ -13,6 +13,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
+// paramEnable is the Schedule.Update RPC parameter key for the enabled flag.
+const paramEnable = "enable"
+
 // NewCommand creates the thermostat schedule disable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var scheduleID int
@@ -31,8 +34,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 					return fmt.Errorf("thermostat component requires Gen2+ device")
 				}
 				params := map[string]any{
-					"id":     scheduleID,
-					"enable": false,
+					"id":        scheduleID,
+					paramEnable: false,
 				}
 				_, err := dev.Gen2().Call(ctx, "Schedule.Update", params)
 				return err

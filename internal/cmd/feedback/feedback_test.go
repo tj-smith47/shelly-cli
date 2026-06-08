@@ -46,7 +46,7 @@ func TestNewCommand_Structure(t *testing.T) {
 	for _, alias := range cmd.Aliases {
 		aliasMap[alias] = true
 	}
-	expectedAliases := []string{"issue", "report-bug", "bug"}
+	expectedAliases := []string{"issue", "report-bug", github.IssueTypeBug}
 	for _, expected := range expectedAliases {
 		if !aliasMap[expected] {
 			t.Errorf("expected alias %q not found", expected)
@@ -214,7 +214,7 @@ func TestExecute_DryRun_BugType(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "bug", "--dry-run"})
+	cmd.SetArgs([]string{"--type", github.IssueTypeBug, "--dry-run"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -294,7 +294,7 @@ func TestExecute_DryRun_WithTitle(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "bug", "--title", "Test Bug Title", "--dry-run"})
+	cmd.SetArgs([]string{"--type", github.IssueTypeBug, "--title", "Test Bug Title", "--dry-run"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -391,7 +391,7 @@ func TestExecute_BugType_WithTitle(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "bug", "--title", "CLI Crash on Startup"})
+	cmd.SetArgs([]string{"--type", github.IssueTypeBug, "--title", "CLI Crash on Startup"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -445,7 +445,7 @@ func TestExecute_Success_OpensBrowser(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "bug"})
+	cmd.SetArgs([]string{"--type", github.IssueTypeBug})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -474,7 +474,7 @@ func TestExecute_BrowserError_WithClipboardFallback(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "bug"})
+	cmd.SetArgs([]string{"--type", github.IssueTypeBug})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -516,7 +516,7 @@ func TestExecute_AttachLog_Flag(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "bug", "--attach-log", "--dry-run"})
+	cmd.SetArgs([]string{"--type", github.IssueTypeBug, "--attach-log", "--dry-run"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -583,7 +583,7 @@ func TestExecute_TypeFlag_InvalidValue(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "bug", "--dry-run"})
+	cmd.SetArgs([]string{"--type", github.IssueTypeBug, "--dry-run"})
 
 	// This should still work - the invalid type will just not match any case
 	err := cmd.Execute()
@@ -644,7 +644,7 @@ func TestRun_NilConfig(t *testing.T) {
 
 	opts := &Options{
 		Factory:    tf.Factory,
-		Type:       "bug",
+		Type:       github.IssueTypeBug,
 		Title:      "Test Bug",
 		DryRun:     true,
 		OpenIssues: false,
@@ -664,7 +664,7 @@ func TestRun_WithConfig(t *testing.T) {
 
 	opts := &Options{
 		Factory: tf.Factory,
-		Type:    "bug",
+		Type:    github.IssueTypeBug,
 		Title:   "Test",
 		DryRun:  true,
 	}
@@ -728,7 +728,7 @@ func TestNewCommand_LongDescription(t *testing.T) {
 		t.Error("Long should mention GitHub")
 	}
 
-	if !strings.Contains(long, "bug") {
+	if !strings.Contains(long, github.IssueTypeBug) {
 		t.Error("Long should mention bug")
 	}
 
@@ -748,7 +748,7 @@ func TestExecute_EmptyTitleWithBugType_DryRun(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "bug", "--dry-run"})
+	cmd.SetArgs([]string{"--type", github.IssueTypeBug, "--dry-run"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -769,7 +769,7 @@ func TestExecute_SystemInfo_InBody(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "bug", "--dry-run"})
+	cmd.SetArgs([]string{"--type", github.IssueTypeBug, "--dry-run"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -787,7 +787,7 @@ func TestOptions_Fields(t *testing.T) {
 	t.Parallel()
 
 	opts := &Options{
-		Type:       "bug",
+		Type:       github.IssueTypeBug,
 		Title:      "Test Title",
 		Device:     "test-device",
 		AttachLog:  true,
@@ -795,7 +795,7 @@ func TestOptions_Fields(t *testing.T) {
 		OpenIssues: false,
 	}
 
-	if opts.Type != "bug" {
+	if opts.Type != github.IssueTypeBug {
 		t.Errorf("Type = %q, want bug", opts.Type)
 	}
 	if opts.Title != "Test Title" {

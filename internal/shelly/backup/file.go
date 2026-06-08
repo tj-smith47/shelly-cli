@@ -68,9 +68,9 @@ func GenerateFilename(deviceName, deviceID string, encrypted bool) string {
 		safeName = deviceID
 	}
 
-	suffix := ".json"
+	suffix := config.ExtJSON
 	if encrypted {
-		suffix = ".enc.json"
+		suffix = ".enc" + config.ExtJSON
 	}
 
 	return fmt.Sprintf("backup-%s-%s%s", safeName, timestamp, suffix)

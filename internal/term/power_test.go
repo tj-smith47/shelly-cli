@@ -225,9 +225,9 @@ func TestDisplayDashboard(t *testing.T) {
 		TotalPower:   500.0,
 		TotalEnergy:  1500.0,
 		Devices: []model.DashboardDeviceEntry{
-			{Device: "device1", Online: true, TotalPower: 200.0},
-			{Device: "device2", Online: true, TotalPower: 300.0},
-			{Device: "device3", Online: false, TotalPower: 0.0},
+			{Device: testDevice1, Online: true, TotalPower: 200.0},
+			{Device: testDevice2, Online: true, TotalPower: 300.0},
+			{Device: testDevice3, Online: false, TotalPower: 0.0},
 		},
 	}
 
@@ -237,7 +237,7 @@ func TestDisplayDashboard(t *testing.T) {
 	if !strings.Contains(output, "Energy Dashboard") {
 		t.Error("output should contain 'Energy Dashboard'")
 	}
-	if !strings.Contains(output, "device1") {
+	if !strings.Contains(output, testDevice1) {
 		t.Error("output should contain 'device1'")
 	}
 }
@@ -258,7 +258,7 @@ func TestDisplayDashboard_WithCost(t *testing.T) {
 		CostPerKwh:    0.30,
 		CostCurrency:  "$",
 		Devices: []model.DashboardDeviceEntry{
-			{Device: "device1", Online: true, TotalPower: 100.0},
+			{Device: testDevice1, Online: true, TotalPower: 100.0},
 		},
 	}
 
@@ -282,9 +282,9 @@ func TestDisplayComparison(t *testing.T) {
 		MaxEnergy:   5.0,
 		MinEnergy:   1.0,
 		Devices: []model.DeviceEnergy{
-			{Device: "device1", Energy: 5.0, AvgPower: 208.3, PeakPower: 500.0, Percentage: 50.0, Online: true},
-			{Device: "device2", Energy: 3.0, AvgPower: 125.0, PeakPower: 300.0, Percentage: 30.0, Online: true},
-			{Device: "device3", Energy: 2.0, AvgPower: 83.3, PeakPower: 200.0, Percentage: 20.0, Online: true},
+			{Device: testDevice1, Energy: 5.0, AvgPower: 208.3, PeakPower: 500.0, Percentage: 50.0, Online: true},
+			{Device: testDevice2, Energy: 3.0, AvgPower: 125.0, PeakPower: 300.0, Percentage: 30.0, Online: true},
+			{Device: testDevice3, Energy: 2.0, AvgPower: 83.3, PeakPower: 200.0, Percentage: 20.0, Online: true},
 		},
 	}
 
@@ -294,7 +294,7 @@ func TestDisplayComparison(t *testing.T) {
 	if !strings.Contains(output, "Energy Comparison") {
 		t.Error("output should contain 'Energy Comparison'")
 	}
-	if !strings.Contains(output, "device1") {
+	if !strings.Contains(output, testDevice1) {
 		t.Error("output should contain 'device1'")
 	}
 }
@@ -309,8 +309,8 @@ func TestDisplayComparison_OfflineDevice(t *testing.T) {
 		MaxEnergy:   5.0,
 		MinEnergy:   0.0,
 		Devices: []model.DeviceEnergy{
-			{Device: "device1", Energy: 5.0, Online: true},
-			{Device: "device2", Energy: 0.0, Online: false},
+			{Device: testDevice1, Energy: 5.0, Online: true},
+			{Device: testDevice2, Energy: 0.0, Online: false},
 		},
 	}
 
@@ -332,8 +332,8 @@ func TestDisplayComparison_WithError(t *testing.T) {
 		MaxEnergy:   5.0,
 		MinEnergy:   0.0,
 		Devices: []model.DeviceEnergy{
-			{Device: "device1", Energy: 5.0, Online: true},
-			{Device: "device2", Online: true, Error: "connection timeout"},
+			{Device: testDevice1, Energy: 5.0, Online: true},
+			{Device: testDevice2, Online: true, Error: "connection timeout"},
 		},
 	}
 
@@ -349,25 +349,25 @@ func TestSortDevicesByEnergy(t *testing.T) {
 	t.Parallel()
 
 	devices := []model.DeviceEnergy{
-		{Device: "device1", Energy: 1.0},
-		{Device: "device2", Energy: 5.0},
-		{Device: "device3", Energy: 3.0},
+		{Device: testDevice1, Energy: 1.0},
+		{Device: testDevice2, Energy: 5.0},
+		{Device: testDevice3, Energy: 3.0},
 	}
 
 	sorted := sortDevicesByEnergy(devices)
 
-	if sorted[0].Device != "device2" || sorted[0].Energy != 5.0 {
+	if sorted[0].Device != testDevice2 || sorted[0].Energy != 5.0 {
 		t.Errorf("first device should be device2 (highest energy), got %q", sorted[0].Device)
 	}
-	if sorted[1].Device != "device3" || sorted[1].Energy != 3.0 {
+	if sorted[1].Device != testDevice3 || sorted[1].Energy != 3.0 {
 		t.Errorf("second device should be device3, got %q", sorted[1].Device)
 	}
-	if sorted[2].Device != "device1" || sorted[2].Energy != 1.0 {
+	if sorted[2].Device != testDevice1 || sorted[2].Energy != 1.0 {
 		t.Errorf("third device should be device1 (lowest energy), got %q", sorted[2].Device)
 	}
 
 	// Verify original slice is not modified
-	if devices[0].Device != "device1" {
+	if devices[0].Device != testDevice1 {
 		t.Error("original slice should not be modified")
 	}
 }
@@ -386,13 +386,13 @@ func TestFormatComponentSummary(t *testing.T) {
 	t.Run("single component", func(t *testing.T) {
 		t.Parallel()
 		components := []model.ComponentPower{
-			{Type: "switch", Power: 100.0},
+			{Type: testCompSwitch, Power: 100.0},
 		}
 		result := formatComponentSummary(components)
 		if !strings.Contains(result, "1") {
 			t.Errorf("result should contain count, got %q", result)
 		}
-		if !strings.Contains(result, "switch") {
+		if !strings.Contains(result, testCompSwitch) {
 			t.Errorf("result should contain 'switch', got %q", result)
 		}
 	})
@@ -400,8 +400,8 @@ func TestFormatComponentSummary(t *testing.T) {
 	t.Run("multiple types", func(t *testing.T) {
 		t.Parallel()
 		components := []model.ComponentPower{
-			{Type: "switch", Power: 100.0},
-			{Type: "switch", Power: 50.0},
+			{Type: testCompSwitch, Power: 100.0},
+			{Type: testCompSwitch, Power: 50.0},
 			{Type: "light", Power: 20.0},
 		}
 		result := formatComponentSummary(components)

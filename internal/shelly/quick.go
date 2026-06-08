@@ -19,6 +19,14 @@ const (
 	ActionToggle = "toggle"
 )
 
+// Cover state names.
+const (
+	coverStateOpen    = "open"
+	coverStateClosed  = "closed"
+	coverStateOpening = "opening"
+	coverStateClosing = "closing"
+)
+
 // QuickResult holds the result of a quick operation.
 type QuickResult struct {
 	// Count is the number of components affected.
@@ -290,9 +298,9 @@ func toggleCover(ctx context.Context, cover *client.CoverComponent) error {
 	}
 
 	switch status.State {
-	case "open", "opening":
+	case coverStateOpen, coverStateOpening:
 		return cover.Close(ctx, nil)
-	case "closed", "closing":
+	case coverStateClosed, coverStateClosing:
 		return cover.Open(ctx, nil)
 	default:
 		// If stopped mid-way or unknown, open

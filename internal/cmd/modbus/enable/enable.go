@@ -10,12 +10,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 )
 
+// modbusComponent is the Modbus component name, used as the example parent
+// command and as the device-state component key.
+const modbusComponent = "modbus"
+
 // NewCommand creates the modbus enable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return factories.NewEnableDisableCommand(f, factories.EnableDisableOpts{
 		Feature:       "Modbus-TCP",
 		Enable:        true,
-		ExampleParent: "modbus",
+		ExampleParent: modbusComponent,
 		Long: `Enable the Modbus-TCP server on a Shelly device.
 
 When enabled, the device exposes Modbus registers on TCP port 502.`,

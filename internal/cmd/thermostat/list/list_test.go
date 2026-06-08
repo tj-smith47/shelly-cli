@@ -27,8 +27,8 @@ func TestNewCommand(t *testing.T) {
 		t.Fatal("NewCommand returned nil")
 	}
 
-	if cmd.Use != "list <device>" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "list <device>")
+	if cmd.Use != useList {
+		t.Errorf("Use = %q, want %q", cmd.Use, useList)
 	}
 
 	if cmd.Short != "List thermostats" {
@@ -85,7 +85,7 @@ func TestNewCommand_Structure(t *testing.T) {
 	}{
 		{
 			name:      "has use",
-			checkFunc: func(c *cobra.Command) bool { return c.Use == "list <device>" },
+			checkFunc: func(c *cobra.Command) bool { return c.Use == useList },
 			errMsg:    "Use should be 'list <device>'",
 		},
 		{

@@ -207,7 +207,7 @@ type toggleVerbs struct {
 // newToggleVerbs returns the verb forms for the given enable/disable state.
 func newToggleVerbs(enable bool) toggleVerbs {
 	if enable {
-		return toggleVerbs{Verb: "enable", PastVerb: "enabled", Gerund: "Enabling", Alias: "on"}
+		return toggleVerbs{Verb: verbEnable, PastVerb: "enabled", Gerund: "Enabling", Alias: string(QuickOn)}
 	}
-	return toggleVerbs{Verb: "disable", PastVerb: "disabled", Gerund: "Disabling", Alias: "off"}
+	return toggleVerbs{Verb: verbDisable, PastVerb: "disabled", Gerund: "Disabling", Alias: string(QuickOff)}
 }

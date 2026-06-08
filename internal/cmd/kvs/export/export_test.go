@@ -17,11 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
-const (
-	formatJSON    = "json"
-	formatYAML    = "yaml"
-	testExportDir = "/test/kvs/export"
-)
+const testExportDir = "/test/kvs/export"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -172,17 +168,17 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 	}{
 		{
 			name:    "format flag short",
-			args:    []string{"-f", "yaml"},
+			args:    []string{"-f", formatYAML},
 			wantErr: false,
 		},
 		{
 			name:    "format flag long",
-			args:    []string{"--format", "json"},
+			args:    []string{"--format", formatJSON},
 			wantErr: false,
 		},
 		{
 			name:    "format yml",
-			args:    []string{"--format", "yml"},
+			args:    []string{"--format", formatYML},
 			wantErr: false,
 		},
 	}
@@ -309,9 +305,9 @@ func TestRun_ValidFormats(t *testing.T) {
 		format string
 		valid  bool
 	}{
-		{"json format", "json", true},
-		{"yaml format", "yaml", true},
-		{"yml format", "yml", true},
+		{"json format", formatJSON, true},
+		{"yaml format", formatYAML, true},
+		{"yml format", formatYML, true},
 		{"invalid format", "xml", false},
 		{"empty format", "", false},
 		{"csv format", "csv", false},
@@ -386,7 +382,7 @@ func TestRun_WriteToFile(t *testing.T) {
 	tf.SetShellyService(mockSvc)
 
 	opts := &Options{
-		OutputFlags: flags.OutputFlags{Format: "json"},
+		OutputFlags: flags.OutputFlags{Format: formatJSON},
 		Factory:     tf.Factory,
 		Device:      "192.168.1.100",
 		File:        outputFile,
@@ -408,7 +404,7 @@ func TestRun_WriteToStdout(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
-		OutputFlags: flags.OutputFlags{Format: "json"},
+		OutputFlags: flags.OutputFlags{Format: formatJSON},
 		Factory:     tf.Factory,
 		Device:      "test-device",
 		File:        "", // No file means stdout
@@ -430,7 +426,7 @@ func TestRun_YAMLFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
-		OutputFlags: flags.OutputFlags{Format: "yaml"},
+		OutputFlags: flags.OutputFlags{Format: formatYAML},
 		Factory:     tf.Factory,
 		Device:      "test-device",
 	}
@@ -451,7 +447,7 @@ func TestRun_YMLFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
-		OutputFlags: flags.OutputFlags{Format: "yml"},
+		OutputFlags: flags.OutputFlags{Format: formatYML},
 		Factory:     tf.Factory,
 		Device:      "test-device",
 	}
@@ -475,7 +471,7 @@ func TestRun_ContextCancelled(t *testing.T) {
 	cancel() // Cancel immediately
 
 	opts := &Options{
-		OutputFlags: flags.OutputFlags{Format: "json"},
+		OutputFlags: flags.OutputFlags{Format: formatJSON},
 		Factory:     tf.Factory,
 		Device:      "test-device",
 	}
@@ -516,7 +512,7 @@ func TestRun_FileWriteError(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
-		OutputFlags: flags.OutputFlags{Format: "json"},
+		OutputFlags: flags.OutputFlags{Format: formatJSON},
 		Factory:     tf.Factory,
 		Device:      "test-device",
 		File:        invalidPath,
@@ -667,7 +663,7 @@ func TestRun_WithMockError(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
-		OutputFlags: flags.OutputFlags{Format: "json"},
+		OutputFlags: flags.OutputFlags{Format: formatJSON},
 		Factory:     tf.Factory,
 		Device:      "nonexistent-device",
 	}
@@ -687,7 +683,7 @@ func TestRun_EmptyDeviceName(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
-		OutputFlags: flags.OutputFlags{Format: "json"},
+		OutputFlags: flags.OutputFlags{Format: formatJSON},
 		Factory:     tf.Factory,
 		Device:      "", // Empty device name
 	}
@@ -737,7 +733,7 @@ func TestRun_OptionsFactoryAccess(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
-		OutputFlags: flags.OutputFlags{Format: "json"},
+		OutputFlags: flags.OutputFlags{Format: formatJSON},
 		Factory:     tf.Factory,
 		Device:      "test-device",
 	}
@@ -776,7 +772,7 @@ func TestRun_FileOutputSuccess(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
-		OutputFlags: flags.OutputFlags{Format: "json"},
+		OutputFlags: flags.OutputFlags{Format: formatJSON},
 		Factory:     tf.Factory,
 		Device:      "test-device",
 		File:        outputFile,

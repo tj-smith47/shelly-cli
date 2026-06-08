@@ -93,7 +93,7 @@ func TestNewCommand(t *testing.T) {
 		t.Fatal("NewCommand returned nil")
 	}
 
-	if cmd.Use != "token" {
+	if cmd.Use != commandUse {
 		t.Errorf("Use = %q, want 'token'", cmd.Use)
 	}
 
@@ -249,7 +249,7 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Long description should mention key concepts
-	if !strings.Contains(cmd.Long, "token") {
+	if !strings.Contains(cmd.Long, commandUse) {
 		t.Error("Long description should mention 'token'")
 	}
 	if !strings.Contains(cmd.Long, "Shelly Cloud") {
@@ -262,7 +262,7 @@ func TestNewCommand_ShortDescription(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Short description should be concise and mention token
-	if !strings.Contains(cmd.Short, "token") {
+	if !strings.Contains(cmd.Short, commandUse) {
 		t.Error("Short description should mention 'token'")
 	}
 }
@@ -272,7 +272,7 @@ func TestNewCommand_UseField(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Use field should be exactly "token"
-	if cmd.Use != "token" {
+	if cmd.Use != commandUse {
 		t.Errorf("Use = %q, want 'token'", cmd.Use)
 	}
 }
@@ -657,7 +657,7 @@ func TestExecute_Help(t *testing.T) {
 	}
 
 	output := tf.OutString()
-	if !strings.Contains(output, "token") {
+	if !strings.Contains(output, commandUse) {
 		t.Error("help should mention token")
 	}
 }

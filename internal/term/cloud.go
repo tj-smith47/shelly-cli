@@ -8,6 +8,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+// eventShellyOnline is the cloud event name for device online/offline transitions.
+const eventShellyOnline = "Shelly:Online"
+
 // DisplayCloudEvent formats and displays a cloud event to the terminal.
 func DisplayCloudEvent(ios *iostreams.IOStreams, event *model.CloudEvent) {
 	timestamp := time.Now().Format("15:04:05")
@@ -21,7 +24,7 @@ func DisplayCloudEvent(ios *iostreams.IOStreams, event *model.CloudEvent) {
 	}
 
 	switch event.Event {
-	case "Shelly:Online":
+	case eventShellyOnline:
 		status := "offline"
 		if event.Online != nil && *event.Online == 1 {
 			status = "online"

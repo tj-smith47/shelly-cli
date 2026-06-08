@@ -91,7 +91,7 @@ func (s *Service) BTHomeAddDevice(ctx context.Context, identifier, addr, name st
 			config["name"] = name
 		}
 		params := map[string]any{
-			"config": config,
+			keyConfig: config,
 		}
 
 		resultAny, err := conn.Call(ctx, "BTHome.AddDevice", params)

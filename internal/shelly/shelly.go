@@ -778,8 +778,8 @@ func (s *Service) GetMQTTConfig(ctx context.Context, identifier string) (map[str
 		return nil, err
 	}
 	return map[string]any{
-		"enable":       cfg.Enable,
-		"server":       cfg.Server,
+		fieldEnable:    cfg.Enable,
+		fieldServer:    cfg.Server,
 		"user":         cfg.User,
 		"client_id":    cfg.ClientID,
 		"topic_prefix": cfg.TopicPrefix,
@@ -835,7 +835,7 @@ func (s *Service) GetEthernetConfig(ctx context.Context, identifier string) (map
 		return nil, err
 	}
 	return map[string]any{
-		"enable":     cfg.Enable,
+		fieldEnable:  cfg.Enable,
 		"ipv4mode":   cfg.IPv4Mode,
 		"ip":         cfg.IP,
 		"netmask":    cfg.Netmask,
@@ -897,7 +897,7 @@ func (s *Service) GetModbusConfig(ctx context.Context, identifier string) (map[s
 		return nil, err
 	}
 	return map[string]any{
-		"enable": cfg.Enable,
+		fieldEnable: cfg.Enable,
 	}, nil
 }
 

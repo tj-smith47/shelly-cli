@@ -53,7 +53,7 @@ func (s *Service) PushDeviceConfig(ctx context.Context, device string, cfg map[s
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
 	}
-	_, err = conn.Call(ctx, "Shelly.SetConfig", map[string]any{"config": cfg})
+	_, err = conn.Call(ctx, "Shelly.SetConfig", map[string]any{fieldConfig: cfg})
 	iostreams.CloseWithDebug("closing sync push connection", conn)
 	if err != nil {
 		return err

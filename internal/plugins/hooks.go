@@ -15,6 +15,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
+// flagAddress is the CLI flag passed to every plugin hook to identify the target device.
+const flagAddress = "--address"
+
 // HookExecutor executes plugin hooks.
 type HookExecutor struct {
 	plugin *Plugin
@@ -31,7 +34,7 @@ func (e *HookExecutor) ExecuteDetect(ctx context.Context, address string, auth *
 		return nil, fmt.Errorf("plugin %s does not have detect hook", e.plugin.Name)
 	}
 
-	args := []string{"--address", address}
+	args := []string{flagAddress, address}
 	if auth != nil && auth.Username != "" {
 		args = append(args, "--auth-user", auth.Username, "--auth-pass", auth.Password)
 	}
@@ -55,7 +58,7 @@ func (e *HookExecutor) ExecuteStatus(ctx context.Context, address string, auth *
 		return nil, fmt.Errorf("plugin %s does not have status hook", e.plugin.Name)
 	}
 
-	args := []string{"--address", address}
+	args := []string{flagAddress, address}
 	if auth != nil && auth.Username != "" {
 		args = append(args, "--auth-user", auth.Username, "--auth-pass", auth.Password)
 	}
@@ -80,7 +83,7 @@ func (e *HookExecutor) ExecuteControl(ctx context.Context, address string, auth 
 	}
 
 	args := []string{
-		"--address", address,
+		flagAddress, address,
 		"--action", action,
 		"--component", component,
 		"--id", fmt.Sprintf("%d", id),
@@ -108,7 +111,7 @@ func (e *HookExecutor) ExecuteCheckUpdates(ctx context.Context, address string, 
 		return nil, fmt.Errorf("plugin %s does not have check_updates hook", e.plugin.Name)
 	}
 
-	args := []string{"--address", address}
+	args := []string{flagAddress, address}
 	if auth != nil && auth.Username != "" {
 		args = append(args, "--auth-user", auth.Username, "--auth-pass", auth.Password)
 	}
@@ -132,7 +135,7 @@ func (e *HookExecutor) ExecuteApplyUpdate(ctx context.Context, address string, a
 		return nil, fmt.Errorf("plugin %s does not have apply_update hook", e.plugin.Name)
 	}
 
-	args := []string{"--address", address}
+	args := []string{flagAddress, address}
 	if stage != "" {
 		args = append(args, "--stage", stage)
 	}

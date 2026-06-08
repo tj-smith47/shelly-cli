@@ -31,6 +31,13 @@ type AlertItem struct {
 // actionNotify is the default alert action.
 const actionNotify = "notify"
 
+// Alert action identifiers reported in AlertActionResultMsg.
+const (
+	actionToggle = "toggle"
+	actionSnooze = "snooze"
+	actionTest   = "test"
+)
+
 // LoadedMsg is sent when alerts are loaded.
 type LoadedMsg struct {
 	Alerts []AlertItem
@@ -362,9 +369,9 @@ func (m *Model) loadAlerts() tea.Cmd {
 func (m *Model) toggleAlert(name string, enabled bool) tea.Cmd {
 	return func() tea.Msg {
 		if err := config.UpdateAlert(name, &enabled, ""); err != nil {
-			return AlertActionResultMsg{Action: "toggle", Name: name, Err: err}
+			return AlertActionResultMsg{Action: actionToggle, Name: name, Err: err}
 		}
-		return AlertActionResultMsg{Action: "toggle", Name: name}
+		return AlertActionResultMsg{Action: actionToggle, Name: name}
 	}
 }
 
@@ -372,9 +379,9 @@ func (m *Model) snoozeAlert(name string, duration time.Duration) tea.Cmd {
 	return func() tea.Msg {
 		snoozedUntil := time.Now().Add(duration).Format(time.RFC3339)
 		if err := config.UpdateAlert(name, nil, snoozedUntil); err != nil {
-			return AlertActionResultMsg{Action: "snooze", Name: name, Err: err}
+			return AlertActionResultMsg{Action: actionSnooze, Name: name, Err: err}
 		}
-		return AlertActionResultMsg{Action: "snooze", Name: name}
+		return AlertActionResultMsg{Action: actionSnooze, Name: name}
 	}
 }
 
@@ -393,11 +400,11 @@ func (m *Model) TestAlert(name string) tea.Cmd {
 	return func() tea.Msg {
 		alert, ok := config.GetAlert(name)
 		if !ok {
-			return AlertActionResultMsg{Action: "test", Name: name, Err: fmt.Errorf("alert not found")}
+			return AlertActionResultMsg{Action: actionTest, Name: name, Err: fmt.Errorf("alert not found")}
 		}
 
 		if m.svc == nil {
-			return AlertActionResultMsg{Action: "test", Name: name, Err: fmt.Errorf("service not available")}
+			return AlertActionResultMsg{Action: actionTest, Name: name, Err: fmt.Errorf("service not available")}
 		}
 
 		// Check the alert condition

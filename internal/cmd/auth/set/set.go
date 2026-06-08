@@ -11,6 +11,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// flagPassword is the name of the password flag and alias.
+const flagPassword = "password"
+
 // Options holds the command options.
 type Options struct {
 	Factory  *cmdutil.Factory
@@ -29,7 +32,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "set <device>",
-		Aliases: []string{"password", "pw"},
+		Aliases: []string{flagPassword, "pw"},
 		Short:   "Set authentication credentials",
 		Long: `Set authentication credentials for a device.
 
@@ -49,7 +52,7 @@ to "admin" if not specified.`,
 	}
 
 	cmd.Flags().StringVar(&opts.User, "user", "admin", "Username for authentication")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "Password for authentication (required)")
+	cmd.Flags().StringVar(&opts.Password, flagPassword, "", "Password for authentication (required)")
 	cmd.Flags().StringVar(&opts.Realm, "realm", "", "Authentication realm (optional)")
 
 	return cmd

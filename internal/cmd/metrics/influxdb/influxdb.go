@@ -15,6 +15,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
+// defaultMeasurement is the default InfluxDB measurement name.
+const defaultMeasurement = "shelly"
+
 // Options holds command options.
 type Options struct {
 	Factory     *cmdutil.Factory
@@ -31,7 +34,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
 		Factory:     f,
 		Interval:    10 * time.Second,
-		Measurement: "shelly",
+		Measurement: defaultMeasurement,
 	}
 
 	cmd := &cobra.Command{

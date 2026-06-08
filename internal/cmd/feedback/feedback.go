@@ -31,7 +31,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "feedback",
-		Aliases: []string{"issue", "report-bug", "bug"},
+		Aliases: []string{"issue", "report-bug", github.IssueTypeBug},
 		Short:   "Report issues or request features",
 		Long: `Report issues, bugs, or request features via GitHub.
 

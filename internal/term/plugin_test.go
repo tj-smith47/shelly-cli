@@ -11,8 +11,8 @@ func TestDisplayPluginUpgradeResults_AllUpgraded(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	results := []PluginUpgradeResult{
-		{Name: "plugin1", OldVersion: "1.0.0", NewVersion: "2.0.0", Upgraded: true},
-		{Name: "plugin2", OldVersion: "1.5.0", NewVersion: "2.0.0", Upgraded: true},
+		{Name: "plugin1", OldVersion: testFWVersion, NewVersion: testFWVersion2, Upgraded: true},
+		{Name: "plugin2", OldVersion: "1.5.0", NewVersion: testFWVersion2, Upgraded: true},
 	}
 	DisplayPluginUpgradeResults(ios, results)
 
@@ -20,10 +20,10 @@ func TestDisplayPluginUpgradeResults_AllUpgraded(t *testing.T) {
 	if !strings.Contains(output, "plugin1") {
 		t.Error("expected plugin1 name")
 	}
-	if !strings.Contains(output, "1.0.0") {
+	if !strings.Contains(output, testFWVersion) {
 		t.Error("expected old version")
 	}
-	if !strings.Contains(output, "2.0.0") {
+	if !strings.Contains(output, testFWVersion2) {
 		t.Error("expected new version")
 	}
 	if !strings.Contains(output, "2 upgraded") {
@@ -42,9 +42,9 @@ func TestDisplayPluginUpgradeResults_MixedResults(t *testing.T) {
 
 	ios, out, errOut := testIOStreams()
 	results := []PluginUpgradeResult{
-		{Name: "upgraded", OldVersion: "1.0", NewVersion: "2.0", Upgraded: true},
-		{Name: "skipped", OldVersion: "1.0", Skipped: true, Error: errors.New("network unavailable")},
-		{Name: "failed", OldVersion: "1.0", Error: errors.New("download failed")},
+		{Name: "upgraded", OldVersion: testVersion10, NewVersion: "2.0", Upgraded: true},
+		{Name: "skipped", OldVersion: testVersion10, Skipped: true, Error: errors.New("network unavailable")},
+		{Name: "failed", OldVersion: testVersion10, Error: errors.New("download failed")},
 		{Name: "current", OldVersion: "2.0", Upgraded: false},
 	}
 	DisplayPluginUpgradeResults(ios, results)
@@ -83,8 +83,8 @@ func TestDisplayPluginUpgradeResult_Upgraded(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	result := PluginUpgradeResult{
 		Name:       "my-plugin",
-		OldVersion: "1.0.0",
-		NewVersion: "1.1.0",
+		OldVersion: testFWVersion,
+		NewVersion: testFWVersionNew,
 		Upgraded:   true,
 	}
 	DisplayPluginUpgradeResult(ios, result)
@@ -123,7 +123,7 @@ func TestDisplayPluginUpgradeResult_AlreadyLatest(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	result := PluginUpgradeResult{
 		Name:       "current-plugin",
-		OldVersion: "2.0.0",
+		OldVersion: testFWVersion2,
 		Upgraded:   false,
 	}
 	DisplayPluginUpgradeResult(ios, result)
@@ -132,7 +132,7 @@ func TestDisplayPluginUpgradeResult_AlreadyLatest(t *testing.T) {
 	if !strings.Contains(output, "already at latest version") {
 		t.Error("expected already latest message")
 	}
-	if !strings.Contains(output, "2.0.0") {
+	if !strings.Contains(output, testFWVersion2) {
 		t.Error("expected version")
 	}
 }

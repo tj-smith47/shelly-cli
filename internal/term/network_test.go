@@ -13,9 +13,9 @@ func TestDisplayWiFiStatus(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	status := &shelly.WiFiStatus{
-		Status:  "connected",
+		Status:  testValueConnected,
 		SSID:    "MyNetwork",
-		StaIP:   "192.168.1.100",
+		StaIP:   testIP100,
 		RSSI:    -55,
 		APCount: 2,
 	}
@@ -29,7 +29,7 @@ func TestDisplayWiFiStatus(t *testing.T) {
 	if !strings.Contains(output, "MyNetwork") {
 		t.Error("output should contain SSID")
 	}
-	if !strings.Contains(output, "192.168.1.100") {
+	if !strings.Contains(output, testIP100) {
 		t.Error("output should contain IP address")
 	}
 	if !strings.Contains(output, "-55") {
@@ -44,8 +44,8 @@ func TestDisplayWiFiAPClients(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		clients := []shelly.WiFiAPClient{
-			{MAC: "AA:BB:CC:DD:EE:FF", IP: "192.168.1.10"},
-			{MAC: "11:22:33:44:55:66", IP: "192.168.1.11"},
+			{MAC: testMAC, IP: testIP10},
+			{MAC: testMAC2, IP: "192.168.1.11"},
 		}
 
 		DisplayWiFiAPClients(ios, clients)
@@ -54,7 +54,7 @@ func TestDisplayWiFiAPClients(t *testing.T) {
 		if !strings.Contains(output, "Connected Clients") {
 			t.Error("output should contain 'Connected Clients'")
 		}
-		if !strings.Contains(output, "AA:BB:CC:DD:EE:FF") {
+		if !strings.Contains(output, testMAC) {
 			t.Error("output should contain MAC address")
 		}
 		if !strings.Contains(output, "2 client(s) connected") {
@@ -66,7 +66,7 @@ func TestDisplayWiFiAPClients(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		clients := []shelly.WiFiAPClient{
-			{MAC: "AA:BB:CC:DD:EE:FF", IP: ""},
+			{MAC: testMAC, IP: ""},
 		}
 
 		DisplayWiFiAPClients(ios, clients)
@@ -150,7 +150,7 @@ func TestFormatWiFiSignal(t *testing.T) {
 func TestDisplayEthernetStatus(t *testing.T) {
 	t.Parallel()
 
-	t.Run("connected", func(t *testing.T) {
+	t.Run(testValueConnected, func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		status := &shelly.EthernetStatus{
@@ -190,7 +190,7 @@ func TestDisplayEthernetStatus(t *testing.T) {
 func TestDisplayMQTTStatus(t *testing.T) {
 	t.Parallel()
 
-	t.Run("connected", func(t *testing.T) {
+	t.Run(testValueConnected, func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		status := &shelly.MQTTStatus{
@@ -244,8 +244,8 @@ func TestDisplayCloudDevices(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		devices := []network.CloudDevice{
-			{ID: "device1", Model: "Shelly Pro 1PM", Generation: 2, Online: true},
-			{ID: "device2", Model: "Shelly Plus 1", Generation: 2, Online: false},
+			{ID: testDevice1, Model: testModelNamePro1, Generation: 2, Online: true},
+			{ID: testDevice2, Model: testShellyPlus1, Generation: 2, Online: false},
 		}
 
 		DisplayCloudDevices(ios, devices)
@@ -254,7 +254,7 @@ func TestDisplayCloudDevices(t *testing.T) {
 		if !strings.Contains(output, "Found 2 device(s)") {
 			t.Error("output should contain device count")
 		}
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain 'device1'")
 		}
 	})
@@ -275,7 +275,7 @@ func TestDisplayCloudDevices(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		devices := []network.CloudDevice{
-			{ID: "device1", Model: "", Generation: 0, Online: true},
+			{ID: testDevice1, Model: "", Generation: 0, Online: true},
 		}
 
 		DisplayCloudDevices(ios, devices)
@@ -294,11 +294,11 @@ func TestDisplayCloudDevice(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		device := &network.CloudDevice{
-			ID:              "shellypro1pm-123456",
-			Model:           "Shelly Pro 1PM",
+			ID:              testDeviceIDPro1,
+			Model:           testModelNamePro1,
 			Generation:      2,
-			MAC:             "AA:BB:CC:DD:EE:FF",
-			FirmwareVersion: "1.0.0",
+			MAC:             testMAC,
+			FirmwareVersion: testFWVersion,
 			Online:          true,
 		}
 
@@ -308,7 +308,7 @@ func TestDisplayCloudDevice(t *testing.T) {
 		if !strings.Contains(output, "Cloud Device") {
 			t.Error("output should contain 'Cloud Device'")
 		}
-		if !strings.Contains(output, "shellypro1pm-123456") {
+		if !strings.Contains(output, testDeviceIDPro1) {
 			t.Error("output should contain device ID")
 		}
 	})
@@ -317,7 +317,7 @@ func TestDisplayCloudDevice(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		device := &network.CloudDevice{
-			ID:     "device1",
+			ID:     testDevice1,
 			Online: true,
 			Status: []byte(`{"switch:0": {"output": true}}`),
 		}
@@ -355,8 +355,8 @@ func TestDisplayTLSConfig(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		config := map[string]any{
 			"mqtt": map[string]any{
-				"server": "mqtt.example.com:8883",
-				"ssl_ca": "/path/to/ca.crt",
+				testValueServer: "mqtt.example.com:8883",
+				"ssl_ca":        "/path/to/ca.crt",
 			},
 		}
 
@@ -376,7 +376,7 @@ func TestDisplayTLSConfig(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		config := map[string]any{
 			"mqtt": map[string]any{
-				"server": "mqtt.example.com:1883",
+				testValueServer: "mqtt.example.com:1883",
 			},
 		}
 

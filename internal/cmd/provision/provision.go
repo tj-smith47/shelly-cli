@@ -17,6 +17,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Discovery method labels used for progress line IDs.
+const (
+	methodBLE    = "BLE"
+	methodWiFiAP = "WiFi AP"
+)
+
 // Options holds command options.
 type Options struct {
 	Factory      *cmdutil.Factory
@@ -251,19 +257,19 @@ func (o *Options) runDiscovery(ctx context.Context, svc *shelly.Service, opts *s
 	ios := o.Factory.IOStreams()
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
 	if !opts.APOnly {
-		mw.AddLine("BLE", "scanning...")
+		mw.AddLine(methodBLE, "scanning...")
 	}
 	if !opts.BLEOnly {
-		mw.AddLine("WiFi AP", "scanning...")
+		mw.AddLine(methodWiFiAP, "scanning...")
 	}
 
 	devices, err := svc.DiscoverForOnboard(ctx, opts, func(p shelly.OnboardProgress) {
 		lineID := "network"
 		switch p.Method {
-		case "BLE":
-			lineID = "BLE"
-		case "WiFi AP":
-			lineID = "WiFi AP"
+		case methodBLE:
+			lineID = methodBLE
+		case methodWiFiAP:
+			lineID = methodWiFiAP
 		}
 
 		switch {

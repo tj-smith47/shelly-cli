@@ -21,9 +21,12 @@ import (
 // Keep only compound/special keys that don't have keyconst entries.
 // Single-char keys and keys in keyconst should use those directly.
 
+// eventTypeSinglePush is the single-push input event type.
+const eventTypeSinglePush = "single_push"
+
 // Input event types available for actions.
 var inputEventTypes = []string{
-	"single_push",
+	eventTypeSinglePush,
 	"double_push",
 	"triple_push",
 	"long_push",

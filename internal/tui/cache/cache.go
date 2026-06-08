@@ -1625,9 +1625,9 @@ func countCover(online bool, state string, result *ComponentCountsResult) {
 		return
 	}
 	switch state {
-	case "open":
+	case CoverStateOpen:
 		result.CoversOpen++
-	case "closed":
+	case CoverStateClosed:
 		result.CoversClosed++
 	default:
 		result.CoversMoving++

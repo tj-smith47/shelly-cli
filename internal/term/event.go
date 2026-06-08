@@ -9,6 +9,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// eventStateChanged is the device event type for state transitions.
+const eventStateChanged = "state_changed"
+
 // DisplayEvent displays a single device event with color-coded type.
 func DisplayEvent(ios *iostreams.IOStreams, event model.DeviceEvent) error {
 	timestamp := event.Timestamp.Format("15:04:05.000")
@@ -16,7 +19,7 @@ func DisplayEvent(ios *iostreams.IOStreams, event model.DeviceEvent) error {
 	// Color code by event type
 	eventStyle := theme.StatusOK()
 	switch event.Event {
-	case "state_changed":
+	case eventStateChanged:
 		eventStyle = theme.StatusWarn()
 	case "error":
 		eventStyle = theme.StatusError()

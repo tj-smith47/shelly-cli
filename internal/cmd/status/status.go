@@ -15,6 +15,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// commandUse is the cobra Use string for the quick status command.
+const commandUse = "status [device]"
+
 // Options holds command options.
 type Options struct {
 	Device  string
@@ -26,7 +29,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "status [device]",
+		Use:     commandUse,
 		Aliases: []string{"st", "state"},
 		Short:   "Show device status (quick overview)",
 		Long: `Show a quick status overview for a device or all registered devices.

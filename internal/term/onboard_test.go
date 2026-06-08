@@ -27,7 +27,7 @@ func TestDisplayOnboardDevices_WithDevices(t *testing.T) {
 	devices := []shelly.OnboardDevice{
 		{
 			Name:       "shelly-plus-1",
-			Model:      "SNSW-001P16EU",
+			Model:      testModel1PM,
 			Source:     shelly.OnboardSourceBLE,
 			Generation: 2,
 		},
@@ -45,7 +45,7 @@ func TestDisplayOnboardDevices_WithDevices(t *testing.T) {
 	if !strings.Contains(output, "shelly-plus-1") {
 		t.Error("expected device name in output")
 	}
-	if !strings.Contains(output, "BLE") {
+	if !strings.Contains(output, testMethodBLE) {
 		t.Error("expected BLE source in output")
 	}
 	if !strings.Contains(output, "2 device") {
@@ -82,22 +82,22 @@ func TestDisplayOnboardResults_Success(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	results := []*shelly.OnboardResult{
 		{
-			Device:     &shelly.OnboardDevice{Name: "dev-1"},
-			NewAddress: "192.168.1.50",
+			Device:     &shelly.OnboardDevice{Name: testDevID1},
+			NewAddress: testIP50,
 			Registered: true,
-			Method:     "BLE",
+			Method:     testMethodBLE,
 		},
 	}
 	DisplayOnboardResults(ios, results)
 
 	output := out.String()
-	if !strings.Contains(output, "dev-1") {
+	if !strings.Contains(output, testDevID1) {
 		t.Error("expected device name")
 	}
-	if !strings.Contains(output, "BLE") {
+	if !strings.Contains(output, testMethodBLE) {
 		t.Error("expected method")
 	}
-	if !strings.Contains(output, "192.168.1.50") {
+	if !strings.Contains(output, testIP50) {
 		t.Error("expected new address")
 	}
 	if !strings.Contains(output, "registered") {
@@ -113,7 +113,7 @@ func TestDisplayOnboardResults_Error(t *testing.T) {
 		{
 			Device: &shelly.OnboardDevice{Name: "dev-fail"},
 			Error:  errors.New("BLE init failed"),
-			Method: "BLE",
+			Method: testMethodBLE,
 		},
 	}
 	DisplayOnboardResults(ios, results)
@@ -134,7 +134,7 @@ func TestDisplayOnboardResults_ProvisionedNotFound(t *testing.T) {
 	results := []*shelly.OnboardResult{
 		{
 			Device: &shelly.OnboardDevice{Name: "dev-lost"},
-			Method: "BLE",
+			Method: testMethodBLE,
 			Note:   "provisioned but not found on network: timeout",
 			// NewAddress empty, Error nil — provisioned but never located.
 		},
@@ -155,8 +155,8 @@ func TestDisplayOnboardSummary_ProvisionedNotFound(t *testing.T) {
 
 	ios, _, errOut := testIOStreams()
 	results := []*shelly.OnboardResult{
-		{Device: &shelly.OnboardDevice{Name: "dev-1"}, NewAddress: "192.168.1.50"},
-		{Device: &shelly.OnboardDevice{Name: "dev-2"}, Note: "not found"},
+		{Device: &shelly.OnboardDevice{Name: testDevID1}, NewAddress: testIP50},
+		{Device: &shelly.OnboardDevice{Name: testDevID2}, Note: "not found"},
 	}
 	DisplayOnboardSummary(ios, results)
 
@@ -177,8 +177,8 @@ func TestDisplayOnboardSummary_AllSuccess(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	results := []*shelly.OnboardResult{
-		{Device: &shelly.OnboardDevice{Name: "dev-1"}, NewAddress: "192.168.1.50"},
-		{Device: &shelly.OnboardDevice{Name: "dev-2"}, NewAddress: "192.168.1.51"},
+		{Device: &shelly.OnboardDevice{Name: testDevID1}, NewAddress: testIP50},
+		{Device: &shelly.OnboardDevice{Name: testDevID2}, NewAddress: "192.168.1.51"},
 	}
 	DisplayOnboardSummary(ios, results)
 
@@ -186,7 +186,7 @@ func TestDisplayOnboardSummary_AllSuccess(t *testing.T) {
 	if !strings.Contains(output, "All 2 devices provisioned successfully") {
 		t.Error("expected all success message")
 	}
-	if !strings.Contains(output, "192.168.1.50") {
+	if !strings.Contains(output, testIP50) {
 		t.Error("expected address mapping")
 	}
 }
@@ -196,8 +196,8 @@ func TestDisplayOnboardSummary_SomeFailures(t *testing.T) {
 
 	ios, _, errOut := testIOStreams()
 	results := []*shelly.OnboardResult{
-		{Device: &shelly.OnboardDevice{Name: "dev-1"}, NewAddress: "192.168.1.50"},
-		{Device: &shelly.OnboardDevice{Name: "dev-2"}, Error: errors.New("timeout")},
+		{Device: &shelly.OnboardDevice{Name: testDevID1}, NewAddress: testIP50},
+		{Device: &shelly.OnboardDevice{Name: testDevID2}, Error: errors.New("timeout")},
 	}
 	DisplayOnboardSummary(ios, results)
 
@@ -215,8 +215,8 @@ func TestDisplayOnboardSummary_AllFailed(t *testing.T) {
 
 	ios, _, errOut := testIOStreams()
 	results := []*shelly.OnboardResult{
-		{Device: &shelly.OnboardDevice{Name: "dev-1"}, Error: errors.New("err1")},
-		{Device: &shelly.OnboardDevice{Name: "dev-2"}, Error: errors.New("err2")},
+		{Device: &shelly.OnboardDevice{Name: testDevID1}, Error: errors.New("err1")},
+		{Device: &shelly.OnboardDevice{Name: testDevID2}, Error: errors.New("err2")},
 	}
 	DisplayOnboardSummary(ios, results)
 
@@ -232,7 +232,7 @@ func TestFormatOnboardDeviceOptions(t *testing.T) {
 	devices := []shelly.OnboardDevice{
 		{Name: "shelly-plus-1", Generation: 2, Source: shelly.OnboardSourceBLE},
 		{Name: "shelly-1", Generation: 1, Source: shelly.OnboardSourceWiFiAP},
-		{Name: "", Address: "192.168.1.50", Generation: 0, Source: shelly.OnboardSourceHTTP},
+		{Name: "", Address: testIP50, Generation: 0, Source: shelly.OnboardSourceHTTP},
 	}
 
 	options := FormatOnboardDeviceOptions(devices)
@@ -245,7 +245,7 @@ func TestFormatOnboardDeviceOptions(t *testing.T) {
 	if !strings.Contains(options[0], "Gen2") {
 		t.Errorf("options[0] = %q, want to contain Gen2", options[0])
 	}
-	if !strings.Contains(options[0], "BLE") {
+	if !strings.Contains(options[0], testMethodBLE) {
 		t.Errorf("options[0] = %q, want to contain BLE", options[0])
 	}
 	if !strings.Contains(options[1], "Gen1") {
@@ -259,7 +259,7 @@ func TestFormatOnboardDeviceOptions(t *testing.T) {
 		t.Errorf("options[2] = %q, want to contain Gen?", options[2])
 	}
 	// Fallback to address
-	if !strings.Contains(options[2], "192.168.1.50") {
+	if !strings.Contains(options[2], testIP50) {
 		t.Errorf("options[2] = %q, want to contain address", options[2])
 	}
 }
@@ -277,8 +277,8 @@ func TestSelectOnboardDevices_AutoConfirm(t *testing.T) {
 	t.Parallel()
 
 	devices := []shelly.OnboardDevice{
-		{Name: "dev-1"},
-		{Name: "dev-2"},
+		{Name: testDevID1},
+		{Name: testDevID2},
 	}
 
 	selected, err := SelectOnboardDevices(nil, devices, true)

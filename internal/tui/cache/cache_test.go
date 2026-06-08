@@ -15,6 +15,31 @@ const (
 	deviceKitchen = "kitchen"
 	deviceOffice  = "office"
 	deviceBedroom = "bedroom"
+
+	keySwitch0 = "switch:0"
+	keySwitch1 = "switch:1"
+	keyLight0  = "light:0"
+	keyCover0  = "cover:0"
+	keyInput0  = "input:0"
+
+	testAddr100 = "192.168.1.100"
+	testAddr101 = "192.168.1.101"
+	testAddr102 = "192.168.1.102"
+
+	testDeviceName  = "test-device"
+	testTasmotaName = "test-tasmota"
+
+	fieldUptime = "uptime"
+	fieldMAC    = "mac"
+	fieldOutput = "output"
+	fieldName   = "name"
+	fieldValue  = "value"
+	fieldUnit   = "unit"
+	fieldState  = "state"
+
+	testMACUpper = "AABBCCDDEEFF"
+	testInvalid  = "invalid"
+	testStr      = "test"
 )
 
 func TestSortStrings(t *testing.T) {
@@ -37,8 +62,8 @@ func TestSortStrings(t *testing.T) {
 		},
 		{
 			name:  "random order",
-			input: []string{"kitchen", "bedroom", "office", "garage"},
-			want:  []string{"bedroom", "garage", "kitchen", "office"},
+			input: []string{deviceKitchen, deviceBedroom, deviceOffice, "garage"},
+			want:  []string{deviceBedroom, "garage", deviceKitchen, deviceOffice},
 		},
 		{
 			name:  "single element",
@@ -79,7 +104,7 @@ func TestDeviceData_Fields(t *testing.T) {
 	now := time.Now()
 	data := DeviceData{
 		Device: model.Device{
-			Address: "192.168.1.100",
+			Address: testAddr100,
 		},
 		Online:      true,
 		Fetched:     true,
@@ -89,7 +114,7 @@ func TestDeviceData_Fields(t *testing.T) {
 		TotalEnergy: 1234.5,
 		Temperature: 25.3,
 		Switches: []SwitchState{
-			{ID: 0, On: true, Source: "button"},
+			{ID: 0, On: true, Source: testInputTypeButton},
 			{ID: 1, On: false, Source: "init"},
 		},
 		UpdatedAt: now,
@@ -121,7 +146,7 @@ func TestSwitchState_Fields(t *testing.T) {
 	state := SwitchState{
 		ID:     0,
 		On:     true,
-		Source: "button",
+		Source: testInputTypeButton,
 	}
 
 	if state.ID != 0 {
@@ -130,7 +155,7 @@ func TestSwitchState_Fields(t *testing.T) {
 	if !state.On {
 		t.Error("SwitchState.On should be true")
 	}
-	if state.Source != "button" {
+	if state.Source != testInputTypeButton {
 		t.Errorf("SwitchState.Source = %q, want 'button'", state.Source)
 	}
 }
@@ -139,7 +164,7 @@ func TestDeviceUpdateMsg_Fields(t *testing.T) {
 	t.Parallel()
 
 	data := &DeviceData{
-		Device: model.Device{Address: "192.168.1.100"},
+		Device: model.Device{Address: testAddr100},
 		Online: true,
 	}
 
@@ -212,19 +237,19 @@ func TestCache_GetDevice(t *testing.T) {
 	t.Parallel()
 
 	data := &DeviceData{
-		Device: model.Device{Address: "192.168.1.100"},
+		Device: model.Device{Address: testAddr100},
 		Online: true,
 		Power:  45.2,
 	}
 
 	c := &Cache{
 		devices: map[string]*DeviceData{
-			"kitchen": data,
+			deviceKitchen: data,
 		},
 	}
 
 	// Get existing device
-	got := c.GetDevice("kitchen")
+	got := c.GetDevice(deviceKitchen)
 	if got != data {
 		t.Error("GetDevice('kitchen') should return cached data")
 	}
@@ -239,15 +264,15 @@ func TestCache_GetDevice(t *testing.T) {
 func TestCache_GetAllDevices(t *testing.T) {
 	t.Parallel()
 
-	kitchen := &DeviceData{Device: model.Device{Address: "192.168.1.100"}}
-	office := &DeviceData{Device: model.Device{Address: "192.168.1.101"}}
+	kitchen := &DeviceData{Device: model.Device{Address: testAddr100}}
+	office := &DeviceData{Device: model.Device{Address: testAddr101}}
 
 	c := &Cache{
 		devices: map[string]*DeviceData{
-			"kitchen": kitchen,
-			"office":  office,
+			deviceKitchen: kitchen,
+			deviceOffice:  office,
 		},
-		order: []string{"kitchen", "office"},
+		order: []string{deviceKitchen, deviceOffice},
 	}
 
 	all := c.GetAllDevices()
@@ -268,25 +293,25 @@ func TestCache_GetOnlineDevices(t *testing.T) {
 	t.Parallel()
 
 	kitchen := &DeviceData{
-		Device: model.Device{Address: "192.168.1.100"},
+		Device: model.Device{Address: testAddr100},
 		Online: true,
 	}
 	office := &DeviceData{
-		Device: model.Device{Address: "192.168.1.101"},
+		Device: model.Device{Address: testAddr101},
 		Online: false,
 	}
 	bedroom := &DeviceData{
-		Device: model.Device{Address: "192.168.1.102"},
+		Device: model.Device{Address: testAddr102},
 		Online: true,
 	}
 
 	c := &Cache{
 		devices: map[string]*DeviceData{
-			"kitchen": kitchen,
-			"office":  office,
-			"bedroom": bedroom,
+			deviceKitchen: kitchen,
+			deviceOffice:  office,
+			deviceBedroom: bedroom,
 		},
-		order: []string{"bedroom", "kitchen", "office"},
+		order: []string{deviceBedroom, deviceKitchen, deviceOffice},
 	}
 
 	online := c.GetOnlineDevices()
@@ -417,7 +442,7 @@ func TestCreateWaves_SingleDevice(t *testing.T) {
 
 	c := NewForTesting()
 	devices := map[string]model.Device{
-		"kitchen": {Address: "192.168.1.100", Generation: 2},
+		deviceKitchen: {Address: testAddr100, Generation: 2},
 	}
 
 	waves := c.createWaves(devices)
@@ -435,8 +460,8 @@ func TestCreateWaves_TwoDevices(t *testing.T) {
 	c := NewForTesting()
 	// Two devices should fit in a single wave (first wave is 2)
 	devices := map[string]model.Device{
-		"a": {Address: "192.168.1.100", Generation: 2},
-		"b": {Address: "192.168.1.101", Generation: 2},
+		"a": {Address: testAddr100, Generation: 2},
+		"b": {Address: testAddr101, Generation: 2},
 	}
 
 	waves := c.createWaves(devices)
@@ -454,9 +479,9 @@ func TestCreateWaves_MultipleWaves(t *testing.T) {
 	c := NewForTesting()
 	// 5 devices: first wave = 2, then 1, then 1, then 1
 	devices := map[string]model.Device{
-		"a": {Address: "192.168.1.100", Generation: 2},
-		"b": {Address: "192.168.1.101", Generation: 2},
-		"c": {Address: "192.168.1.102", Generation: 2},
+		"a": {Address: testAddr100, Generation: 2},
+		"b": {Address: testAddr101, Generation: 2},
+		"c": {Address: testAddr102, Generation: 2},
 		"d": {Address: "192.168.1.103", Generation: 2},
 		"e": {Address: "192.168.1.104", Generation: 2},
 	}
@@ -485,9 +510,9 @@ func TestCreateWaves_Gen2First(t *testing.T) {
 	c := NewForTesting()
 	// Gen2 devices should come before Gen1
 	devices := map[string]model.Device{
-		"gen1_a": {Address: "192.168.1.100", Generation: 1},
-		"gen2_b": {Address: "192.168.1.101", Generation: 2},
-		"gen1_c": {Address: "192.168.1.102", Generation: 1},
+		"gen1_a": {Address: testAddr100, Generation: 1},
+		"gen2_b": {Address: testAddr101, Generation: 2},
+		"gen1_c": {Address: testAddr102, Generation: 1},
 		"gen2_d": {Address: "192.168.1.103", Generation: 2},
 	}
 
@@ -517,8 +542,8 @@ func TestCreateWaves_UnknownGenTreatedAsGen2(t *testing.T) {
 	c := NewForTesting()
 	// Generation 0 (unknown) should be treated as Gen2 (prioritized)
 	devices := map[string]model.Device{
-		"gen1":    {Address: "192.168.1.100", Generation: 1},
-		"unknown": {Address: "192.168.1.101", Generation: 0},
+		"gen1":    {Address: testAddr100, Generation: 1},
+		"unknown": {Address: testAddr101, Generation: 0},
 	}
 
 	waves := c.createWaves(devices)
@@ -651,10 +676,10 @@ func TestGetRefreshInterval_FocusedDevice(t *testing.T) {
 
 	c := &Cache{
 		refreshConfig: DefaultRefreshConfig(),
-		focusedDevice: "kitchen",
+		focusedDevice: deviceKitchen,
 	}
 	data := &DeviceData{
-		Device: model.Device{Name: "kitchen"},
+		Device: model.Device{Name: deviceKitchen},
 		Online: true,
 		Info:   &shelly.DeviceInfo{Generation: 2},
 	}
@@ -745,12 +770,12 @@ func TestDeviceUpdateMsg_RequestID(t *testing.T) {
 	t.Parallel()
 
 	data := &DeviceData{
-		Device: model.Device{Address: "192.168.1.100"},
+		Device: model.Device{Address: testAddr100},
 		Online: true,
 	}
 
 	msg := DeviceUpdateMsg{
-		Name:      "kitchen",
+		Name:      deviceKitchen,
 		Data:      data,
 		RequestID: 42,
 	}
@@ -764,7 +789,7 @@ func TestDeviceData_LastRequestID(t *testing.T) {
 	t.Parallel()
 
 	data := DeviceData{
-		Device:        model.Device{Address: "192.168.1.100"},
+		Device:        model.Device{Address: testAddr100},
 		lastRequestID: 123,
 	}
 
@@ -784,17 +809,17 @@ func TestStaleResponseDiscard(t *testing.T) {
 	}
 
 	// Add existing device with request ID 100
-	c.devices["kitchen"] = &DeviceData{
-		Device:        model.Device{Address: "192.168.1.100"},
+	c.devices[deviceKitchen] = &DeviceData{
+		Device:        model.Device{Address: testAddr100},
 		Online:        true,
 		lastRequestID: 100,
 	}
 
 	// Try to update with older request ID (stale response)
 	staleMsg := DeviceUpdateMsg{
-		Name: "kitchen",
+		Name: deviceKitchen,
 		Data: &DeviceData{
-			Device:        model.Device{Address: "192.168.1.100"},
+			Device:        model.Device{Address: testAddr100},
 			Online:        false, // Different state to detect if applied
 			lastRequestID: 50,
 		},
@@ -804,11 +829,11 @@ func TestStaleResponseDiscard(t *testing.T) {
 	_ = c.Update(staleMsg)
 
 	// Device should still be online (stale response discarded)
-	if !c.devices["kitchen"].Online {
+	if !c.devices[deviceKitchen].Online {
 		t.Error("stale response should have been discarded, device should still be online")
 	}
-	if c.devices["kitchen"].lastRequestID != 100 {
-		t.Errorf("lastRequestID = %d, want 100 (unchanged)", c.devices["kitchen"].lastRequestID)
+	if c.devices[deviceKitchen].lastRequestID != 100 {
+		t.Errorf("lastRequestID = %d, want 100 (unchanged)", c.devices[deviceKitchen].lastRequestID)
 	}
 }
 
@@ -823,17 +848,17 @@ func TestNewerResponseAccepted(t *testing.T) {
 	}
 
 	// Add existing device with request ID 100
-	c.devices["kitchen"] = &DeviceData{
-		Device:        model.Device{Address: "192.168.1.100"},
+	c.devices[deviceKitchen] = &DeviceData{
+		Device:        model.Device{Address: testAddr100},
 		Online:        true,
 		lastRequestID: 100,
 	}
 
 	// Update with newer request ID
 	newerMsg := DeviceUpdateMsg{
-		Name: "kitchen",
+		Name: deviceKitchen,
 		Data: &DeviceData{
-			Device:        model.Device{Address: "192.168.1.100"},
+			Device:        model.Device{Address: testAddr100},
 			Online:        false, // Changed state
 			lastRequestID: 150,
 		},
@@ -843,11 +868,11 @@ func TestNewerResponseAccepted(t *testing.T) {
 	_ = c.Update(newerMsg)
 
 	// Device should now be offline (newer response accepted)
-	if c.devices["kitchen"].Online {
+	if c.devices[deviceKitchen].Online {
 		t.Error("newer response should have been accepted, device should be offline")
 	}
-	if c.devices["kitchen"].lastRequestID != 150 {
-		t.Errorf("lastRequestID = %d, want 150", c.devices["kitchen"].lastRequestID)
+	if c.devices[deviceKitchen].lastRequestID != 150 {
+		t.Errorf("lastRequestID = %d, want 150", c.devices[deviceKitchen].lastRequestID)
 	}
 }
 
@@ -862,17 +887,17 @@ func TestZeroRequestIDAlwaysAccepted(t *testing.T) {
 	}
 
 	// Add existing device with request ID 100
-	c.devices["kitchen"] = &DeviceData{
-		Device:        model.Device{Address: "192.168.1.100"},
+	c.devices[deviceKitchen] = &DeviceData{
+		Device:        model.Device{Address: testAddr100},
 		Online:        true,
 		lastRequestID: 100,
 	}
 
 	// Update with zero request ID (always accepted to support initial fetches)
 	zeroMsg := DeviceUpdateMsg{
-		Name: "kitchen",
+		Name: deviceKitchen,
 		Data: &DeviceData{
-			Device:        model.Device{Address: "192.168.1.100"},
+			Device:        model.Device{Address: testAddr100},
 			Online:        false,
 			lastRequestID: 0,
 		},
@@ -882,7 +907,7 @@ func TestZeroRequestIDAlwaysAccepted(t *testing.T) {
 	_ = c.Update(zeroMsg)
 
 	// Zero request ID should be accepted
-	if c.devices["kitchen"].Online {
+	if c.devices[deviceKitchen].Online {
 		t.Error("zero request ID should be accepted, device should be offline")
 	}
 }
@@ -892,8 +917,8 @@ func TestZeroRequestIDAlwaysAccepted(t *testing.T) {
 func TestDeviceRefreshMsg(t *testing.T) {
 	t.Parallel()
 
-	msg := DeviceRefreshMsg{Name: "kitchen"}
-	if msg.Name != "kitchen" {
+	msg := DeviceRefreshMsg{Name: deviceKitchen}
+	if msg.Name != deviceKitchen {
 		t.Errorf("DeviceRefreshMsg.Name = %q, want 'kitchen'", msg.Name)
 	}
 }
@@ -902,11 +927,11 @@ func TestWaveMsg(t *testing.T) {
 	t.Parallel()
 
 	devices := []deviceFetch{
-		{Name: "a", Device: model.Device{Address: "192.168.1.100"}},
-		{Name: "b", Device: model.Device{Address: "192.168.1.101"}},
+		{Name: "a", Device: model.Device{Address: testAddr100}},
+		{Name: "b", Device: model.Device{Address: testAddr101}},
 	}
 	remaining := [][]deviceFetch{
-		{{Name: "c", Device: model.Device{Address: "192.168.1.102"}}},
+		{{Name: "c", Device: model.Device{Address: testAddr102}}},
 	}
 
 	msg := WaveMsg{
@@ -943,19 +968,19 @@ func TestCache_SetEventStreamManaged(t *testing.T) {
 	c := NewForTesting()
 
 	// Initially not connected
-	if c.IsEventStreamManaged("kitchen") {
+	if c.IsEventStreamManaged(deviceKitchen) {
 		t.Error("expected kitchen to not be WebSocket connected initially")
 	}
 
 	// Set connected
-	c.SetEventStreamManaged("kitchen", true)
-	if !c.IsEventStreamManaged("kitchen") {
+	c.SetEventStreamManaged(deviceKitchen, true)
+	if !c.IsEventStreamManaged(deviceKitchen) {
 		t.Error("expected kitchen to be WebSocket connected after SetEventStreamManaged(true)")
 	}
 
 	// Set disconnected
-	c.SetEventStreamManaged("kitchen", false)
-	if c.IsEventStreamManaged("kitchen") {
+	c.SetEventStreamManaged(deviceKitchen, false)
+	if c.IsEventStreamManaged(deviceKitchen) {
 		t.Error("expected kitchen to not be WebSocket connected after SetEventStreamManaged(false)")
 	}
 }
@@ -966,26 +991,26 @@ func TestCache_SetEventStreamManaged_MultipleDevices(t *testing.T) {
 	c := NewForTesting()
 
 	// Connect two devices
-	c.SetEventStreamManaged("kitchen", true)
-	c.SetEventStreamManaged("office", true)
+	c.SetEventStreamManaged(deviceKitchen, true)
+	c.SetEventStreamManaged(deviceOffice, true)
 
-	if !c.IsEventStreamManaged("kitchen") {
+	if !c.IsEventStreamManaged(deviceKitchen) {
 		t.Error("expected kitchen to be WebSocket connected")
 	}
-	if !c.IsEventStreamManaged("office") {
+	if !c.IsEventStreamManaged(deviceOffice) {
 		t.Error("expected office to be WebSocket connected")
 	}
-	if c.IsEventStreamManaged("bedroom") {
+	if c.IsEventStreamManaged(deviceBedroom) {
 		t.Error("expected bedroom to not be WebSocket connected")
 	}
 
 	// Disconnect one
-	c.SetEventStreamManaged("kitchen", false)
+	c.SetEventStreamManaged(deviceKitchen, false)
 
-	if c.IsEventStreamManaged("kitchen") {
+	if c.IsEventStreamManaged(deviceKitchen) {
 		t.Error("expected kitchen to not be WebSocket connected after disconnect")
 	}
-	if !c.IsEventStreamManaged("office") {
+	if !c.IsEventStreamManaged(deviceOffice) {
 		t.Error("expected office to still be WebSocket connected")
 	}
 }
@@ -994,7 +1019,7 @@ func TestCache_ScheduleDeviceRefresh_SkipsWebSocketDevices(t *testing.T) {
 	t.Parallel()
 
 	c := NewForTesting()
-	c.SetDeviceForTesting(model.Device{Name: "kitchen", Address: "192.168.1.100", Generation: 2}, true)
+	c.SetDeviceForTesting(model.Device{Name: deviceKitchen, Address: testAddr100, Generation: 2}, true)
 
 	// Mark initial load complete - scheduleDeviceRefresh skips until this is true
 	c.mu.Lock()
@@ -1002,14 +1027,14 @@ func TestCache_ScheduleDeviceRefresh_SkipsWebSocketDevices(t *testing.T) {
 	c.mu.Unlock()
 
 	// Without WebSocket - should return a command
-	cmd := c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
+	cmd := c.scheduleDeviceRefresh(deviceKitchen, c.GetDevice(deviceKitchen))
 	if cmd == nil {
 		t.Error("expected scheduleDeviceRefresh to return a command for non-WebSocket device")
 	}
 
 	// With WebSocket - should return nil
-	c.SetEventStreamManaged("kitchen", true)
-	cmd = c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
+	c.SetEventStreamManaged(deviceKitchen, true)
+	cmd = c.scheduleDeviceRefresh(deviceKitchen, c.GetDevice(deviceKitchen))
 	if cmd != nil {
 		t.Error("expected scheduleDeviceRefresh to return nil for WebSocket-connected device")
 	}
@@ -1019,10 +1044,10 @@ func TestCache_ScheduleDeviceRefresh_SkipsDuringInitialLoad(t *testing.T) {
 	t.Parallel()
 
 	c := NewForTesting()
-	c.SetDeviceForTesting(model.Device{Name: "kitchen", Address: "192.168.1.100", Generation: 2}, true)
+	c.SetDeviceForTesting(model.Device{Name: deviceKitchen, Address: testAddr100, Generation: 2}, true)
 
 	// Initial load not complete - should return nil even for non-WebSocket devices
-	cmd := c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
+	cmd := c.scheduleDeviceRefresh(deviceKitchen, c.GetDevice(deviceKitchen))
 	if cmd != nil {
 		t.Error("expected scheduleDeviceRefresh to return nil during initial load")
 	}
@@ -1033,7 +1058,7 @@ func TestCache_ScheduleDeviceRefresh_SkipsDuringInitialLoad(t *testing.T) {
 	c.mu.Unlock()
 
 	// Now it should return a command
-	cmd = c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
+	cmd = c.scheduleDeviceRefresh(deviceKitchen, c.GetDevice(deviceKitchen))
 	if cmd == nil {
 		t.Error("expected scheduleDeviceRefresh to return a command after initial load complete")
 	}
@@ -1048,7 +1073,7 @@ func TestCache_IsEventStreamManaged_ThreadSafe(t *testing.T) {
 	done := make(chan bool)
 	for i := range 10 {
 		go func(i int) {
-			device := "device" + string(rune('0'+i))
+			device := "device" + string(rune(('0'+i)&0xFF))
 			c.SetEventStreamManaged(device, true)
 			_ = c.IsEventStreamManaged(device)
 			c.SetEventStreamManaged(device, false)
@@ -1076,14 +1101,14 @@ func TestHandleDeviceEvent_NotifyEventDoesNotIncrementVersion(t *testing.T) {
 	c := NewForTesting()
 
 	// Add a device to the cache
-	c.SetDeviceForTesting(model.Device{Name: "test-device"}, true)
+	c.SetDeviceForTesting(model.Device{Name: testDeviceName}, true)
 
 	// Get initial version
 	initialVersion := c.Version()
 
 	// Send a NotifyEvent (e.g., ble.scan_result)
 	// NotifyEvent is not handled by the cache, so version should NOT increment
-	notifyEvt := shellyevents.NewNotifyEvent("test-device", "ble:0", "ble.scan_result")
+	notifyEvt := shellyevents.NewNotifyEvent(testDeviceName, "ble:0", "ble.scan_result")
 	c.handleDeviceEvent(notifyEvt)
 
 	// Version should NOT have changed
@@ -1099,13 +1124,13 @@ func TestHandleDeviceEvent_StatusChangeEventIncrementsVersion(t *testing.T) {
 	c := NewForTesting()
 
 	// Add a device to the cache
-	c.SetDeviceForTesting(model.Device{Name: "test-device"}, true)
+	c.SetDeviceForTesting(model.Device{Name: testDeviceName}, true)
 
 	// Get initial version
 	initialVersion := c.Version()
 
 	// Send a StatusChangeEvent (which IS handled)
-	statusEvt := shellyevents.NewStatusChangeEvent("test-device", "switch:0", nil)
+	statusEvt := shellyevents.NewStatusChangeEvent(testDeviceName, "switch:0", nil)
 	c.handleDeviceEvent(statusEvt)
 
 	// Version SHOULD have changed
@@ -1120,13 +1145,13 @@ func TestHandleDeviceEvent_DeviceOnlineEventIncrementsVersion(t *testing.T) {
 	c := NewForTesting()
 
 	// Add a device to the cache (initially offline)
-	c.SetDeviceForTesting(model.Device{Name: "test-device"}, false)
+	c.SetDeviceForTesting(model.Device{Name: testDeviceName}, false)
 
 	// Get initial version
 	initialVersion := c.Version()
 
 	// Send a DeviceOnlineEvent
-	onlineEvt := shellyevents.NewDeviceOnlineEvent("test-device")
+	onlineEvt := shellyevents.NewDeviceOnlineEvent(testDeviceName)
 	c.handleDeviceEvent(onlineEvt)
 
 	// Version SHOULD have changed

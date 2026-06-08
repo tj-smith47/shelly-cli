@@ -3,6 +3,7 @@ package cache
 import (
 	"errors"
 	"os"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -10,6 +11,14 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+)
+
+const (
+	testBasePath = "/cache"
+	testDataVal  = "data"
+	testKey      = "key"
+	testKeyName  = "test"
+	testValue    = "value"
 )
 
 // errorFs wraps an afero.Fs and allows injecting errors for specific operations.
@@ -52,7 +61,7 @@ func TestFileCache_GetSet(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -104,13 +113,13 @@ func TestFileCache_Expiration(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Set with very short TTL
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeSystem, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -144,13 +153,13 @@ func TestFileCache_Invalidate(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Set some data
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -188,13 +197,13 @@ func TestFileCache_InvalidateDevice(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Set multiple entries for same device
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -241,13 +250,13 @@ func TestFileCache_InvalidateAll(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Set multiple entries
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -282,13 +291,13 @@ func TestFileCache_Cleanup(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Set one expired and one valid entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("expired", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -331,13 +340,13 @@ func TestFileCache_Stats(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Set some entries
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -374,18 +383,18 @@ func TestFileCache_ConcurrentAccess(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	var wg sync.WaitGroup
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 
 	// Concurrent writes
 	for i := range 10 {
 		wg.Go(func() {
-			device := "device" + string(rune('0'+i))
+			device := "device" + strconv.Itoa(i)
 			if err := cache.Set(device, TypeFirmware, testData, time.Hour); err != nil {
 				t.Errorf("Set() error: %v", err)
 			}
@@ -418,12 +427,12 @@ func TestFileCache_SetWithID(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	deviceID := "shellyplus1pm-abc123"
 	if err := cache.SetWithID("kitchen", deviceID, TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("SetWithID() error: %v", err)
@@ -445,7 +454,7 @@ func TestFileCache_CorruptFile(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -555,7 +564,7 @@ func TestFileCache_Meta(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -589,13 +598,13 @@ func TestFileCache_CleanupIfNeeded(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add an expired entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -639,7 +648,7 @@ func TestFileCache_GetWithExpired_Errors(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -655,7 +664,7 @@ func TestFileCache_GetWithExpired_Errors(t *testing.T) {
 	}
 
 	// Should return nil for old version
-	entry, err := cache.GetWithExpired("test", TypeFirmware)
+	entry, err := cache.GetWithExpired(testKeyName, TypeFirmware)
 	if err != nil {
 		t.Fatalf("GetWithExpired() error: %v", err)
 	}
@@ -668,7 +677,7 @@ func TestFileCache_InvalidateAll_Empty(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -683,7 +692,7 @@ func TestFileCache_SetWithID_Errors(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -700,7 +709,7 @@ func TestFileCache_Stats_Empty(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -718,7 +727,7 @@ func TestFileCache_ReadMeta_CorruptFile(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -742,13 +751,13 @@ func TestFileCache_InvalidateAll_WithEntries(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add multiple entries
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -782,13 +791,13 @@ func TestFileCache_InvalidateDevice_MultipleTypes(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add multiple entry types for same device
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -834,7 +843,7 @@ func TestFileCache_Get_CorruptEntry(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -849,7 +858,7 @@ func TestFileCache_Get_CorruptEntry(t *testing.T) {
 	}
 
 	// Get should return nil for corrupt entry
-	entry, err := cache.Get("test", TypeFirmware)
+	entry, err := cache.Get(testKeyName, TypeFirmware)
 	if err != nil {
 		t.Fatalf("Get() error: %v", err)
 	}
@@ -862,13 +871,13 @@ func TestFileCache_WalkEntries(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add entries
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -893,12 +902,12 @@ func TestFileCache_SetWithID_DeviceID(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"key": "value"}
+	testData := map[string]string{testKey: testValue}
 	if err := cache.SetWithID("device", "device_id_123", TypeSchedules, testData, time.Hour); err != nil {
 		t.Fatalf("SetWithID() error: %v", err)
 	}
@@ -926,13 +935,13 @@ func TestFileCache_WalkEntries_SkipNonJSON(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add a valid entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -956,7 +965,7 @@ func TestFileCache_WalkEntries_SkipMeta(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -968,7 +977,7 @@ func TestFileCache_WalkEntries_SkipMeta(t *testing.T) {
 	}
 
 	// Add a valid entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -987,13 +996,13 @@ func TestFileCache_WalkEntries_CorruptEntry(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add a valid entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1047,7 +1056,7 @@ func TestFileCache_InvalidateDevice_Empty(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1062,12 +1071,12 @@ func TestFileCache_Stats_ExpiredEntries(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 
 	// Add an expired entry
 	if err := cache.Set("expired", TypeFirmware, testData, time.Millisecond); err != nil {
@@ -1096,13 +1105,13 @@ func TestFileCache_Cleanup_NoExpired(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add valid entries only
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1138,7 +1147,7 @@ func TestFileCache_CleanupIfNeeded_CorruptMeta(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1149,7 +1158,7 @@ func TestFileCache_CleanupIfNeeded_CorruptMeta(t *testing.T) {
 	}
 
 	// Add an expired entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1169,7 +1178,7 @@ func TestFileCache_Get_OldVersion(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1184,7 +1193,7 @@ func TestFileCache_Get_OldVersion(t *testing.T) {
 	}
 
 	// Get should return nil for old version and remove the file
-	entry, err := cache.Get("test", TypeFirmware)
+	entry, err := cache.Get(testKeyName, TypeFirmware)
 	if err != nil {
 		t.Fatalf("Get() error: %v", err)
 	}
@@ -1206,7 +1215,7 @@ func TestFileCache_GetWithExpired_CacheMiss(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1225,7 +1234,7 @@ func TestFileCache_Invalidate_NonExistent(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1240,13 +1249,13 @@ func TestFileCache_Stats_OldestNewest(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add entries with different times
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("first", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1276,12 +1285,12 @@ func TestFileCache_Stats_TotalSize(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"key": "value", "another": "entry"}
+	testData := map[string]string{testKey: testValue, "another": "entry"}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1303,7 +1312,7 @@ func TestFileCache_NewWithFs_Error(t *testing.T) {
 	baseFs := afero.NewMemMapFs()
 	roFs := afero.NewReadOnlyFs(baseFs)
 
-	_, err := NewWithFs("/cache", roFs)
+	_, err := NewWithFs(testBasePath, roFs)
 	if err == nil {
 		t.Error("NewWithFs() expected error for read-only filesystem")
 	}
@@ -1314,7 +1323,7 @@ func TestFileCache_Set_WriteError(t *testing.T) {
 
 	// Create cache with writable fs, then switch to read-only for error testing
 	baseFs := afero.NewMemMapFs()
-	if _, err := NewWithFs("/cache", baseFs); err != nil {
+	if _, err := NewWithFs(testBasePath, baseFs); err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
@@ -1325,9 +1334,9 @@ func TestFileCache_Set_WriteError(t *testing.T) {
 
 	// Now use read-only wrapper to trigger write error
 	roFs := afero.NewReadOnlyFs(baseFs)
-	roCache := &FileCache{basePath: "/cache", afs: roFs}
+	roCache := &FileCache{basePath: testBasePath, afs: roFs}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	err := roCache.Set("device1", TypeFirmware, testData, time.Hour)
 	if err == nil {
 		t.Error("Set() expected error for read-only filesystem")
@@ -1338,13 +1347,13 @@ func TestFileCache_WriteMeta_Error(t *testing.T) {
 	t.Parallel()
 
 	baseFs := afero.NewMemMapFs()
-	if _, err := NewWithFs("/cache", baseFs); err != nil {
+	if _, err := NewWithFs(testBasePath, baseFs); err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Use read-only wrapper
 	roFs := afero.NewReadOnlyFs(baseFs)
-	roCache := &FileCache{basePath: "/cache", afs: roFs}
+	roCache := &FileCache{basePath: testBasePath, afs: roFs}
 
 	meta := &Meta{Version: CurrentVersion, LastCleanup: time.Now()}
 	err := roCache.WriteMeta(meta)
@@ -1357,7 +1366,7 @@ func TestFileCache_GetWithExpired_CorruptEntry(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1384,13 +1393,13 @@ func TestFileCache_SetWithID_Empty(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Set with empty device ID should still work
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.SetWithID("device", "", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("SetWithID() error: %v", err)
 	}
@@ -1449,15 +1458,15 @@ func TestFileCache_SetWithID_MkdirAllError(t *testing.T) {
 
 	// Create cache with writable fs first
 	baseFs := afero.NewMemMapFs()
-	if err := baseFs.MkdirAll("/cache", 0o755); err != nil {
+	if err := baseFs.MkdirAll(testBasePath, 0o755); err != nil {
 		t.Fatalf("MkdirAll() error: %v", err)
 	}
 
 	// Switch to read-only fs to trigger MkdirAll error
 	roFs := afero.NewReadOnlyFs(baseFs)
-	roCache := &FileCache{basePath: "/cache", afs: roFs}
+	roCache := &FileCache{basePath: testBasePath, afs: roFs}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	err := roCache.SetWithID("device", "id", TypeFirmware, testData, time.Hour)
 	if err == nil {
 		t.Error("SetWithID() expected error for read-only filesystem")
@@ -1469,19 +1478,19 @@ func TestFileCache_Invalidate_RemoveError(t *testing.T) {
 
 	// Create a writable fs with cache entry
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
 
 	// Switch internal filesystem to read-only (entry exists but can't be removed)
 	roFs := afero.NewReadOnlyFs(baseFs)
-	roCache := &FileCache{basePath: "/cache", afs: roFs}
+	roCache := &FileCache{basePath: testBasePath, afs: roFs}
 
 	err = roCache.Invalidate("device1", TypeFirmware)
 	if err == nil {
@@ -1494,19 +1503,19 @@ func TestFileCache_InvalidateAll_RemoveAllError(t *testing.T) {
 
 	// Create a writable fs with cache entries
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
 
 	// Switch internal filesystem to read-only
 	roFs := afero.NewReadOnlyFs(baseFs)
-	roCache := &FileCache{basePath: "/cache", afs: roFs}
+	roCache := &FileCache{basePath: testBasePath, afs: roFs}
 
 	err = roCache.InvalidateAll()
 	if err == nil {
@@ -1518,13 +1527,13 @@ func TestFileCache_WalkEntries_SkipTempFile(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add a valid entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1552,13 +1561,13 @@ func TestFileCache_CleanupIfNeeded_CleanupError(t *testing.T) {
 
 	// Create cache with writable fs
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add an expired entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1566,7 +1575,7 @@ func TestFileCache_CleanupIfNeeded_CleanupError(t *testing.T) {
 
 	// Switch to read-only to cause Cleanup to fail when removing expired entries
 	roFs := afero.NewReadOnlyFs(baseFs)
-	roCache := &FileCache{basePath: "/cache", afs: roFs}
+	roCache := &FileCache{basePath: testBasePath, afs: roFs}
 
 	// CleanupIfNeeded should try cleanup since no meta exists, but fail on Remove
 	_, err = roCache.CleanupIfNeeded(time.Hour)
@@ -1580,19 +1589,19 @@ func TestFileCache_InvalidateDevice_RemoveError(t *testing.T) {
 
 	// Create a writable fs with cache entry
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
 
 	// Switch internal filesystem to read-only
 	roFs := afero.NewReadOnlyFs(baseFs)
-	roCache := &FileCache{basePath: "/cache", afs: roFs}
+	roCache := &FileCache{basePath: testBasePath, afs: roFs}
 
 	err = roCache.InvalidateDevice("device1")
 	if err == nil {
@@ -1605,13 +1614,13 @@ func TestFileCache_Cleanup_RemoveError(t *testing.T) {
 
 	// Create cache with writable fs
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add an expired entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1619,7 +1628,7 @@ func TestFileCache_Cleanup_RemoveError(t *testing.T) {
 
 	// Switch to read-only to cause Remove failure
 	roFs := afero.NewReadOnlyFs(baseFs)
-	roCache := &FileCache{basePath: "/cache", afs: roFs}
+	roCache := &FileCache{basePath: testBasePath, afs: roFs}
 
 	_, err = roCache.Cleanup()
 	if err == nil {
@@ -1678,7 +1687,7 @@ func TestFileCache_SetWithID_RenameError(t *testing.T) {
 
 	// Create a custom filesystem that fails on Rename
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1690,7 +1699,7 @@ func TestFileCache_SetWithID_RenameError(t *testing.T) {
 
 	// Create a file at the temp path location that can't be renamed
 	// (MemMapFs doesn't have rename issues, so we test the happy path covers lines)
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.SetWithID("device", "id", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("SetWithID() error: %v", err)
 	}
@@ -1710,13 +1719,13 @@ func TestFileCache_CleanupIfNeeded_WriteMetaError(t *testing.T) {
 
 	// Create cache with writable fs
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add an expired entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1747,13 +1756,13 @@ func TestFileCache_InvalidateAll_ReadDirError(t *testing.T) {
 
 	// Create cache but remove base directory to cause ReadDir error
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Remove the cache directory
-	if err := fs.RemoveAll("/cache"); err != nil {
+	if err := fs.RemoveAll(testBasePath); err != nil {
 		t.Fatalf("RemoveAll() error: %v", err)
 	}
 
@@ -1767,13 +1776,13 @@ func TestFileCache_Stats_WalkError(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add a valid entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1792,7 +1801,7 @@ func TestFileCache_Get_ReadFileError(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1816,7 +1825,7 @@ func TestFileCache_GetWithExpired_ReadError(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1835,7 +1844,7 @@ func TestFileCache_ReadMeta_ReadError(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1854,7 +1863,7 @@ func TestFileCache_SetWithID_MarshalError(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1871,7 +1880,7 @@ func TestFileCache_CleanupIfNeeded_ReadMetaError(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1882,7 +1891,7 @@ func TestFileCache_CleanupIfNeeded_ReadMetaError(t *testing.T) {
 	}
 
 	// Add an expired entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1929,7 +1938,7 @@ func TestFileCache_Cleanup_Empty(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1948,7 +1957,7 @@ func TestFileCache_CleanupIfNeeded_SuccessWithMetaWrite(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -1960,7 +1969,7 @@ func TestFileCache_CleanupIfNeeded_SuccessWithMetaWrite(t *testing.T) {
 	}
 
 	// Add an expired entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -1989,7 +1998,7 @@ func TestFileCache_CleanupIfNeeded_SkippedRecently(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -2001,7 +2010,7 @@ func TestFileCache_CleanupIfNeeded_SkippedRecently(t *testing.T) {
 	}
 
 	// Add an expired entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -2021,7 +2030,7 @@ func TestFileCache_Get_OldVersionRemoval(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -2058,7 +2067,7 @@ func TestFileCache_GetWithExpired_OldVersion(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -2086,12 +2095,12 @@ func TestFileCache_Stats_WithExpiredEntries(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 
 	// Add valid entry
 	if err := cache.Set("valid", TypeFirmware, testData, time.Hour); err != nil {
@@ -2120,13 +2129,13 @@ func TestFileCache_WalkEntries_Directory(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add a valid entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -2150,7 +2159,7 @@ func TestFileCache_Set_OverwriteExisting(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -2213,7 +2222,7 @@ func TestFileCache_SetWithID_HappyPath(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -2226,9 +2235,9 @@ func TestFileCache_SetWithID_HappyPath(t *testing.T) {
 		dataType string
 		data     any
 	}{
-		{"map", "dev1", "id1", TypeFirmware, map[string]string{"key": "value"}},
+		{"map", "dev1", "id1", TypeFirmware, map[string]string{testKey: testValue}},
 		{"slice", "dev2", "id2", TypeSystem, []string{"a", "b", "c"}},
-		{"struct", "dev3", "id3", TypeBLE, struct{ Name string }{"test"}},
+		{"struct", "dev3", "id3", TypeBLE, struct{ Name string }{testKeyName}},
 		{"int", "dev4", "", TypeCloud, 42},
 	}
 
@@ -2243,12 +2252,12 @@ func TestFileCache_Cleanup_MultipleExpired(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 
 	// Add multiple expired entries
 	for i := range 5 {
@@ -2290,12 +2299,12 @@ func TestFileCache_Stats_AllTypeCounts(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 
 	// Add entries of different types
 	types := []string{TypeFirmware, TypeSystem, TypeBLE, TypeCloud, TypeDeviceInfo, TypeComponents}
@@ -2323,13 +2332,13 @@ func TestFileCache_InvalidateDevice_NotExists(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add some entries
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -2353,12 +2362,12 @@ func TestFileCache_Get_ExpiredEntry(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -2378,12 +2387,12 @@ func TestFileCache_GetWithExpired_FreshEntry(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -2405,7 +2414,7 @@ func TestFileCache_CleanupIfNeeded_NoEntries(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -2424,7 +2433,7 @@ func TestFileCache_WriteMeta_Success(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -2477,8 +2486,8 @@ func TestEntry_Unmarshal_Success(t *testing.T) {
 	if err := entry.Unmarshal(&result); err != nil {
 		t.Fatalf("Unmarshal() error: %v", err)
 	}
-	if result.Name != "test" {
-		t.Errorf("Name = %q, want %q", result.Name, "test")
+	if result.Name != testKeyName {
+		t.Errorf("Name = %q, want %q", result.Name, testKeyName)
 	}
 	if result.Value != 42 {
 		t.Errorf("Value = %d, want %d", result.Value, 42)
@@ -2490,19 +2499,19 @@ func TestFileCache_Get_ReadError(t *testing.T) {
 
 	// Create base filesystem with a valid entry
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
 
 	// Switch to error fs that fails on read (but not with "not exist")
 	errFs := &errorFs{Fs: baseFs, readErr: errors.New("disk I/O error")}
-	errCache := &FileCache{basePath: "/cache", afs: errFs}
+	errCache := &FileCache{basePath: testBasePath, afs: errFs}
 
 	// Get should return error
 	_, err = errCache.Get("device1", TypeFirmware)
@@ -2516,19 +2525,19 @@ func TestFileCache_GetWithExpired_DiskReadError(t *testing.T) {
 
 	// Create base filesystem with a valid entry
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeSystem, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
 
 	// Switch to error fs that fails on read
 	errFs := &errorFs{Fs: baseFs, readErr: errors.New("disk I/O error")}
-	errCache := &FileCache{basePath: "/cache", afs: errFs}
+	errCache := &FileCache{basePath: testBasePath, afs: errFs}
 
 	// GetWithExpired should return error
 	_, err = errCache.GetWithExpired("device1", TypeSystem)
@@ -2542,19 +2551,19 @@ func TestFileCache_Stats_StatError(t *testing.T) {
 
 	// Create base filesystem with a valid entry
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
 
 	// Switch to error fs that fails on Stat
 	errFs := &errorFs{Fs: baseFs, statErr: errors.New("stat error")}
-	errCache := &FileCache{basePath: "/cache", afs: errFs}
+	errCache := &FileCache{basePath: testBasePath, afs: errFs}
 
 	// Stats should still work (skips entries that can't be stat'd)
 	stats, err := errCache.Stats()
@@ -2578,9 +2587,9 @@ func TestFileCache_SetWithID_RenameErrorWithCleanup(t *testing.T) {
 
 	// Error fs that fails on Rename
 	errFs := &errorFs{Fs: baseFs, renameErr: errors.New("rename error")}
-	errCache := &FileCache{basePath: "/cache", afs: errFs}
+	errCache := &FileCache{basePath: testBasePath, afs: errFs}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	err := errCache.SetWithID("device1", "id1", TypeFirmware, testData, time.Hour)
 	if err == nil {
 		t.Error("SetWithID() expected error for rename failure")
@@ -2602,19 +2611,19 @@ func TestFileCache_InvalidateAll_ReadDirError_NotNotExist(t *testing.T) {
 
 	// Create base filesystem
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
 
 	// Use error fs that fails ReadDir with non-"not exist" error
 	errFs := &errorFs{Fs: baseFs, readErr: errors.New("permission denied")}
-	errCache := &FileCache{basePath: "/cache", afs: errFs}
+	errCache := &FileCache{basePath: testBasePath, afs: errFs}
 
 	// InvalidateAll should return error
 	err = errCache.InvalidateAll()
@@ -2628,13 +2637,13 @@ func TestFileCache_CleanupIfNeeded_WriteMetaFailure(t *testing.T) {
 
 	// Create cache with writable fs
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add an expired entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -2642,7 +2651,7 @@ func TestFileCache_CleanupIfNeeded_WriteMetaFailure(t *testing.T) {
 
 	// Use read-only fs wrapper - cleanup will run but WriteMeta will fail
 	roFs := afero.NewReadOnlyFs(baseFs)
-	roCache := &FileCache{basePath: "/cache", afs: roFs}
+	roCache := &FileCache{basePath: testBasePath, afs: roFs}
 
 	// CleanupIfNeeded - the Cleanup() call will fail when trying to remove files
 	// This tests a different path - we need cleanup to succeed but WriteMeta to fail
@@ -2692,13 +2701,13 @@ func TestFileCache_WalkEntries_TempFilePattern(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add a valid entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Hour); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -2725,7 +2734,7 @@ func TestFileCache_ReadMeta_EmptyFile(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", fs)
+	cache, err := NewWithFs(testBasePath, fs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
@@ -2769,13 +2778,13 @@ func TestFileCache_CleanupIfNeeded_WriteMetaOnlyFails(t *testing.T) {
 
 	// Create cache with normal fs
 	baseFs := afero.NewMemMapFs()
-	cache, err := NewWithFs("/cache", baseFs)
+	cache, err := NewWithFs(testBasePath, baseFs)
 	if err != nil {
 		t.Fatalf("NewWithFs() error: %v", err)
 	}
 
 	// Add an expired entry
-	testData := map[string]string{"test": "data"}
+	testData := map[string]string{testKeyName: testDataVal}
 	if err := cache.Set("device1", TypeFirmware, testData, time.Millisecond); err != nil {
 		t.Fatalf("Set() error: %v", err)
 	}
@@ -2783,7 +2792,7 @@ func TestFileCache_CleanupIfNeeded_WriteMetaOnlyFails(t *testing.T) {
 
 	// Use meta-write-fail fs - cleanup will succeed but WriteMeta will fail
 	failFs := &metaWriteFailFs{Fs: baseFs}
-	failCache := &FileCache{basePath: "/cache", afs: failFs}
+	failCache := &FileCache{basePath: testBasePath, afs: failFs}
 
 	// CleanupIfNeeded should succeed (WriteMeta error is logged, not returned)
 	removed, err := failCache.CleanupIfNeeded(time.Hour)
@@ -2799,13 +2808,13 @@ func TestFileCache_WriteMeta_WriteError(t *testing.T) {
 	t.Parallel()
 
 	baseFs := afero.NewMemMapFs()
-	if err := baseFs.MkdirAll("/cache", 0o755); err != nil {
+	if err := baseFs.MkdirAll(testBasePath, 0o755); err != nil {
 		t.Fatalf("MkdirAll() error: %v", err)
 	}
 
 	// Use meta-write-fail fs
 	failFs := &metaWriteFailFs{Fs: baseFs}
-	failCache := &FileCache{basePath: "/cache", afs: failFs}
+	failCache := &FileCache{basePath: testBasePath, afs: failFs}
 
 	meta := &Meta{Version: CurrentVersion, LastCleanup: time.Now()}
 	err := failCache.WriteMeta(meta)

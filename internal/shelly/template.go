@@ -116,7 +116,7 @@ func (s *Service) GetDeviceInfo(ctx context.Context, identifier string) (*Device
 func sanitizeConfig(cfg map[string]any) {
 	// Remove WiFi credentials
 	if wifi, ok := cfg["wifi"].(map[string]any); ok {
-		if sta, ok := wifi["sta"].(map[string]any); ok {
+		if sta, ok := wifi[fieldSTA].(map[string]any); ok {
 			delete(sta, "pass")
 		}
 		if sta1, ok := wifi["sta1"].(map[string]any); ok {
@@ -134,7 +134,7 @@ func sanitizeConfig(cfg map[string]any) {
 
 	// Remove cloud credentials
 	if cloud, ok := cfg["cloud"].(map[string]any); ok {
-		delete(cloud, "server")
+		delete(cloud, fieldServer)
 	}
 }
 

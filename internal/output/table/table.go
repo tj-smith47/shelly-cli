@@ -391,7 +391,7 @@ func BuildFromData(data any) *Table {
 	v := reflect.ValueOf(data)
 
 	// Dereference pointers
-	for v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return nil
 		}
@@ -409,7 +409,7 @@ func BuildFromData(data any) *Table {
 
 	// Get the element type
 	elemType := v.Type().Elem()
-	for elemType.Kind() == reflect.Ptr {
+	for elemType.Kind() == reflect.Pointer {
 		elemType = elemType.Elem()
 	}
 
@@ -429,7 +429,7 @@ func BuildFromData(data any) *Table {
 	// Build rows from slice elements
 	for i := range v.Len() {
 		elem := v.Index(i)
-		for elem.Kind() == reflect.Ptr {
+		for elem.Kind() == reflect.Pointer {
 			if elem.IsNil() {
 				continue
 			}
@@ -499,7 +499,7 @@ func buildRowFromStruct(v reflect.Value, t reflect.Type) []string {
 // formatFieldValue converts a reflect.Value to a string for table display.
 func formatFieldValue(v reflect.Value) string {
 	// Handle pointers
-	for v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return LabelPlaceholder
 		}

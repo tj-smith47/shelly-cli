@@ -306,7 +306,14 @@ func (s *Service) DeleteVirtualComponent(ctx context.Context, identifier, key st
 }
 
 // ValidVirtualTypes is the list of valid virtual component types.
-var ValidVirtualTypes = []string{"boolean", "number", "text", "enum", "button", "group"}
+var ValidVirtualTypes = []string{
+	string(VirtualBoolean),
+	string(VirtualNumber),
+	string(VirtualText),
+	string(VirtualEnum),
+	string(VirtualButton),
+	string(VirtualGroup),
+}
 
 // IsValidVirtualType checks if a type string is a valid virtual component type.
 func IsValidVirtualType(t string) bool {

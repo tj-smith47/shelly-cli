@@ -12,10 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
-const (
-	formatText = "text"
-	formatJSON = "json"
-)
+const formatText = "text"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -437,7 +434,7 @@ func TestExecute_Gen2Device_JSONOutput(t *testing.T) {
 				"switch:0": map[string]any{"output": true},
 				"coiot": map[string]any{
 					"enable":        true,
-					"update_period": 30,
+					keyUpdatePeriod: 30,
 				},
 			},
 		},
@@ -453,7 +450,7 @@ func TestExecute_Gen2Device_JSONOutput(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"test-device", "--format", "json"})
+	cmd.SetArgs([]string{"test-device", "--format", formatJSON})
 	cmd.SetContext(context.Background())
 
 	err = cmd.Execute()
@@ -491,7 +488,7 @@ func TestExecute_Gen2Device_TextOutput(t *testing.T) {
 				"switch:0": map[string]any{"output": true},
 				"coiot": map[string]any{
 					"enable":        true,
-					"update_period": 30,
+					keyUpdatePeriod: 30,
 				},
 			},
 		},
@@ -654,7 +651,7 @@ func TestExecute_Gen2Device_ShowsWebSocketMessage(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"test-device", "--format", "json"})
+	cmd.SetArgs([]string{"test-device", "--format", formatJSON})
 	cmd.SetContext(context.Background())
 
 	err = cmd.Execute()

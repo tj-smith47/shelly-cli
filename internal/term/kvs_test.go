@@ -16,7 +16,7 @@ func TestDisplayKVSRaw(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		result := &kvs.GetResult{
 			Value: "test string",
-			Etag:  "etag123",
+			Etag:  testETag,
 		}
 
 		DisplayKVSRaw(ios, result)
@@ -33,7 +33,7 @@ func TestDisplayKVSRaw(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		result := &kvs.GetResult{
 			Value: nil,
-			Etag:  "etag123",
+			Etag:  testETag,
 		}
 
 		DisplayKVSRaw(ios, result)
@@ -50,7 +50,7 @@ func TestDisplayKVSRaw(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		result := &kvs.GetResult{
 			Value: 42,
-			Etag:  "etag123",
+			Etag:  testETag,
 		}
 
 		DisplayKVSRaw(ios, result)
@@ -67,7 +67,7 @@ func TestDisplayKVSRaw(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		result := &kvs.GetResult{
 			Value: true,
-			Etag:  "etag123",
+			Etag:  testETag,
 		}
 
 		DisplayKVSRaw(ios, result)
@@ -85,7 +85,7 @@ func TestDisplayKVSResult(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	result := &kvs.GetResult{
 		Value: "test value",
-		Etag:  "etag123",
+		Etag:  testETag,
 	}
 
 	DisplayKVSResult(ios, "mykey", result)
@@ -97,7 +97,7 @@ func TestDisplayKVSResult(t *testing.T) {
 	if !strings.Contains(output, "test value") {
 		t.Error("output should contain value")
 	}
-	if !strings.Contains(output, "etag123") {
+	if !strings.Contains(output, testETag) {
 		t.Error("output should contain etag")
 	}
 }
@@ -110,17 +110,17 @@ func TestDisplayKVSKeys(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		result := &kvs.ListResult{
-			Keys: []string{"key1", "key2", "key3"},
+			Keys: []string{testKey1, testKey2, testKey3},
 			Rev:  5,
 		}
 
 		DisplayKVSKeys(ios, result)
 
 		output := out.String()
-		if !strings.Contains(output, "key1") {
+		if !strings.Contains(output, testKey1) {
 			t.Error("output should contain 'key1'")
 		}
-		if !strings.Contains(output, "key2") {
+		if !strings.Contains(output, testKey2) {
 			t.Error("output should contain 'key2'")
 		}
 		if !strings.Contains(output, "3 key(s)") {
@@ -154,15 +154,15 @@ func TestDisplayKVSItems(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	items := []kvs.Item{
-		{Key: "key1", Value: "value1"},
-		{Key: "key2", Value: 42},
-		{Key: "key3", Value: true},
+		{Key: testKey1, Value: testVal1},
+		{Key: testKey2, Value: 42},
+		{Key: testKey3, Value: true},
 	}
 
 	DisplayKVSItems(ios, items)
 
 	output := out.String()
-	if !strings.Contains(output, "key1") {
+	if !strings.Contains(output, testKey1) {
 		t.Error("output should contain 'key1'")
 	}
 	if !strings.Contains(output, "3 key(s)") {
@@ -176,8 +176,8 @@ func TestDisplayKVSImportPreview(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	data := &kvs.Export{
 		Items: []kvs.Item{
-			{Key: "key1", Value: "value1"},
-			{Key: "key2", Value: "value2"},
+			{Key: testKey1, Value: testVal1},
+			{Key: testKey2, Value: "value2"},
 		},
 	}
 
@@ -187,7 +187,7 @@ func TestDisplayKVSImportPreview(t *testing.T) {
 	if !strings.Contains(output, "2 key(s) to import") {
 		t.Error("output should contain key count")
 	}
-	if !strings.Contains(output, "key1") {
+	if !strings.Contains(output, testKey1) {
 		t.Error("output should contain 'key1'")
 	}
 }
@@ -273,11 +273,11 @@ func TestGetResult_Fields(t *testing.T) {
 	t.Parallel()
 
 	result := kvs.GetResult{
-		Value: "test",
+		Value: testValueTest,
 		Etag:  "abc123",
 	}
 
-	if result.Value != "test" {
+	if result.Value != testValueTest {
 		t.Errorf("got Value=%v, want test", result.Value)
 	}
 	if result.Etag != "abc123" {
@@ -289,7 +289,7 @@ func TestListResult_Fields(t *testing.T) {
 	t.Parallel()
 
 	result := kvs.ListResult{
-		Keys: []string{"key1", "key2"},
+		Keys: []string{testKey1, testKey2},
 		Rev:  10,
 	}
 
@@ -322,14 +322,14 @@ func TestExport_Fields(t *testing.T) {
 
 	export := kvs.Export{
 		Items: []kvs.Item{
-			{Key: "key1", Value: "value1"},
+			{Key: testKey1, Value: testVal1},
 		},
 	}
 
 	if len(export.Items) != 1 {
 		t.Errorf("got %d items, want 1", len(export.Items))
 	}
-	if export.Items[0].Key != "key1" {
+	if export.Items[0].Key != testKey1 {
 		t.Errorf("got Key=%q, want key1", export.Items[0].Key)
 	}
 }

@@ -325,7 +325,7 @@ func (m CoverModel) renderState() string {
 	var stateStyle lipgloss.Style
 
 	switch m.state.State {
-	case "open":
+	case actionOpen:
 		stateStr = "▲ OPEN"
 		stateStyle = m.styles.OnState
 	case "closed":

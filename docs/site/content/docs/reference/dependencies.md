@@ -145,7 +145,7 @@ func (m Model) View() string { /* render */ }
 
 ---
 
-## Go 1.25.5 Features
+## Go 1.26.4 Features
 
 Use these Go 1.25 features where applicable:
 

@@ -28,7 +28,6 @@ const (
 	testEventOnline         = "Shelly:Online"
 	testEventStatusOnChange = "Shelly:StatusOnChange"
 	testEventSettings       = "Shelly:Settings"
-	testFormatJSON          = "json"
 	testFormatText          = "text"
 	testDevice1             = "device1"
 	testTypeString          = "string"
@@ -56,8 +55,8 @@ func TestNewCommand_Structure(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "events" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "events")
+	if cmd.Use != commandUse {
+		t.Errorf("Use = %q, want %q", cmd.Use, commandUse)
 	}
 
 	wantAliases := []string{"watch", "subscribe"}
@@ -320,15 +319,15 @@ func TestOptions_OutputFlags(t *testing.T) {
 
 	opts := &Options{
 		OutputFlags: flags.OutputFlags{
-			Format: "json",
+			Format: formatJSON,
 		},
 		DeviceFilter: "device1",
 		EventFilter:  "Online",
 		Raw:          false,
 	}
 
-	if opts.Format != testFormatJSON {
-		t.Errorf("Format = %q, want %q", opts.Format, testFormatJSON)
+	if opts.Format != formatJSON {
+		t.Errorf("Format = %q, want %q", opts.Format, formatJSON)
 	}
 
 	if opts.DeviceFilter != testDevice1 {
@@ -361,7 +360,7 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 		},
 		{
 			name:    "format json",
-			args:    []string{"--format", "json"},
+			args:    []string{"--format", formatJSON},
 			wantErr: false,
 		},
 		{
@@ -429,7 +428,7 @@ func TestNewCommand_ExampleContainsJSON(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if !strings.Contains(cmd.Example, "json") {
+	if !strings.Contains(cmd.Example, formatJSON) {
 		t.Error("Example should show json format option")
 	}
 }
@@ -449,7 +448,7 @@ func TestNewCommand_CommandName(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Name() != "events" {
+	if cmd.Name() != commandUse {
 		t.Errorf("Name() = %q, want 'events'", cmd.Name())
 	}
 }
@@ -478,7 +477,7 @@ func TestNewCommand_UsageString(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	usage := cmd.UsageString()
-	if !strings.Contains(usage, "events") {
+	if !strings.Contains(usage, commandUse) {
 		t.Error("UsageString should contain command name")
 	}
 }
@@ -580,7 +579,7 @@ func TestNewCommand_FormatFlagValue(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if err := cmd.ParseFlags([]string{"--format", "json"}); err != nil {
+	if err := cmd.ParseFlags([]string{"--format", formatJSON}); err != nil {
 		t.Fatalf("ParseFlags error: %v", err)
 	}
 
@@ -588,8 +587,8 @@ func TestNewCommand_FormatFlagValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetString error: %v", err)
 	}
-	if val != testFormatJSON {
-		t.Errorf("format value = %q, want %q", val, testFormatJSON)
+	if val != formatJSON {
+		t.Errorf("format value = %q, want %q", val, formatJSON)
 	}
 }
 
@@ -1046,7 +1045,7 @@ func TestNewCommand_HelpOutput(t *testing.T) {
 		t.Error("Help should not be empty")
 	}
 
-	if !strings.Contains(help, "events") {
+	if !strings.Contains(help, commandUse) {
 		t.Error("Help should mention events")
 	}
 
@@ -1145,7 +1144,7 @@ func TestNewCommand_CommandPath(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	path := cmd.CommandPath()
-	if !strings.Contains(path, "events") {
+	if !strings.Contains(path, commandUse) {
 		t.Errorf("CommandPath() = %q, should contain 'events'", path)
 	}
 }
@@ -1548,14 +1547,14 @@ func TestOptions_AllFieldsSet(t *testing.T) {
 
 	opts := &Options{
 		OutputFlags: flags.OutputFlags{
-			Format: "json",
+			Format: formatJSON,
 		},
 		DeviceFilter: "device123",
 		EventFilter:  "StatusOnChange",
 		Raw:          true,
 	}
 
-	if opts.Format != "json" {
+	if opts.Format != formatJSON {
 		t.Errorf("Format = %q, want 'json'", opts.Format)
 	}
 	if opts.DeviceFilter != "device123" {
@@ -1578,7 +1577,7 @@ func TestNewCommand_FullFlagSet(t *testing.T) {
 	args := []string{
 		"--device", "mydevice",
 		"--event", "Online",
-		"--format", "json",
+		"--format", formatJSON,
 		"--raw",
 	}
 
@@ -1609,8 +1608,8 @@ func TestNewCommand_FullFlagSet(t *testing.T) {
 	if event != "Online" {
 		t.Errorf("event = %q, want 'Online'", event)
 	}
-	if format != testFormatJSON {
-		t.Errorf("format = %q, want %q", format, testFormatJSON)
+	if format != formatJSON {
+		t.Errorf("format = %q, want %q", format, formatJSON)
 	}
 	if !raw {
 		t.Error("raw should be true")
@@ -1659,7 +1658,7 @@ func TestOptions_CopyValues(t *testing.T) {
 
 	original := &Options{
 		OutputFlags: flags.OutputFlags{
-			Format: "json",
+			Format: formatJSON,
 		},
 		DeviceFilter: "device123",
 		EventFilter:  "Online",

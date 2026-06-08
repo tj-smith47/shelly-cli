@@ -33,8 +33,8 @@ func TestNewCommand_Use(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "status [device]" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "status [device]")
+	if cmd.Use != commandUse {
+		t.Errorf("Use = %q, want %q", cmd.Use, commandUse)
 	}
 }
 
@@ -184,8 +184,8 @@ func TestNewCommand_ArgsPopulatesDevice(t *testing.T) {
 
 	// Execute the command with a device argument to verify the RunE closure works
 	// We just verify the command is set up correctly - actual execution would require mocks
-	if cmd.Use != "status [device]" {
-		t.Errorf("command Use = %q, expected %q", cmd.Use, "status [device]")
+	if cmd.Use != commandUse {
+		t.Errorf("command Use = %q, expected %q", cmd.Use, commandUse)
 	}
 }
 

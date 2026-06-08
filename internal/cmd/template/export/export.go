@@ -11,10 +11,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
+// componentTemplate is the config component name for templates.
+const componentTemplate = "template"
+
 // NewCommand creates the template export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return factories.NewConfigExportCommand(f, factories.ConfigExportOpts[config.DeviceTemplate]{
-		Component: "template",
+		Component: componentTemplate,
 		Aliases:   []string{"save", "dump"},
 		Short:     "Export a template to a file",
 		Long: `Export a configuration template to a JSON or YAML file.

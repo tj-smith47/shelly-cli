@@ -158,6 +158,9 @@ func (m Model) Tick() tea.Cmd {
 	return m.spinner.Tick
 }
 
+// ageJustNow is the age label for timestamps less than a minute old.
+const ageJustNow = "just now"
+
 // formatAge returns a human-readable age string.
 func formatAge(t time.Time) string {
 	if t.IsZero() {
@@ -167,7 +170,7 @@ func formatAge(t time.Time) string {
 	age := time.Since(t)
 	switch {
 	case age < time.Minute:
-		return "just now"
+		return ageJustNow
 	case age < time.Hour:
 		mins := int(age.Minutes())
 		if mins == 1 {

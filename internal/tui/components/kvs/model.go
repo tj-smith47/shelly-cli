@@ -29,6 +29,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
+// actionDelete is the ActionMsg.Action value for a KVS delete operation.
+const actionDelete = "delete"
+
 // Item represents a key-value pair in the device KVS.
 type Item struct {
 	Key   string
@@ -624,7 +627,7 @@ func (m Model) executeDelete(key string) tea.Cmd {
 		defer cancel()
 
 		err := m.svc.Delete(ctx, m.device, key)
-		return ActionMsg{Action: "delete", Key: key, Err: err}
+		return ActionMsg{Action: actionDelete, Key: key, Err: err}
 	}
 }
 
@@ -957,7 +960,7 @@ func (m Model) FooterText() string {
 		{Key: "j/k", Desc: "scroll"},
 		{Key: "e", Desc: "edit"},
 		{Key: "n", Desc: "new"},
-		{Key: "d", Desc: "delete"},
+		{Key: "d", Desc: actionDelete},
 		{Key: "r", Desc: "refresh"},
 	}, keys.FooterHintWidth(m.Width))
 }

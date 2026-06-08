@@ -17,9 +17,9 @@ func TestOutputReport_JSON(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	report := model.DeviceReport{
 		Timestamp:  time.Now(),
-		ReportType: "status",
+		ReportType: cmdStatus,
 		Devices: []model.DeviceReportInfo{
-			{Name: "kitchen-light", IP: "192.168.1.100"},
+			{Name: "kitchen-light", IP: testIP100},
 		},
 	}
 	err := OutputReport(ios, report, "json", "")
@@ -31,7 +31,7 @@ func TestOutputReport_JSON(t *testing.T) {
 	if !strings.Contains(output, "kitchen-light") {
 		t.Error("expected device name in JSON")
 	}
-	if !strings.Contains(output, "192.168.1.100") {
+	if !strings.Contains(output, testIP100) {
 		t.Error("expected IP in JSON")
 	}
 }
@@ -42,9 +42,9 @@ func TestOutputReport_Text(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	report := model.DeviceReport{
 		Timestamp:  time.Now(),
-		ReportType: "status",
+		ReportType: cmdStatus,
 		Devices: []model.DeviceReportInfo{
-			{Name: "living-room", IP: "192.168.1.101"},
+			{Name: "living-room", IP: testIP101},
 		},
 	}
 	err := OutputReport(ios, report, "text", "")
@@ -81,9 +81,9 @@ func TestOutputReport_ToFile(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	report := model.DeviceReport{
 		Timestamp:  time.Now(),
-		ReportType: "status",
+		ReportType: cmdStatus,
 		Devices: []model.DeviceReportInfo{
-			{Name: "test-device", IP: "192.168.1.50"},
+			{Name: "test-device", IP: testIP50},
 		},
 	}
 
@@ -118,7 +118,7 @@ func TestOutputReport_ToFileText(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	report := model.DeviceReport{
 		Timestamp:  time.Now(),
-		ReportType: "status",
+		ReportType: cmdStatus,
 		Devices: []model.DeviceReportInfo{
 			{Name: "text-device", IP: "192.168.1.60"},
 		},

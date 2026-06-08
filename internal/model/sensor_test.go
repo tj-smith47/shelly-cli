@@ -95,13 +95,13 @@ func TestTemperatureReading_GetID(t *testing.T) {
 func TestTemperatureReading_GetErrors(t *testing.T) {
 	t.Parallel()
 
-	s := TemperatureReading{Errors: []string{"disconnected"}}
+	s := TemperatureReading{Errors: []string{testStatusDisconnected}}
 	errors := s.GetErrors()
 	if len(errors) != 1 {
 		t.Errorf("GetErrors() len = %d, want 1", len(errors))
 	}
-	if errors[0] != "disconnected" {
-		t.Errorf("GetErrors()[0] = %q, want %q", errors[0], "disconnected")
+	if errors[0] != testStatusDisconnected {
+		t.Errorf("GetErrors()[0] = %q, want %q", errors[0], testStatusDisconnected)
 	}
 }
 

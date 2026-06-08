@@ -25,7 +25,7 @@ func TestDisplayShellHelp(t *testing.T) {
 	if !strings.Contains(output, "info") {
 		t.Error("expected info command")
 	}
-	if !strings.Contains(output, "status") {
+	if !strings.Contains(output, cmdStatus) {
 		t.Error("expected status command")
 	}
 	if !strings.Contains(output, "config") {
@@ -77,7 +77,7 @@ func TestShellSession_ExecuteCommand_Exit(t *testing.T) {
 	ios, _, _ := testIOStreams()
 	session := NewShellSession(ios, nil, "test-device")
 
-	exitCommands := []string{"exit", "quit", "q", "EXIT", "QUIT", "Q"}
+	exitCommands := []string{"exit", cmdQuit, "q", "EXIT", "QUIT", "Q"}
 	for _, cmd := range exitCommands {
 		shouldExit := session.ExecuteCommand(context.Background(), cmd)
 		if !shouldExit {

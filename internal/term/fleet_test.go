@@ -17,14 +17,14 @@ func TestDisplayFleetStatus(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		statuses := []*integrator.DeviceStatus{
 			{
-				DeviceID: "device1",
-				Host:     "192.168.1.100",
+				DeviceID: testDevice1,
+				Host:     testIP100,
 				Online:   true,
 				LastSeen: time.Now().Add(-5 * time.Minute),
 			},
 			{
-				DeviceID: "device2",
-				Host:     "192.168.1.101",
+				DeviceID: testDevice2,
+				Host:     testIP101,
 				Online:   false,
 				LastSeen: time.Now().Add(-1 * time.Hour),
 			},
@@ -33,13 +33,13 @@ func TestDisplayFleetStatus(t *testing.T) {
 		DisplayFleetStatus(ios, statuses)
 
 		output := out.String()
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain device1")
 		}
-		if !strings.Contains(output, "device2") {
+		if !strings.Contains(output, testDevice2) {
 			t.Error("output should contain device2")
 		}
-		if !strings.Contains(output, "192.168.1.100") {
+		if !strings.Contains(output, testIP100) {
 			t.Error("output should contain host")
 		}
 	})
@@ -67,7 +67,7 @@ func TestDisplayFleetHealth(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		health := []*integrator.DeviceHealth{
 			{
-				DeviceID:      "device1",
+				DeviceID:      testDevice1,
 				Online:        true,
 				LastSeen:      time.Now().Add(-5 * time.Minute),
 				OnlineCount:   100,
@@ -75,7 +75,7 @@ func TestDisplayFleetHealth(t *testing.T) {
 				ActivityCount: 50,
 			},
 			{
-				DeviceID:      "device2",
+				DeviceID:      testDevice2,
 				Online:        false,
 				LastSeen:      time.Now().Add(-1 * time.Hour),
 				OnlineCount:   10,
@@ -87,7 +87,7 @@ func TestDisplayFleetHealth(t *testing.T) {
 		DisplayFleetHealth(ios, health, 30*time.Minute)
 
 		output := out.String()
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain device1")
 		}
 		if !strings.Contains(output, "Summary:") {
@@ -114,7 +114,7 @@ func TestDisplayFleetHealth(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		health := []*integrator.DeviceHealth{
 			{
-				DeviceID:     "device1",
+				DeviceID:     testDevice1,
 				Online:       true,
 				LastSeen:     time.Now().Add(-5 * time.Minute),
 				OnlineCount:  10,
@@ -256,9 +256,9 @@ func TestFormatTimeSince(t *testing.T) {
 			want: "never",
 		},
 		{
-			name: "just now",
+			name: relTimeJustNow,
 			time: time.Now().Add(-30 * time.Second),
-			want: "just now",
+			want: relTimeJustNow,
 		},
 		{
 			name: "minutes ago",
@@ -315,12 +315,12 @@ func TestFormatDuration(t *testing.T) {
 		{
 			name:     "less than minute",
 			duration: 30 * time.Second,
-			want:     "just now",
+			want:     relTimeJustNow,
 		},
 		{
 			name:     "1 minute",
 			duration: 1 * time.Minute,
-			want:     "1 minute ago",
+			want:     relTimeOneMinute,
 		},
 		{
 			name:     "5 minutes",
@@ -330,7 +330,7 @@ func TestFormatDuration(t *testing.T) {
 		{
 			name:     "1 hour",
 			duration: 1 * time.Hour,
-			want:     "1 hour ago",
+			want:     relTimeOneHour,
 		},
 		{
 			name:     "5 hours",
@@ -340,7 +340,7 @@ func TestFormatDuration(t *testing.T) {
 		{
 			name:     "1 day",
 			duration: 24 * time.Hour,
-			want:     "1 day ago",
+			want:     relTimeOneDay,
 		},
 		{
 			name:     "3 days",
@@ -369,7 +369,7 @@ func TestFormatInt(t *testing.T) {
 		n    int
 		want string
 	}{
-		{"zero", 0, "0"},
+		{testValueZero, 0, "0"},
 		{"positive", 42, "42"},
 		{"large", 1000, "1000"},
 	}

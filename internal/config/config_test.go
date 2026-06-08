@@ -275,7 +275,7 @@ func TestGetTUIThemeConfig(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo,paralleltest // Test functions with many test cases; modifies global state via SetFs
+//nolint:paralleltest // modifies global state via SetFs
 func TestManager_UpdateDeviceInfo(t *testing.T) {
 	m := setupConfigTest(t)
 
@@ -572,7 +572,7 @@ func TestValidateDeviceAlias(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo,paralleltest // Test functions with many test cases; modifies global state via SetFs
+//nolint:paralleltest // modifies global state via SetFs
 func TestManager_DeviceAliases(t *testing.T) {
 	m := setupConfigTest(t)
 

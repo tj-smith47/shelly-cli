@@ -13,18 +13,18 @@ func TestDisplayMapSection(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		m := map[string]any{
-			"key1": "value1",
-			"key2": 123,
-			"key3": true,
+			testKey1: testVal1,
+			testKey2: 123,
+			testKey3: true,
 		}
 
 		DisplayMapSection(ios, m, "")
 
 		output := out.String()
-		if !strings.Contains(output, "key1") {
+		if !strings.Contains(output, testKey1) {
 			t.Error("output should contain 'key1'")
 		}
-		if !strings.Contains(output, "value1") {
+		if !strings.Contains(output, testVal1) {
 			t.Error("output should contain 'value1'")
 		}
 	})
@@ -35,7 +35,7 @@ func TestDisplayMapSection(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		m := map[string]any{
 			"outer": map[string]any{
-				"inner": "value",
+				"inner": testValue,
 			},
 		}
 
@@ -55,7 +55,7 @@ func TestDisplayMapSection(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		m := map[string]any{
-			"key": "value",
+			testKey: testValue,
 		}
 
 		DisplayMapSection(ios, m, "  ")
@@ -87,7 +87,7 @@ func TestDisplayJSONResult(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		data := map[string]any{
-			"name": "test",
+			"name": testValueTest,
 			"id":   123,
 		}
 
@@ -100,7 +100,7 @@ func TestDisplayJSONResult(t *testing.T) {
 		if !strings.Contains(output, "name") {
 			t.Error("output should contain JSON key")
 		}
-		if !strings.Contains(output, "test") {
+		if !strings.Contains(output, testValueTest) {
 			t.Error("output should contain JSON value")
 		}
 	})
@@ -138,7 +138,7 @@ func TestDisplayWebSocketEvent(t *testing.T) {
 		if !strings.Contains(output, "NotifyStatus") {
 			t.Error("output should contain method")
 		}
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain source")
 		}
 	})
@@ -197,8 +197,8 @@ func TestDisplayWebSocketFallbackConfig(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	wsConfig := map[string]any{
-		"server": "ws://example.com",
-		"enable": true,
+		testValueServer: testWSURL,
+		"enable":        true,
 	}
 
 	DisplayWebSocketFallbackConfig(ios, wsConfig)
@@ -207,7 +207,7 @@ func TestDisplayWebSocketFallbackConfig(t *testing.T) {
 	if !strings.Contains(output, "WebSocket") {
 		t.Error("output should contain 'WebSocket'")
 	}
-	if !strings.Contains(output, "server") {
+	if !strings.Contains(output, testValueServer) {
 		t.Error("output should contain config keys")
 	}
 }
@@ -219,12 +219,12 @@ func TestDisplayWebSocketConnectionState(t *testing.T) {
 		state    string
 		wantText string
 	}{
-		{"Connected", "connected"},
+		{"Connected", testValueConnected},
 		{"Disconnected", "disconnected"},
 		{"Reconnecting", "reconnecting"},
 		{"Connecting", "connecting"},
 		{"Closed", "closed"},
-		{"Unknown", "Unknown"},
+		{unknownLabel, unknownLabel},
 	}
 
 	for _, tt := range tests {
@@ -250,8 +250,8 @@ func TestDisplayWebSocketInfo(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		config := map[string]any{"server": "ws://example.com"}
-		status := map[string]any{"connected": true}
+		config := map[string]any{testValueServer: testWSURL}
+		status := map[string]any{testValueConnected: true}
 
 		DisplayWebSocketInfo(ios, config, status)
 
@@ -268,7 +268,7 @@ func TestDisplayWebSocketInfo(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		config := map[string]any{"server": "ws://example.com"}
+		config := map[string]any{testValueServer: testWSURL}
 
 		DisplayWebSocketInfo(ios, config, nil)
 
@@ -285,7 +285,7 @@ func TestDisplayWebSocketInfo(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		status := map[string]any{"connected": true}
+		status := map[string]any{testValueConnected: true}
 
 		DisplayWebSocketInfo(ios, nil, status)
 

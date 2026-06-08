@@ -15,6 +15,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+// localhostAddr is the fallback address used when no non-loopback IP is available.
+const localhostAddr = "localhost"
+
 // Entry represents a single received webhook.
 type Entry struct {
 	Timestamp  time.Time         `json:"timestamp"`
@@ -157,7 +160,7 @@ func GetLocalIP() string {
 	// Try to get a non-loopback IP
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		return "localhost"
+		return localhostAddr
 	}
 
 	for _, addr := range addrs {
@@ -168,7 +171,7 @@ func GetLocalIP() string {
 		}
 	}
 
-	return "localhost"
+	return localhostAddr
 }
 
 // ConfigureDevices configures devices to send webhooks to the server.

@@ -210,7 +210,7 @@ func TestRun_JSONOutput(t *testing.T) {
 		Factory: tf.Factory,
 		Name:    "json-scene",
 	}
-	opts.Format = "json"
+	opts.Format = string(output.FormatJSON)
 
 	err := run(opts)
 
@@ -307,7 +307,7 @@ func TestNewCommand_ExecuteWithOutputFlag(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"flag-scene", "-o", "json"})
+	cmd.SetArgs([]string{"flag-scene", "-o", string(output.FormatJSON)})
 
 	err := cmd.Execute()
 

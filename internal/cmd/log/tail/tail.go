@@ -12,6 +12,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
+// Command name and flag literals.
+const (
+	cmdName    = "tail"
+	flagFollow = "follow"
+)
+
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -23,8 +29,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "tail",
-		Aliases: []string{"follow", "f"},
+		Use:     cmdName,
+		Aliases: []string{flagFollow, "f"},
 		Short:   "Tail log file",
 		Long:    `Show and optionally follow the log file in real-time.`,
 		Example: `  # Show last entries and follow
@@ -38,7 +44,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Follow, "follow", "f", false, "Follow log output")
+	cmd.Flags().BoolVarP(&opts.Follow, flagFollow, "f", false, "Follow log output")
 
 	return cmd
 }

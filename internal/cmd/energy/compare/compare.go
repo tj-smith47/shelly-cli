@@ -13,6 +13,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// periodDay is the default comparison period.
+const periodDay = "day"
+
 // Options holds command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -26,7 +29,7 @@ type Options struct {
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
 		Factory: f,
-		Period:  "day",
+		Period:  periodDay,
 	}
 
 	cmd := &cobra.Command{
@@ -56,7 +59,7 @@ By default, compares all registered devices. Use --devices to specify a subset.`
 	}
 
 	cmd.Flags().StringSliceVar(&opts.Devices, "devices", nil, "Devices to compare (default: all registered)")
-	cmd.Flags().StringVarP(&opts.Period, "period", "p", "day", "Time period (hour, day, week, month)")
+	cmd.Flags().StringVarP(&opts.Period, "period", "p", periodDay, "Time period (hour, day, week, month)")
 	cmd.Flags().StringVar(&opts.From, "from", "", "Start time (RFC3339 or YYYY-MM-DD)")
 	cmd.Flags().StringVar(&opts.To, "to", "", "End time (RFC3339 or YYYY-MM-DD)")
 

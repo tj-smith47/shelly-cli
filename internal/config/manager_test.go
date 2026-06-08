@@ -113,7 +113,7 @@ func TestManager_Save_AddsSchemaHeader(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo,paralleltest // test function with many assertions; modifies global state via SetFs
+//nolint:paralleltest // modifies global state via SetFs
 func TestManager_SceneOperations(t *testing.T) {
 	m := setupTestManager(t)
 

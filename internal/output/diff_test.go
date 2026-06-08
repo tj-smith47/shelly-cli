@@ -6,7 +6,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
-//nolint:gocyclo // test function with many sub-tests
 func TestCompareConfigs(t *testing.T) {
 	t.Parallel()
 

@@ -107,12 +107,12 @@ func TestValidGenerations(t *testing.T) {
 func TestLookupModelUnambiguous(t *testing.T) {
 	t.Parallel()
 
-	m, err := LookupModel("plus-1", 0)
+	m, err := LookupModel(slugPlus1, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if m.Name != "Shelly Plus 1" {
-		t.Errorf("got name %q, want %q", m.Name, "Shelly Plus 1")
+	if m.Name != namePlus1 {
+		t.Errorf("got name %q, want %q", m.Name, namePlus1)
 	}
 	if m.Generation != 2 {
 		t.Errorf("got generation %d, want 2", m.Generation)
@@ -129,8 +129,8 @@ func TestLookupModelMultiGenDefaultsToLatest(t *testing.T) {
 	if m.Generation != 4 {
 		t.Errorf("got generation %d, want 4 (latest)", m.Generation)
 	}
-	if m.Name != "Shelly 1 Gen4" {
-		t.Errorf("got name %q, want %q", m.Name, "Shelly 1 Gen4")
+	if m.Name != name1Gen4 {
+		t.Errorf("got name %q, want %q", m.Name, name1Gen4)
 	}
 }
 
@@ -164,7 +164,7 @@ func TestLookupModelNotFound(t *testing.T) {
 func TestLookupModelNotFoundWithGeneration(t *testing.T) {
 	t.Parallel()
 
-	_, err := LookupModel("plus-1", 1)
+	_, err := LookupModel(slugPlus1, 1)
 	if err == nil {
 		t.Fatal("expected error for plus-1 gen1")
 	}
@@ -180,8 +180,8 @@ func TestLookupModelAltSlug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if m.Name != "Shelly 2.5" {
-		t.Errorf("got name %q, want %q", m.Name, "Shelly 2.5")
+	if m.Name != name25 {
+		t.Errorf("got name %q, want %q", m.Name, name25)
 	}
 }
 
@@ -192,8 +192,8 @@ func TestLookupModelCaseInsensitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if m.Name != "Shelly Plus 1" {
-		t.Errorf("got name %q, want %q", m.Name, "Shelly Plus 1")
+	if m.Name != namePlus1 {
+		t.Errorf("got name %q, want %q", m.Name, namePlus1)
 	}
 }
 
@@ -208,7 +208,7 @@ func TestModelSlugs(t *testing.T) {
 		}
 		found := false
 		for _, s := range slugs {
-			if s == "plus-1" {
+			if s == slugPlus1 {
 				found = true
 				break
 			}
@@ -289,68 +289,68 @@ func TestRenderTopologies(t *testing.T) {
 
 	tests := []renderTestCase{
 		// SingleRelay - all 3 styles
-		{name: "SingleRelay/schematic", slug: "plus-1", style: StyleSchematic,
-			wantContains: []string{"Shelly Plus 1", "L", "N", "SW", "O"}},
-		{name: "SingleRelay/compact", slug: "plus-1", style: StyleCompact,
-			wantContains: []string{"Shelly Plus 1", "L", "N", "SW", "O"}},
-		{name: "SingleRelay/detailed", slug: "plus-1", style: StyleDetailed,
-			wantContains: []string{"Shelly Plus 1", "L", "N", "SW", "O"}},
+		{name: "SingleRelay/schematic", slug: slugPlus1, style: StyleSchematic,
+			wantContains: []string{namePlus1, "L", "N", "SW", "O"}},
+		{name: "SingleRelay/compact", slug: slugPlus1, style: StyleCompact,
+			wantContains: []string{namePlus1, "L", "N", "SW", "O"}},
+		{name: "SingleRelay/detailed", slug: slugPlus1, style: StyleDetailed,
+			wantContains: []string{namePlus1, "L", "N", "SW", "O"}},
 
 		// DualRelay - all 3 styles
-		{name: "DualRelay/schematic", slug: "2.5", generation: 1, style: StyleSchematic,
-			wantContains: []string{"Shelly 2.5", "L", "N", "S1", "S2", "O1", "O2"}},
-		{name: "DualRelay/compact", slug: "2.5", generation: 1, style: StyleCompact,
-			wantContains: []string{"Shelly 2.5", "L", "N", "S1", "S2", "O1", "O2"}},
-		{name: "DualRelay/detailed", slug: "2.5", generation: 1, style: StyleDetailed,
-			wantContains: []string{"Shelly 2.5", "L", "N", "S1", "S2", "O1", "O2"}},
+		{name: "DualRelay/schematic", slug: slug25, generation: 1, style: StyleSchematic,
+			wantContains: []string{name25, "L", "N", "S1", "S2", "O1", "O2"}},
+		{name: "DualRelay/compact", slug: slug25, generation: 1, style: StyleCompact,
+			wantContains: []string{name25, "L", "N", "S1", "S2", "O1", "O2"}},
+		{name: "DualRelay/detailed", slug: slug25, generation: 1, style: StyleDetailed,
+			wantContains: []string{name25, "L", "N", "S1", "S2", "O1", "O2"}},
 
 		// QuadRelay - all 3 styles
-		{name: "QuadRelay/schematic", slug: "pro-4pm", style: StyleSchematic,
-			wantContains: []string{"Shelly Pro 4PM", "L", "N", "S1", "S4", "O1", "O4"}},
-		{name: "QuadRelay/compact", slug: "pro-4pm", style: StyleCompact,
-			wantContains: []string{"Shelly Pro 4PM", "L", "N", "S1", "S4", "O1", "O4"}},
-		{name: "QuadRelay/detailed", slug: "pro-4pm", style: StyleDetailed,
-			wantContains: []string{"Shelly Pro 4PM", "L", "N", "S1", "S4", "O1", "O4"}},
+		{name: "QuadRelay/schematic", slug: slugPro4PM, style: StyleSchematic,
+			wantContains: []string{namePro4PM, "L", "N", "S1", "S4", "O1", "O4"}},
+		{name: "QuadRelay/compact", slug: slugPro4PM, style: StyleCompact,
+			wantContains: []string{namePro4PM, "L", "N", "S1", "S4", "O1", "O4"}},
+		{name: "QuadRelay/detailed", slug: slugPro4PM, style: StyleDetailed,
+			wantContains: []string{namePro4PM, "L", "N", "S1", "S4", "O1", "O4"}},
 
 		// Dimmer - all 3 styles
-		{name: "Dimmer/schematic", slug: "dimmer-2", style: StyleSchematic,
-			wantContains: []string{"Shelly Dimmer 2", "L", "N", "SW1", "SW2", "O"}},
-		{name: "Dimmer/compact", slug: "dimmer-2", style: StyleCompact,
-			wantContains: []string{"Shelly Dimmer 2", "L", "N", "SW1", "SW2", "O"}},
-		{name: "Dimmer/detailed", slug: "dimmer-2", style: StyleDetailed,
-			wantContains: []string{"Shelly Dimmer 2", "L", "N", "SW1", "SW2", "O"}},
+		{name: "Dimmer/schematic", slug: slugDimmer2, style: StyleSchematic,
+			wantContains: []string{nameDimmer2, "L", "N", "SW1", "SW2", "O"}},
+		{name: "Dimmer/compact", slug: slugDimmer2, style: StyleCompact,
+			wantContains: []string{nameDimmer2, "L", "N", "SW1", "SW2", "O"}},
+		{name: "Dimmer/detailed", slug: slugDimmer2, style: StyleDetailed,
+			wantContains: []string{nameDimmer2, "L", "N", "SW1", "SW2", "O"}},
 
 		// InputOnly - all 3 styles
 		{name: "InputOnly/schematic", slug: "i3", style: StyleSchematic,
-			wantContains: []string{"Shelly i3", "L", "N", "SW1", "SW2", "SW3"}},
+			wantContains: []string{nameI3, "L", "N", "SW1", "SW2", "SW3"}},
 		{name: "InputOnly/compact", slug: "i3", style: StyleCompact,
-			wantContains: []string{"Shelly i3", "L", "N", "SW1"}},
+			wantContains: []string{nameI3, "L", "N", "SW1"}},
 		{name: "InputOnly/detailed", slug: "i3", style: StyleDetailed,
-			wantContains: []string{"Shelly i3", "L", "N", "SW1", "SW2", "SW3"}},
+			wantContains: []string{nameI3, "L", "N", "SW1", "SW2", "SW3"}},
 
 		// Plug - all 3 styles
-		{name: "Plug/schematic", slug: "plug-s", generation: 1, style: StyleSchematic,
-			wantContains: []string{"Shelly Plug S", "Relay", "Plug"}},
-		{name: "Plug/compact", slug: "plug-s", generation: 1, style: StyleCompact,
-			wantContains: []string{"Shelly Plug S", "Plug"}},
-		{name: "Plug/detailed", slug: "plug-s", generation: 1, style: StyleDetailed,
-			wantContains: []string{"Shelly Plug S", "Relay", "Plug"}},
+		{name: "Plug/schematic", slug: slugPlugS, generation: 1, style: StyleSchematic,
+			wantContains: []string{namePlugS, "Relay", "Plug"}},
+		{name: "Plug/compact", slug: slugPlugS, generation: 1, style: StyleCompact,
+			wantContains: []string{namePlugS, "Plug"}},
+		{name: "Plug/detailed", slug: slugPlugS, generation: 1, style: StyleDetailed,
+			wantContains: []string{namePlugS, "Relay", "Plug"}},
 
 		// EnergyMonitor - all 3 styles
 		{name: "EnergyMonitor/schematic", slug: "em", style: StyleSchematic,
-			wantContains: []string{"Shelly EM", "L", "N", "CT1", "CT2"}},
+			wantContains: []string{nameEM, "L", "N", "CT1", "CT2"}},
 		{name: "EnergyMonitor/compact", slug: "em", style: StyleCompact,
-			wantContains: []string{"Shelly EM", "L", "N", "CT"}},
+			wantContains: []string{nameEM, "L", "N", "CT"}},
 		{name: "EnergyMonitor/detailed", slug: "em", style: StyleDetailed,
-			wantContains: []string{"Shelly EM", "L", "N", "CT1", "CT2"}},
+			wantContains: []string{nameEM, "L", "N", "CT1", "CT2"}},
 
 		// RGBW - all 3 styles
-		{name: "RGBW/schematic", slug: "rgbw2", style: StyleSchematic,
-			wantContains: []string{"Shelly RGBW2", "V+", "GND", "R", "G", "B", "W"}},
-		{name: "RGBW/compact", slug: "rgbw2", style: StyleCompact,
-			wantContains: []string{"Shelly RGBW2", "V+", "GND", "R", "G", "B", "W"}},
-		{name: "RGBW/detailed", slug: "rgbw2", style: StyleDetailed,
-			wantContains: []string{"Shelly RGBW2", "V+", "GND", "R", "G", "B", "W"}},
+		{name: "RGBW/schematic", slug: slugRGBW2, style: StyleSchematic,
+			wantContains: []string{nameRGBW2, "V+", "GND", "R", "G", "B", "W"}},
+		{name: "RGBW/compact", slug: slugRGBW2, style: StyleCompact,
+			wantContains: []string{nameRGBW2, "V+", "GND", "R", "G", "B", "W"}},
+		{name: "RGBW/detailed", slug: slugRGBW2, style: StyleDetailed,
+			wantContains: []string{nameRGBW2, "V+", "GND", "R", "G", "B", "W"}},
 	}
 
 	for _, tt := range tests {
@@ -619,7 +619,7 @@ func TestModelGenerations(t *testing.T) {
 
 	t.Run("single-gen slug", func(t *testing.T) {
 		t.Parallel()
-		gens := ModelGenerations("plus-1")
+		gens := ModelGenerations(slugPlus1)
 		if len(gens) != 1 {
 			t.Errorf("slug 'plus-1' should match 1 generation, got %d", len(gens))
 		}
@@ -687,7 +687,7 @@ func TestLookupModelGen4WithFilter(t *testing.T) {
 	if m.Generation != 4 {
 		t.Errorf("got generation %d, want 4", m.Generation)
 	}
-	if m.Name != "Shelly 1 Gen4" {
-		t.Errorf("got name %q, want %q", m.Name, "Shelly 1 Gen4")
+	if m.Name != name1Gen4 {
+		t.Errorf("got name %q, want %q", m.Name, name1Gen4)
 	}
 }

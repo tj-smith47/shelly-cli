@@ -36,9 +36,9 @@ type ScheduleToggleOpts struct {
 // This factory consolidates the common pattern for schedule enable/disable pairs
 // that take <device> <id> arguments.
 func NewScheduleToggleCommand(f *cmdutil.Factory, opts ScheduleToggleOpts) *cobra.Command {
-	verb := "disable"
+	verb := verbDisable
 	if opts.Enable {
-		verb = "enable"
+		verb = verbEnable
 	}
 	pastVerb := "disabled"
 	if opts.Enable {

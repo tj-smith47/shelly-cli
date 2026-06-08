@@ -16,6 +16,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// useMethods is the cobra Use string for the methods subcommand.
+const useMethods = "methods <device>"
+
 // Options holds options for the methods subcommand.
 type Options struct {
 	flags.OutputFlags
@@ -29,7 +32,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "methods <device>",
+		Use:     useMethods,
 		Aliases: []string{"list-methods", "lm"},
 		Short:   "List available RPC methods (Gen2+ only)",
 		Long: `List all RPC methods available on a Shelly device.

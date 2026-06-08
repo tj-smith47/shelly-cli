@@ -28,6 +28,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
+// WiFi status and auth-mode string values reported by the device.
+const (
+	statusGotIP  = "got ip"
+	authModeOpen = "open"
+)
+
 // Deps holds the dependencies for the WiFi component.
 type Deps struct {
 	Ctx       context.Context
@@ -613,7 +619,7 @@ func (m Model) renderStatus() string {
 
 	// Connection status
 	switch m.status.Status {
-	case "got ip":
+	case statusGotIP:
 		content.WriteString(m.styles.Connected.Render("● Connected"))
 	case "disconnected":
 		content.WriteString(m.styles.Disconnected.Render("○ Disconnected"))
@@ -695,7 +701,7 @@ func (m Model) renderConfig() string {
 		if sta.Enabled {
 			enabled = "enabled"
 		}
-		content.WriteString(fmt.Sprintf("  STA: %s (%s)\n", sta.SSID, enabled))
+		fmt.Fprintf(&content, "  STA: %s (%s)\n", sta.SSID, enabled)
 	}
 
 	// AP config
@@ -705,7 +711,7 @@ func (m Model) renderConfig() string {
 		if ap.Enabled {
 			enabled = "enabled"
 		}
-		content.WriteString(fmt.Sprintf("  AP:  %s (%s)\n", ap.SSID, enabled))
+		fmt.Fprintf(&content, "  AP:  %s (%s)\n", ap.SSID, enabled)
 	}
 
 	return content.String()
@@ -747,7 +753,7 @@ func (m Model) renderNetworkLine(netw network.WiFiNetworkFull, isSelected bool) 
 
 	// Auth indicator
 	authIcon := "🔓"
-	if netw.Auth != "open" && netw.Auth != "" {
+	if netw.Auth != authModeOpen && netw.Auth != "" {
 		authIcon = "🔒"
 	}
 

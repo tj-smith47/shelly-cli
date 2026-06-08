@@ -52,7 +52,7 @@ func TestNewCommand_Structure(t *testing.T) {
 	}
 
 	// Test Aliases
-	expectedAliases := []string{"view", "cat"}
+	expectedAliases := []string{aliasView, aliasCat}
 	if len(cmd.Aliases) != len(expectedAliases) {
 		t.Errorf("Aliases count = %d, want %d", len(cmd.Aliases), len(expectedAliases))
 	} else {
@@ -432,10 +432,10 @@ func TestExecute_Aliases(t *testing.T) {
 	if len(cmd.Aliases) == 0 {
 		t.Error("expected aliases to be set")
 	}
-	if cmd.Aliases[0] != "view" {
+	if cmd.Aliases[0] != aliasView {
 		t.Errorf("expected first alias to be 'view', got %q", cmd.Aliases[0])
 	}
-	if cmd.Aliases[1] != "cat" {
+	if cmd.Aliases[1] != aliasCat {
 		t.Errorf("expected second alias to be 'cat', got %q", cmd.Aliases[1])
 	}
 

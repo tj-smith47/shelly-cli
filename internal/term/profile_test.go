@@ -16,7 +16,7 @@ func TestDisplayProfile(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		profile := &profiles.Profile{
-			Model:       "SNSW-001P16EU",
+			Model:       testModel1PM,
 			Name:        "Shelly Plus 1PM",
 			Generation:  types.Gen2,
 			Series:      profiles.SeriesPlus,
@@ -40,7 +40,7 @@ func TestDisplayProfile(t *testing.T) {
 		DisplayProfile(ios, profile)
 
 		output := out.String()
-		if !strings.Contains(output, "SNSW-001P16EU") {
+		if !strings.Contains(output, testModel1PM) {
 			t.Error("output should contain model")
 		}
 		if !strings.Contains(output, "Shelly Plus 1PM") {
@@ -56,7 +56,7 @@ func TestDisplayProfile(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		profile := &profiles.Profile{
-			Model:      "SNSW-001P16EU",
+			Model:      testModel1PM,
 			Name:       "Test Device",
 			Generation: types.Gen2,
 			Series:     profiles.SeriesPlus,
@@ -83,7 +83,7 @@ func TestDisplayProfile(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		profile := &profiles.Profile{
-			Model:      "SNSW-001X16EU",
+			Model:      testModel1X,
 			Name:       "Shelly 1 Mini",
 			App:        "Mini1G3",
 			Generation: types.Gen3,

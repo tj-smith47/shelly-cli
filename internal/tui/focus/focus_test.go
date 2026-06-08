@@ -279,7 +279,7 @@ func TestGlobalPanelID_String(t *testing.T) {
 		panel GlobalPanelID
 		want  string
 	}{
-		{PanelNone, "none"},
+		{PanelNone, noneStr},
 		{PanelDeviceList, "deviceList"},
 		{PanelDashboardInfo, "dashboard.info"},
 		{PanelDashboardEvents, "dashboard.events"},

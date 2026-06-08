@@ -14,6 +14,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Command alias literals.
+const (
+	aliasBatch = "batch"
+	aliasMass  = "mass"
+)
+
 // Options holds command options.
 type Options struct {
 	ConfigFile string
@@ -28,7 +34,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "bulk <config-file>",
-		Aliases: []string{"batch", "mass"},
+		Aliases: []string{aliasBatch, aliasMass},
 		Short:   "Bulk provision from config file",
 		Long: `Provision multiple devices from a YAML configuration file.
 

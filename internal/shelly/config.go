@@ -206,10 +206,10 @@ func (s *Service) GetWiFiConfig(ctx context.Context, identifier string) (map[str
 		}
 		// Convert to map for flexibility
 		result = map[string]any{
-			"sta":  config.STA,
-			"sta1": config.STA1,
-			"ap":   config.AP,
-			"roam": config.Roam,
+			fieldSTA: config.STA,
+			"sta1":   config.STA1,
+			"ap":     config.AP,
+			"roam":   config.Roam,
 		}
 		return nil
 	})
@@ -346,8 +346,8 @@ func (s *Service) GetCloudConfig(ctx context.Context, identifier string) (map[st
 			return err
 		}
 		result = map[string]any{
-			"enable": config.Enable,
-			"server": config.Server,
+			fieldEnable: config.Enable,
+			fieldServer: config.Server,
 		}
 		return nil
 	})

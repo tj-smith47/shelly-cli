@@ -219,7 +219,7 @@ func (m EnvironmentModel) View() string {
 	content := m.renderContent()
 
 	footer := keys.FormatHints([]keys.Hint{
-		{Key: "j/k", Desc: "scroll"},
+		{Key: hintScrollKeys, Desc: hintScrollDesc},
 	}, keys.FooterHintWidth(m.Width))
 
 	scrollInfo := ""

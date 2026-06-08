@@ -18,7 +18,7 @@ func TestDisplaySceneDetails(t *testing.T) {
 			Name:        "Morning Routine",
 			Description: "Turn on lights and open blinds",
 			Actions: []config.SceneAction{
-				{Device: "kitchen", Method: "Switch.Set", Params: map[string]any{"id": 0, "on": true}},
+				{Device: "kitchen", Method: testSwitchSet, Params: map[string]any{"id": 0, "on": true}},
 				{Device: "blinds", Method: "Cover.Open", Params: nil},
 			},
 		}
@@ -35,7 +35,7 @@ func TestDisplaySceneDetails(t *testing.T) {
 		if !strings.Contains(allOutput, "kitchen") {
 			t.Error("output should contain device name")
 		}
-		if !strings.Contains(allOutput, "Switch.Set") {
+		if !strings.Contains(allOutput, testSwitchSet) {
 			t.Error("output should contain method name")
 		}
 		if !strings.Contains(allOutput, "Cover.Open") {
@@ -96,14 +96,14 @@ func TestDisplaySceneDetails(t *testing.T) {
 		scene := config.Scene{
 			Name: "Toggle Scene",
 			Actions: []config.SceneAction{
-				{Device: "switch1", Method: "Switch.Toggle", Params: nil},
+				{Device: "switch1", Method: testSwitchToggle, Params: nil},
 			},
 		}
 
 		DisplaySceneDetails(ios, scene)
 
 		output := out.String()
-		if !strings.Contains(output, "Switch.Toggle") {
+		if !strings.Contains(output, testSwitchToggle) {
 			t.Error("output should contain method name")
 		}
 	})
@@ -115,8 +115,8 @@ func TestDisplaySceneDetails(t *testing.T) {
 		scene := config.Scene{
 			Name: "Complex Scene",
 			Actions: []config.SceneAction{
-				{Device: "dev1", Method: "Method1", Params: map[string]any{"key1": "value1"}},
-				{Device: "dev2", Method: "Method2", Params: map[string]any{"key2": 42}},
+				{Device: "dev1", Method: "Method1", Params: map[string]any{testKey1: testVal1}},
+				{Device: "dev2", Method: "Method2", Params: map[string]any{testKey2: 42}},
 				{Device: "dev3", Method: "Method3", Params: map[string]any{}},
 			},
 		}

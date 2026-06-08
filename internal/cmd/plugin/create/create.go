@@ -12,6 +12,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/plugins/scaffold"
 )
 
+// Supported extension language identifiers for the --lang flag.
+const (
+	langBash   = "bash"
+	langGo     = "golang"
+	langPython = "python"
+)
+
 // Options holds the options for the create command.
 type Options struct {
 	Factory   *cmdutil.Factory
@@ -52,7 +59,7 @@ specified with --output.`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Lang, "lang", "l", "bash", "Extension language (bash, go, python)")
+	cmd.Flags().StringVarP(&opts.Lang, "lang", "l", langBash, "Extension language (bash, go, python)")
 	cmd.Flags().StringVarP(&opts.OutputDir, "output", "o", ".", "Output directory")
 
 	return cmd
@@ -73,15 +80,15 @@ func run(opts *Options) error {
 
 	// Generate files based on language
 	switch opts.Lang {
-	case "bash", "sh":
+	case langBash, "sh":
 		if err := scaffold.Bash(extDir, extName, name); err != nil {
 			return err
 		}
-	case "go", "golang":
+	case "go", langGo:
 		if err := scaffold.Go(extDir, extName, name); err != nil {
 			return err
 		}
-	case "python", "py":
+	case langPython, "py":
 		if err := scaffold.Python(extDir, extName, name); err != nil {
 			return err
 		}

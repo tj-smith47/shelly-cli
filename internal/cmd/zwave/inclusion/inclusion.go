@@ -13,6 +13,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Inclusion mode identifiers used by the --mode flag and its aliases.
+const (
+	modeSmartStart = "smart_start"
+	modeButton     = "button"
+	modeSwitch     = "switch"
+	aliasInclude   = "include"
+	aliasPair      = "pair"
+	aliasAdd       = "add"
+)
+
 // Options holds command options.
 type Options struct {
 	Model   string
@@ -26,7 +36,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "inclusion <model>",
-		Aliases: []string{"include", "pair", "add"},
+		Aliases: []string{aliasInclude, aliasPair, aliasAdd},
 		Short:   "Show inclusion instructions",
 		Long: `Show Z-Wave inclusion (pairing) instructions for a device.
 
@@ -49,7 +59,7 @@ Inclusion modes:
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Mode, "mode", "smart_start", "Inclusion mode (smart_start, button, switch)")
+	cmd.Flags().StringVar(&opts.Mode, "mode", modeSmartStart, "Inclusion mode (smart_start, button, switch)")
 
 	return cmd
 }
@@ -69,11 +79,11 @@ func run(opts *Options) error {
 
 	var mode zwave.InclusionMode
 	switch strings.ToLower(opts.Mode) {
-	case "smart_start", "smartstart", "qr":
+	case modeSmartStart, "smartstart", "qr":
 		mode = zwave.InclusionSmartStart
-	case "button", "s":
+	case modeButton, "s":
 		mode = zwave.InclusionButton
-	case "switch":
+	case modeSwitch:
 		mode = zwave.InclusionSwitch
 	default:
 		return fmt.Errorf("invalid mode %q, must be one of: smart_start, button, switch", opts.Mode)

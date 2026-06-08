@@ -10,7 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
-//nolint:gocritic,unparam // helper function returns multiple values for API consistency
+//nolint:unparam // helper function returns multiple values for API consistency
 func testIOStreams() (*iostreams.IOStreams, *bytes.Buffer, *bytes.Buffer) {
 	in := strings.NewReader("")
 	out := &bytes.Buffer{}
@@ -65,7 +65,7 @@ func TestServer_HandleHealth(t *testing.T) {
 	server := NewServer(ios, false)
 	handler := server.Handler()
 
-	req := httptest.NewRequest(http.MethodGet, "/health", http.NoBody)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/health", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -90,7 +90,7 @@ func TestServer_HandleWebhook(t *testing.T) {
 	server := NewServer(ios, false)
 	handler := server.Handler()
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook?event=switch.on", strings.NewReader(`{"switch":{"id":0,"output":true}}`))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/webhook?event=switch.on", strings.NewReader(`{"switch":{"id":0,"output":true}}`))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -113,7 +113,7 @@ func TestServer_HandleWebhook_JSON(t *testing.T) {
 	server := NewServer(ios, true)
 	handler := server.Handler()
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(`{"event":"button.push"}`))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/webhook", strings.NewReader(`{"event":"button.push"}`))
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -135,7 +135,7 @@ func TestServer_HandleWebhook_RootPath(t *testing.T) {
 	server := NewServer(ios, false)
 	handler := server.Handler()
 
-	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -154,13 +154,13 @@ func TestServer_CountIncrement(t *testing.T) {
 
 	// Send three webhooks
 	for range 3 {
-		req := httptest.NewRequest(http.MethodPost, "/webhook", http.NoBody)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/webhook", http.NoBody)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)
 	}
 
 	// Check health to see count
-	req := httptest.NewRequest(http.MethodGet, "/health", http.NoBody)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/health", http.NoBody)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -216,7 +216,7 @@ func TestGetLocalIP(t *testing.T) {
 	}
 
 	// Should be either "localhost" or look like an IP address
-	if ip != "localhost" && !strings.Contains(ip, ".") { //nolint:goconst // test value
+	if ip != "localhost" && !strings.Contains(ip, ".") {
 		t.Errorf("GetLocalIP() = %q, doesn't look like IP or localhost", ip)
 	}
 }

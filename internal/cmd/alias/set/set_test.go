@@ -72,10 +72,10 @@ func TestNewCommand_Args(t *testing.T) {
 	if err := cmd.Args(cmd, []string{"name"}); err == nil {
 		t.Error("Args should reject 1 argument")
 	}
-	if err := cmd.Args(cmd, []string{"name", "command"}); err != nil {
+	if err := cmd.Args(cmd, []string{"name", aliasTypeCommand}); err != nil {
 		t.Errorf("Args should accept 2 arguments: %v", err)
 	}
-	if err := cmd.Args(cmd, []string{"name", "command", "with", "spaces"}); err != nil {
+	if err := cmd.Args(cmd, []string{"name", aliasTypeCommand, "with", "spaces"}); err != nil {
 		t.Errorf("Args should accept more than 2 arguments: %v", err)
 	}
 }

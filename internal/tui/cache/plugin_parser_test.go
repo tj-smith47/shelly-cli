@@ -45,7 +45,7 @@ func setupTestPlugin(t *testing.T, statusJSON string) *shelly.Service {
 		Version:       "1.0.0",
 		Capabilities: &plugins.Capabilities{
 			Platform:   testPlatformName,
-			Components: []string{"switch", "light"},
+			Components: []string{ComponentSwitch, ComponentLight},
 		},
 		Hooks: &plugins.Hooks{
 			Status: "./status",
@@ -85,15 +85,15 @@ func TestParsePluginStatus_SwitchComponent(t *testing.T) {
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Components: map[string]any{
-			"switch:0": map[string]any{
-				"output": true,
-				"name":   "Main Switch",
-				"source": testInputTypeButton,
-				"power":  45.2,
+			keySwitch0: map[string]any{
+				fieldOutput: true,
+				fieldName:   "Main Switch",
+				"source":    testInputTypeButton,
+				"power":     45.2,
 			},
-			"switch:1": map[string]any{
-				"output": false,
-				"name":   "Secondary",
+			keySwitch1: map[string]any{
+				fieldOutput: false,
+				fieldName:   "Secondary",
 			},
 		},
 	}
@@ -119,9 +119,9 @@ func TestParsePluginStatus_LightComponent(t *testing.T) {
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Components: map[string]any{
-			"light:0": map[string]any{
-				"output": true,
-				"name":   "Dimmer",
+			keyLight0: map[string]any{
+				fieldOutput: true,
+				fieldName:   "Dimmer",
 			},
 		},
 	}
@@ -149,9 +149,9 @@ func TestParsePluginStatus_CoverComponent(t *testing.T) {
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Components: map[string]any{
-			"cover:0": map[string]any{
-				"state": "open",
-				"name":  "Blinds",
+			keyCover0: map[string]any{
+				fieldState: CoverStateOpen,
+				fieldName:  "Blinds",
 			},
 		},
 	}
@@ -175,10 +175,10 @@ func TestParsePluginStatus_InputComponent(t *testing.T) {
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Components: map[string]any{
-			"input:0": map[string]any{
-				"state": true,
-				"type":  testInputTypeButton,
-				"name":  "Wall Button",
+			keyInput0: map[string]any{
+				fieldState: true,
+				"type":     testInputTypeButton,
+				fieldName:  "Wall Button",
 			},
 		},
 	}
@@ -238,9 +238,9 @@ func TestParsePluginStatus_Sensors_NestedMap(t *testing.T) {
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Sensors: map[string]any{
-			"temperature": map[string]any{
-				"value": 23.5,
-				"unit":  "C",
+			ComponentTemperature: map[string]any{
+				fieldValue: 23.5,
+				fieldUnit:  "C",
 			},
 		},
 	}
@@ -262,7 +262,7 @@ func TestParsePluginStatus_Sensors_RawFloat(t *testing.T) {
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Sensors: map[string]any{
-			"temperature": 19.0,
+			ComponentTemperature: 19.0,
 		},
 	}
 
@@ -279,15 +279,15 @@ func TestParsePluginStatus_Sensors_RawFloat(t *testing.T) {
 func TestParsePluginStatus_StringState(t *testing.T) {
 	t.Parallel()
 
-	// Test plugins that use "state": "on" instead of "output": true
+	// Test plugins that use fieldState: "on" instead of fieldOutput: true
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Components: map[string]any{
-			"switch:0": map[string]any{
-				"state": "on",
+			keySwitch0: map[string]any{
+				fieldState: "on",
 			},
-			"light:0": map[string]any{
-				"state": "ON",
+			keyLight0: map[string]any{
+				fieldState: "ON",
 			},
 		},
 	}
@@ -311,8 +311,8 @@ func TestParsePluginStatus_InvalidComponentKey(t *testing.T) {
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Components: map[string]any{
-			"invalid":    map[string]any{"output": true},
-			"switch:abc": map[string]any{"output": true},
+			testInvalid:  map[string]any{fieldOutput: true},
+			"switch:abc": map[string]any{fieldOutput: true},
 		},
 	}
 
@@ -333,7 +333,7 @@ func TestParsePluginStatus_NonMapComponent(t *testing.T) {
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Components: map[string]any{
-			"switch:0": "not-a-map",
+			keySwitch0: "not-a-map",
 		},
 	}
 
@@ -353,15 +353,15 @@ func TestParsePluginStatus_MixedComponents(t *testing.T) {
 	result := &plugins.DeviceStatusResult{
 		Online: true,
 		Components: map[string]any{
-			"switch:0": map[string]any{"output": true, "name": "Relay 1"},
-			"switch:1": map[string]any{"output": false, "name": "Relay 2"},
-			"light:0":  map[string]any{"output": true},
-			"cover:0":  map[string]any{"state": "closed"},
-			"input:0":  map[string]any{"state": true, "type": "switch"},
+			keySwitch0: map[string]any{fieldOutput: true, fieldName: "Relay 1"},
+			keySwitch1: map[string]any{fieldOutput: false, fieldName: "Relay 2"},
+			keyLight0:  map[string]any{fieldOutput: true},
+			keyCover0:  map[string]any{fieldState: CoverStateClosed},
+			keyInput0:  map[string]any{fieldState: true, "type": ComponentSwitch},
 		},
 		Energy: &plugins.EnergyStatus{Power: 50.0},
 		Sensors: map[string]any{
-			"temperature": map[string]any{"value": 25.0, "unit": "C"},
+			ComponentTemperature: map[string]any{fieldValue: 25.0, fieldUnit: "C"},
 		},
 	}
 
@@ -467,50 +467,50 @@ func TestPluginGetSensorValue(t *testing.T) {
 	}{
 		{
 			name:    "nested map with value",
-			sensors: map[string]any{"temperature": map[string]any{"value": 23.5, "unit": "C"}},
-			key:     "temperature",
+			sensors: map[string]any{ComponentTemperature: map[string]any{fieldValue: 23.5, fieldUnit: "C"}},
+			key:     ComponentTemperature,
 			want:    23.5,
 			wantOK:  true,
 		},
 		{
 			name:    "raw float fallback",
-			sensors: map[string]any{"temperature": 19.0},
-			key:     "temperature",
+			sensors: map[string]any{ComponentTemperature: 19.0},
+			key:     ComponentTemperature,
 			want:    19.0,
 			wantOK:  true,
 		},
 		{
 			name:    "raw int fallback",
-			sensors: map[string]any{"temperature": 20},
-			key:     "temperature",
+			sensors: map[string]any{ComponentTemperature: 20},
+			key:     ComponentTemperature,
 			want:    20.0,
 			wantOK:  true,
 		},
 		{
 			name:    "missing key",
 			sensors: map[string]any{"humidity": 50.0},
-			key:     "temperature",
+			key:     ComponentTemperature,
 			want:    0,
 			wantOK:  false,
 		},
 		{
 			name:    "nil sensors",
 			sensors: nil,
-			key:     "temperature",
+			key:     ComponentTemperature,
 			want:    0,
 			wantOK:  false,
 		},
 		{
 			name:    "nested map without value field",
-			sensors: map[string]any{"temperature": map[string]any{"unit": "C"}},
-			key:     "temperature",
+			sensors: map[string]any{ComponentTemperature: map[string]any{fieldUnit: "C"}},
+			key:     ComponentTemperature,
 			want:    0,
 			wantOK:  false,
 		},
 		{
 			name:    "unsupported type",
-			sensors: map[string]any{"temperature": "warm"},
-			key:     "temperature",
+			sensors: map[string]any{ComponentTemperature: "warm"},
+			key:     ComponentTemperature,
 			want:    0,
 			wantOK:  false,
 		},
@@ -555,8 +555,8 @@ func TestFetchPluginDevice_OnlineWithComponents(t *testing.T) {
 	}
 
 	device := model.Device{
-		Name:     "test-tasmota",
-		Address:  "192.168.1.100",
+		Name:     testTasmotaName,
+		Address:  testAddr100,
 		Platform: testPlatformName,
 	}
 	data := &DeviceData{
@@ -565,13 +565,13 @@ func TestFetchPluginDevice_OnlineWithComponents(t *testing.T) {
 		UpdatedAt: time.Now(),
 	}
 
-	msg := c.fetchPluginDevice("test-tasmota", device, data, 1)
+	msg := c.fetchPluginDevice(testTasmotaName, device, data, 1)
 	updateMsg, ok := msg.(DeviceUpdateMsg)
 	if !ok {
 		t.Fatalf("expected DeviceUpdateMsg, got %T", msg)
 	}
 
-	if updateMsg.Name != "test-tasmota" {
+	if updateMsg.Name != testTasmotaName {
 		t.Errorf("expected name 'test-tasmota', got %q", updateMsg.Name)
 	}
 	if updateMsg.RequestID != 1 {
@@ -588,7 +588,7 @@ func TestFetchPluginDevice_OnlineWithComponents(t *testing.T) {
 	if updateMsg.Data.Info == nil {
 		t.Fatal("expected DeviceInfo to be set")
 	}
-	if updateMsg.Data.Info.ID != "test-tasmota" {
+	if updateMsg.Data.Info.ID != testTasmotaName {
 		t.Errorf("expected info ID 'test-tasmota', got %q", updateMsg.Data.Info.ID)
 	}
 	if updateMsg.Data.Info.App != testPlatformName {

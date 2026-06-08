@@ -18,20 +18,20 @@ func TestDisplayDeviceStatus(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	status := &shelly.DeviceStatus{
 		Info: &shelly.DeviceInfo{
-			ID:         "shellypro1pm-123456",
-			Model:      "SNSW-001P16EU",
+			ID:         testDeviceIDPro1,
+			Model:      testModel1PM,
 			Generation: 2,
-			Firmware:   "1.0.0",
+			Firmware:   testFWVersion,
 		},
 		Status: map[string]any{
-			"switch:0": map[string]any{"output": true},
+			"switch:0": map[string]any{testValueOutput: true},
 		},
 	}
 
 	DisplayDeviceStatus(ios, status)
 
 	output := out.String()
-	if !strings.Contains(output, "shellypro1pm-123456") {
+	if !strings.Contains(output, testDeviceIDPro1) {
 		t.Error("output should contain device ID")
 	}
 	if !strings.Contains(output, "Gen2") {
@@ -49,10 +49,10 @@ func TestDisplayAllSnapshots(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		snapshots := map[string]*shelly.DeviceSnapshot{
-			"device1": {
+			testDevice1: {
 				Info: &monitoring.DeviceInfo{
-					ID:    "device1",
-					Model: "Shelly Pro 1PM",
+					ID:    testDevice1,
+					Model: testModelNamePro1,
 				},
 				Snapshot: &model.MonitoringSnapshot{
 					Timestamp: time.Now(),
@@ -70,7 +70,7 @@ func TestDisplayAllSnapshots(t *testing.T) {
 		if !strings.Contains(output, "Device Status Summary") {
 			t.Error("output should contain 'Device Status Summary'")
 		}
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain 'device1'")
 		}
 	})
@@ -79,7 +79,7 @@ func TestDisplayAllSnapshots(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		snapshots := map[string]*shelly.DeviceSnapshot{
-			"device1": {
+			testDevice1: {
 				Info:     nil,
 				Snapshot: nil,
 				Error:    errors.New("connection timeout"),
@@ -137,16 +137,16 @@ func TestDisplayPluginDeviceStatus(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		device := model.Device{
 			Name:    "smartthings-device",
-			Address: "192.168.1.100",
+			Address: testIP100,
 			Model:   "ST-SWITCH-01",
 		}
 		status := &plugins.DeviceStatusResult{
 			Online: true,
 			Components: map[string]any{
-				"switch": true,
+				testCompSwitch: true,
 			},
 			Sensors: map[string]any{
-				"temperature": 22.5,
+				testTemperature: 22.5,
 			},
 			Energy: &plugins.EnergyStatus{
 				Power:   100.0,
@@ -176,8 +176,8 @@ func TestDisplayPluginDeviceStatus(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		device := model.Device{
-			Name:    "device1",
-			Address: "192.168.1.100",
+			Name:    testDevice1,
+			Address: testIP100,
 		}
 		status := &plugins.DeviceStatusResult{
 			Online: false,
@@ -196,15 +196,15 @@ func TestComponentState_Fields(t *testing.T) {
 	t.Parallel()
 
 	state := ComponentState{
-		Type:  "Switch 0",
-		Name:  "Kitchen Light",
+		Type:  testSwitch0,
+		Name:  testKitchenName,
 		State: "ON (45W)",
 	}
 
-	if state.Type != "Switch 0" {
+	if state.Type != testSwitch0 {
 		t.Errorf("Type = %q, want 'Switch 0'", state.Type)
 	}
-	if state.Name != "Kitchen Light" {
+	if state.Name != testKitchenName {
 		t.Errorf("Name = %q, want 'Kitchen Light'", state.Name)
 	}
 	if state.State != "ON (45W)" {
@@ -216,15 +216,15 @@ func TestQuickDeviceStatus_Fields(t *testing.T) {
 	t.Parallel()
 
 	status := QuickDeviceStatus{
-		Name:   "device1",
-		Model:  "Shelly Pro 1PM",
+		Name:   testDevice1,
+		Model:  testModelNamePro1,
 		Online: true,
 	}
 
-	if status.Name != "device1" {
+	if status.Name != testDevice1 {
 		t.Errorf("Name = %q, want 'device1'", status.Name)
 	}
-	if status.Model != "Shelly Pro 1PM" {
+	if status.Model != testModelNamePro1 {
 		t.Errorf("Model = %q, want 'Shelly Pro 1PM'", status.Model)
 	}
 	if !status.Online {

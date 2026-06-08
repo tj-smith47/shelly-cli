@@ -15,6 +15,18 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
+// Scenario names and device defaults.
+const (
+	scenarioMinimal = "minimal"
+	scenarioHome    = "home"
+	scenarioOffice  = "office"
+
+	defaultFirmware = "1.0.0"
+	modelPlus1PM    = "Plus 1PM"
+	modelPlus2PM    = "Plus 2PM"
+	modelPlugS      = "Plug S"
+)
+
 // Options holds the command options.
 type Options struct {
 	Factory  *cmdutil.Factory
@@ -53,20 +65,20 @@ func run(_ context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	scenarios := map[string][]mock.Device{
-		"minimal": {
-			{Name: "test-switch", Model: "Plus 1PM", Firmware: "1.0.0"},
+		scenarioMinimal: {
+			{Name: "test-switch", Model: modelPlus1PM, Firmware: defaultFirmware},
 		},
-		"home": {
-			{Name: "living-room", Model: "Plus 1PM", Firmware: "1.0.0"},
-			{Name: "bedroom", Model: "Plus 2PM", Firmware: "1.0.0"},
-			{Name: "kitchen", Model: "Plug S", Firmware: "1.0.0"},
+		scenarioHome: {
+			{Name: "living-room", Model: modelPlus1PM, Firmware: defaultFirmware},
+			{Name: "bedroom", Model: modelPlus2PM, Firmware: defaultFirmware},
+			{Name: "kitchen", Model: modelPlugS, Firmware: defaultFirmware},
 		},
-		"office": {
-			{Name: "desk-lamp", Model: "Plus 1PM", Firmware: "1.0.0"},
-			{Name: "monitor", Model: "Plug S", Firmware: "1.0.0"},
-			{Name: "printer", Model: "Plug S", Firmware: "1.0.0"},
-			{Name: "air-purifier", Model: "Plus 2PM", Firmware: "1.0.0"},
-			{Name: "heater", Model: "Plus 2PM", Firmware: "1.0.0"},
+		scenarioOffice: {
+			{Name: "desk-lamp", Model: modelPlus1PM, Firmware: defaultFirmware},
+			{Name: "monitor", Model: modelPlugS, Firmware: defaultFirmware},
+			{Name: "printer", Model: modelPlugS, Firmware: defaultFirmware},
+			{Name: "air-purifier", Model: modelPlus2PM, Firmware: defaultFirmware},
+			{Name: "heater", Model: modelPlus2PM, Firmware: defaultFirmware},
 		},
 	}
 

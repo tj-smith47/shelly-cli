@@ -8,7 +8,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 )
 
-const testAutomationDevice = "device1"
+const testAutomationDevice = testDevice1
 
 func TestDisplayScriptList(t *testing.T) {
 	t.Parallel()
@@ -64,13 +64,13 @@ func TestDisplayScheduleList(t *testing.T) {
 				Enable:   true,
 				Timespec: "0 0 8 * * MON-FRI",
 				Calls: []automation.ScheduleCall{
-					{Method: "Switch.Set", Params: map[string]any{"id": 0, "on": true}},
+					{Method: testSwitchSet, Params: map[string]any{"id": 0, "on": true}},
 				},
 			},
 			{
 				ID:       2,
 				Enable:   false,
-				Timespec: "0 0 22 * * *",
+				Timespec: testCron10pm,
 				Calls:    []automation.ScheduleCall{},
 			},
 		}
@@ -81,7 +81,7 @@ func TestDisplayScheduleList(t *testing.T) {
 		if !strings.Contains(output, "8 * * MON-FRI") {
 			t.Error("output should contain timespec")
 		}
-		if !strings.Contains(output, "Switch.Set") {
+		if !strings.Contains(output, testSwitchSet) {
 			t.Error("output should contain method name")
 		}
 	})
@@ -115,21 +115,21 @@ func TestFormatScheduleCallsSummary(t *testing.T) {
 		{
 			name: "single call without params",
 			calls: []automation.ScheduleCall{
-				{Method: "Switch.Toggle"},
+				{Method: testSwitchToggle},
 			},
-			want: "Switch.Toggle",
+			want: testSwitchToggle,
 		},
 		{
 			name: "single call with params",
 			calls: []automation.ScheduleCall{
-				{Method: "Switch.Set", Params: map[string]any{"id": 0}},
+				{Method: testSwitchSet, Params: map[string]any{"id": 0}},
 			},
-			want: "Switch.Set",
+			want: testSwitchSet,
 		},
 		{
 			name: "multiple calls",
 			calls: []automation.ScheduleCall{
-				{Method: "Switch.Set"},
+				{Method: testSwitchSet},
 				{Method: "Light.Set"},
 				{Method: "Cover.Open"},
 			},
@@ -227,10 +227,10 @@ func TestDisplayThermostatSchedules(t *testing.T) {
 			{
 				ID:           1,
 				Enabled:      true,
-				Timespec:     "0 0 8 * * *",
+				Timespec:     testCron8am,
 				ThermostatID: 0,
 				TargetC:      &targetC,
-				Mode:         "heat",
+				Mode:         testTypeHeat,
 			},
 		}
 
@@ -243,7 +243,7 @@ func TestDisplayThermostatSchedules(t *testing.T) {
 		if !strings.Contains(output, "22.5") {
 			t.Error("output should contain target temperature")
 		}
-		if !strings.Contains(output, "heat") {
+		if !strings.Contains(output, testTypeHeat) {
 			t.Error("output should contain mode")
 		}
 	})
@@ -282,7 +282,7 @@ func TestDisplayThermostatSchedules(t *testing.T) {
 			{
 				ID:       1,
 				Enabled:  true,
-				Timespec: "0 0 8 * * *",
+				Timespec: testCron8am,
 				Enable:   &enable,
 			},
 		}
@@ -305,7 +305,7 @@ func TestThermostatScheduleCreateDisplay_Fields(t *testing.T) {
 		ScheduleID: 5,
 		Timespec:   "0 0 8 * * MON-FRI",
 		TargetC:    &targetC,
-		Mode:       "heat",
+		Mode:       testTypeHeat,
 		Enable:     true,
 		Disable:    false,
 		Enabled:    true,
@@ -333,9 +333,9 @@ func TestDisplayThermostatScheduleCreate(t *testing.T) {
 		display := ThermostatScheduleCreateDisplay{
 			Device:     testAutomationDevice,
 			ScheduleID: 1,
-			Timespec:   "0 0 8 * * *",
+			Timespec:   testCron8am,
 			TargetC:    &targetC,
-			Mode:       "heat",
+			Mode:       testTypeHeat,
 			Enabled:    true,
 		}
 
@@ -357,7 +357,7 @@ func TestDisplayThermostatScheduleCreate(t *testing.T) {
 		display := ThermostatScheduleCreateDisplay{
 			Device:     testAutomationDevice,
 			ScheduleID: 2,
-			Timespec:   "0 0 22 * * *",
+			Timespec:   testCron10pm,
 			Enabled:    false,
 		}
 
@@ -377,7 +377,7 @@ func TestDisplayThermostatScheduleCreate(t *testing.T) {
 		display := ThermostatScheduleCreateDisplay{
 			Device:     testAutomationDevice,
 			ScheduleID: 3,
-			Timespec:   "0 0 8 * * *",
+			Timespec:   testCron8am,
 			Enable:     true,
 			Enabled:    true,
 		}
@@ -397,7 +397,7 @@ func TestDisplayThermostatScheduleCreate(t *testing.T) {
 		display := ThermostatScheduleCreateDisplay{
 			Device:     testAutomationDevice,
 			ScheduleID: 4,
-			Timespec:   "0 0 22 * * *",
+			Timespec:   testCron10pm,
 			Disable:    true,
 			Enabled:    true,
 		}

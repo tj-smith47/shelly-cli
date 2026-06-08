@@ -16,13 +16,13 @@ func TestNewOutput(t *testing.T) {
 	t.Parallel()
 
 	info := Info{
-		Version:   "1.0.0",
+		Version:   testVersion1,
 		Commit:    "abc123",
-		Date:      "2024-01-01",
-		BuiltBy:   "test",
-		GoVersion: "go1.21.0",
-		OS:        "linux",
-		Arch:      "amd64",
+		Date:      testDate,
+		BuiltBy:   testBuiltBy,
+		GoVersion: testGoVersion,
+		OS:        testOS,
+		Arch:      testArch,
 	}
 
 	output := NewOutput(info)
@@ -118,7 +118,7 @@ func TestWriteJSON_WithUpdateInfo(t *testing.T) {
 	t.Parallel()
 
 	output := &Output{
-		Version: "1.0.0",
+		Version: testVersion1,
 	}
 	output.SetUpdateInfo(testVersion2, true)
 
@@ -146,13 +146,13 @@ func TestWriteJSONOutput_NoUpdateCheck(t *testing.T) {
 	t.Parallel()
 
 	info := Info{
-		Version:   "1.0.0",
-		Commit:    "abc",
-		Date:      "2024-01-01",
-		BuiltBy:   "test",
-		GoVersion: "go1.21.0",
-		OS:        "linux",
-		Arch:      "amd64",
+		Version:   testVersion1,
+		Commit:    testCommitAbc,
+		Date:      testDate,
+		BuiltBy:   testBuiltBy,
+		GoVersion: testGoVersion,
+		OS:        testOS,
+		Arch:      testArch,
 	}
 
 	var buf bytes.Buffer
@@ -166,8 +166,8 @@ func TestWriteJSONOutput_NoUpdateCheck(t *testing.T) {
 		t.Fatalf("output is not valid JSON: %v", err)
 	}
 
-	if decoded["version"] != "1.0.0" {
-		t.Errorf("version = %v, want '1.0.0'", decoded["version"])
+	if decoded["version"] != testVersion1 {
+		t.Errorf("version = %v, want %q", decoded["version"], testVersion1)
 	}
 	// Should not have update info
 	if _, exists := decoded["update_available"]; exists {
@@ -182,13 +182,13 @@ func TestWriteJSONOutput_WithUpdateCheck(t *testing.T) {
 	t.Setenv("HOME", "/test/home")
 
 	info := Info{
-		Version:   "1.0.0",
-		Commit:    "abc",
-		Date:      "2024-01-01",
-		BuiltBy:   "test",
-		GoVersion: "go1.21.0",
-		OS:        "linux",
-		Arch:      "amd64",
+		Version:   testVersion1,
+		Commit:    testCommitAbc,
+		Date:      testDate,
+		BuiltBy:   testBuiltBy,
+		GoVersion: testGoVersion,
+		OS:        testOS,
+		Arch:      testArch,
 	}
 
 	// Mock fetcher that returns a newer version
@@ -221,13 +221,13 @@ func TestWriteJSONOutput_FetcherError(t *testing.T) {
 	t.Parallel()
 
 	info := Info{
-		Version:   "1.0.0",
-		Commit:    "abc",
-		Date:      "2024-01-01",
-		BuiltBy:   "test",
-		GoVersion: "go1.21.0",
-		OS:        "linux",
-		Arch:      "amd64",
+		Version:   testVersion1,
+		Commit:    testCommitAbc,
+		Date:      testDate,
+		BuiltBy:   testBuiltBy,
+		GoVersion: testGoVersion,
+		OS:        testOS,
+		Arch:      testArch,
 	}
 
 	// Mock fetcher that returns an error
@@ -257,13 +257,13 @@ func TestWriteJSONOutput_DevBuild(t *testing.T) {
 	t.Parallel()
 
 	info := Info{
-		Version:   "dev",
-		Commit:    "abc",
-		Date:      "2024-01-01",
-		BuiltBy:   "test",
-		GoVersion: "go1.21.0",
-		OS:        "linux",
-		Arch:      "amd64",
+		Version:   DevVersion,
+		Commit:    testCommitAbc,
+		Date:      testDate,
+		BuiltBy:   testBuiltBy,
+		GoVersion: testGoVersion,
+		OS:        testOS,
+		Arch:      testArch,
 	}
 
 	// Mock fetcher that returns a newer version

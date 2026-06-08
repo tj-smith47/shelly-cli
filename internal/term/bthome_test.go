@@ -13,8 +13,8 @@ func TestDisplayBTHomeAddResult(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	result := BTHomeAddResult{
 		Key:  "bthomedevice:200",
-		Name: "Temperature Sensor",
-		Addr: "AA:BB:CC:DD:EE:FF",
+		Name: sensorNameTemperature,
+		Addr: testMAC,
 	}
 	DisplayBTHomeAddResult(ios, result)
 
@@ -25,10 +25,10 @@ func TestDisplayBTHomeAddResult(t *testing.T) {
 	if !strings.Contains(output, "bthomedevice:200") {
 		t.Error("expected key")
 	}
-	if !strings.Contains(output, "Temperature Sensor") {
+	if !strings.Contains(output, sensorNameTemperature) {
 		t.Error("expected name")
 	}
-	if !strings.Contains(output, "AA:BB:CC:DD:EE:FF") {
+	if !strings.Contains(output, testMAC) {
 		t.Error("expected address")
 	}
 }
@@ -40,7 +40,7 @@ func TestDisplayBTHomeAddResult_NoName(t *testing.T) {
 	result := BTHomeAddResult{
 		Key:  "bthomedevice:201",
 		Name: "",
-		Addr: "11:22:33:44:55:66",
+		Addr: testMAC2,
 	}
 	DisplayBTHomeAddResult(ios, result)
 
@@ -105,15 +105,15 @@ func TestDisplayBTHomeDevices_WithDevices(t *testing.T) {
 	devices := []model.BTHomeDeviceInfo{
 		{
 			ID:      100,
-			Name:    "Temperature Sensor",
-			Addr:    "AA:BB:CC:DD:EE:FF",
+			Name:    sensorNameTemperature,
+			Addr:    testMAC,
 			RSSI:    &rssi,
 			Battery: &battery,
 		},
 		{
 			ID:   101,
 			Name: "",
-			Addr: "11:22:33:44:55:66",
+			Addr: testMAC2,
 		},
 	}
 	DisplayBTHomeDevices(ios, devices, "gateway")
@@ -122,7 +122,7 @@ func TestDisplayBTHomeDevices_WithDevices(t *testing.T) {
 	if !strings.Contains(output, "BTHome Devices (2)") {
 		t.Error("expected device count header")
 	}
-	if !strings.Contains(output, "Temperature Sensor") {
+	if !strings.Contains(output, sensorNameTemperature) {
 		t.Error("expected device name")
 	}
 	if !strings.Contains(output, "ID: 100") {
@@ -211,7 +211,7 @@ func TestDisplayBTHomeDeviceStatus_Full(t *testing.T) {
 	status := model.BTHomeDeviceStatus{
 		ID:           100,
 		Name:         "Temp Sensor",
-		Addr:         "AA:BB:CC:DD:EE:FF",
+		Addr:         testMAC,
 		RSSI:         &rssi,
 		Battery:      &battery,
 		PacketID:     &packetID,

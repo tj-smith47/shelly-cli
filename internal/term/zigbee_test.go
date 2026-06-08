@@ -29,15 +29,15 @@ func TestDisplayZigbeeDevices_WithDevices(t *testing.T) {
 	devices := []model.ZigbeeDevice{
 		{
 			Name:         "Hub Device",
-			Address:      "192.168.1.100",
+			Address:      testIP100,
 			Model:        "SNSN-0043X",
 			Enabled:      true,
-			NetworkState: "joined",
+			NetworkState: zigbeeStateJoined,
 			EUI64:        "00:11:22:FF:FE:33:44:55",
 		},
 		{
 			Name:         "Second Hub",
-			Address:      "192.168.1.101",
+			Address:      testIP101,
 			Model:        "",
 			Enabled:      false,
 			NetworkState: "",
@@ -53,7 +53,7 @@ func TestDisplayZigbeeDevices_WithDevices(t *testing.T) {
 	if !strings.Contains(output, "Hub Device") {
 		t.Error("expected device name")
 	}
-	if !strings.Contains(output, "192.168.1.100") {
+	if !strings.Contains(output, testIP100) {
 		t.Error("expected address")
 	}
 	if !strings.Contains(output, "SNSN-0043X") {
@@ -69,7 +69,7 @@ func TestOutputZigbeeDevicesJSON(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	devices := []model.ZigbeeDevice{
-		{Name: "test", Address: "192.168.1.1", Enabled: true},
+		{Name: testValueTest, Address: "192.168.1.1", Enabled: true},
 	}
 	err := OutputZigbeeDevicesJSON(ios, devices)
 	if err != nil {
@@ -77,7 +77,7 @@ func TestOutputZigbeeDevicesJSON(t *testing.T) {
 	}
 
 	output := out.String()
-	if !strings.Contains(output, "test") {
+	if !strings.Contains(output, testValueTest) {
 		t.Error("expected device name in JSON")
 	}
 	if !strings.Contains(output, "192.168.1.1") {
@@ -91,7 +91,7 @@ func TestDisplayZigbeeStatus_Joined(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	status := model.ZigbeeStatus{
 		Enabled:          true,
-		NetworkState:     "joined",
+		NetworkState:     zigbeeStateJoined,
 		EUI64:            "AA:BB:CC:FF:FE:DD:EE:FF",
 		PANID:            0x1234,
 		Channel:          15,
@@ -106,7 +106,7 @@ func TestDisplayZigbeeStatus_Joined(t *testing.T) {
 	if !strings.Contains(output, "Enabled") {
 		t.Error("expected enabled status")
 	}
-	if !strings.Contains(output, "joined") {
+	if !strings.Contains(output, zigbeeStateJoined) {
 		t.Error("expected network state")
 	}
 	if !strings.Contains(output, "Network Info") {
@@ -165,7 +165,7 @@ func TestOutputZigbeeStatusJSON(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	status := model.ZigbeeStatus{
 		Enabled:      true,
-		NetworkState: "joined",
+		NetworkState: zigbeeStateJoined,
 		PANID:        0xABCD,
 		Channel:      20,
 	}
@@ -178,7 +178,7 @@ func TestOutputZigbeeStatusJSON(t *testing.T) {
 	if !strings.Contains(output, "enabled") {
 		t.Error("expected enabled field in JSON")
 	}
-	if !strings.Contains(output, "joined") {
+	if !strings.Contains(output, zigbeeStateJoined) {
 		t.Error("expected network_state in JSON")
 	}
 }

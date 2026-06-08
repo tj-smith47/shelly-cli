@@ -14,6 +14,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// commandUse is the command's Use string and primary name.
+const commandUse = "sync"
+
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -28,7 +31,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "sync",
+		Use:     commandUse,
 		Aliases: []string{"synchronize"},
 		Short:   "Synchronize device configurations",
 		Long: `Synchronize device configurations between local storage and devices.

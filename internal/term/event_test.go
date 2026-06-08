@@ -8,7 +8,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
-//nolint:gocyclo // comprehensive test coverage
 func TestDisplayEvent(t *testing.T) {
 	t.Parallel()
 
@@ -17,11 +16,11 @@ func TestDisplayEvent(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		event := model.DeviceEvent{
-			Event:       "state_changed",
-			Component:   "switch",
+			Event:       eventStateChanged,
+			Component:   testCompSwitch,
 			ComponentID: 0,
 			Timestamp:   time.Now(),
-			Data:        map[string]any{"output": true},
+			Data:        map[string]any{testValueOutput: true},
 		}
 
 		err := DisplayEvent(ios, event)
@@ -30,10 +29,10 @@ func TestDisplayEvent(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		output := out.String()
-		if !strings.Contains(output, "state_changed") {
+		if !strings.Contains(output, eventStateChanged) {
 			t.Error("output should contain event name")
 		}
-		if !strings.Contains(output, "switch") {
+		if !strings.Contains(output, testCompSwitch) {
 			t.Error("output should contain component")
 		}
 		if !strings.Contains(output, "ON") {
@@ -92,8 +91,8 @@ func TestDisplayEvent(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		event := model.DeviceEvent{
-			Event:       "state_changed",
-			Component:   "switch",
+			Event:       eventStateChanged,
+			Component:   testCompSwitch,
 			ComponentID: 0,
 			Timestamp:   time.Now(),
 			Data:        map[string]any{"apower": 50.5},
@@ -115,12 +114,12 @@ func TestDisplayEvent(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		event := model.DeviceEvent{
-			Event:       "state_changed",
-			Component:   "temperature",
+			Event:       eventStateChanged,
+			Component:   testTemperature,
 			ComponentID: 0,
 			Timestamp:   time.Now(),
 			Data: map[string]any{
-				"temperature": map[string]any{"tC": 25.5},
+				testTemperature: map[string]any{"tC": 25.5},
 			},
 		}
 
@@ -140,11 +139,11 @@ func TestDisplayEvent(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		event := model.DeviceEvent{
-			Event:       "state_changed",
-			Component:   "switch",
+			Event:       eventStateChanged,
+			Component:   testCompSwitch,
 			ComponentID: 0,
 			Timestamp:   time.Now(),
-			Data:        map[string]any{"output": false},
+			Data:        map[string]any{testValueOutput: false},
 		}
 
 		err := DisplayEvent(ios, event)
@@ -163,8 +162,8 @@ func TestDisplayEvent(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		event := model.DeviceEvent{
-			Event:       "custom",
-			Component:   "custom",
+			Event:       testTypeCustom,
+			Component:   testTypeCustom,
 			ComponentID: 0,
 			Timestamp:   time.Now(),
 			Data:        map[string]any{"custom_key": "custom_value"},
@@ -186,8 +185,8 @@ func TestDisplayEvent(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		event := model.DeviceEvent{
-			Event:       "custom",
-			Component:   "switch",
+			Event:       testTypeCustom,
+			Component:   testCompSwitch,
 			ComponentID: 1,
 			Timestamp:   time.Now(),
 			Data:        map[string]any{},
@@ -213,11 +212,11 @@ func TestOutputEventJSON(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		event := model.DeviceEvent{
-			Event:       "state_changed",
-			Component:   "switch",
+			Event:       eventStateChanged,
+			Component:   testCompSwitch,
 			ComponentID: 0,
 			Timestamp:   time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
-			Data:        map[string]any{"output": true},
+			Data:        map[string]any{testValueOutput: true},
 		}
 
 		err := OutputEventJSON(ios, event)
@@ -226,10 +225,10 @@ func TestOutputEventJSON(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		output := out.String()
-		if !strings.Contains(output, "state_changed") {
+		if !strings.Contains(output, eventStateChanged) {
 			t.Error("JSON should contain event name")
 		}
-		if !strings.Contains(output, "switch") {
+		if !strings.Contains(output, testCompSwitch) {
 			t.Error("JSON should contain component")
 		}
 	})
@@ -250,12 +249,12 @@ func TestFormatEventData(t *testing.T) {
 		},
 		{
 			name:   "output on",
-			data:   map[string]any{"output": true},
+			data:   map[string]any{testValueOutput: true},
 			expect: "ON",
 		},
 		{
 			name:   "output off",
-			data:   map[string]any{"output": false},
+			data:   map[string]any{testValueOutput: false},
 			expect: "OFF",
 		},
 		{
@@ -265,7 +264,7 @@ func TestFormatEventData(t *testing.T) {
 		},
 		{
 			name:   "temperature value",
-			data:   map[string]any{"temperature": map[string]any{"tC": 22.5}},
+			data:   map[string]any{testTemperature: map[string]any{"tC": 22.5}},
 			expect: "22.5",
 		},
 	}

@@ -343,7 +343,7 @@ func (m ConsoleModel) renderLines() string {
 		scriptID := m.styles.ScriptID.Render(fmt.Sprintf("[%d]", line.ScriptID))
 		output := m.styles.Output.Render(line.Output)
 
-		content.WriteString(fmt.Sprintf("%s %s %s", timestamp, scriptID, output))
+		fmt.Fprintf(&content, "%s %s %s", timestamp, scriptID, output)
 		if i < end-1 {
 			content.WriteString("\n")
 		}

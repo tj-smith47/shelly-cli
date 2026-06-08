@@ -26,8 +26,8 @@ func TestNewCommand(t *testing.T) {
 		t.Fatal("NewCommand returned nil")
 	}
 
-	if cmd.Use != "methods <device>" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "methods <device>")
+	if cmd.Use != useMethods {
+		t.Errorf("Use = %q, want %q", cmd.Use, useMethods)
 	}
 
 	if cmd.Short == "" {
@@ -258,7 +258,7 @@ func TestNewCommand_Properties(t *testing.T) {
 			name: "Use field is set",
 			check: func(f *cmdutil.Factory) bool {
 				cmd := NewCommand(f)
-				return cmd.Use == "methods <device>"
+				return cmd.Use == useMethods
 			},
 			errorMsg: "Use field not set correctly",
 		},

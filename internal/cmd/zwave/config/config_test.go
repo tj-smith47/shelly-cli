@@ -33,8 +33,8 @@ func TestNewCommand_UseField(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "config" {
-		t.Errorf("Use = %q, want \"config\"", cmd.Use)
+	if cmd.Use != commandName {
+		t.Errorf("Use = %q, want %q", cmd.Use, commandName)
 	}
 }
 
@@ -160,7 +160,7 @@ func TestNewCommand_CanBeAddedToParent(t *testing.T) {
 
 	found := false
 	for _, cmd := range parent.Commands() {
-		if cmd.Name() == "config" {
+		if cmd.Name() == commandName {
 			found = true
 			break
 		}

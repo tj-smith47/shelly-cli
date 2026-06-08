@@ -10,6 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+const aliasLoad = "load"
+
 // Options holds the options for the import command.
 type Options struct {
 	Factory  *cmdutil.Factory
@@ -23,7 +25,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "import <file>",
-		Aliases: []string{"load"},
+		Aliases: []string{aliasLoad},
 		Short:   "Import aliases from a YAML file",
 		Long: `Import command aliases from a YAML file.
 

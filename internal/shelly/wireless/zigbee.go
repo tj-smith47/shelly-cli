@@ -15,8 +15,8 @@ import (
 func (s *Service) ZigbeeEnable(ctx context.Context, identifier string) error {
 	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Zigbee.SetConfig", map[string]any{
-			"config": map[string]any{
-				"enable": true,
+			keyConfig: map[string]any{
+				keyEnable: true,
 			},
 		})
 		if err != nil {
@@ -30,8 +30,8 @@ func (s *Service) ZigbeeEnable(ctx context.Context, identifier string) error {
 func (s *Service) ZigbeeDisable(ctx context.Context, identifier string) error {
 	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Zigbee.SetConfig", map[string]any{
-			"config": map[string]any{
-				"enable": false,
+			keyConfig: map[string]any{
+				keyEnable: false,
 			},
 		})
 		if err != nil {
@@ -188,7 +188,7 @@ func (s *Service) FetchZigbeeStatus(ctx context.Context, device string, ios *ios
 	if err != nil {
 		return status, fmt.Errorf("zigbee not available on this device: %w", err)
 	}
-	if enable, ok := cfg["enable"].(bool); ok {
+	if enable, ok := cfg[keyEnable].(bool); ok {
 		status.Enabled = enable
 	}
 

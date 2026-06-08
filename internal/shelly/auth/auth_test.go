@@ -117,7 +117,7 @@ func TestCalculateHA1(t *testing.T) {
 	}{
 		{
 			name:     "standard credentials",
-			user:     "admin",
+			user:     DefaultUser,
 			realm:    "shelly",
 			password: "password123",
 			// expected MD5 hash of "admin:shelly:password123"
@@ -125,7 +125,7 @@ func TestCalculateHA1(t *testing.T) {
 		},
 		{
 			name:     "empty password",
-			user:     "admin",
+			user:     DefaultUser,
 			realm:    "shelly",
 			password: "",
 			// expected MD5 hash of "admin:shelly:"
@@ -133,7 +133,7 @@ func TestCalculateHA1(t *testing.T) {
 		},
 		{
 			name:     "empty realm",
-			user:     "admin",
+			user:     DefaultUser,
 			realm:    "",
 			password: "test",
 			// expected MD5 hash of "admin::test"
@@ -160,15 +160,15 @@ func TestStatus_Fields(t *testing.T) {
 
 	status := Status{
 		Enabled: true,
-		User:    "admin",
+		User:    DefaultUser,
 		Realm:   "shelly-device",
 	}
 
 	if !status.Enabled {
 		t.Error("expected Enabled to be true")
 	}
-	if status.User != "admin" {
-		t.Errorf("got User=%q, want %q", status.User, "admin")
+	if status.User != DefaultUser {
+		t.Errorf("got User=%q, want %q", status.User, DefaultUser)
 	}
 	if status.Realm != "shelly-device" {
 		t.Errorf("got Realm=%q, want %q", status.Realm, "shelly-device")

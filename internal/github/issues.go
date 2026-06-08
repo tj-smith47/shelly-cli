@@ -57,7 +57,7 @@ func BuildIssueBody(cfg *config.Config, opts IssueOpts) string {
 	case IssueTypeDevice:
 		sb.WriteString("## Device Compatibility Issue\n\n")
 		if opts.Device != "" {
-			sb.WriteString(fmt.Sprintf("**Device:** %s\n\n", opts.Device))
+			fmt.Fprintf(&sb, "**Device:** %s\n\n", opts.Device)
 		}
 		sb.WriteString("**Device Model:** <!-- e.g., Shelly Plus 1PM -->\n")
 		sb.WriteString("**Device Firmware:** <!-- e.g., 1.0.8 -->\n\n")
@@ -82,19 +82,19 @@ func FormatSystemInfo(cfg *config.Config, attachLog bool) string {
 
 	var sb strings.Builder
 	sb.WriteString("```\n")
-	sb.WriteString(fmt.Sprintf("CLI Version: %s\n", info.Version))
-	sb.WriteString(fmt.Sprintf("Commit: %s\n", info.Commit))
-	sb.WriteString(fmt.Sprintf("OS: %s\n", runtime.GOOS))
-	sb.WriteString(fmt.Sprintf("Arch: %s\n", runtime.GOARCH))
-	sb.WriteString(fmt.Sprintf("Go: %s\n", runtime.Version()))
+	fmt.Fprintf(&sb, "CLI Version: %s\n", info.Version)
+	fmt.Fprintf(&sb, "Commit: %s\n", info.Commit)
+	fmt.Fprintf(&sb, "OS: %s\n", runtime.GOOS)
+	fmt.Fprintf(&sb, "Arch: %s\n", runtime.GOARCH)
+	fmt.Fprintf(&sb, "Go: %s\n", runtime.Version())
 
 	// Add config info if available
 	if cfg != nil {
 		if cfg.Theme != "" {
-			sb.WriteString(fmt.Sprintf("Theme: %s\n", cfg.Theme))
+			fmt.Fprintf(&sb, "Theme: %s\n", cfg.Theme)
 		}
 		deviceCount := len(cfg.Devices)
-		sb.WriteString(fmt.Sprintf("Configured Devices: %d\n", deviceCount))
+		fmt.Fprintf(&sb, "Configured Devices: %d\n", deviceCount)
 	}
 
 	if attachLog {

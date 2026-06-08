@@ -101,7 +101,7 @@ func TestNewCommand_Flags(t *testing.T) {
 		defValue  string
 	}{
 		{"all", "a", "true"},
-		{"format", "f", "json"},
+		{"format", "f", defaultFormat},
 		{"parallel", "", "3"},
 	}
 
@@ -322,7 +322,7 @@ func TestRun_NoDevices(t *testing.T) {
 		Factory:   tf.Factory,
 		Directory: dir,
 		All:       true,
-		Format:    "json",
+		Format:    defaultFormat,
 		Parallel:  3,
 	}
 	err = run(context.Background(), opts)
@@ -366,7 +366,7 @@ func TestRun_WithDevices(t *testing.T) {
 		Factory:   tf.Factory,
 		Directory: dir,
 		All:       true,
-		Format:    "json",
+		Format:    defaultFormat,
 		Parallel:  3,
 	}
 	err = run(context.Background(), opts)
@@ -407,7 +407,7 @@ func TestRun_InvalidDirectory(t *testing.T) {
 		Factory:   tf.Factory,
 		Directory: "/dev/null/invalid",
 		All:       true,
-		Format:    "json",
+		Format:    defaultFormat,
 		Parallel:  3,
 	}
 	err = run(context.Background(), opts)
@@ -459,7 +459,7 @@ func TestRun_MultipleDevices(t *testing.T) {
 		Factory:   tf.Factory,
 		Directory: dir,
 		All:       true,
-		Format:    "json",
+		Format:    defaultFormat,
 		Parallel:  3,
 	}
 	err = run(context.Background(), opts)

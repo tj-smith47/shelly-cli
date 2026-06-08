@@ -10,6 +10,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// useLine is the command usage string, reused by tests.
+const useLine = "enable <device>"
+
 // Options holds command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -21,7 +24,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "enable <device>",
+		Use:     useLine,
 		Aliases: []string{"on", "activate"},
 		Short:   "Enable Matter on a device",
 		Long: `Enable Matter connectivity on a Shelly device.

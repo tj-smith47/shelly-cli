@@ -12,6 +12,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// thermostatActionEnable is the schedule action label for enabling a thermostat.
+const thermostatActionEnable = "enable"
+
 // DisplayScriptList prints a table of scripts.
 func DisplayScriptList(ios *iostreams.IOStreams, scripts []automation.ScriptInfo) {
 	builder := table.NewBuilder("ID", "Name", "Enabled", "Running")
@@ -118,7 +121,7 @@ func DisplayThermostatSchedules(ios *iostreams.IOStreams, schedules []shelly.The
 		if sched.Enable != nil {
 			enableStr := "disable"
 			if *sched.Enable {
-				enableStr = "enable"
+				enableStr = thermostatActionEnable
 			}
 			ios.Printf("    Action: %s thermostat\n", enableStr)
 		}

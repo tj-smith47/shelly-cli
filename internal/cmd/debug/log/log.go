@@ -12,6 +12,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+// commandUse is the Use string for the debug log command.
+const commandUse = "log <device>"
+
 // Options holds command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -23,7 +26,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "log <device>",
+		Use:     commandUse,
 		Aliases: []string{"logs", "debug-log"},
 		Short:   "Get device debug log (Gen1)",
 		Long: `Get the debug log from a Gen1 Shelly device.

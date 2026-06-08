@@ -7,17 +7,29 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+// Theme name keys recognized by themeMappings.
+const (
+	themeNord            = "nord"
+	themeTokyoNight      = "tokyo-night"
+	themeTokyoNightAlt   = "tokyonight"
+	themeTokyoNightNight = "tokyonight-night"
+	themeGruvbox         = "gruvbox"
+	themeGruvboxDark     = "gruvbox-dark"
+	themeCatppuccin      = "catppuccin"
+	themeCatppuccinMocha = "catppuccin-mocha"
+)
+
 // themeMappings maps theme names to their semantic color mapping functions.
 var themeMappings = map[string]func() SemanticColors{
-	"dracula":          DraculaSemanticMapping,
-	"nord":             NordSemanticMapping,
-	"tokyo-night":      TokyoNightSemanticMapping,
-	"tokyonight":       TokyoNightSemanticMapping,
-	"tokyonight-night": TokyoNightSemanticMapping,
-	"gruvbox":          GruvboxSemanticMapping,
-	"gruvbox-dark":     GruvboxSemanticMapping,
-	"catppuccin":       CatppuccinSemanticMapping,
-	"catppuccin-mocha": CatppuccinSemanticMapping,
+	DefaultTheme:         DraculaSemanticMapping,
+	themeNord:            NordSemanticMapping,
+	themeTokyoNight:      TokyoNightSemanticMapping,
+	themeTokyoNightAlt:   TokyoNightSemanticMapping,
+	themeTokyoNightNight: TokyoNightSemanticMapping,
+	themeGruvbox:         GruvboxSemanticMapping,
+	themeGruvboxDark:     GruvboxSemanticMapping,
+	themeCatppuccin:      CatppuccinSemanticMapping,
+	themeCatppuccinMocha: CatppuccinSemanticMapping,
 }
 
 // GetThemeMapping returns the semantic colors for a named theme.

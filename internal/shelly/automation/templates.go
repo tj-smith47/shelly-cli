@@ -8,22 +8,41 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// Built-in template metadata shared across the bundled script definitions.
+const (
+	templateAuthor     = "Shelly CLI"
+	templateVersion    = "1.0.0"
+	categoryAutomation = "automation"
+	nameMotionLight    = "motion-light"
+	namePowerMonitor   = "power-monitor"
+	nameScheduleHelper = "schedule-helper"
+	nameToggleSync     = "toggle-sync"
+	nameEnergyLogger   = "energy-logger"
+	varLightID         = "LIGHT_ID"
+	varInputID         = "INPUT_ID"
+	varSwitchID        = "SWITCH_ID"
+	varMasterID        = "MASTER_ID"
+	varSlaveID         = "SLAVE_ID"
+
+	varTypeNumber = "number"
+)
+
 // BuiltInScriptTemplates returns the bundled script templates.
 // These are maintained by the CLI and provide common functionality.
 func BuiltInScriptTemplates() map[string]config.ScriptTemplate {
 	return map[string]config.ScriptTemplate{
-		"motion-light": {
-			Name:        "motion-light",
+		nameMotionLight: {
+			Name:        nameMotionLight,
 			Description: "Turn on light when motion is detected, auto-off after timeout",
-			Category:    "automation",
+			Category:    categoryAutomation,
 			MinGen:      2,
 			BuiltIn:     true,
-			Author:      "Shelly CLI",
-			Version:     "1.0.0",
+			Author:      templateAuthor,
+			Version:     templateVersion,
 			Variables: []config.ScriptVariable{
-				{Name: "LIGHT_ID", Description: "Light component ID (0-3)", Type: "number", Default: 0, Required: true},
-				{Name: "INPUT_ID", Description: "Motion sensor input ID (0-3)", Type: "number", Default: 0, Required: true},
-				{Name: "TIMEOUT_SEC", Description: "Auto-off timeout in seconds", Type: "number", Default: 300, Required: false},
+				{Name: varLightID, Description: "Light component ID (0-3)", Type: varTypeNumber, Default: 0, Required: true},
+				{Name: varInputID, Description: "Motion sensor input ID (0-3)", Type: varTypeNumber, Default: 0, Required: true},
+				{Name: "TIMEOUT_SEC", Description: "Auto-off timeout in seconds", Type: varTypeNumber, Default: 300, Required: false},
 			},
 			Code: `// Motion-activated light control
 // Turns on light when motion detected, auto-off after timeout
@@ -58,18 +77,18 @@ Shelly.addEventHandler(function(event) {
 print("Motion light script started");
 `,
 		},
-		"power-monitor": {
-			Name:        "power-monitor",
+		namePowerMonitor: {
+			Name:        namePowerMonitor,
 			Description: "Monitor power consumption and log high usage alerts",
 			Category:    "monitoring",
 			MinGen:      2,
 			BuiltIn:     true,
-			Author:      "Shelly CLI",
-			Version:     "1.0.0",
+			Author:      templateAuthor,
+			Version:     templateVersion,
 			Variables: []config.ScriptVariable{
-				{Name: "SWITCH_ID", Description: "Switch component ID (0-3)", Type: "number", Default: 0, Required: true},
-				{Name: "THRESHOLD_W", Description: "Power threshold in watts for alert", Type: "number", Default: 1000, Required: false},
-				{Name: "CHECK_INTERVAL_SEC", Description: "Check interval in seconds", Type: "number", Default: 60, Required: false},
+				{Name: varSwitchID, Description: "Switch component ID (0-3)", Type: varTypeNumber, Default: 0, Required: true},
+				{Name: "THRESHOLD_W", Description: "Power threshold in watts for alert", Type: varTypeNumber, Default: 1000, Required: false},
+				{Name: "CHECK_INTERVAL_SEC", Description: "Check interval in seconds", Type: varTypeNumber, Default: 60, Required: false},
 			},
 			Code: `// Power consumption monitor
 // Logs alerts when power exceeds threshold
@@ -97,18 +116,18 @@ Timer.set(CONFIG.interval * 1000, true, checkPower);
 print("Power monitor started - checking every " + CONFIG.interval + "s, threshold: " + CONFIG.threshold + "W");
 `,
 		},
-		"schedule-helper": {
-			Name:        "schedule-helper",
+		nameScheduleHelper: {
+			Name:        nameScheduleHelper,
 			Description: "Simple on/off scheduler with sunrise/sunset support",
-			Category:    "automation",
+			Category:    categoryAutomation,
 			MinGen:      2,
 			BuiltIn:     true,
-			Author:      "Shelly CLI",
-			Version:     "1.0.0",
+			Author:      templateAuthor,
+			Version:     templateVersion,
 			Variables: []config.ScriptVariable{
-				{Name: "SWITCH_ID", Description: "Switch component ID (0-3)", Type: "number", Default: 0, Required: true},
-				{Name: "ON_HOUR", Description: "Hour to turn on (0-23, or -1 for sunset)", Type: "number", Default: 18, Required: false},
-				{Name: "OFF_HOUR", Description: "Hour to turn off (0-23, or -1 for sunrise)", Type: "number", Default: 23, Required: false},
+				{Name: varSwitchID, Description: "Switch component ID (0-3)", Type: varTypeNumber, Default: 0, Required: true},
+				{Name: "ON_HOUR", Description: "Hour to turn on (0-23, or -1 for sunset)", Type: varTypeNumber, Default: 18, Required: false},
+				{Name: "OFF_HOUR", Description: "Hour to turn off (0-23, or -1 for sunrise)", Type: varTypeNumber, Default: 23, Required: false},
 			},
 			Code: `// Simple scheduler
 // Turn switch on/off at specified hours
@@ -150,17 +169,17 @@ checkSchedule();
 print("Scheduler started: ON at " + CONFIG.onHour + ":00, OFF at " + CONFIG.offHour + ":00");
 `,
 		},
-		"toggle-sync": {
-			Name:        "toggle-sync",
+		nameToggleSync: {
+			Name:        nameToggleSync,
 			Description: "Sync state between two switches (master/slave)",
-			Category:    "automation",
+			Category:    categoryAutomation,
 			MinGen:      2,
 			BuiltIn:     true,
-			Author:      "Shelly CLI",
-			Version:     "1.0.0",
+			Author:      templateAuthor,
+			Version:     templateVersion,
 			Variables: []config.ScriptVariable{
-				{Name: "MASTER_ID", Description: "Master switch component ID", Type: "number", Default: 0, Required: true},
-				{Name: "SLAVE_ID", Description: "Slave switch component ID", Type: "number", Default: 1, Required: true},
+				{Name: varMasterID, Description: "Master switch component ID", Type: varTypeNumber, Default: 0, Required: true},
+				{Name: varSlaveID, Description: "Slave switch component ID", Type: varTypeNumber, Default: 1, Required: true},
 			},
 			Code: `// Switch synchronization
 // Slave switch follows master switch state
@@ -182,16 +201,16 @@ Shelly.addEventHandler(function(event) {
 print("Toggle sync active: switch " + CONFIG.masterId + " -> switch " + CONFIG.slaveId);
 `,
 		},
-		"energy-logger": {
-			Name:        "energy-logger",
+		nameEnergyLogger: {
+			Name:        nameEnergyLogger,
 			Description: "Log hourly energy consumption to KVS for tracking",
 			Category:    "monitoring",
 			MinGen:      2,
 			BuiltIn:     true,
-			Author:      "Shelly CLI",
-			Version:     "1.0.0",
+			Author:      templateAuthor,
+			Version:     templateVersion,
 			Variables: []config.ScriptVariable{
-				{Name: "SWITCH_ID", Description: "Switch component ID with energy metering", Type: "number", Default: 0, Required: true},
+				{Name: varSwitchID, Description: "Switch component ID with energy metering", Type: varTypeNumber, Default: 0, Required: true},
 			},
 			Code: `// Energy consumption logger
 // Stores hourly readings in KVS

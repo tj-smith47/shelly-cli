@@ -631,7 +631,7 @@ func (m *Manage) captureSceneFromDevices() tea.Cmd {
 		}
 
 		if len(actions) == 0 {
-			return scenes.ActionMsg{Action: "capture", Err: fmt.Errorf("no device states captured")}
+			return scenes.ActionMsg{Action: actionCapture, Err: fmt.Errorf("no device states captured")}
 		}
 
 		// Create the scene with captured actions
@@ -643,10 +643,10 @@ func (m *Manage) captureSceneFromDevices() tea.Cmd {
 		}
 
 		if err := config.SaveScene(scene); err != nil {
-			return scenes.ActionMsg{Action: "capture", Err: err}
+			return scenes.ActionMsg{Action: actionCapture, Err: err}
 		}
 
-		return scenes.ActionMsg{Action: "capture", SceneName: sceneName}
+		return scenes.ActionMsg{Action: actionCapture, SceneName: sceneName}
 	}
 }
 
@@ -666,13 +666,13 @@ func (m *Manage) createTemplateFromDevice() tea.Cmd {
 		// Get device config
 		cfg, err := m.svc.GetConfig(ctx, device.Name)
 		if err != nil {
-			return templates.ActionMsg{Action: "create", Err: err}
+			return templates.ActionMsg{Action: actionCreate, Err: err}
 		}
 
 		// Get device info for model/generation
 		info, err := m.svc.GetDeviceInfo(ctx, device.Name)
 		if err != nil {
-			return templates.ActionMsg{Action: "create", Err: err}
+			return templates.ActionMsg{Action: actionCreate, Err: err}
 		}
 
 		// Create template name from device name
@@ -688,10 +688,10 @@ func (m *Manage) createTemplateFromDevice() tea.Cmd {
 			device.Name,
 		)
 		if err != nil {
-			return templates.ActionMsg{Action: "create", Err: err}
+			return templates.ActionMsg{Action: actionCreate, Err: err}
 		}
 
-		return templates.ActionMsg{Action: "create", TemplateName: tplName}
+		return templates.ActionMsg{Action: actionCreate, TemplateName: tplName}
 	}
 }
 
@@ -763,7 +763,7 @@ func (m *Manage) StatusSummary() string {
 		devices := m.discovery.Devices()
 		if len(devices) > 0 {
 			parts = append(parts, m.styles.Muted.Render(
-				strings.ReplaceAll("Discovered: %d", "%d", string(rune('0'+len(devices)))),
+				fmt.Sprintf("Discovered: %d", len(devices)),
 			))
 		}
 	}
@@ -775,7 +775,7 @@ func (m *Manage) StatusSummary() string {
 		parts = append(parts, "Updating firmware...")
 	} else if count := m.firmware.UpdateCount(); count > 0 {
 		parts = append(parts, m.styles.Title.Render(
-			strings.ReplaceAll("Updates: %d", "%d", string(rune('0'+count))),
+			fmt.Sprintf("Updates: %d", count),
 		))
 	}
 

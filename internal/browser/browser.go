@@ -48,10 +48,13 @@ func (b *browserImpl) Browse(ctx context.Context, url string) error {
 
 	switch runtime.GOOS {
 	case "linux":
+		//nolint:gosec // G204: opening a URL requires passing it to the platform opener; url is a non-shell arg, not interpreted by a shell.
 		cmd = exec.CommandContext(ctx, "xdg-open", url)
 	case "darwin":
+		//nolint:gosec // G204: opening a URL requires passing it to the platform opener; url is a non-shell arg, not interpreted by a shell.
 		cmd = exec.CommandContext(ctx, "open", url)
 	case "windows":
+		//nolint:gosec // G204: opening a URL requires passing it to the platform opener; url is a non-shell arg, not interpreted by a shell.
 		cmd = exec.CommandContext(ctx, "cmd", "/c", "start", url)
 	default:
 		// Unsupported OS - try clipboard fallback

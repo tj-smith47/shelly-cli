@@ -42,7 +42,7 @@ func TestNewCommand_Aliases(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expectedAliases := []string{"show", "i"}
+	expectedAliases := []string{aliasShow, "i"}
 	if len(cmd.Aliases) != len(expectedAliases) {
 		t.Errorf("got %d aliases, want %d", len(cmd.Aliases), len(expectedAliases))
 	}
@@ -397,7 +397,7 @@ func TestNewCommand_AliasesWork(t *testing.T) {
 
 	hasShowAlias := false
 	for _, alias := range cmd.Aliases {
-		if alias == "show" {
+		if alias == aliasShow {
 			hasShowAlias = true
 			break
 		}

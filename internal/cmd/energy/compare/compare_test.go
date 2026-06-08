@@ -73,7 +73,7 @@ func TestNewCommand_Flags(t *testing.T) {
 		defValue  string
 	}{
 		{"devices", "", "[]"},
-		{"period", "p", "day"},
+		{"period", "p", periodDay},
 		{"from", "", ""},
 		{"to", "", ""},
 	}
@@ -297,7 +297,7 @@ func TestExecute_WithMock_Day(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--period", "day"})
+	cmd.SetArgs([]string{"--period", periodDay})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -855,7 +855,7 @@ func TestRun_DirectCall(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Devices: []string{"test-dev-1", "test-dev-2"},
-		Period:  "day",
+		Period:  periodDay,
 	}
 
 	// Call run directly
@@ -873,7 +873,7 @@ func TestRun_EmptyDevicesList(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Devices: []string{},
-		Period:  "day",
+		Period:  periodDay,
 	}
 
 	// Call run with empty devices list (tests the warning path)
@@ -896,7 +896,7 @@ func TestRun_SingleDeviceOnly(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Devices: []string{"single-device"},
-		Period:  "day",
+		Period:  periodDay,
 	}
 
 	// Call run with just one device (tests the warning path)

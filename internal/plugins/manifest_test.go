@@ -480,7 +480,7 @@ func TestManifest_BinaryPath(t *testing.T) {
 	manifest.Binary.Name = "shelly-test"
 
 	path := manifest.BinaryPath("/home/user/plugins/shelly-test")
-	expected := filepath.Join("/home/user/plugins/shelly-test", "shelly-test") //nolint:gocritic // test path
+	expected := filepath.Join("/home/user/plugins/shelly-test", "shelly-test")
 	if path != expected {
 		t.Errorf("BinaryPath() = %q, want %q", path, expected)
 	}

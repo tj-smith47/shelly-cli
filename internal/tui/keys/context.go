@@ -121,33 +121,33 @@ func NewContextMap() *ContextMap {
 func (m *ContextMap) initDefaults() {
 	// Global bindings
 	m.bindings[ContextGlobal] = map[string]Action{
-		"q":                  ActionQuit,
-		"?":                  ActionHelp,
-		"/":                  ActionFilter,
-		":":                  ActionCommand,
-		keyconst.KeyEsc:      ActionEscape,
-		"ctrl+[":             ActionEscape,
-		keyconst.KeyTab:      ActionNextPanel,
-		keyconst.KeyShiftTab: ActionPrevPanel,
-		"alt+]":              ActionNextPanel,
-		"alt+[":              ActionPrevPanel,
-		"1":                  ActionTab1,
-		"2":                  ActionTab2,
-		"3":                  ActionTab3,
-		"4":                  ActionTab4,
-		"5":                  ActionTab5,
-		"6":                  ActionTab6,
-		"!":                  ActionPanel1, // Shift+1
-		"@":                  ActionPanel2, // Shift+2
-		"#":                  ActionPanel3, // Shift+3
-		"$":                  ActionPanel4, // Shift+4
-		"%":                  ActionPanel5, // Shift+5
-		"^":                  ActionPanel6, // Shift+6
-		"&":                  ActionPanel7, // Shift+7
-		"*":                  ActionPanel8, // Shift+8
-		"(":                  ActionPanel9, // Shift+9
-		"D":                  ActionDebug,
-		"ctrl+c":             ActionQuit,
+		"q":                         ActionQuit,
+		"?":                         ActionHelp,
+		"/":                         ActionFilter,
+		":":                         ActionCommand,
+		keyconst.KeyEsc:             ActionEscape,
+		keyconst.KeyCtrlOpenBracket: ActionEscape,
+		keyconst.KeyTab:             ActionNextPanel,
+		keyconst.KeyShiftTab:        ActionPrevPanel,
+		"alt+]":                     ActionNextPanel,
+		"alt+[":                     ActionPrevPanel,
+		"1":                         ActionTab1,
+		"2":                         ActionTab2,
+		"3":                         ActionTab3,
+		"4":                         ActionTab4,
+		"5":                         ActionTab5,
+		"6":                         ActionTab6,
+		"!":                         ActionPanel1, // Shift+1
+		"@":                         ActionPanel2, // Shift+2
+		"#":                         ActionPanel3, // Shift+3
+		"$":                         ActionPanel4, // Shift+4
+		"%":                         ActionPanel5, // Shift+5
+		"^":                         ActionPanel6, // Shift+6
+		"&":                         ActionPanel7, // Shift+7
+		"*":                         ActionPanel8, // Shift+8
+		"(":                         ActionPanel9, // Shift+9
+		"D":                         ActionDebug,
+		"ctrl+c":                    ActionQuit,
 	}
 
 	// Events context - dual column layout with h/l for column switching
@@ -158,8 +158,8 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyUp:     ActionUp,
 		"h":                ActionLeft,  // Switch to user (left) column
 		"l":                ActionRight, // Switch to system (right) column
-		"left":             ActionLeft,
-		"right":            ActionRight,
+		keyconst.KeyLeft:   ActionLeft,
+		keyconst.KeyRight:  ActionRight,
 		keyconst.KeySpace:  ActionPause,
 		"c":                ActionClear,
 		"f":                ActionFilterToggle,
@@ -179,8 +179,8 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyUp:     ActionUp,
 		"h":                ActionLeft,
 		"l":                ActionRight,
-		"left":             ActionLeft,
-		"right":            ActionRight,
+		keyconst.KeyLeft:   ActionLeft,
+		keyconst.KeyRight:  ActionRight,
 		"t":                ActionToggle,
 		"o":                ActionOn,
 		"O":                ActionOff,
@@ -190,7 +190,7 @@ func (m *ContextMap) initDefaults() {
 		"p":                ActionPlatformFilter,
 		keyconst.KeyEnter:  ActionEnter,
 		"r":                ActionRefresh,
-		"ctrl+r":           ActionRefreshAll,
+		keyconst.KeyCtrlR:  ActionRefreshAll,
 		"b":                ActionBrowser, // Open in browser
 		keyconst.KeyPgDown: ActionPageDown,
 		keyconst.KeyPgUp:   ActionPageUp,
@@ -198,8 +198,8 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyCtrlU:  ActionPageUp,   // Half-page up
 		"g":                ActionHome,
 		"G":                ActionEnd,
-		"home":             ActionHome,
-		"end":              ActionEnd,
+		keyconst.KeyHome:   ActionHome,
+		keyconst.KeyEnd:    ActionEnd,
 	}
 
 	// Info context
@@ -210,8 +210,8 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyUp:     ActionUp,
 		"h":                ActionLeft,
 		"l":                ActionRight,
-		"left":             ActionLeft,
-		"right":            ActionRight,
+		keyconst.KeyLeft:   ActionLeft,
+		keyconst.KeyRight:  ActionRight,
 		keyconst.KeyEnter:  ActionEnter,
 		"a":                ActionExpand, // Toggle all/single view
 		keyconst.KeyPgDown: ActionPageDown,
@@ -220,8 +220,8 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyCtrlU:  ActionPageUp,
 		"g":                ActionHome,
 		"G":                ActionEnd,
-		"home":             ActionHome,
-		"end":              ActionEnd,
+		keyconst.KeyHome:   ActionHome,
+		keyconst.KeyEnd:    ActionEnd,
 	}
 
 	// Energy context
@@ -232,8 +232,8 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyUp:     ActionUp,
 		"h":                ActionLeft,
 		"l":                ActionRight,
-		"left":             ActionLeft,
-		"right":            ActionRight,
+		keyconst.KeyLeft:   ActionLeft,
+		keyconst.KeyRight:  ActionRight,
 		"s":                ActionSort,
 		"e":                ActionExpand,
 		keyconst.KeyPgDown: ActionPageDown,
@@ -246,25 +246,25 @@ func (m *ContextMap) initDefaults() {
 
 	// JSON context
 	m.bindings[ContextJSON] = map[string]Action{
-		"j":                ActionDown,
-		"k":                ActionUp,
-		keyconst.KeyDown:   ActionDown,
-		keyconst.KeyUp:     ActionUp,
-		"h":                ActionLeft,
-		"l":                ActionRight,
-		"left":             ActionLeft,
-		"right":            ActionRight,
-		"q":                ActionEscape,
-		keyconst.KeyEsc:    ActionEscape,
-		"ctrl+[":           ActionEscape,
-		"y":                ActionCopy,
-		"r":                ActionRefresh,
-		keyconst.KeyPgDown: ActionPageDown,
-		keyconst.KeyPgUp:   ActionPageUp,
-		keyconst.KeyCtrlD:  ActionPageDown,
-		keyconst.KeyCtrlU:  ActionPageUp,
-		"g":                ActionHome,
-		"G":                ActionEnd,
+		"j":                         ActionDown,
+		"k":                         ActionUp,
+		keyconst.KeyDown:            ActionDown,
+		keyconst.KeyUp:              ActionUp,
+		"h":                         ActionLeft,
+		"l":                         ActionRight,
+		keyconst.KeyLeft:            ActionLeft,
+		keyconst.KeyRight:           ActionRight,
+		"q":                         ActionEscape,
+		keyconst.KeyEsc:             ActionEscape,
+		keyconst.KeyCtrlOpenBracket: ActionEscape,
+		"y":                         ActionCopy,
+		"r":                         ActionRefresh,
+		keyconst.KeyPgDown:          ActionPageDown,
+		keyconst.KeyPgUp:            ActionPageUp,
+		keyconst.KeyCtrlD:           ActionPageDown,
+		keyconst.KeyCtrlU:           ActionPageUp,
+		"g":                         ActionHome,
+		"G":                         ActionEnd,
 	}
 
 	// Automation context - scripts, schedules, webhooks, KVS
@@ -275,8 +275,8 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyUp:     ActionUp,
 		"h":                ActionLeft,
 		"l":                ActionRight,
-		"left":             ActionLeft,
-		"right":            ActionRight,
+		keyconst.KeyLeft:   ActionLeft,
+		keyconst.KeyRight:  ActionRight,
 		keyconst.KeyEnter:  ActionEnter,
 		"e":                ActionEdit,   // Edit script/schedule/webhook
 		"n":                ActionNew,    // Create new
@@ -298,8 +298,8 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyUp:     ActionUp,
 		"h":                ActionLeft,
 		"l":                ActionRight,
-		"left":             ActionLeft,
-		"right":            ActionRight,
+		keyconst.KeyLeft:   ActionLeft,
+		keyconst.KeyRight:  ActionRight,
 		keyconst.KeyEnter:  ActionEnter,
 		"e":                ActionEdit, // Edit configuration
 		"r":                ActionRefresh,
@@ -319,8 +319,8 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyUp:     ActionUp,
 		"h":                ActionLeft,
 		"l":                ActionRight,
-		"left":             ActionLeft,
-		"right":            ActionRight,
+		keyconst.KeyLeft:   ActionLeft,
+		keyconst.KeyRight:  ActionRight,
 		keyconst.KeyEnter:  ActionEnter,
 		"r":                ActionRefresh, // Refresh device list
 		keyconst.KeySpace:  ActionToggle,  // Select device
@@ -339,8 +339,8 @@ func (m *ContextMap) initDefaults() {
 		"k":                ActionUp,
 		keyconst.KeyDown:   ActionDown,
 		keyconst.KeyUp:     ActionUp,
-		"left":             ActionLeft,
-		"right":            ActionRight,
+		keyconst.KeyLeft:   ActionLeft,
+		keyconst.KeyRight:  ActionRight,
 		"t":                ActionToggle,
 		"o":                ActionOn,
 		"O":                ActionOff,
@@ -353,7 +353,7 @@ func (m *ContextMap) initDefaults() {
 		"e":                ActionEdit,        // Edit / toggle enable
 		keyconst.KeyEnter:  ActionEnter,
 		"r":                ActionRefresh,
-		"ctrl+r":           ActionRefreshAll,
+		keyconst.KeyCtrlR:  ActionRefreshAll,
 		"x":                ActionExport,     // CSV export
 		"X":                ActionExportJSON, // JSON export
 		"J":                ActionViewJSON,   // Open JSON viewer
@@ -365,8 +365,8 @@ func (m *ContextMap) initDefaults() {
 		keyconst.KeyCtrlU:  ActionPageUp,   // Half-page up
 		"g":                ActionHome,
 		"G":                ActionEnd,
-		"home":             ActionHome,
-		"end":              ActionEnd,
+		keyconst.KeyHome:   ActionHome,
+		keyconst.KeyEnd:    ActionEnd,
 	}
 
 	// Fleet context - cloud fleet management
@@ -389,48 +389,48 @@ func (m *ContextMap) initDefaults() {
 
 	// Help context
 	m.bindings[ContextHelp] = map[string]Action{
-		"?":                ActionEscape,
-		"q":                ActionEscape,
-		keyconst.KeyEsc:    ActionEscape,
-		"ctrl+[":           ActionEscape,
-		"/":                ActionFilter, // Search keybindings
-		"j":                ActionDown,
-		"k":                ActionUp,
-		keyconst.KeyDown:   ActionDown,
-		keyconst.KeyUp:     ActionUp,
-		keyconst.KeyPgDown: ActionPageDown,
-		keyconst.KeyPgUp:   ActionPageUp,
-		keyconst.KeyCtrlD:  ActionPageDown,
-		keyconst.KeyCtrlU:  ActionPageUp,
-		"g":                ActionHome,
-		"G":                ActionEnd,
+		"?":                         ActionEscape,
+		"q":                         ActionEscape,
+		keyconst.KeyEsc:             ActionEscape,
+		keyconst.KeyCtrlOpenBracket: ActionEscape,
+		"/":                         ActionFilter, // Search keybindings
+		"j":                         ActionDown,
+		"k":                         ActionUp,
+		keyconst.KeyDown:            ActionDown,
+		keyconst.KeyUp:              ActionUp,
+		keyconst.KeyPgDown:          ActionPageDown,
+		keyconst.KeyPgUp:            ActionPageUp,
+		keyconst.KeyCtrlD:           ActionPageDown,
+		keyconst.KeyCtrlU:           ActionPageUp,
+		"g":                         ActionHome,
+		"G":                         ActionEnd,
 	}
 
 	// Modal context - for edit modals and dialog forms
 	m.bindings[ContextModal] = map[string]Action{
-		"j":                  ActionDown,
-		"k":                  ActionUp,
-		keyconst.KeyDown:     ActionDown,
-		keyconst.KeyUp:       ActionUp,
-		keyconst.KeyTab:      ActionNextField,
-		keyconst.KeyShiftTab: ActionPrevField,
-		keyconst.KeyEsc:      ActionEscape,
-		"ctrl+[":             ActionEscape,
-		keyconst.KeyEnter:    ActionConfirm,
-		"ctrl+s":             ActionSave,
-		"h":                  ActionLeft,
-		"l":                  ActionRight,
-		"left":               ActionLeft,
-		"right":              ActionRight,
-		keyconst.KeySpace:    ActionToggle,
+		"j":                         ActionDown,
+		"k":                         ActionUp,
+		keyconst.KeyDown:            ActionDown,
+		keyconst.KeyUp:              ActionUp,
+		keyconst.KeyTab:             ActionNextField,
+		keyconst.KeyShiftTab:        ActionPrevField,
+		keyconst.KeyEsc:             ActionEscape,
+		keyconst.KeyCtrlOpenBracket: ActionEscape,
+		keyconst.KeyEnter:           ActionConfirm,
+		"ctrl+s":                    ActionSave,
+		"h":                         ActionLeft,
+		"l":                         ActionRight,
+		keyconst.KeyLeft:            ActionLeft,
+		keyconst.KeyRight:           ActionRight,
+		keyconst.KeySpace:           ActionToggle,
 	}
 
 	// Input context - minimal bindings for text input capture
 	// Most keys should pass through to the text input
 	m.bindings[ContextInput] = map[string]Action{
-		keyconst.KeyEsc:   ActionEscape,
-		"ctrl+[":          ActionEscape,
-		keyconst.KeyEnter: ActionConfirm,
+		keyconst.KeyEsc:             ActionEscape,
+		keyconst.KeyCtrlOpenBracket: ActionEscape,
+		keyconst.KeyEnter:           ActionConfirm,
 	}
 }
 
@@ -504,9 +504,21 @@ func keyString(msg tea.KeyPressMsg) string {
 	return msg.String()
 }
 
+// Reused action description strings shared between the generic and
+// context-specific description maps.
+const (
+	descQuit         = "Quit"
+	descToggle       = "Toggle"
+	descCreateNew    = "Create new"
+	descExportCSV    = "Export CSV"
+	descExportJSON   = "Export JSON"
+	descDeviceDetail = "Device detail overlay"
+	descOpenWebUI    = "Open web UI"
+)
+
 // actionDescriptions maps actions to their human-readable descriptions.
 var actionDescriptions = map[Action]string{
-	ActionQuit:           "Quit",
+	ActionQuit:           descQuit,
 	ActionHelp:           "Show help",
 	ActionFilter:         "Filter",
 	ActionCommand:        "Command mode",
@@ -516,7 +528,7 @@ var actionDescriptions = map[Action]string{
 	ActionDown:           "Move down",
 	ActionLeft:           "Move left",
 	ActionRight:          "Move right",
-	ActionToggle:         "Toggle",
+	ActionToggle:         descToggle,
 	ActionOn:             "Turn on",
 	ActionOff:            "Turn off",
 	ActionReboot:         "Reboot device",
@@ -535,7 +547,7 @@ var actionDescriptions = map[Action]string{
 	ActionRefreshAll:     "Refresh all",
 	ActionFilterToggle:   "Toggle filter",
 	ActionEdit:           "Edit",
-	ActionNew:            "Create new",
+	ActionNew:            descCreateNew,
 	ActionDelete:         "Delete",
 	ActionBrowser:        "Open in browser",
 	ActionDebug:          "Toggle debug",
@@ -556,8 +568,8 @@ var actionDescriptions = map[Action]string{
 	ActionPanel9:         "Jump to panel 9",
 	ActionControl:        "Control panel",
 	ActionDetail:         "Device detail",
-	ActionExport:         "Export CSV",
-	ActionExportJSON:     "Export JSON",
+	ActionExport:         descExportCSV,
+	ActionExportJSON:     descExportJSON,
 	ActionViewJSON:       "JSON viewer",
 	ActionPlatformFilter: "Filter by platform",
 	ActionNextField:      "Next field",
@@ -573,7 +585,7 @@ var contextActionDescriptions = map[Context]map[Action]string{
 	ContextAutomation: {
 		ActionEnter:  "View script",
 		ActionEdit:   "Edit script/schedule",
-		ActionNew:    "Create new",
+		ActionNew:    descCreateNew,
 		ActionDelete: "Delete item",
 	},
 	ContextEvents: {
@@ -583,9 +595,9 @@ var contextActionDescriptions = map[Context]map[Action]string{
 	},
 	ContextDevices: {
 		ActionEnter:          "Select/Enter",
-		ActionDetail:         "Device detail overlay",
+		ActionDetail:         descDeviceDetail,
 		ActionRefresh:        "Refresh device",
-		ActionBrowser:        "Open web UI",
+		ActionBrowser:        descOpenWebUI,
 		ActionControl:        "Open control panel",
 		ActionPlatformFilter: "Filter by platform",
 	},
@@ -607,14 +619,14 @@ var contextActionDescriptions = map[Context]map[Action]string{
 		ActionRefresh: "Refresh list",
 	},
 	ContextMonitor: {
-		ActionEnter:       "Device detail overlay",
-		ActionDetail:      "Device detail overlay",
+		ActionEnter:       descDeviceDetail,
+		ActionDetail:      descDeviceDetail,
 		ActionPause:       "Pause monitoring",
 		ActionRefresh:     "Refresh data",
-		ActionBrowser:     "Open web UI",
+		ActionBrowser:     descOpenWebUI,
 		ActionControl:     "Open control panel",
-		ActionExport:      "Export CSV",
-		ActionExportJSON:  "Export JSON",
+		ActionExport:      descExportCSV,
+		ActionExportJSON:  descExportJSON,
 		ActionViewJSON:    "Open JSON viewer",
 		ActionHistory:     "Energy history overlay",
 		ActionPhaseDetail: "3-phase detail overlay",

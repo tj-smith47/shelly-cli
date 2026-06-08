@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+// Boolean literal values recognized when parsing and formatting settings.
+const (
+	valTrue  = "true"
+	valFalse = "false"
+)
+
 // ParseValue attempts to parse a string value into an appropriate type.
 // It handles boolean, null, integer, float, and string values.
 func ParseValue(s string) any {
@@ -15,10 +21,10 @@ func ParseValue(s string) any {
 
 	// Check for boolean
 	lower := strings.ToLower(s)
-	if lower == "true" || lower == "on" || lower == "yes" {
+	if lower == valTrue || lower == "on" || lower == "yes" {
 		return true
 	}
-	if lower == "false" || lower == "off" || lower == "no" {
+	if lower == valFalse || lower == cmdOff || lower == "no" {
 		return false
 	}
 

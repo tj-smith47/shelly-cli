@@ -38,7 +38,7 @@ func TestNewCommand_Structure(t *testing.T) {
 	}
 
 	// Test Aliases
-	wantAliases := []string{"password", "pw"}
+	wantAliases := []string{flagPassword, "pw"}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
 	} else {
@@ -96,7 +96,7 @@ func TestNewCommand_Flags(t *testing.T) {
 		defValue string
 	}{
 		{"user", "admin"},
-		{"password", ""},
+		{flagPassword, ""},
 		{"realm", ""},
 	}
 

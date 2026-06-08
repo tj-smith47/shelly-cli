@@ -51,13 +51,13 @@ func TestDisplayGroups(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		groups := []model.GroupInfo{
-			{Name: "Test Group", DeviceCount: 5},
+			{Name: testGroupName, DeviceCount: 5},
 		}
 
 		DisplayGroups(ios, groups)
 
 		output := out.String()
-		if !strings.Contains(output, "Test Group") {
+		if !strings.Contains(output, testGroupName) {
 			t.Error("output should contain 'Test Group'")
 		}
 		if !strings.Contains(output, "1 group") {
@@ -73,7 +73,7 @@ func TestDisplayGroupMembers(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		devices := []string{"device1", "device2", "device3"}
+		devices := []string{testDevice1, testDevice2, testDevice3}
 
 		DisplayGroupMembers(ios, "Living Room", devices)
 
@@ -81,10 +81,10 @@ func TestDisplayGroupMembers(t *testing.T) {
 		if !strings.Contains(output, "Living Room") {
 			t.Error("output should contain group name")
 		}
-		if !strings.Contains(output, "device1") {
+		if !strings.Contains(output, testDevice1) {
 			t.Error("output should contain 'device1'")
 		}
-		if !strings.Contains(output, "device2") {
+		if !strings.Contains(output, testDevice2) {
 			t.Error("output should contain 'device2'")
 		}
 		if !strings.Contains(output, "3 member") {
@@ -112,11 +112,11 @@ func TestGroupInfo_Fields(t *testing.T) {
 	t.Parallel()
 
 	info := model.GroupInfo{
-		Name:        "Test Group",
+		Name:        testGroupName,
 		DeviceCount: 5,
 	}
 
-	if info.Name != "Test Group" {
+	if info.Name != testGroupName {
 		t.Errorf("got Name=%q, want Test Group", info.Name)
 	}
 	if info.DeviceCount != 5 {

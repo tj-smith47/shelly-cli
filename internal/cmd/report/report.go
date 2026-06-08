@@ -13,6 +13,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Report type identifiers selectable via --type.
+const (
+	reportTypeDevices = "devices"
+	reportTypeAudit   = "audit"
+)
+
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -25,7 +31,7 @@ type Options struct {
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
 		Factory: f,
-		Type:    "devices",
+		Type:    reportTypeDevices,
 	}
 
 	cmd := &cobra.Command{
@@ -59,7 +65,7 @@ Output formats:
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Type, "type", "t", "devices", "Report type: devices, energy, audit")
+	cmd.Flags().StringVarP(&opts.Type, "type", "t", reportTypeDevices, "Report type: devices, energy, audit")
 	cmd.Flags().StringVar(&opts.Output, "output-file", "", "Output file path")
 	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "json", "json", "text")
 
@@ -83,11 +89,11 @@ func run(ctx context.Context, opts *Options) error {
 	var spinnerMsg string
 
 	switch opts.Type {
-	case "devices":
+	case reportTypeDevices:
 		spinnerMsg = "Generating device report..."
 	case "energy":
 		spinnerMsg = "Generating energy report..."
-	case "audit":
+	case reportTypeAudit:
 		spinnerMsg = "Generating security audit report..."
 	default:
 		return fmt.Errorf("unknown report type: %s", opts.Type)
@@ -95,11 +101,11 @@ func run(ctx context.Context, opts *Options) error {
 
 	err = cmdutil.RunWithSpinner(ctx, ios, spinnerMsg, func(ctx context.Context) error {
 		switch opts.Type {
-		case "devices":
+		case reportTypeDevices:
 			report = svc.GenerateDevicesReport(ctx, cfg.Devices)
 		case "energy":
 			report = svc.GenerateEnergyReport(ctx, cfg.Devices)
-		case "audit":
+		case reportTypeAudit:
 			report = svc.GenerateAuditReport(ctx, cfg.Devices)
 		}
 		return nil

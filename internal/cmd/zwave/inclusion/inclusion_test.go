@@ -37,7 +37,7 @@ func TestNewCommand_Structure(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "inclusion <model>")
 	}
 
-	wantAliases := []string{"include", "pair", "add"}
+	wantAliases := []string{aliasInclude, aliasPair, aliasAdd}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
 	}
@@ -86,8 +86,8 @@ func TestNewCommand_Flags(t *testing.T) {
 	if flag == nil {
 		t.Fatal("--mode flag not found")
 	}
-	if flag.DefValue != "smart_start" {
-		t.Errorf("--mode default = %q, want %q", flag.DefValue, "smart_start")
+	if flag.DefValue != modeSmartStart {
+		t.Errorf("--mode default = %q, want %q", flag.DefValue, modeSmartStart)
 	}
 }
 
@@ -141,7 +141,7 @@ func TestOptions(t *testing.T) {
 	f := cmdutil.NewFactory()
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "button",
+		Mode:    modeButton,
 		Factory: f,
 	}
 
@@ -149,8 +149,8 @@ func TestOptions(t *testing.T) {
 		t.Errorf("Model = %q, want %q", opts.Model, "SNSW-001P16ZW")
 	}
 
-	if opts.Mode != "button" {
-		t.Errorf("Mode = %q, want %q", opts.Mode, "button")
+	if opts.Mode != modeButton {
+		t.Errorf("Mode = %q, want %q", opts.Mode, modeButton)
 	}
 }
 
@@ -162,7 +162,7 @@ func TestRun_UnknownModel(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Model:   "UNKNOWN-MODEL-12345",
-		Mode:    "smart_start",
+		Mode:    modeSmartStart,
 	}
 
 	err := run(opts)
@@ -203,7 +203,7 @@ func TestRun_NonZWaveDevice(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Model:   "SNSW-001P16EU",
-		Mode:    "smart_start",
+		Mode:    modeSmartStart,
 	}
 
 	err := run(opts)
@@ -254,7 +254,7 @@ func TestExecute_ButtonMode(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 
 	// Test with button inclusion mode
-	cmd.SetArgs([]string{"SNSW-001P16ZW", "--mode", "button"})
+	cmd.SetArgs([]string{"SNSW-001P16ZW", "--mode", modeButton})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -299,7 +299,7 @@ func TestExecute_SwitchMode(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 
 	// Test with switch inclusion mode
-	cmd.SetArgs([]string{"SNSW-001P16ZW", "--mode", "switch"})
+	cmd.SetArgs([]string{"SNSW-001P16ZW", "--mode", modeSwitch})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -425,7 +425,7 @@ func TestRun_ValidZWaveModel_SmartStart(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "smart_start",
+		Mode:    modeSmartStart,
 		Factory: tf.Factory,
 	}
 
@@ -446,7 +446,7 @@ func TestRun_ValidZWaveModel_Button(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "button",
+		Mode:    modeButton,
 		Factory: tf.Factory,
 	}
 
@@ -467,7 +467,7 @@ func TestRun_ValidZWaveModel_Switch(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "switch",
+		Mode:    modeSwitch,
 		Factory: tf.Factory,
 	}
 
@@ -488,7 +488,7 @@ func TestRun_OutputContainsDeviceInfo(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "smart_start",
+		Mode:    modeSmartStart,
 		Factory: tf.Factory,
 	}
 
@@ -514,7 +514,7 @@ func TestRun_OutputContainsMode(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "button",
+		Mode:    modeButton,
 		Factory: tf.Factory,
 	}
 
@@ -537,7 +537,7 @@ func TestRun_OutputContainsInstructions(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "smart_start",
+		Mode:    modeSmartStart,
 		Factory: tf.Factory,
 	}
 
@@ -582,7 +582,7 @@ func TestNewCommand_RunE_WithFlagMode(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 
 	// Set model and mode flag
-	cmd.SetArgs([]string{"SNSW-001P16ZW", "--mode", "button"})
+	cmd.SetArgs([]string{"SNSW-001P16ZW", "--mode", modeButton})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -615,7 +615,7 @@ func TestExecute_WithAlias_Pair(t *testing.T) {
 	// Verify aliases are set
 	hasAlias := false
 	for _, alias := range cmd.Aliases {
-		if alias == "pair" {
+		if alias == aliasPair {
 			hasAlias = true
 			break
 		}
@@ -634,7 +634,7 @@ func TestExecute_WithAlias_Add(t *testing.T) {
 	// Verify aliases are set
 	hasAlias := false
 	for _, alias := range cmd.Aliases {
-		if alias == "add" {
+		if alias == aliasAdd {
 			hasAlias = true
 			break
 		}

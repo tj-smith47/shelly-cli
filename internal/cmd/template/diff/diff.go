@@ -15,6 +15,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+const (
+	// aliasCompare is the "compare" alias for the diff command.
+	aliasCompare = "compare"
+	// aliasCmp is the short "cmp" alias for the diff command.
+	aliasCmp = "cmp"
+)
+
 // Options holds command options.
 type Options struct {
 	Template string
@@ -28,7 +35,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "diff <template> <device>",
-		Aliases: []string{"compare", "cmp"},
+		Aliases: []string{aliasCompare, aliasCmp},
 		Short:   "Compare a template with a device",
 		Long: `Compare a saved configuration template with a device's current configuration.
 

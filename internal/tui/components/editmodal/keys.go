@@ -35,7 +35,7 @@ func (b *Base) HandleKey(msg tea.KeyPressMsg) KeyAction {
 	}
 
 	switch msg.String() {
-	case keyconst.KeyEsc, "ctrl+[":
+	case keyconst.KeyEsc, keyconst.KeyCtrlOpenBracket:
 		return ActionClose
 	case keyconst.KeyEnter, keyconst.KeyCtrlS:
 		return ActionSave

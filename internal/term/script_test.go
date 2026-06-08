@@ -77,16 +77,16 @@ func TestDisplayScriptEvalResult_Object(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	result := map[string]any{
-		"key":   "value",
+		testKey: testValue,
 		"count": float64(10),
 	}
 	DisplayScriptEvalResult(ios, result)
 
 	output := out.String()
-	if !strings.Contains(output, "key") {
+	if !strings.Contains(output, testKey) {
 		t.Error("expected key in JSON output")
 	}
-	if !strings.Contains(output, "value") {
+	if !strings.Contains(output, testValue) {
 		t.Error("expected value in JSON output")
 	}
 }
@@ -206,9 +206,9 @@ func TestDisplayScriptTemplate_Full(t *testing.T) {
 	tpl := config.ScriptTemplate{
 		Name:        "my-template",
 		Description: "A test template",
-		Category:    "test",
+		Category:    testValueTest,
 		Author:      "Test Author",
-		Version:     "1.0.0",
+		Version:     testFWVersion,
 		MinGen:      2,
 		BuiltIn:     true,
 		Variables: []config.ScriptVariable{
@@ -229,7 +229,7 @@ func TestDisplayScriptTemplate_Full(t *testing.T) {
 	if !strings.Contains(output, "Test Author") {
 		t.Error("expected author")
 	}
-	if !strings.Contains(output, "1.0.0") {
+	if !strings.Contains(output, testFWVersion) {
 		t.Error("expected version")
 	}
 	if !strings.Contains(output, "Min Gen:      2") {

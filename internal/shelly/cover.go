@@ -12,6 +12,14 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
+// Component list table column headers.
+const (
+	headerName       = "Name"
+	headerState      = "State"
+	headerPower      = "Power"
+	headerBrightness = "Brightness"
+)
+
 // CoverInfo holds cover information for list operations.
 type CoverInfo struct {
 	ID       int
@@ -23,7 +31,7 @@ type CoverInfo struct {
 
 // ListHeaders returns the column headers for the table.
 func (c CoverInfo) ListHeaders() []string {
-	return []string{"ID", "Name", "State", "Position", "Power"}
+	return []string{"ID", headerName, headerState, "Position", headerPower}
 }
 
 // ListRow returns the formatted row values for the table.

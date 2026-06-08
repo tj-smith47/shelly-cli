@@ -19,6 +19,14 @@ const (
 	healthStatusUnhealthy = "unhealthy"
 )
 
+// Singular relative-time labels emitted by formatDuration.
+const (
+	relTimeJustNow   = "just now"
+	relTimeOneMinute = "1 minute ago"
+	relTimeOneHour   = "1 hour ago"
+	relTimeOneDay    = "1 day ago"
+)
+
 // DisplayFleetStatus displays the status of devices in the fleet.
 func DisplayFleetStatus(ios *iostreams.IOStreams, statuses []*integrator.DeviceStatus) {
 	if len(statuses) == 0 {
@@ -136,7 +144,7 @@ func formatTimeSince(t time.Time) string {
 	d := time.Since(t)
 	switch {
 	case d < time.Minute:
-		return "just now"
+		return relTimeJustNow
 	case d < time.Hour:
 		return formatDuration(d.Round(time.Minute))
 	case d < 24*time.Hour:
@@ -148,25 +156,25 @@ func formatTimeSince(t time.Time) string {
 
 func formatDuration(d time.Duration) string {
 	if d < time.Minute {
-		return "just now"
+		return relTimeJustNow
 	}
 	if d < time.Hour {
 		m := int(d.Minutes())
 		if m == 1 {
-			return "1 minute ago"
+			return relTimeOneMinute
 		}
 		return formatInt(m) + " minutes ago"
 	}
 	if d < 24*time.Hour {
 		h := int(d.Hours())
 		if h == 1 {
-			return "1 hour ago"
+			return relTimeOneHour
 		}
 		return formatInt(h) + " hours ago"
 	}
 	days := int(d.Hours() / 24)
 	if days == 1 {
-		return "1 day ago"
+		return relTimeOneDay
 	}
 	return formatInt(days) + " days ago"
 }

@@ -14,6 +14,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// unknownLabel is the display fallback for an unidentified device model.
+const unknownLabel = "Unknown"
+
 // DisplayDeviceStatus prints the device status information.
 func DisplayDeviceStatus(ios *iostreams.IOStreams, status *shelly.DeviceStatus) {
 	ios.Info("Device: %s", theme.Bold().Render(status.Info.ID))
@@ -69,7 +72,7 @@ func DisplayAllSnapshots(ios *iostreams.IOStreams, snapshots map[string]*shelly.
 
 		// Display device line
 		statusIcon := theme.StatusOK().Render("●")
-		deviceModel := "Unknown"
+		deviceModel := unknownLabel
 		if snap.Info != nil {
 			deviceModel = snap.Info.Model
 		}

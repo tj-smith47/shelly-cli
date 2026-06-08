@@ -22,6 +22,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+const (
+	// commandUse is the cobra Use string for the cloud events command.
+	commandUse = "events"
+	// formatJSON is the JSON output format value.
+	formatJSON = "json"
+)
+
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
@@ -36,7 +43,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "events",
+		Use:     commandUse,
 		Aliases: []string{"watch", "subscribe"},
 		Short:   "Subscribe to real-time cloud events",
 		Long: `Subscribe to real-time events from the Shelly Cloud via WebSocket.
@@ -69,7 +76,7 @@ Event types:
 
 	cmd.Flags().StringVar(&opts.DeviceFilter, "device", "", "Filter by device ID")
 	cmd.Flags().StringVar(&opts.EventFilter, "event", "", "Filter by event type")
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", formatJSON)
 	cmd.Flags().BoolVar(&opts.Raw, "raw", false, "Output raw JSON messages")
 
 	return cmd
@@ -149,7 +156,7 @@ func run(ctx context.Context, opts *Options) error {
 
 		// Output based on format
 		switch opts.Format {
-		case "json":
+		case formatJSON:
 			formatted, jsonErr := json.Marshal(event)
 			if jsonErr != nil {
 				return jsonErr

@@ -13,7 +13,7 @@ func TestDisplayAuditResult_Reachable(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	result := &model.AuditResult{
 		Device:    "kitchen-light",
-		Address:   "192.168.1.100",
+		Address:   testIP100,
 		Reachable: true,
 		Issues:    []string{"No authentication enabled", "Firmware outdated"},
 		Warnings:  []string{"Cloud not configured"},
@@ -25,7 +25,7 @@ func TestDisplayAuditResult_Reachable(t *testing.T) {
 	if !strings.Contains(output, "kitchen-light") {
 		t.Error("expected device name")
 	}
-	if !strings.Contains(output, "192.168.1.100") {
+	if !strings.Contains(output, testIP100) {
 		t.Error("expected device address")
 	}
 	if !strings.Contains(output, "No authentication enabled") {
@@ -51,7 +51,7 @@ func TestDisplayAuditResult_Unreachable(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	result := &model.AuditResult{
 		Device:    "offline-device",
-		Address:   "192.168.1.50",
+		Address:   testIP50,
 		Reachable: false,
 	}
 	DisplayAuditResult(ios, result)

@@ -14,6 +14,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Command metadata shared between the command definition and its tests.
+const (
+	useShell     = "shell <device>"
+	aliasConsole = "console"
+	shortDesc    = "Interactive shell for a specific device"
+)
+
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -27,9 +34,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "shell <device>",
-		Aliases: []string{"sh", "console"},
-		Short:   "Interactive shell for a specific device",
+		Use:     useShell,
+		Aliases: []string{"sh", aliasConsole},
+		Short:   shortDesc,
 		Long: `Open an interactive shell for a specific Shelly device.
 
 This provides direct access to execute RPC commands on the device.

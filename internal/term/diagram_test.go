@@ -17,7 +17,7 @@ func TestDisplayDiagram(t *testing.T) {
 	if output == "" {
 		t.Error("DisplayDiagram should produce output")
 	}
-	if !strings.Contains(output, "Shelly Plus 1") {
+	if !strings.Contains(output, testShellyPlus1) {
 		t.Error("output should contain the rendered diagram content")
 	}
 }

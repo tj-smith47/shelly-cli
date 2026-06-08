@@ -9,11 +9,14 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+// switchName is the "switch" alias/flag identifier shared with tests.
+const switchName = "switch"
+
 // NewCommand creates the fleet toggle command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return factories.NewFleetRelayCommand(f, factories.FleetRelayOpts{
 		Action:  shelly.RelayToggle,
-		Aliases: []string{"flip", "switch"},
+		Aliases: []string{"flip", switchName},
 		Short:   "Toggle devices via cloud",
 		Long: `Toggle devices through Shelly Cloud.
 

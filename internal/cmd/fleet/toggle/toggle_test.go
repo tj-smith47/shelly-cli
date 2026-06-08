@@ -39,7 +39,7 @@ func TestNewCommand_Aliases(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expectedAliases := []string{"flip", "switch"}
+	expectedAliases := []string{"flip", switchName}
 	if len(cmd.Aliases) != len(expectedAliases) {
 		t.Fatalf("Aliases = %v, want %v", cmd.Aliases, expectedAliases)
 	}
@@ -62,7 +62,7 @@ func TestNewCommand_Flags(t *testing.T) {
 		{"group", "g"},
 		{"all", "a"},
 		{"timeout", "t"},
-		{"switch", "s"},
+		{switchName, "s"},
 		{"concurrent", "c"},
 	}
 
@@ -118,11 +118,11 @@ func TestNewCommand_SwitchFlag(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if err := cmd.Flags().Set("switch", "2"); err != nil {
+	if err := cmd.Flags().Set(switchName, "2"); err != nil {
 		t.Fatalf("failed to set switch flag: %v", err)
 	}
 
-	val, err := cmd.Flags().GetInt("switch")
+	val, err := cmd.Flags().GetInt(switchName)
 	if err != nil {
 		t.Fatalf("failed to get switch value: %v", err)
 	}

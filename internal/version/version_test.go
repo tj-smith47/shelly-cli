@@ -129,22 +129,22 @@ func TestCompareVersions(t *testing.T) {
 		v2   string
 		want int
 	}{
-		{"1.0.0", "1.0.0", 0},
-		{"1.0.0", "2.0.0", -1},
-		{"2.0.0", "1.0.0", 1},
-		{"1.0.0", "1.0.1", -1},
-		{"1.0.1", "1.0.0", 1},
-		{"1.1.0", "1.0.0", 1},
-		{"v1.0.0", "1.0.0", 0},
-		{"1.0.0", "v1.0.0", 0},
-		{"v1.0.0", "v2.0.0", -1},
-		{"0.5.11", "0.6.1", -1},
-		{"0.6.1", "0.5.11", 1},
+		{testVersion1, testVersion1, 0},
+		{testVersion1, testVersion2, -1},
+		{testVersion2, testVersion1, 1},
+		{testVersion1, "1.0.1", -1},
+		{"1.0.1", testVersion1, 1},
+		{"1.1.0", testVersion1, 1},
+		{testVersionV1, testVersion1, 0},
+		{testVersion1, testVersionV1, 0},
+		{testVersionV1, "v2.0.0", -1},
+		{testVersion051, testVersion061, -1},
+		{testVersion061, testVersion051, 1},
 		{"0.10.0", "0.9.0", 1},
 		{"0.9.0", "0.10.0", -1},
-		{"1.0.0-beta", "1.0.0", 0},  // Pre-release suffix ignored
-		{"1.0.0", "1.0.0-beta", 0},  // Pre-release suffix ignored
-		{"1.0.0+build", "1.0.0", 0}, // Build metadata ignored
+		{"1.0.0-beta", testVersion1, 0},  // Pre-release suffix ignored
+		{testVersion1, "1.0.0-beta", 0},  // Pre-release suffix ignored
+		{"1.0.0+build", testVersion1, 0}, // Build metadata ignored
 	}
 
 	for _, tt := range tests {
@@ -163,11 +163,11 @@ func TestIsNewerVersion(t *testing.T) {
 		available string
 		want      bool
 	}{
-		{"1.0.0", "2.0.0", true},
-		{"2.0.0", "1.0.0", false},
-		{"1.0.0", "1.0.0", false},
-		{"0.5.11", "0.6.1", true},
-		{"0.6.1", "0.5.11", false},
+		{testVersion1, testVersion2, true},
+		{testVersion2, testVersion1, false},
+		{testVersion1, testVersion1, false},
+		{testVersion051, testVersion061, true},
+		{testVersion061, testVersion051, false},
 		{"v0.5.11", "v0.6.1", true},
 	}
 
@@ -188,9 +188,9 @@ func TestCompareVersions_EdgeCases(t *testing.T) {
 		want int
 	}{
 		{"", "", 0},
-		{"1.0", "1.0.0", 0},
-		{"1", "1.0.0", 0},
-		{"1.0.0.0", "1.0.0", 0},
+		{"1.0", testVersion1, 0},
+		{"1", testVersion1, 0},
+		{"1.0.0.0", testVersion1, 0},
 	}
 
 	for _, tt := range tests {

@@ -14,6 +14,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
 )
 
+const commandUse = "show"
+
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
@@ -24,7 +26,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "show",
+		Use:   commandUse,
 		Short: "Show cache statistics",
 		Long: `Display detailed information about the file cache.
 

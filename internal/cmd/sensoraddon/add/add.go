@@ -13,6 +13,14 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/sensoraddon"
 )
 
+// Peripheral type identifiers accepted as the <type> argument.
+const (
+	typeDS18B20   = "ds18b20"
+	typeDHT22     = "dht22"
+	typeDigitalIn = "digital_in"
+	typeAnalogIn  = "analog_in"
+)
+
 // Options holds command options.
 type Options struct {
 	Device  string
@@ -80,16 +88,16 @@ func run(ctx context.Context, opts *Options) error {
 	// Validate type
 	var pType sensoraddon.PeripheralType
 	switch opts.Type {
-	case "ds18b20":
+	case typeDS18B20:
 		pType = sensoraddon.TypeDS18B20
 		if opts.Addr == "" {
 			return fmt.Errorf("--addr is required for DS18B20 sensors")
 		}
-	case "dht22":
+	case typeDHT22:
 		pType = sensoraddon.TypeDHT22
-	case "digital_in":
+	case typeDigitalIn:
 		pType = sensoraddon.TypeDigitalIn
-	case "analog_in":
+	case typeAnalogIn:
 		pType = sensoraddon.TypeAnalogIn
 	default:
 		return fmt.Errorf("invalid type %q, must be one of: %s", opts.Type, strings.Join(sensoraddon.ValidPeripheralTypes, ", "))

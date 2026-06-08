@@ -23,6 +23,16 @@ const (
 	CategoryUnsupported
 )
 
+// User-facing messages for each error category.
+const (
+	// MsgTimeout is the message shown for timeout errors.
+	MsgTimeout = "Request timed out"
+	// MsgNetwork is the message shown for network connectivity errors.
+	MsgNetwork = "Network error"
+	// MsgAuth is the message shown for authentication failures.
+	MsgAuth = "Authentication failed"
+)
+
 // CategorizedError wraps an error with a category and user-friendly message.
 type CategorizedError struct {
 	Category Category
@@ -55,7 +65,7 @@ func Categorize(err error) CategorizedError {
 		return CategorizedError{
 			Category: CategoryTimeout,
 			Original: err,
-			Message:  "Request timed out",
+			Message:  MsgTimeout,
 			Hint:     "Device may be unresponsive. Check if device is powered on.",
 		}
 
@@ -64,7 +74,7 @@ func Categorize(err error) CategorizedError {
 		return CategorizedError{
 			Category: CategoryNetwork,
 			Original: err,
-			Message:  "Network error",
+			Message:  MsgNetwork,
 			Hint:     "Check device connectivity and network settings.",
 		}
 
@@ -72,7 +82,7 @@ func Categorize(err error) CategorizedError {
 		return CategorizedError{
 			Category: CategoryAuth,
 			Original: err,
-			Message:  "Authentication failed",
+			Message:  MsgAuth,
 			Hint:     "Check device credentials in configuration.",
 		}
 

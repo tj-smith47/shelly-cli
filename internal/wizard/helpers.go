@@ -101,12 +101,12 @@ func CheckCompletionInstalled(shell string) bool {
 func ValidateConfig(cfg *config.Config) error {
 	var errs []string
 
-	validOutputs := map[string]bool{"table": true, "json": true, "yaml": true, "text": true, "template": true}
+	validOutputs := map[string]bool{outputTable: true, outputJSON: true, outputYAML: true, outputText: true, outputTemplate: true}
 	if cfg.Output != "" && !validOutputs[cfg.Output] {
 		errs = append(errs, fmt.Sprintf("invalid output format: %s", cfg.Output))
 	}
 
-	validAPIModes := map[string]bool{"local": true, "cloud": true, "auto": true}
+	validAPIModes := map[string]bool{apiModeLocal: true, apiModeCloud: true, apiModeAuto: true}
 	if cfg.APIMode != "" && !validAPIModes[cfg.APIMode] {
 		errs = append(errs, fmt.Sprintf("invalid api_mode: %s", cfg.APIMode))
 	}

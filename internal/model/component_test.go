@@ -15,9 +15,9 @@ func TestComponentType_Constants(t *testing.T) {
 		ctype ComponentType
 		want  string
 	}{
-		{"switch", ComponentSwitch, "switch"},
+		{string(ComponentSwitch), ComponentSwitch, string(ComponentSwitch)},
 		{"cover", ComponentCover, "cover"},
-		{"light", ComponentLight, "light"},
+		{string(ComponentLight), ComponentLight, string(ComponentLight)},
 		{"rgb", ComponentRGB, "rgb"},
 		{"input", ComponentInput, "input"},
 	}
@@ -61,7 +61,7 @@ func TestSwitchStatus_Fields(t *testing.T) {
 	status := SwitchStatus{
 		ID:          0,
 		Output:      true,
-		Source:      "button",
+		Source:      testSourceButton,
 		Power:       &power,
 		Voltage:     &voltage,
 		Current:     &current,
@@ -76,7 +76,7 @@ func TestSwitchStatus_Fields(t *testing.T) {
 	if !status.Output {
 		t.Error("Output = false, want true")
 	}
-	if status.Source != "button" {
+	if status.Source != testSourceButton {
 		t.Errorf("Source = %q, want button", status.Source)
 	}
 	if status.Power == nil || *status.Power != 25.5 {
@@ -158,7 +158,7 @@ func TestCoverStatus_Fields(t *testing.T) {
 	status := CoverStatus{
 		ID:              0,
 		State:           "opening",
-		Source:          "button",
+		Source:          testSourceButton,
 		CurrentPosition: &position,
 		TargetPosition:  &target,
 		MoveTimeout:     false,
@@ -361,7 +361,7 @@ func TestInputStatus_Fields(t *testing.T) {
 	status := InputStatus{
 		ID:    0,
 		State: true,
-		Type:  "button",
+		Type:  testSourceButton,
 	}
 
 	if status.ID != 0 {
@@ -370,7 +370,7 @@ func TestInputStatus_Fields(t *testing.T) {
 	if !status.State {
 		t.Error("State = false, want true")
 	}
-	if status.Type != "button" {
+	if status.Type != testSourceButton {
 		t.Errorf("Type = %q, want button", status.Type)
 	}
 }
@@ -382,7 +382,7 @@ func TestInputConfig_Fields(t *testing.T) {
 	cfg := InputConfig{
 		ID:     0,
 		Name:   &name,
-		Type:   "switch",
+		Type:   string(ComponentSwitch),
 		Invert: true,
 	}
 

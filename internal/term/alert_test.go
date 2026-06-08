@@ -9,7 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-const testAlertDevice = "device1"
+const testAlertDevice = testDevice1
 
 func TestDisplayAlertTriggered(t *testing.T) {
 	t.Parallel()
@@ -19,9 +19,9 @@ func TestDisplayAlertTriggered(t *testing.T) {
 
 		ios, _, errOut := testIOStreams()
 		result := shelly.AlertCheckResult{
-			Name:      "High Temp",
+			Name:      testHighTemp,
 			Device:    testAlertDevice,
-			Condition: "temperature > 30",
+			Condition: testTempCondition,
 			Value:     "35",
 		}
 		actionResult := shelly.ActionResult{
@@ -35,7 +35,7 @@ func TestDisplayAlertTriggered(t *testing.T) {
 		if !strings.Contains(errOutput, "ALERT") {
 			t.Errorf("output should contain 'ALERT', got %q", errOutput)
 		}
-		if !strings.Contains(errOutput, "High Temp") {
+		if !strings.Contains(errOutput, testHighTemp) {
 			t.Errorf("output should contain alert name, got %q", errOutput)
 		}
 	})
@@ -45,7 +45,7 @@ func TestDisplayAlertTriggered(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		result := shelly.AlertCheckResult{
-			Name:   "Test Alert",
+			Name:   testAlertName,
 			Device: testAlertDevice,
 		}
 		actionResult := shelly.ActionResult{
@@ -69,7 +69,7 @@ func TestDisplayAlertTriggered(t *testing.T) {
 
 		ios, _, errOut := testIOStreams()
 		result := shelly.AlertCheckResult{
-			Name:   "Test Alert",
+			Name:   testAlertName,
 			Device: testAlertDevice,
 		}
 		actionResult := shelly.ActionResult{
@@ -90,7 +90,7 @@ func TestDisplayAlertTriggered(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		result := shelly.AlertCheckResult{
-			Name:   "Test Alert",
+			Name:   testAlertName,
 			Device: testAlertDevice,
 		}
 		actionResult := shelly.ActionResult{
@@ -114,7 +114,7 @@ func TestDisplayAlertTriggered(t *testing.T) {
 
 		ios, _, errOut := testIOStreams()
 		result := shelly.AlertCheckResult{
-			Name:   "Test Alert",
+			Name:   testAlertName,
 			Device: testAlertDevice,
 		}
 		actionResult := shelly.ActionResult{
@@ -135,7 +135,7 @@ func TestDisplayAlertTriggered(t *testing.T) {
 
 		ios, _, errOut := testIOStreams()
 		result := shelly.AlertCheckResult{
-			Name:   "Test Alert",
+			Name:   testAlertName,
 			Device: testAlertDevice,
 		}
 		actionResult := shelly.ActionResult{
@@ -157,7 +157,7 @@ func TestDisplayAlertCleared(t *testing.T) {
 
 	ios, out, errOut := testIOStreams()
 	result := shelly.AlertCheckResult{
-		Condition: "temperature > 30",
+		Condition: testTempCondition,
 		Device:    testAlertDevice,
 	}
 
@@ -210,7 +210,7 @@ func TestDisplayAlertActionStarting(t *testing.T) {
 		t.Parallel()
 
 		ios, out, errOut := testIOStreams()
-		DisplayAlertActionStarting(ios, "unknown", "Test Alert")
+		DisplayAlertActionStarting(ios, "unknown", testAlertName)
 
 		allOutput := out.String() + errOut.String()
 		// Unknown action should not produce output
@@ -224,27 +224,27 @@ func TestAlertCheckResult_Fields(t *testing.T) {
 	t.Parallel()
 
 	result := shelly.AlertCheckResult{
-		Name:      "High Temp",
+		Name:      testHighTemp,
 		Device:    testAlertDevice,
-		Condition: "temperature > 30",
+		Condition: testTempCondition,
 		Value:     "35.5",
 		Action:    shelly.AlertActionTriggered,
 	}
 
-	if result.Name != "High Temp" {
+	if result.Name != testHighTemp {
 		t.Errorf("got Name=%q, want High Temp", result.Name)
 	}
 	if result.Device != testAlertDevice {
 		t.Errorf("got Device=%q, want %q", result.Device, testAlertDevice)
 	}
-	if result.Condition != "temperature > 30" {
+	if result.Condition != testTempCondition {
 		t.Errorf("got Condition=%q, want temperature > 30", result.Condition)
 	}
 	if result.Value != "35.5" {
 		t.Errorf("got Value=%q, want 35.5", result.Value)
 	}
 	if result.Action != shelly.AlertActionTriggered {
-		t.Errorf("got Action=%q, want %q", result.Action, shelly.AlertActionTriggered)
+		t.Errorf("got Action=%d, want %d", result.Action, shelly.AlertActionTriggered)
 	}
 }
 

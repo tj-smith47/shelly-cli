@@ -39,7 +39,7 @@ func TestDisplayMigrationPreview_WithDifferences(t *testing.T) {
 	ios, out, _ := testIOStreams()
 	diff := &model.BackupDiff{
 		ConfigDiffs: []model.ConfigDiff{
-			{Path: "sys.device.name", DiffType: model.DiffAdded, NewValue: "NewName"},
+			{Path: testConfigDeviceName, DiffType: model.DiffAdded, NewValue: "NewName"},
 		},
 	}
 	DisplayMigrationPreview(ios, "/path/to/backup.json", "file", "target", diff)

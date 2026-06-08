@@ -40,7 +40,7 @@ func TestNewCommand_Structure(t *testing.T) {
 	}
 
 	// Test Aliases
-	wantAliases := []string{"search", "find"}
+	wantAliases := []string{aliasSearch, aliasFind}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
 	} else {
@@ -638,7 +638,7 @@ func TestNewCommand_AllAliasesWork(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	aliases := []string{"search", "find"}
+	aliases := []string{aliasSearch, aliasFind}
 	for _, alias := range aliases {
 		t.Run("alias_"+alias, func(t *testing.T) {
 			t.Parallel()

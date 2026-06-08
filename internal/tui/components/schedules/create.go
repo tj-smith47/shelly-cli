@@ -62,6 +62,23 @@ const (
 	methodScriptStop  = "Script.Stop"
 )
 
+// RPC method names used in schedule calls.
+const (
+	rpcSwitchSet = "Switch.Set"
+	rpcLightSet  = "Light.Set"
+)
+
+// Weekday abbreviations used in cron timespec parsing and display.
+const (
+	daySun = "SUN"
+	dayMon = "MON"
+	dayTue = "TUE"
+	dayWed = "WED"
+	dayThu = "THU"
+	dayFri = "FRI"
+	daySat = "SAT"
+)
+
 // rpcMethodInfo maps display names to actual RPC method and default params.
 type rpcMethodInfo struct {
 	Method string
@@ -71,14 +88,14 @@ type rpcMethodInfo struct {
 // getRPCMethodInfo returns the RPC method details for a display name.
 func getRPCMethodInfo(displayName string) rpcMethodInfo {
 	methods := map[string]rpcMethodInfo{
-		methodSwitchOn:    {Method: "Switch.Set", Params: map[string]any{"id": 0, "on": true}},
-		methodSwitchOff:   {Method: "Switch.Set", Params: map[string]any{"id": 0, "on": false}},
+		methodSwitchOn:    {Method: rpcSwitchSet, Params: map[string]any{"id": 0, "on": true}},
+		methodSwitchOff:   {Method: rpcSwitchSet, Params: map[string]any{"id": 0, "on": false}},
 		methodSwitchTog:   {Method: "Switch.Toggle", Params: map[string]any{"id": 0}},
 		methodCoverOpen:   {Method: "Cover.Open", Params: map[string]any{"id": 0}},
 		methodCoverClose:  {Method: "Cover.Close", Params: map[string]any{"id": 0}},
 		methodCoverStop:   {Method: "Cover.Stop", Params: map[string]any{"id": 0}},
-		methodLightOn:     {Method: "Light.Set", Params: map[string]any{"id": 0, "on": true}},
-		methodLightOff:    {Method: "Light.Set", Params: map[string]any{"id": 0, "on": false}},
+		methodLightOn:     {Method: rpcLightSet, Params: map[string]any{"id": 0, "on": true}},
+		methodLightOff:    {Method: rpcLightSet, Params: map[string]any{"id": 0, "on": false}},
 		methodScriptStart: {Method: "Script.Start", Params: map[string]any{"id": 1}},
 		methodScriptStop:  {Method: "Script.Stop", Params: map[string]any{"id": 1}},
 	}
@@ -172,7 +189,7 @@ func NewCreateModel(ctx context.Context, svc *automation.Service) CreateModel {
 	)
 
 	customMethodInput := form.NewTextInput(
-		form.WithPlaceholder("Switch.Set"),
+		form.WithPlaceholder(rpcSwitchSet),
 		form.WithCharLimit(64),
 		form.WithWidth(30),
 		form.WithHelp("Custom RPC method name"),
@@ -567,7 +584,7 @@ func (m CreateModel) buildTimespec(second, minute, hour string) (string, error) 
 }
 
 func (m CreateModel) buildCustomDays() string {
-	dayNames := []string{"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"}
+	dayNames := []string{daySun, dayMon, dayTue, dayWed, dayThu, dayFri, daySat}
 	var selected []string
 	for i, sel := range m.selectedDays {
 		if sel {

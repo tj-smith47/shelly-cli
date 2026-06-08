@@ -175,7 +175,7 @@ func (m PluginModel) renderComponent(comp PluginComponent, selected bool) string
 	// State indicator
 	var stateStr string
 	switch comp.Type {
-	case "cover":
+	case string(TypeCover):
 		stateStr = m.renderCoverState(comp.State)
 	default:
 		if comp.On {
@@ -203,7 +203,7 @@ func (m PluginModel) renderComponent(comp PluginComponent, selected bool) string
 
 func (m PluginModel) renderCoverState(state string) string {
 	switch state {
-	case "open":
+	case actionOpen:
 		return m.styles.OnState.Render("▲ OPEN")
 	case "closed":
 		return m.styles.OffState.Render("▼ CLOSED")

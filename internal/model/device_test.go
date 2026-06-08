@@ -12,27 +12,27 @@ func TestDevice_HasAuth(t *testing.T) {
 	}{
 		{
 			name: "no auth",
-			dev:  Device{Name: "test"},
+			dev:  Device{Name: testNameTest},
 			want: false,
 		},
 		{
 			name: "nil auth",
-			dev:  Device{Name: "test", Auth: nil},
+			dev:  Device{Name: testNameTest, Auth: nil},
 			want: false,
 		},
 		{
 			name: "empty password",
-			dev:  Device{Name: "test", Auth: &Auth{Username: "admin", Password: ""}},
+			dev:  Device{Name: testNameTest, Auth: &Auth{Username: testUserAdmin, Password: ""}},
 			want: false,
 		},
 		{
 			name: "has auth",
-			dev:  Device{Name: "test", Auth: &Auth{Username: "admin", Password: "secret"}},
+			dev:  Device{Name: testNameTest, Auth: &Auth{Username: testUserAdmin, Password: "secret"}},
 			want: true,
 		},
 		{
 			name: "password only",
-			dev:  Device{Name: "test", Auth: &Auth{Password: "secret"}},
+			dev:  Device{Name: testNameTest, Auth: &Auth{Password: "secret"}},
 			want: true,
 		},
 	}
@@ -58,13 +58,13 @@ func TestDevice_DisplayName(t *testing.T) {
 	}{
 		{
 			name: "with name",
-			dev:  Device{Name: "Living Room Switch", Address: "192.168.1.100"},
-			want: "Living Room Switch",
+			dev:  Device{Name: testLivingRoomSwitch, Address: testReportIP},
+			want: testLivingRoomSwitch,
 		},
 		{
 			name: "empty name falls back to address",
-			dev:  Device{Name: "", Address: "192.168.1.100"},
-			want: "192.168.1.100",
+			dev:  Device{Name: "", Address: testReportIP},
+			want: testReportIP,
 		},
 		{
 			name: "no name or address",
@@ -94,22 +94,22 @@ func TestDevice_Fields(t *testing.T) {
 
 	dev := Device{
 		Name:       "Kitchen Light",
-		Address:    "192.168.1.50",
+		Address:    testIP50,
 		Platform:   PlatformShelly,
 		Generation: 2,
-		Type:       "SHSW-PM",
-		Model:      "Shelly Plus 1PM",
+		Type:       testModelSHSWPM,
+		Model:      testShellyPlus1PM,
 		Auth: &Auth{
-			Username: "admin",
-			Password: "secret123",
+			Username: testUserAdmin,
+			Password: testPasswordValue,
 		},
 	}
 
 	if dev.Name != "Kitchen Light" {
 		t.Errorf("Name = %q, want %q", dev.Name, "Kitchen Light")
 	}
-	if dev.Address != "192.168.1.50" {
-		t.Errorf("Address = %q, want %q", dev.Address, "192.168.1.50")
+	if dev.Address != testIP50 {
+		t.Errorf("Address = %q, want %q", dev.Address, testIP50)
 	}
 	if dev.Platform != PlatformShelly {
 		t.Errorf("Platform = %q, want %q", dev.Platform, PlatformShelly)
@@ -117,17 +117,17 @@ func TestDevice_Fields(t *testing.T) {
 	if dev.Generation != 2 {
 		t.Errorf("Generation = %d, want %d", dev.Generation, 2)
 	}
-	if dev.Type != "SHSW-PM" {
-		t.Errorf("Type = %q, want %q", dev.Type, "SHSW-PM")
+	if dev.Type != testModelSHSWPM {
+		t.Errorf("Type = %q, want %q", dev.Type, testModelSHSWPM)
 	}
-	if dev.Model != "Shelly Plus 1PM" {
-		t.Errorf("Model = %q, want %q", dev.Model, "Shelly Plus 1PM")
+	if dev.Model != testShellyPlus1PM {
+		t.Errorf("Model = %q, want %q", dev.Model, testShellyPlus1PM)
 	}
-	if dev.Auth.Username != "admin" {
-		t.Errorf("Auth.Username = %q, want %q", dev.Auth.Username, "admin")
+	if dev.Auth.Username != testUserAdmin {
+		t.Errorf("Auth.Username = %q, want %q", dev.Auth.Username, testUserAdmin)
 	}
-	if dev.Auth.Password != "secret123" {
-		t.Errorf("Auth.Password = %q, want %q", dev.Auth.Password, "secret123")
+	if dev.Auth.Password != testPasswordValue {
+		t.Errorf("Auth.Password = %q, want %q", dev.Auth.Password, testPasswordValue)
 	}
 }
 
@@ -151,12 +151,12 @@ func TestDevice_IsShelly(t *testing.T) {
 		},
 		{
 			name:     "tasmota platform is not Shelly",
-			platform: "tasmota",
+			platform: testGenTasmota,
 			want:     false,
 		},
 		{
 			name:     "esphome platform is not Shelly",
-			platform: "esphome",
+			platform: testGenESPHome,
 			want:     false,
 		},
 		{
@@ -198,12 +198,12 @@ func TestDevice_IsPluginManaged(t *testing.T) {
 		},
 		{
 			name:     "tasmota platform is plugin-managed",
-			platform: "tasmota",
+			platform: testGenTasmota,
 			want:     true,
 		},
 		{
 			name:     "esphome platform is plugin-managed",
-			platform: "esphome",
+			platform: testGenESPHome,
 			want:     true,
 		},
 		{
@@ -245,8 +245,8 @@ func TestDevice_GetPlatform(t *testing.T) {
 		},
 		{
 			name:     "tasmota platform",
-			platform: "tasmota",
-			want:     "tasmota",
+			platform: testGenTasmota,
+			want:     testGenTasmota,
 		},
 		{
 			name:     "custom platform",
@@ -287,12 +287,12 @@ func TestDevice_PluginName(t *testing.T) {
 		},
 		{
 			name:     "tasmota platform returns shelly-tasmota",
-			platform: "tasmota",
+			platform: testGenTasmota,
 			want:     "shelly-tasmota",
 		},
 		{
 			name:     "esphome platform returns shelly-esphome",
-			platform: "esphome",
+			platform: testGenESPHome,
 			want:     "shelly-esphome",
 		},
 		{
@@ -330,32 +330,32 @@ func TestNormalizeMAC(t *testing.T) {
 		{
 			name:  "lowercase colon-separated",
 			input: "aa:bb:cc:dd:ee:ff",
-			want:  "AA:BB:CC:DD:EE:FF",
+			want:  testReportMAC,
 		},
 		{
 			name:  "uppercase colon-separated",
-			input: "AA:BB:CC:DD:EE:FF",
-			want:  "AA:BB:CC:DD:EE:FF",
+			input: testReportMAC,
+			want:  testReportMAC,
 		},
 		{
 			name:  "mixed case colon-separated",
 			input: "Aa:bB:Cc:dD:Ee:fF",
-			want:  "AA:BB:CC:DD:EE:FF",
+			want:  testReportMAC,
 		},
 		{
 			name:  "dash-separated",
 			input: "AA-BB-CC-DD-EE-FF",
-			want:  "AA:BB:CC:DD:EE:FF",
+			want:  testReportMAC,
 		},
 		{
 			name:  "dot-separated (Cisco format)",
 			input: "AABB.CCDD.EEFF",
-			want:  "AA:BB:CC:DD:EE:FF",
+			want:  testReportMAC,
 		},
 		{
 			name:  "no separators",
 			input: "aabbccddeeff",
-			want:  "AA:BB:CC:DD:EE:FF",
+			want:  testReportMAC,
 		},
 		{
 			name:  "too short",
@@ -406,12 +406,12 @@ func TestDevice_NormalizedMAC(t *testing.T) {
 		{
 			name: "valid MAC gets normalized",
 			mac:  "aa:bb:cc:dd:ee:ff",
-			want: "AA:BB:CC:DD:EE:FF",
+			want: testReportMAC,
 		},
 		{
 			name: "already normalized MAC",
-			mac:  "AA:BB:CC:DD:EE:FF",
-			want: "AA:BB:CC:DD:EE:FF",
+			mac:  testReportMAC,
+			want: testReportMAC,
 		},
 	}
 
@@ -468,7 +468,7 @@ func TestDevice_HasAlias(t *testing.T) {
 		},
 		{
 			name:    "no match",
-			aliases: []string{"kitchen", "light"},
+			aliases: []string{"kitchen", string(ComponentLight)},
 			lookup:  "mb",
 			want:    false,
 		},

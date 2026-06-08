@@ -61,3 +61,9 @@ examples/plugins/*/shelly-*
 *~
 .DS_Store
 Thumbs.db
+CLAUDE.local.md
+.claude/local/
+.claude/scratch/
+
+# go-task checksum cache
+.task/

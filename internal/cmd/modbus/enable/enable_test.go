@@ -198,7 +198,7 @@ func TestExecute_Success(t *testing.T) {
 		},
 		DeviceStates: map[string]mock.DeviceState{
 			"modbus-device": {
-				"modbus":        map[string]any{"enabled": false},
+				modbusComponent: map[string]any{"enabled": false},
 				"modbus_config": map[string]any{"enable": false},
 			},
 		},
@@ -262,7 +262,7 @@ func TestExecute_WithDevice(t *testing.T) {
 		},
 		DeviceStates: map[string]mock.DeviceState{
 			"exec-device": {
-				"modbus":        map[string]any{"enabled": false},
+				modbusComponent: map[string]any{"enabled": false},
 				"modbus_config": map[string]any{"enable": false},
 			},
 		},

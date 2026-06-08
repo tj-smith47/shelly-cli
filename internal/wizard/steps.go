@@ -32,6 +32,22 @@ const (
 	totalSteps   = 6
 )
 
+// Output format, API mode, and theme name identifiers used by the setup wizard.
+const (
+	outputTable    = "table"
+	outputJSON     = "json"
+	outputYAML     = "yaml"
+	outputText     = "text"
+	outputTemplate = "template"
+
+	apiModeLocal = "local"
+	apiModeCloud = "cloud"
+	apiModeAuto  = "auto"
+
+	themeNord       = "nord"
+	themeTokyoNight = "tokyo-night"
+)
+
 // Registration mode constants for the 3-way registration choice.
 const (
 	regDefaultNames = "Yes, with default names"
@@ -229,7 +245,7 @@ func stepConfiguration(ios *iostreams.IOStreams, opts *Options) error {
 	colorEnabled := !opts.NoColor
 	apiMode := opts.APIMode
 	if apiMode == "" {
-		apiMode = "local"
+		apiMode = apiModeLocal
 	}
 
 	cfg := config.Get()
@@ -733,7 +749,7 @@ func selectOutputFormat(ios *iostreams.IOStreams, opts *Options) (string, error)
 		return opts.OutputFormat, nil
 	}
 	if opts.UseDefaults() {
-		return "table", nil
+		return outputTable, nil
 	}
 
 	formatOptions := []string{
@@ -758,8 +774,8 @@ func selectTheme(ios *iostreams.IOStreams, opts *Options) (string, error) {
 
 	themeOptions := []string{
 		"dracula (default)",
-		"nord",
-		"tokyo-night",
+		themeNord,
+		themeTokyoNight,
 		"gruvbox",
 		"catppuccin",
 		"one-dark",

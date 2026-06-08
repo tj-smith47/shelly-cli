@@ -219,12 +219,12 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 		},
 		{
 			name:    "format flag yaml",
-			args:    []string{"-f", "yaml"},
+			args:    []string{"-f", formatYAML},
 			wantErr: false,
 		},
 		{
 			name:    "format flag yml",
-			args:    []string{"-f", "yml"},
+			args:    []string{"-f", formatYML},
 			wantErr: false,
 		},
 		{
@@ -408,7 +408,7 @@ func TestNewCommand_RunE_WithFormatFlag(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"my-device", "output.yaml", "-f", "yaml"})
+	cmd.SetArgs([]string{"my-device", "output.yaml", "-f", formatYAML})
 
 	// Create a cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -441,8 +441,8 @@ func TestNewCommand_FormatValues(t *testing.T) {
 		format string
 	}{
 		{"json format", "json"},
-		{"yaml format", "yaml"},
-		{"yml format", "yml"},
+		{"yaml format", formatYAML},
+		{"yml format", formatYML},
 	}
 
 	for _, tt := range tests {
@@ -559,7 +559,7 @@ func TestRun_ExportToYAMLFile(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"yaml-export-device", "/tmp/config.yaml", "-f", "yaml"})
+	cmd.SetArgs([]string{"yaml-export-device", "/tmp/config.yaml", "-f", formatYAML})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -625,7 +625,7 @@ func TestRun_ExportToYMLFile(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"yml-export-device", "/tmp/config.yml", "-f", "yml"})
+	cmd.SetArgs([]string{"yml-export-device", "/tmp/config.yml", "-f", formatYML})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 

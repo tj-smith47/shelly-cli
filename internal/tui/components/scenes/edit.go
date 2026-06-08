@@ -474,7 +474,7 @@ func (m EditModel) renderDeleteConfirmation() string {
 
 	content.WriteString(m.styles.Title.Render("Delete Scene"))
 	content.WriteString("\n\n")
-	content.WriteString(fmt.Sprintf("Are you sure you want to delete scene %q?\n\n", m.originalName))
+	fmt.Fprintf(&content, "Are you sure you want to delete scene %q?\n\n", m.originalName)
 	content.WriteString(m.styles.Muted.Render("Press y to confirm, n or Esc to cancel"))
 
 	box := m.styles.Box.

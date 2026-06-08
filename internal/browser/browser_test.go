@@ -7,6 +7,13 @@ import (
 	"testing"
 )
 
+const (
+	testIPv4      = "192.168.1.1"
+	testIPv4URL   = "http://192.168.1.1"
+	testLocalhost = "localhost"
+	testHTTPURL   = "http://example.com"
+)
+
 func TestNew(t *testing.T) {
 	t.Parallel()
 
@@ -44,9 +51,9 @@ func TestOpenDeviceUI_URLFormat(t *testing.T) {
 		ip      string
 		wantURL string
 	}{
-		{"ipv4_private", "192.168.1.1", "http://192.168.1.1"},
+		{"ipv4_private", testIPv4, testIPv4URL},
 		{"ipv4_private_10", "10.0.0.100", "http://10.0.0.100"},
-		{"localhost", "localhost", "http://localhost"},
+		{"localhost", testLocalhost, "http://localhost"},
 		{"localhost_port", "localhost:8080", "http://localhost:8080"},
 		{"ipv4_with_port", "192.168.1.1:80", "http://192.168.1.1:80"},
 		{"hostname", "shelly-device.local", "http://shelly-device.local"},
@@ -75,7 +82,10 @@ func TestBrowseContext_Cancelled(t *testing.T) {
 	// but we can at least verify the method accepts a cancelled context
 	// without panicking. The actual Browse call may or may not return an error
 	// depending on timing.
-	_ = b.Browse(ctx, "http://example.com") //nolint:errcheck // testing panic-free behavior, not error
+	// The assertion is panic-free behavior; the returned error is timing-dependent.
+	if err := b.Browse(ctx, testHTTPURL); err != nil {
+		t.Logf("Browse returned: %v", err)
+	}
 }
 
 // TestOpenDeviceUI_Cancelled verifies cancelled context for OpenDeviceUI.
@@ -86,8 +96,10 @@ func TestOpenDeviceUI_Cancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	// Should not panic with cancelled context
-	_ = b.OpenDeviceUI(ctx, "192.168.1.1") //nolint:errcheck // testing panic-free behavior, not error
+	// Should not panic with cancelled context; the returned error is irrelevant here.
+	if err := b.OpenDeviceUI(ctx, testIPv4); err != nil {
+		t.Logf("OpenDeviceUI returned: %v", err)
+	}
 }
 
 // TestBrowseOSDetection verifies the OS-specific command selection logic.
@@ -120,9 +132,9 @@ func TestBrowseURLVariants(t *testing.T) {
 	cancel()
 
 	urls := []string{
-		"http://example.com",
+		testHTTPURL,
 		"https://example.com",
-		"http://192.168.1.1",
+		testIPv4URL,
 		"http://localhost:8080",
 		"https://example.com/path?query=value",
 		"http://user:pass@example.com",
@@ -131,8 +143,10 @@ func TestBrowseURLVariants(t *testing.T) {
 	for _, url := range urls {
 		t.Run(url, func(t *testing.T) {
 			t.Parallel()
-			// Should not panic
-			_ = b.Browse(cancelCtx, url) //nolint:errcheck // testing panic-free behavior, not error
+			// Should not panic; the returned error is timing-dependent.
+			if err := b.Browse(cancelCtx, url); err != nil {
+				t.Logf("Browse returned: %v", err)
+			}
 		})
 	}
 }
@@ -146,10 +160,10 @@ func TestOpenDeviceUI_IPVariants(t *testing.T) {
 	cancel()
 
 	ips := []string{
-		"192.168.1.1",
+		testIPv4,
 		"10.0.0.1",
 		"172.16.0.1",
-		"localhost",
+		testLocalhost,
 		"shelly.local",
 		"192.168.1.1:80",
 	}
@@ -157,8 +171,10 @@ func TestOpenDeviceUI_IPVariants(t *testing.T) {
 	for _, ip := range ips {
 		t.Run(ip, func(t *testing.T) {
 			t.Parallel()
-			// Should not panic
-			_ = b.OpenDeviceUI(cancelCtx, ip) //nolint:errcheck // testing panic-free behavior, not error
+			// Should not panic; the returned error is timing-dependent.
+			if err := b.OpenDeviceUI(cancelCtx, ip); err != nil {
+				t.Logf("OpenDeviceUI returned: %v", err)
+			}
 		})
 	}
 }
@@ -200,7 +216,7 @@ func TestMockBrowser(t *testing.T) {
 		m := &MockBrowser{}
 		ctx := context.Background()
 
-		err := m.Browse(ctx, "http://example.com")
+		err := m.Browse(ctx, testHTTPURL)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -208,8 +224,8 @@ func TestMockBrowser(t *testing.T) {
 		if len(m.BrowseCalls) != 1 {
 			t.Errorf("expected 1 Browse call, got %d", len(m.BrowseCalls))
 		}
-		if m.BrowseCalls[0] != "http://example.com" {
-			t.Errorf("BrowseCalls[0] = %q, want http://example.com", m.BrowseCalls[0])
+		if m.BrowseCalls[0] != testHTTPURL {
+			t.Errorf("BrowseCalls[0] = %q, want %s", m.BrowseCalls[0], testHTTPURL)
 		}
 	})
 
@@ -218,7 +234,7 @@ func TestMockBrowser(t *testing.T) {
 		m := &MockBrowser{BrowseError: fmt.Errorf("test error")}
 		ctx := context.Background()
 
-		err := m.Browse(ctx, "http://example.com")
+		err := m.Browse(ctx, testHTTPURL)
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -229,7 +245,7 @@ func TestMockBrowser(t *testing.T) {
 		m := &MockBrowser{}
 		ctx := context.Background()
 
-		err := m.OpenDeviceUI(ctx, "192.168.1.1")
+		err := m.OpenDeviceUI(ctx, testIPv4)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -237,8 +253,8 @@ func TestMockBrowser(t *testing.T) {
 		if len(m.OpenDeviceCalls) != 1 {
 			t.Errorf("expected 1 OpenDeviceUI call, got %d", len(m.OpenDeviceCalls))
 		}
-		if m.OpenDeviceCalls[0] != "192.168.1.1" {
-			t.Errorf("OpenDeviceCalls[0] = %q, want 192.168.1.1", m.OpenDeviceCalls[0])
+		if m.OpenDeviceCalls[0] != testIPv4 {
+			t.Errorf("OpenDeviceCalls[0] = %q, want %s", m.OpenDeviceCalls[0], testIPv4)
 		}
 	})
 
@@ -247,7 +263,7 @@ func TestMockBrowser(t *testing.T) {
 		m := &MockBrowser{OpenDeviceError: fmt.Errorf("test error")}
 		ctx := context.Background()
 
-		err := m.OpenDeviceUI(ctx, "192.168.1.1")
+		err := m.OpenDeviceUI(ctx, testIPv4)
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -270,9 +286,9 @@ func TestClipboardFallbackError_Error(t *testing.T) {
 		url  string
 		want string
 	}{
-		{"http_url", "http://example.com", "URL copied to clipboard: http://example.com"},
+		{"http_url", testHTTPURL, "URL copied to clipboard: http://example.com"},
 		{"https_url", "https://example.com", "URL copied to clipboard: https://example.com"},
-		{"device_url", "http://192.168.1.1", "URL copied to clipboard: http://192.168.1.1"},
+		{"device_url", testIPv4URL, "URL copied to clipboard: http://192.168.1.1"},
 	}
 
 	for _, tt := range tests {
@@ -292,7 +308,7 @@ func TestClipboardFallbackError_ImplementsError(t *testing.T) {
 	t.Parallel()
 
 	// Verify ClipboardFallbackError implements error interface at compile time
-	err := &ClipboardFallbackError{URL: "http://example.com"}
+	err := &ClipboardFallbackError{URL: testHTTPURL}
 	msg := err.Error()
 	if msg == "" {
 		t.Error("Error() should return non-empty message")
@@ -307,7 +323,7 @@ func TestMockBrowser_CopyToClipboard(t *testing.T) {
 		t.Parallel()
 		m := &MockBrowser{}
 
-		err := m.CopyToClipboard("http://example.com")
+		err := m.CopyToClipboard(testHTTPURL)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -315,8 +331,8 @@ func TestMockBrowser_CopyToClipboard(t *testing.T) {
 		if len(m.CopyClipboardCalls) != 1 {
 			t.Errorf("expected 1 CopyToClipboard call, got %d", len(m.CopyClipboardCalls))
 		}
-		if m.CopyClipboardCalls[0] != "http://example.com" {
-			t.Errorf("CopyClipboardCalls[0] = %q, want http://example.com", m.CopyClipboardCalls[0])
+		if m.CopyClipboardCalls[0] != testHTTPURL {
+			t.Errorf("CopyClipboardCalls[0] = %q, want %s", m.CopyClipboardCalls[0], testHTTPURL)
 		}
 	})
 
@@ -324,7 +340,7 @@ func TestMockBrowser_CopyToClipboard(t *testing.T) {
 		t.Parallel()
 		m := &MockBrowser{CopyClipboardError: fmt.Errorf("clipboard error")}
 
-		err := m.CopyToClipboard("http://example.com")
+		err := m.CopyToClipboard(testHTTPURL)
 		if err == nil {
 			t.Error("expected error, got nil")
 		}

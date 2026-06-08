@@ -15,7 +15,7 @@ func TestScript(t *testing.T) {
 	t.Parallel()
 	s := Script{
 		ID:      1,
-		Name:    "test_script",
+		Name:    testScriptName,
 		Enabled: true,
 		Running: true,
 	}
@@ -23,8 +23,8 @@ func TestScript(t *testing.T) {
 	if s.ID != 1 {
 		t.Errorf("ID = %d, want 1", s.ID)
 	}
-	if s.Name != "test_script" {
-		t.Errorf("Name = %q, want %q", s.Name, "test_script")
+	if s.Name != testScriptName {
+		t.Errorf("Name = %q, want %q", s.Name, testScriptName)
 	}
 	if !s.Enabled {
 		t.Error("Enabled = false, want true")
@@ -125,8 +125,8 @@ func TestListModel_SetSize_VisibleRows(t *testing.T) {
 func TestListModel_CursorNavigation(t *testing.T) {
 	t.Parallel()
 	scripts := []Script{
-		{ID: 1, Name: "script1"},
-		{ID: 2, Name: "script2"},
+		{ID: 1, Name: testScript1},
+		{ID: 2, Name: testScript2},
 		{ID: 3, Name: "script3"},
 	}
 
@@ -201,8 +201,8 @@ func TestListModel_ScrollerVisibility(t *testing.T) {
 func TestListModel_SelectedScript(t *testing.T) {
 	t.Parallel()
 	scripts := []Script{
-		{ID: 1, Name: "script1"},
-		{ID: 2, Name: "script2"},
+		{ID: 1, Name: testScript1},
+		{ID: 2, Name: testScript2},
 	}
 
 	m := ListModel{
@@ -246,9 +246,9 @@ func TestListModel_ScriptCount(t *testing.T) {
 
 func TestListModel_Device(t *testing.T) {
 	t.Parallel()
-	m := ListModel{device: "192.168.1.100"}
-	if got := m.Device(); got != "192.168.1.100" {
-		t.Errorf("Device() = %q, want %q", got, "192.168.1.100")
+	m := ListModel{device: testDevice}
+	if got := m.Device(); got != testDevice {
+		t.Errorf("Device() = %q, want %q", got, testDevice)
 	}
 }
 
@@ -297,7 +297,7 @@ func TestListModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
 		Sizable: panel.NewSizable(4, panel.NewScroller(0, 1)),
-		device:  "192.168.1.100",
+		device:  testDevice,
 		loading: true,
 		styles:  DefaultListStyles(),
 	}
@@ -313,7 +313,7 @@ func TestListModel_View_NoScripts(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
 		Sizable: panel.NewSizable(4, panel.NewScroller(0, 1)),
-		device:  "192.168.1.100",
+		device:  testDevice,
 		loading: false,
 		scripts: []Script{},
 		styles:  DefaultListStyles(),
@@ -335,7 +335,7 @@ func TestListModel_View_WithScripts(t *testing.T) {
 	}
 	m := ListModel{
 		Sizable: panel.NewSizable(4, panel.NewScroller(len(scripts), 10)),
-		device:  "192.168.1.100",
+		device:  testDevice,
 		loading: false,
 		scripts: scripts,
 		styles:  DefaultListStyles(),
@@ -416,8 +416,8 @@ func TestListModel_Update_LoadedMsg(t *testing.T) {
 	}
 
 	scripts := []Script{
-		{ID: 1, Name: "script1"},
-		{ID: 2, Name: "script2"},
+		{ID: 1, Name: testScript1},
+		{ID: 2, Name: testScript2},
 	}
 
 	m, _ = m.Update(LoadedMsg{Scripts: scripts})

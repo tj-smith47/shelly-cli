@@ -201,14 +201,24 @@ func (c *Client) FilterComponents(ctx context.Context, compType model.ComponentT
 	return filtered, nil
 }
 
+// Component key prefixes used to parse component keys like "switch:0".
+const (
+	switchPrefix = "switch:"
+	coverPrefix  = "cover:"
+	lightPrefix  = "light:"
+	rgbPrefix    = "rgb:"
+	rgbwPrefix   = "rgbw:"
+	inputPrefix  = "input:"
+)
+
 // componentPrefixes maps component key prefixes to their types.
 var componentPrefixes = map[string]model.ComponentType{
-	"switch:": model.ComponentSwitch,
-	"cover:":  model.ComponentCover,
-	"light:":  model.ComponentLight,
-	"rgb:":    model.ComponentRGB,
-	"rgbw:":   model.ComponentRGBW,
-	"input:":  model.ComponentInput,
+	switchPrefix: model.ComponentSwitch,
+	coverPrefix:  model.ComponentCover,
+	lightPrefix:  model.ComponentLight,
+	rgbPrefix:    model.ComponentRGB,
+	rgbwPrefix:   model.ComponentRGBW,
+	inputPrefix:  model.ComponentInput,
 }
 
 // parseComponentKey parses a component key like "switch:0" into a Component.

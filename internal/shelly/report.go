@@ -42,7 +42,7 @@ func extractPower(rawStatus any) (float64, bool) {
 	// Look for switch:0 or em:0 with power info
 	for _, val := range status {
 		if valMap, ok := val.(map[string]interface{}); ok {
-			if power, ok := valMap["apower"].(float64); ok {
+			if power, ok := valMap[metricApower].(float64); ok {
 				return power, true
 			}
 		}

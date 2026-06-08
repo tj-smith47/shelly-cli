@@ -18,6 +18,7 @@ func main() {
 	if len(os.Args) > 1 {
 		outputDir = os.Args[1]
 	}
+	outputDir = filepath.Clean(outputDir)
 
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(outputDir, 0o750); err != nil {

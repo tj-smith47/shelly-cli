@@ -15,8 +15,8 @@ func TestDisplayBulkProvisionDryRun_WithWiFi(t *testing.T) {
 	cfg := &model.BulkProvisionConfig{
 		WiFi: &model.ProvisionWiFiConfig{SSID: "GlobalSSID"},
 		Devices: []model.DeviceProvisionConfig{
-			{Name: "device1"},
-			{Name: "device2", WiFi: &model.ProvisionWiFiConfig{SSID: "CustomSSID"}},
+			{Name: testDevice1},
+			{Name: testDevice2, WiFi: &model.ProvisionWiFiConfig{SSID: "CustomSSID"}},
 		},
 	}
 	DisplayBulkProvisionDryRun(ios, cfg)
@@ -40,7 +40,7 @@ func TestDisplayBulkProvisionDryRun_NoWiFi(t *testing.T) {
 	cfg := &model.BulkProvisionConfig{
 		WiFi: nil,
 		Devices: []model.DeviceProvisionConfig{
-			{Name: "device1"},
+			{Name: testDevice1},
 		},
 	}
 	DisplayBulkProvisionDryRun(ios, cfg)
@@ -57,9 +57,9 @@ func TestDisplayBulkProvisionResults_AllSuccess(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	results := []model.ProvisionResult{
-		{Device: "device1", Err: nil},
-		{Device: "device2", Err: nil},
-		{Device: "device3", Err: nil},
+		{Device: testDevice1, Err: nil},
+		{Device: testDevice2, Err: nil},
+		{Device: testDevice3, Err: nil},
 	}
 	failed := DisplayBulkProvisionResults(ios, results, 3)
 
@@ -77,9 +77,9 @@ func TestDisplayBulkProvisionResults_SomeFailures(t *testing.T) {
 
 	ios, out, errOut := testIOStreams()
 	results := []model.ProvisionResult{
-		{Device: "device1", Err: nil},
-		{Device: "device2", Err: errors.New("connection refused")},
-		{Device: "device3", Err: nil},
+		{Device: testDevice1, Err: nil},
+		{Device: testDevice2, Err: errors.New("connection refused")},
+		{Device: testDevice3, Err: nil},
 	}
 	failed := DisplayBulkProvisionResults(ios, results, 3)
 
@@ -102,8 +102,8 @@ func TestDisplayBulkProvisionResults_AllFailed(t *testing.T) {
 
 	ios, _, errOut := testIOStreams()
 	results := []model.ProvisionResult{
-		{Device: "device1", Err: errors.New("timeout")},
-		{Device: "device2", Err: errors.New("auth failed")},
+		{Device: testDevice1, Err: errors.New("timeout")},
+		{Device: testDevice2, Err: errors.New("auth failed")},
 	}
 	failed := DisplayBulkProvisionResults(ios, results, 2)
 

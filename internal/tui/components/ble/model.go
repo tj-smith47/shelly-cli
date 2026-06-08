@@ -28,6 +28,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
+// Footer hint descriptions for BLE panel actions.
+const (
+	hintEdit    = "edit"
+	hintRefresh = "refresh"
+)
+
 // Deps holds the dependencies for the BLE component.
 type Deps struct {
 	Ctx       context.Context
@@ -831,11 +837,11 @@ func (m Model) buildFooter() string {
 	var hints []keys.Hint
 	switch {
 	case m.ble != nil && m.ble.Enable && len(m.devices) > 0:
-		hints = []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "d", Desc: "discover"}, {Key: "p", Desc: "pair"}, {Key: "x", Desc: "remove"}, {Key: "r", Desc: "refresh"}}
+		hints = []keys.Hint{{Key: "e", Desc: hintEdit}, {Key: "d", Desc: "discover"}, {Key: "p", Desc: "pair"}, {Key: "x", Desc: "remove"}, {Key: "r", Desc: hintRefresh}}
 	case m.ble != nil && m.ble.Enable:
-		hints = []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "d", Desc: "discover"}, {Key: "p", Desc: "pair"}, {Key: "r", Desc: "refresh"}}
+		hints = []keys.Hint{{Key: "e", Desc: hintEdit}, {Key: "d", Desc: "discover"}, {Key: "p", Desc: "pair"}, {Key: "r", Desc: hintRefresh}}
 	default:
-		hints = []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "r", Desc: "refresh"}}
+		hints = []keys.Hint{{Key: "e", Desc: hintEdit}, {Key: "r", Desc: hintRefresh}}
 	}
 	footer := theme.StyledKeybindings(keys.FormatHints(hints, keys.FooterHintWidth(m.Width)))
 

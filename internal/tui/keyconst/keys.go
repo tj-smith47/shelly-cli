@@ -31,6 +31,10 @@ const (
 const (
 	KeyDown   = "down"
 	KeyUp     = "up"
+	KeyLeft   = "left"
+	KeyRight  = "right"
+	KeyHome   = "home"
+	KeyEnd    = "end"
 	KeyPgDown = "pgdown"
 	KeyPgUp   = "pgup"
 	KeyCtrlD  = "ctrl+d"
@@ -41,4 +45,5 @@ const (
 const (
 	KeyCtrlS = "ctrl+s"
 	KeyCtrlF = "ctrl+f"
+	KeyCtrlR = "ctrl+r"
 )

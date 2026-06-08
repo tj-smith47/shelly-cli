@@ -92,7 +92,7 @@ func TestScroller_ScrollInfo(t *testing.T) {
 		wantInfo  string
 		wantRange string
 	}{
-		{"empty", 0, 5, 0, "[0/0]", "[0/0]"},
+		{"empty", 0, 5, 0, emptyScrollInfo, emptyScrollInfo},
 		{"single", 1, 5, 0, "[1/1]", "[1]"},
 		{"partial", 3, 5, 1, "[2/3]", "[3]"},
 		{"scrolled", 20, 5, 10, "[11/20]", "[7-11/20]"},

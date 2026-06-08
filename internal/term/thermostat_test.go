@@ -9,7 +9,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
-//nolint:gocyclo // comprehensive test coverage
 func TestDisplayThermostatStatus(t *testing.T) {
 	t.Parallel()
 
@@ -203,7 +202,7 @@ func TestDisplayThermostats(t *testing.T) {
 
 		ios, out, errOut := testIOStreams()
 
-		DisplayThermostats(ios, []model.ThermostatInfo{}, "device1")
+		DisplayThermostats(ios, []model.ThermostatInfo{}, testDevice1)
 
 		allOutput := out.String() + errOut.String()
 		if !strings.Contains(allOutput, "No thermostats found") {

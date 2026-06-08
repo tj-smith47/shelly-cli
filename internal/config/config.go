@@ -21,6 +21,14 @@ const (
 	ExtYML  = ".yml"
 )
 
+// Default config values and event/component filter keys.
+const (
+	defaultOutputTable = "table"
+	defaultThemeName   = "dracula"
+	eventBLEScanResult = "ble.scan_result"
+	componentSys       = "sys"
+)
+
 // ThemeConfig supports both string and block theme configuration formats.
 // It allows users to specify just a theme name, or customize with color overrides.
 type ThemeConfig struct {
@@ -114,14 +122,14 @@ func DefaultTUIEventsConfig() TUIEventsConfig {
 	return TUIEventsConfig{
 		// Default filtered events - high-frequency noise that clutters the UI
 		FilteredEvents: []string{
-			"ble.scan_result", // BLE scanning produces many events
+			eventBLEScanResult, // BLE scanning produces many events
 		},
 		// Default filtered components - status changes that aren't user-actionable
 		FilteredComponents: []string{
-			"sys",   // System heartbeats
-			"wifi",  // WiFi signal fluctuations
-			"cloud", // Cloud connection status
-			"ts",    // Timestamp-only updates
+			componentSys, // System heartbeats
+			"wifi",       // WiFi signal fluctuations
+			cmdCloud,     // Cloud connection status
+			"ts",         // Timestamp-only updates
 		},
 		MaxItems: 100,
 	}
@@ -578,9 +586,9 @@ func Get() *Config {
 	cfg := mgr.Get()
 	if cfg == nil {
 		return &Config{
-			Output:  "table",
+			Output:  defaultOutputTable,
 			Color:   true,
-			Theme:   "dracula",
+			Theme:   defaultThemeName,
 			APIMode: "local",
 			Devices: make(map[string]model.Device),
 			Aliases: make(map[string]Alias),
@@ -601,7 +609,7 @@ func Get() *Config {
 // It handles both string format (e.g., "dracula") and block format.
 func (c *Config) GetThemeConfig() ThemeConfig {
 	if c == nil {
-		return ThemeConfig{Name: "dracula"}
+		return ThemeConfig{Name: defaultThemeName}
 	}
 
 	switch v := c.Theme.(type) {
@@ -610,7 +618,7 @@ func (c *Config) GetThemeConfig() ThemeConfig {
 	case map[string]any:
 		var tc ThemeConfig
 		if err := mapstructure.Decode(v, &tc); err != nil {
-			return ThemeConfig{Name: "dracula"}
+			return ThemeConfig{Name: defaultThemeName}
 		}
 		return tc
 	case ThemeConfig:
@@ -619,9 +627,9 @@ func (c *Config) GetThemeConfig() ThemeConfig {
 		if v != nil {
 			return *v
 		}
-		return ThemeConfig{Name: "dracula"}
+		return ThemeConfig{Name: defaultThemeName}
 	default:
-		return ThemeConfig{Name: "dracula"}
+		return ThemeConfig{Name: defaultThemeName}
 	}
 }
 

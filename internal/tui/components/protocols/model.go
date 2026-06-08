@@ -62,6 +62,9 @@ const (
 	ProtocolEthernet                 // Ethernet section
 )
 
+// ipv4ModeDHCP is the default IPv4 addressing mode shown when none is configured.
+const ipv4ModeDHCP = "dhcp"
+
 // StatusLoadedMsg signals that protocol statuses were loaded.
 type StatusLoadedMsg struct {
 	MQTT     *MQTTData
@@ -808,7 +811,7 @@ func (m Model) renderEthernet() string {
 	content.WriteString("    " + m.styles.Label.Render("Mode: "))
 	mode := m.ethernet.IPv4Mode
 	if mode == "" {
-		mode = "dhcp"
+		mode = ipv4ModeDHCP
 	}
 	content.WriteString(m.styles.Value.Render(mode))
 

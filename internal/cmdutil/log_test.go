@@ -28,7 +28,7 @@ func TestGetLogPath(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest,gocyclo // Test modifies global state via config.SetFs
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestReadLastLines(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { config.SetFs(nil) })

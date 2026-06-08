@@ -38,7 +38,7 @@ func WriteBackupFile(bkp *backup.DeviceBackup, filePath, format string) error {
 	var err error
 
 	switch format {
-	case FormatYAML, "yml":
+	case FormatYAML, FormatYML:
 		data, err = yaml.Marshal(bkp)
 	default:
 		data, err = json.MarshalIndent(bkp, "", "  ")
@@ -120,7 +120,7 @@ func ParseBackupFile(filePath string) (model.BackupFileInfo, error) {
 // MarshalBackup serializes a backup to the specified format.
 func MarshalBackup(bkp *backup.DeviceBackup, format string) ([]byte, error) {
 	switch format {
-	case "yaml", "yml":
+	case FormatYAML, FormatYML:
 		return yaml.Marshal(bkp)
 	default:
 		return json.MarshalIndent(bkp, "", "  ")

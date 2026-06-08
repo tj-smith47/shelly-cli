@@ -716,7 +716,7 @@ func TestRenderFunctions_WithColor(t *testing.T) {
 	})
 }
 
-//nolint:paralleltest,gocyclo // Tests modify shared isTTY and viper state; many test cases
+//nolint:paralleltest // Tests modify shared isTTY and viper state
 func TestColorEnabled_TTY(t *testing.T) {
 	// Save and restore isTTY
 	oldIsTTY := isTTY

@@ -20,6 +20,14 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Interactive command keywords shared by the REPL and shell sessions.
+const (
+	cmdExit   = "exit"
+	cmdQuit   = "quit"
+	cmdHelp   = "help"
+	cmdStatus = "status"
+)
+
 // DisplayREPLHelp displays available REPL commands.
 func DisplayREPLHelp(ios *iostreams.IOStreams) {
 	ios.Println(theme.Bold().Render("Available Commands:"))
@@ -188,13 +196,13 @@ func NewREPLSession(ios *iostreams.IOStreams, svc *shelly.Service, initialDevice
 // Returns true if the REPL should exit.
 func (s *REPLSession) ExecuteCommand(ctx context.Context, cmd string, args []string) bool {
 	// Handle exit commands
-	if cmd == "exit" || cmd == "quit" || cmd == "q" {
+	if cmd == cmdExit || cmd == cmdQuit || cmd == "q" {
 		return true
 	}
 
 	// Handle other commands
 	switch cmd {
-	case "help", "h", "?":
+	case cmdHelp, "h", "?":
 		DisplayREPLHelp(s.IOS)
 	case "devices", "ls":
 		DisplayRegisteredDevices(s.IOS)
@@ -202,7 +210,7 @@ func (s *REPLSession) ExecuteCommand(ctx context.Context, cmd string, args []str
 		s.handleConnect(args)
 	case "disconnect", "clear":
 		s.handleDisconnect()
-	case "status", "st":
+	case cmdStatus, "st":
 		s.handleStatus(ctx, args)
 	case shelly.ActionOn, shelly.ActionOff, shelly.ActionToggle:
 		s.handleControl(ctx, args, cmd)
@@ -343,7 +351,7 @@ func (s *REPLSession) RunREPLLoop(ctx context.Context) error {
 		Prompt:          output.FormatREPLPrompt(s.ActiveDevice),
 		HistoryFile:     historyFile,
 		InterruptPrompt: "^C",
-		EOFPrompt:       "exit",
+		EOFPrompt:       cmdExit,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize readline: %w", err)

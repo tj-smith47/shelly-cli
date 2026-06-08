@@ -2,6 +2,7 @@
 package scripts
 
 import (
+	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -133,7 +134,7 @@ func (m TemplateModel) Update(msg tea.Msg) (TemplateModel, tea.Cmd) {
 
 func (m TemplateModel) handleKey(msg tea.KeyPressMsg) (TemplateModel, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "q":
+	case keyconst.KeyEsc, "q":
 		m = m.Hide()
 		return m, func() tea.Msg { return messages.EditClosedMsg{Saved: false} }
 
@@ -253,7 +254,7 @@ func (m TemplateModel) renderContent() string {
 	if len(m.templates) > visible {
 		content.WriteString(m.styles.Muted.Render(
 			strings.Repeat("\n", 1) +
-				"[" + string(rune('0'+m.cursor+1)) + "/" + string(rune('0'+len(m.templates))) + "]",
+				fmt.Sprintf("[%d/%d]", m.cursor+1, len(m.templates)),
 		))
 	}
 

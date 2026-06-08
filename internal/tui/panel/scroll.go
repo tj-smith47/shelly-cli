@@ -3,6 +3,9 @@ package panel
 
 import "github.com/tj-smith47/shelly-cli/internal/tui/messages"
 
+// emptyScrollInfo is the scroll indicator shown when there are no items.
+const emptyScrollInfo = "[0/0]"
+
 // Scroller provides cursor and scroll management for list-based panels.
 // It handles navigation, visible range calculation, and scroll indicators.
 type Scroller struct {
@@ -131,7 +134,7 @@ func (s *Scroller) IsVisible(idx int) bool {
 // ScrollInfo returns a formatted scroll info string like "[5/20]".
 func (s *Scroller) ScrollInfo() string {
 	if s.itemCount == 0 {
-		return "[0/0]"
+		return emptyScrollInfo
 	}
 	return "[" + itoa(s.cursor+1) + "/" + itoa(s.itemCount) + "]"
 }
@@ -139,7 +142,7 @@ func (s *Scroller) ScrollInfo() string {
 // ScrollInfoRange returns a range-based scroll info like "[1-10/20]".
 func (s *Scroller) ScrollInfoRange() string {
 	if s.itemCount == 0 {
-		return "[0/0]"
+		return emptyScrollInfo
 	}
 	start, end := s.VisibleRange()
 	if start == end || end-start >= s.itemCount {

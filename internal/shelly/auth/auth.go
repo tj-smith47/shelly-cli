@@ -16,6 +16,8 @@ const (
 	DefaultPasswordLength = 16
 	// PasswordCharset contains characters used for password generation.
 	PasswordCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+	// DefaultUser is the Shelly device's built-in authentication user.
+	DefaultUser = "admin"
 )
 
 // Status holds authentication status information.
@@ -83,7 +85,7 @@ func (s *Service) Disable(ctx context.Context, identifier string) error {
 	return s.provider.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		// Setting ha1 to null disables authentication
 		params := map[string]any{
-			"user":  "admin",
+			"user":  DefaultUser,
 			"realm": "",
 			"ha1":   nil,
 		}

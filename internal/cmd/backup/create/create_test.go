@@ -15,10 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
-const (
-	testFalseValue  = "false"
-	testJSONDefault = "json"
-)
+const testFalseValue = "false"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -120,8 +117,8 @@ func TestNewCommand_Flags(t *testing.T) {
 	if formatFlag.Shorthand != "f" {
 		t.Errorf("format flag shorthand = %q, want 'f'", formatFlag.Shorthand)
 	}
-	if formatFlag.DefValue != testJSONDefault {
-		t.Errorf("format flag default = %q, want %q", formatFlag.DefValue, testJSONDefault)
+	if formatFlag.DefValue != defaultFormat {
+		t.Errorf("format flag default = %q, want %q", formatFlag.DefValue, defaultFormat)
 	}
 
 	// Check encrypt flag
@@ -176,7 +173,7 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 		name string
 		args []string
 	}{
-		{"format json", []string{"--format", "json", "device"}},
+		{"format json", []string{"--format", defaultFormat, "device"}},
 		{"format yaml", []string{"--format", "yaml", "device"}},
 		{"format short", []string{"-f", "yaml", "device"}},
 		{"encrypt", []string{"--encrypt", "mypassword", "device"}},
@@ -637,7 +634,7 @@ func TestRun_Success(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Device:  "test-device",
-		Format:  "json",
+		Format:  defaultFormat,
 	}
 	err = run(context.Background(), opts)
 	if err != nil {
@@ -684,7 +681,7 @@ func TestRun_WriteToFile(t *testing.T) {
 		Factory:  tf.Factory,
 		Device:   "test-device",
 		FilePath: filePath,
-		Format:   "json",
+		Format:   defaultFormat,
 	}
 	err = run(context.Background(), opts)
 	if err != nil {
@@ -730,7 +727,7 @@ func TestRun_InvalidFilePath(t *testing.T) {
 		Factory:  tf.Factory,
 		Device:   "test-device",
 		FilePath: "/nonexistent/directory/backup.json",
-		Format:   "json",
+		Format:   defaultFormat,
 	}
 	err = run(context.Background(), opts)
 	// This should fail either at backup creation (mock limitation) or file write (invalid path)
@@ -819,7 +816,7 @@ func TestRun_WithAllSkipFlags(t *testing.T) {
 	opts := &Options{
 		Factory:       tf.Factory,
 		Device:        "test-device",
-		Format:        "json",
+		Format:        defaultFormat,
 		SkipScripts:   true,
 		SkipSchedules: true,
 		SkipWebhooks:  true,
@@ -866,7 +863,7 @@ func TestRun_WithPassword(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Device:  "test-device",
-		Format:  "json",
+		Format:  defaultFormat,
 		Encrypt: "mysecretpassword",
 	}
 	err = run(context.Background(), opts)

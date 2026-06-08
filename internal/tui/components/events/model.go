@@ -49,6 +49,15 @@ const (
 	ColumnSystem
 )
 
+const (
+	// eventBLEScanResult is the BLE scan result event name, filtered by default.
+	eventBLEScanResult = "ble.scan_result"
+	// componentSys is the system component name, filtered by default.
+	componentSys = "sys"
+	// componentWiFi is the WiFi component name, filtered by default.
+	componentWiFi = "wifi"
+)
+
 // Deps holds the dependencies for the events component.
 type Deps struct {
 	Ctx         context.Context
@@ -240,12 +249,12 @@ func New(deps Deps) Model {
 	// Use provided filters or defaults
 	filteredEvents := deps.FilteredEvents
 	if len(filteredEvents) == 0 {
-		filteredEvents = []string{"ble.scan_result"} // Default filtered events
+		filteredEvents = []string{eventBLEScanResult} // Default filtered events
 	}
 
 	filteredComponents := deps.FilteredComponents
 	if len(filteredComponents) == 0 {
-		filteredComponents = []string{"sys", "wifi", "cloud", "ts"} // Default filtered components
+		filteredComponents = []string{componentSys, componentWiFi, "cloud", "ts"} // Default filtered components
 	}
 
 	return Model{

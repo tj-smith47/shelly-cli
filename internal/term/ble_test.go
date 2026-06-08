@@ -22,8 +22,8 @@ func TestDisplayBLEProvisionResult(t *testing.T) {
 			CompletedAt: time.Now(),
 			Device: &provisioning.BLEDevice{
 				Name:       "ShellyPlus1PM",
-				Address:    "AA:BB:CC:DD:EE:FF",
-				Model:      "SNSW-001P16EU",
+				Address:    testMAC,
+				Model:      testModel1PM,
 				Generation: 2,
 			},
 		}
@@ -37,7 +37,7 @@ func TestDisplayBLEProvisionResult(t *testing.T) {
 		if !strings.Contains(output, "ShellyPlus1PM") {
 			t.Error("output should contain device name")
 		}
-		if !strings.Contains(output, "AA:BB:CC:DD:EE:FF") {
+		if !strings.Contains(output, testMAC) {
 			t.Error("output should contain device address")
 		}
 		if !strings.Contains(output, "MyNetwork") {
@@ -90,15 +90,15 @@ func TestDisplayBLEProvisionResult(t *testing.T) {
 			CompletedAt: time.Now(),
 			Device: &provisioning.BLEDevice{
 				Name:    "ShellyPlus2PM",
-				Address: "11:22:33:44:55:66",
-				Model:   "SNSW-002P16EU",
+				Address: testMAC2,
+				Model:   testModel2PM,
 			},
 		}
 
 		DisplayBLEProvisionResult(ios, result, "TestNetwork")
 
 		output := out.String()
-		if !strings.Contains(output, "SNSW-002P16EU") {
+		if !strings.Contains(output, testModel2PM) {
 			t.Error("output should contain device model")
 		}
 	})
@@ -133,7 +133,7 @@ func TestDisplayBLEDevice(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		device := &provisioning.BLEDevice{
 			Name:       "ShellyPlus1",
-			Address:    "AA:BB:CC:DD:EE:FF",
+			Address:    testMAC,
 			Model:      "SNSW-001P8EU",
 			RSSI:       -65,
 			Generation: 2,
@@ -145,7 +145,7 @@ func TestDisplayBLEDevice(t *testing.T) {
 		if !strings.Contains(output, "ShellyPlus1") {
 			t.Error("output should contain device name")
 		}
-		if !strings.Contains(output, "AA:BB:CC:DD:EE:FF") {
+		if !strings.Contains(output, testMAC) {
 			t.Error("output should contain device address")
 		}
 		if !strings.Contains(output, "SNSW-001P8EU") {
@@ -164,17 +164,17 @@ func TestDisplayBLEDevice(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		device := &provisioning.BLEDevice{
-			Name:    "Unknown",
-			Address: "11:22:33:44:55:66",
+			Name:    unknownLabel,
+			Address: testMAC2,
 		}
 
 		DisplayBLEDevice(ios, device)
 
 		output := out.String()
-		if !strings.Contains(output, "Unknown") {
+		if !strings.Contains(output, unknownLabel) {
 			t.Error("output should contain device name")
 		}
-		if !strings.Contains(output, "11:22:33:44:55:66") {
+		if !strings.Contains(output, testMAC2) {
 			t.Error("output should contain device address")
 		}
 		// Should not contain optional fields
@@ -202,7 +202,7 @@ func TestDisplayBLEDevice(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		device := &provisioning.BLEDevice{
 			Name:    "Device",
-			Address: "AA:BB:CC:DD:EE:FF",
+			Address: testMAC,
 			RSSI:    0,
 		}
 
@@ -220,7 +220,7 @@ func TestDisplayBLEDevice(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		device := &provisioning.BLEDevice{
 			Name:       "Device",
-			Address:    "AA:BB:CC:DD:EE:FF",
+			Address:    testMAC,
 			Generation: 0,
 		}
 

@@ -42,7 +42,7 @@ func TestNewCommand_Aliases(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expectedAliases := []string{"factory-reset", "factory"}
+	expectedAliases := []string{aliasFactoryReset, "factory"}
 	if len(cmd.Aliases) != len(expectedAliases) {
 		t.Errorf("got %d aliases, want %d", len(cmd.Aliases), len(expectedAliases))
 	}
@@ -370,7 +370,7 @@ func TestNewCommand_AliasesWork(t *testing.T) {
 
 	hasFactoryResetAlias := false
 	for _, alias := range cmd.Aliases {
-		if alias == "factory-reset" {
+		if alias == aliasFactoryReset {
 			hasFactoryResetAlias = true
 			break
 		}

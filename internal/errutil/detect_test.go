@@ -7,6 +7,12 @@ import (
 	"testing"
 )
 
+const (
+	tcNilError     = "nil error"
+	tcGenericError = "generic error"
+	tcNetworkError = "network error"
+)
+
 func TestIsTimeout(t *testing.T) {
 	t.Parallel()
 
@@ -15,7 +21,7 @@ func TestIsTimeout(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"nil error", nil, false},
+		{tcNilError, nil, false},
 		{"context deadline exceeded", context.DeadlineExceeded, true},
 		{"timeout string", errors.New("connection timeout"), true},
 		{"deadline exceeded string", errors.New("deadline exceeded"), true},
@@ -42,7 +48,7 @@ func TestIsDNS(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"nil error", nil, false},
+		{tcNilError, nil, false},
 		{"no such host", errors.New("dial tcp: lookup test-device: no such host"), true},
 		{"server misbehaving", errors.New("lookup test on 127.0.0.53:53: server misbehaving"), true},
 		{"lookup with dial tcp", errors.New("dial tcp: lookup baddevice: failed"), true},
@@ -68,7 +74,7 @@ func TestIsNetwork(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"nil error", nil, false},
+		{tcNilError, nil, false},
 		{"connection refused", errors.New("connection refused"), true},
 		{"no route to host", errors.New("no route to host"), true},
 		{"network unreachable", errors.New("network unreachable"), true},
@@ -77,7 +83,7 @@ func TestIsNetwork(t *testing.T) {
 		{"dial tcp", errors.New("dial tcp: connection failed"), true},
 		{"i/o timeout", errors.New("i/o timeout"), true},
 		{"auth error", errors.New("401 unauthorized"), false},
-		{"generic error", errors.New("something went wrong"), false},
+		{tcGenericError, errors.New("something went wrong"), false},
 	}
 
 	for _, tt := range tests {
@@ -117,7 +123,7 @@ func TestIsAuth(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"nil error", nil, false},
+		{tcNilError, nil, false},
 		{"401 status", errors.New("HTTP 401"), true},
 		{"403 status", errors.New("HTTP 403 forbidden"), true},
 		{"unauthorized", errors.New("request unauthorized"), true},
@@ -125,8 +131,8 @@ func TestIsAuth(t *testing.T) {
 		{"authentication failed", errors.New("authentication failed"), true},
 		{"invalid password", errors.New("invalid password"), true},
 		{"access denied", errors.New("access denied"), true},
-		{"network error", errors.New("connection refused"), false},
-		{"generic error", errors.New("something went wrong"), false},
+		{tcNetworkError, errors.New("connection refused"), false},
+		{tcGenericError, errors.New("something went wrong"), false},
 	}
 
 	for _, tt := range tests {
@@ -147,14 +153,14 @@ func TestIsDevice(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"nil error", nil, false},
+		{tcNilError, nil, false},
 		{"device error", errors.New("device error: switch failed"), true},
 		{"device in message", errors.New("failed to connect to device"), true},
 		{"shelly error", errors.New("shelly returned error"), true},
 		{"component error", errors.New("component error: invalid id"), true},
 		{"component in message", errors.New("switch component failed"), true},
-		{"network error", errors.New("connection refused"), false},
-		{"generic error", errors.New("something went wrong"), false},
+		{tcNetworkError, errors.New("connection refused"), false},
+		{tcGenericError, errors.New("something went wrong"), false},
 	}
 
 	for _, tt := range tests {
@@ -175,13 +181,13 @@ func TestIsUnsupported(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"nil error", nil, false},
+		{tcNilError, nil, false},
 		{"404 status", errors.New("HTTP 404"), true},
 		{"unknown method", errors.New("unknown method: Script.GetCode"), true},
 		{"not found", errors.New("resource not found"), true},
 		{"not supported", errors.New("feature not supported"), true},
-		{"network error", errors.New("connection refused"), false},
-		{"generic error", errors.New("something went wrong"), false},
+		{tcNetworkError, errors.New("connection refused"), false},
+		{tcGenericError, errors.New("something went wrong"), false},
 	}
 
 	for _, tt := range tests {
@@ -202,10 +208,10 @@ func TestCategorize(t *testing.T) {
 		err  error
 		want Category
 	}{
-		{"nil error", nil, CategoryUnknown},
+		{tcNilError, nil, CategoryUnknown},
 		{"timeout", context.DeadlineExceeded, CategoryTimeout},
 		{"dns error", errors.New("no such host"), CategoryDNS},
-		{"network error", errors.New("connection refused"), CategoryNetwork},
+		{tcNetworkError, errors.New("connection refused"), CategoryNetwork},
 		{"auth error", errors.New("401 unauthorized"), CategoryAuth},
 		{"unsupported", errors.New("unknown method"), CategoryUnsupported},
 		{"device error", errors.New("device error: failed"), CategoryDevice},
@@ -230,13 +236,13 @@ func TestCategory_String(t *testing.T) {
 		cat  Category
 		want string
 	}{
-		{CategoryUnknown, "unknown"},
-		{CategoryTimeout, "timeout"},
-		{CategoryDNS, "dns"},
-		{CategoryNetwork, "network"},
-		{CategoryAuth, "auth"},
-		{CategoryDevice, "device"},
-		{CategoryUnsupported, "unsupported"},
+		{CategoryUnknown, nameUnknown},
+		{CategoryTimeout, nameTimeout},
+		{CategoryDNS, nameDNS},
+		{CategoryNetwork, nameNetwork},
+		{CategoryAuth, nameAuth},
+		{CategoryDevice, nameDevice},
+		{CategoryUnsupported, nameUnsupported},
 	}
 
 	for _, tt := range tests {

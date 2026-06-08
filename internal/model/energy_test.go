@@ -22,7 +22,7 @@ func TestDashboardData(t *testing.T) {
 		OfflineCount: 1,
 		Devices: []DashboardDeviceEntry{
 			{
-				Device:     "switch1",
+				Device:     testSwitch1,
 				Online:     true,
 				TotalPower: 50.5,
 			},
@@ -75,7 +75,7 @@ func TestDashboardDeviceEntry(t *testing.T) {
 		TotalEnergy: 500.5,
 		Components: []ComponentPower{
 			{
-				Type:    "switch",
+				Type:    string(ComponentSwitch),
 				ID:      0,
 				Power:   75.25,
 				Voltage: 230.0,
@@ -122,7 +122,7 @@ func TestComponentPower(t *testing.T) {
 	t.Parallel()
 
 	power := ComponentPower{
-		Type:    "switch",
+		Type:    string(ComponentSwitch),
 		ID:      0,
 		Power:   25.5,
 		Voltage: 230.0,
@@ -130,8 +130,8 @@ func TestComponentPower(t *testing.T) {
 		Energy:  100.0,
 	}
 
-	if power.Type != "switch" {
-		t.Errorf("Type = %q, want %q", power.Type, "switch")
+	if power.Type != string(ComponentSwitch) {
+		t.Errorf("Type = %q, want %q", power.Type, string(ComponentSwitch))
 	}
 	if power.ID != 0 {
 		t.Errorf("ID = %d, want 0", power.ID)
@@ -163,7 +163,7 @@ func TestComparisonData(t *testing.T) {
 		To:     to,
 		Devices: []DeviceEnergy{
 			{
-				Device:     "device1",
+				Device:     testDevice1,
 				Energy:     100.5,
 				AvgPower:   50.0,
 				PeakPower:  200.0,
@@ -172,7 +172,7 @@ func TestComparisonData(t *testing.T) {
 				Percentage: 45.5,
 			},
 			{
-				Device:     "device2",
+				Device:     testDevice2,
 				Energy:     120.0,
 				AvgPower:   60.0,
 				PeakPower:  180.0,

@@ -20,6 +20,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
+// rootCommandPath is the command path reported for the bare root command.
+const rootCommandPath = "shelly"
+
 // Endpoint is the telemetry collection endpoint.
 // Set via ldflags at build time:
 //
@@ -292,7 +295,7 @@ func Close() {
 func GetCommandPath(rootCmd *cobra.Command, args []string) string {
 	cmd, _, err := rootCmd.Find(args)
 	if err != nil || cmd == nil || cmd == rootCmd {
-		return "shelly"
+		return rootCommandPath
 	}
 
 	// Build path from command chain

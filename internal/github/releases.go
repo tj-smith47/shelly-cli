@@ -30,6 +30,9 @@ const (
 	DefaultOwner = "tj-smith47"
 	// DefaultRepo is the repository name.
 	DefaultRepo = "shelly-cli"
+
+	// extZip is the file extension for zip archives.
+	extZip = ".zip"
 )
 
 // GitHubAPIBaseURL is the base URL for GitHub API (var for testing).
@@ -223,7 +226,7 @@ func (c *Client) FindBinaryAsset(release *Release, binaryName string) (*Asset, e
 	}
 
 	// Also try with common extensions
-	extensions := []string{"", ".exe", ".tar.gz", ".zip"}
+	extensions := []string{"", ".exe", ".tar.gz", extZip}
 
 	for _, pattern := range patterns {
 		for _, ext := range extensions {
@@ -358,7 +361,7 @@ func (c *Client) ExtractBinary(archivePath, tmpDir, binaryName string) (string, 
 	switch {
 	case strings.HasSuffix(archivePath, ".tar.gz") || strings.HasSuffix(archivePath, ".tgz"):
 		binaryPath, err = c.extractTarGz(archivePath, tmpDir, binaryName)
-	case strings.HasSuffix(archivePath, ".zip"):
+	case strings.HasSuffix(archivePath, extZip):
 		binaryPath, err = c.extractZip(archivePath, tmpDir, binaryName)
 	default:
 		// Assume it's already the binary
@@ -598,9 +601,9 @@ func (r *Release) FindAssetForPlatform() *Asset {
 	}
 
 	// OS-specific extensions
-	extensions := []string{".tar.gz", ".zip"}
+	extensions := []string{".tar.gz", extZip}
 	if goos == "windows" {
-		extensions = []string{".zip", ".exe"}
+		extensions = []string{extZip, ".exe"}
 	}
 
 	for i := range r.Assets {

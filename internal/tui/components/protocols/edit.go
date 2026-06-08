@@ -41,6 +41,12 @@ const (
 	TLSUserCA
 )
 
+// SSLCA config values for the MQTT TLS modes.
+const (
+	sslCADefault = "ca.pem"
+	sslCAUser    = "user_ca.pem"
+)
+
 // MQTTEditSaveResultMsg is an alias for the shared save result message.
 type MQTTEditSaveResultMsg = messages.SaveResultMsg
 
@@ -170,9 +176,9 @@ func (m MQTTEditModel) setTLSFromSSLCA(sslca string) form.Select {
 		return m.tlsDropdown.SetSelected(0) // No TLS
 	case "*":
 		return m.tlsDropdown.SetSelected(1) // TLS no verify
-	case "ca.pem":
+	case sslCADefault:
 		return m.tlsDropdown.SetSelected(2) // TLS default CA
-	case "user_ca.pem":
+	case sslCAUser:
 		return m.tlsDropdown.SetSelected(3) // TLS user CA
 	default:
 		return m.tlsDropdown.SetSelected(0)
@@ -185,9 +191,9 @@ func (m MQTTEditModel) getSSLCAFromDropdown() string {
 	case 1:
 		return "*"
 	case 2:
-		return "ca.pem"
+		return sslCADefault
 	case 3:
-		return "user_ca.pem"
+		return sslCAUser
 	default:
 		return ""
 	}

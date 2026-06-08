@@ -110,7 +110,7 @@ func TestNewCommand_FlagDefaults(t *testing.T) {
 		name     string
 		defValue string
 	}{
-		{"type", "devices"},
+		{"type", reportTypeDevices},
 		{"output-file", ""},
 		{"format", formatJSON},
 	}
@@ -153,7 +153,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	wantPatterns := []string{
 		"shelly report",
 		"--type",
-		"devices",
+		reportTypeDevices,
 		reportTypeEnergy,
 		"-o",
 		"--format",
@@ -172,9 +172,9 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	wantPatterns := []string{
-		"devices",
+		reportTypeDevices,
 		reportTypeEnergy,
-		"audit",
+		reportTypeAudit,
 		formatJSON,
 		formatText,
 	}
@@ -216,7 +216,7 @@ func TestExecute_NoDevices(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "devices"})
+	cmd.SetArgs([]string{"--type", reportTypeDevices})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -316,7 +316,7 @@ func TestExecute_DevicesReport(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "devices"})
+	cmd.SetArgs([]string{"--type", reportTypeDevices})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -327,7 +327,7 @@ func TestExecute_DevicesReport(t *testing.T) {
 
 	// Check output contains expected JSON fields
 	output := tf.OutString()
-	if !strings.Contains(output, "devices") {
+	if !strings.Contains(output, reportTypeDevices) {
 		t.Errorf("expected 'devices' in output, got: %s", output)
 	}
 }
@@ -420,7 +420,7 @@ func TestExecute_AuditReport(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "audit"})
+	cmd.SetArgs([]string{"--type", reportTypeAudit})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -431,7 +431,7 @@ func TestExecute_AuditReport(t *testing.T) {
 
 	// Check output contains expected JSON fields
 	output := tf.OutString()
-	if !strings.Contains(output, "audit") {
+	if !strings.Contains(output, reportTypeAudit) {
 		t.Errorf("expected 'audit' in output, got: %s", output)
 	}
 }
@@ -472,7 +472,7 @@ func TestExecute_TextFormat(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "devices", "--format", formatText})
+	cmd.SetArgs([]string{"--type", reportTypeDevices, "--format", formatText})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -525,7 +525,7 @@ func TestExecute_WithMultipleDevices(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", "devices"})
+	cmd.SetArgs([]string{"--type", reportTypeDevices})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -568,7 +568,7 @@ func TestRun_DevicesReport(t *testing.T) {
 
 	opts := &Options{
 		Factory: tf.Factory,
-		Type:    "devices",
+		Type:    reportTypeDevices,
 	}
 	opts.Format = formatJSON
 
@@ -654,7 +654,7 @@ func TestRun_AuditReport(t *testing.T) {
 
 	opts := &Options{
 		Factory: tf.Factory,
-		Type:    "audit",
+		Type:    reportTypeAudit,
 	}
 	opts.Format = formatJSON
 
@@ -697,7 +697,7 @@ func TestRun_TextFormat(t *testing.T) {
 
 	opts := &Options{
 		Factory: tf.Factory,
-		Type:    "devices",
+		Type:    reportTypeDevices,
 	}
 	opts.Format = formatText
 

@@ -23,7 +23,7 @@ type SwitchInfo struct {
 
 // ListHeaders returns the column headers for the table.
 func (s SwitchInfo) ListHeaders() []string {
-	return []string{"ID", "Name", "State", "Power"}
+	return []string{"ID", headerName, headerState, headerPower}
 }
 
 // ListRow returns the formatted row values for the table.

@@ -89,7 +89,7 @@ const (
 
 // panelNames maps panel IDs to their string names for debugging.
 var panelNames = map[GlobalPanelID]string{
-	PanelNone:                   "none",
+	PanelNone:                   noneStr,
 	PanelDeviceList:             "deviceList",
 	PanelDashboardInfo:          "dashboard.info",
 	PanelDashboardEvents:        "dashboard.events",

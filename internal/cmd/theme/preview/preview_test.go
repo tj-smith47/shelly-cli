@@ -10,6 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+const themeNord = "nord"
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -74,12 +76,12 @@ func TestNewCommand_Args(t *testing.T) {
 		},
 		{
 			name:    "one arg is valid",
-			args:    []string{"nord"},
+			args:    []string{themeNord},
 			wantErr: false,
 		},
 		{
 			name:    "two args is invalid",
-			args:    []string{"nord", "dracula"},
+			args:    []string{themeNord, "dracula"},
 			wantErr: true,
 		},
 	}
@@ -159,7 +161,7 @@ func TestRun_SpecificTheme(t *testing.T) {
 	// Set a different current theme first
 	theme.SetTheme("dracula")
 
-	opts := &Options{Factory: f, ThemeName: "nord"}
+	opts := &Options{Factory: f, ThemeName: themeNord}
 	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
@@ -168,7 +170,7 @@ func TestRun_SpecificTheme(t *testing.T) {
 	output := outBuf.String()
 
 	// Should show the previewed theme name
-	if !strings.Contains(output, "nord") {
+	if !strings.Contains(output, themeNord) {
 		t.Error("Output should contain theme name 'nord'")
 	}
 }
@@ -238,7 +240,7 @@ func TestRun_PreservesCurrentTheme(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Preview a different theme
-	opts := &Options{Factory: f, ThemeName: "nord"}
+	opts := &Options{Factory: f, ThemeName: themeNord}
 	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)

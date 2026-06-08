@@ -34,8 +34,8 @@ func TestNewCommand_Structure(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "updates" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "updates")
+	if cmd.Use != commandUse {
+		t.Errorf("Use = %q, want %q", cmd.Use, commandUse)
 	}
 
 	wantAliases := []string{"upd"}
@@ -144,7 +144,7 @@ func TestNewCommand_LongDescription(t *testing.T) {
 
 	wantPatterns := []string{
 		"firmware",
-		"updates",
+		commandUse,
 		"interactive",
 		"Shelly",
 	}

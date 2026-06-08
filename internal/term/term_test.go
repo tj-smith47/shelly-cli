@@ -10,7 +10,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-//nolint:gocritic // helper function returns multiple values
 func testIOStreams() (*iostreams.IOStreams, *bytes.Buffer, *bytes.Buffer) {
 	in := strings.NewReader("")
 	out := &bytes.Buffer{}
@@ -79,7 +78,7 @@ func TestRepeatChar(t *testing.T) {
 		n    int
 		want string
 	}{
-		{"zero", '-', 0, ""},
+		{testValueZero, '-', 0, ""},
 		{"one", '-', 1, "-"},
 		{"five", '=', 5, "====="},
 		{"unicode", '★', 3, "★★★"},
@@ -105,7 +104,7 @@ func TestValueOrEmpty(t *testing.T) {
 		want  string
 	}{
 		{"empty", "", "<not connected>"},
-		{"non-empty", "value", "value"},
+		{"non-empty", testValue, testValue},
 		{"whitespace only", "  ", "  "},
 	}
 
@@ -183,7 +182,7 @@ func TestRepeatCharVariants(t *testing.T) {
 		n    int
 		want string
 	}{
-		{"zero", '-', 0, ""},
+		{testValueZero, '-', 0, ""},
 		{"one", '-', 1, "-"},
 		{"five dash", '-', 5, "-----"},
 		{"five equals", '=', 5, "====="},
@@ -382,7 +381,7 @@ func TestDisplaySwitchList(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	switches := []shelly.SwitchInfo{
-		{ID: 0, Name: "Switch 0", Output: true},
+		{ID: 0, Name: testSwitch0, Output: true},
 		{ID: 1, Name: "Switch 1", Output: false},
 	}
 	DisplaySwitchList(ios, switches)
@@ -471,7 +470,7 @@ func TestDisplayInputList(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 	inputs := []shelly.InputInfo{
-		{ID: 0, Name: "Input 0", State: true, Type: "button"},
+		{ID: 0, Name: testInput0, State: true, Type: "button"},
 	}
 	DisplayInputList(ios, inputs)
 

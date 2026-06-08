@@ -42,9 +42,11 @@ var (
 
 // Action string constants (shared across views).
 const (
-	actionToggle = "toggle"
-	actionSnooze = "snooze"
-	actionSave   = "save"
+	actionToggle  = "toggle"
+	actionSnooze  = "snooze"
+	actionSave    = "save"
+	actionCapture = "capture"
+	actionCreate  = "create"
 )
 
 // automationLoadPhase tracks which component is being loaded.
@@ -914,9 +916,9 @@ func (a *Automation) saveAlert(msg alerts.AlertFormSubmitMsg) tea.Cmd {
 		// CreateAlert handles both create and update
 		err := config.CreateAlert(msg.Name, msg.Description, msg.Device, msg.Condition, msg.Action, msg.Enabled)
 		if err != nil {
-			return alerts.AlertActionResultMsg{Action: "save", Name: msg.Name, Err: err}
+			return alerts.AlertActionResultMsg{Action: actionSave, Name: msg.Name, Err: err}
 		}
-		return alerts.AlertActionResultMsg{Action: "save", Name: msg.Name}
+		return alerts.AlertActionResultMsg{Action: actionSave, Name: msg.Name}
 	}
 }
 

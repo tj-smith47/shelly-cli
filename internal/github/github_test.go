@@ -41,6 +41,28 @@ const (
 	testBackupPath  = "/tmp/backup"
 	testSourcePath  = "/tmp/source"
 	testTargetPath  = "/tmp/target"
+
+	testVersion100      = "1.0.0"
+	testVersion101      = "1.0.1"
+	testVersion200      = "2.0.0"
+	testRelease100      = "Release 1.0.0"
+	testRelease200      = "Release 2.0.0"
+	testReleaseNotes    = "Release notes"
+	testBody            = "test body"
+	testOwner           = "owner"
+	testRepo            = "repo"
+	testMyOrg           = "myorg"
+	testMyRepo          = "myrepo"
+	testAbc123          = "abc123"
+	testVersionFlag     = "--version"
+	testShelly          = "shelly"
+	testAssetTarGz      = "shelly-linux-amd64.tar.gz"
+	testAssetUnderscore = "shelly_linux_amd64.tar.gz"
+	testDownloadURL     = "https://example.com/download"
+	testTarGz           = "test.tar.gz"
+	testZip             = "test.zip"
+	testBinaryTarGz     = "binary.tar.gz"
+	testStr             = "test"
 )
 
 func TestRelease_Version(t *testing.T) {
@@ -53,13 +75,13 @@ func TestRelease_Version(t *testing.T) {
 	}{
 		{
 			name:    "with v prefix",
-			tagName: "v1.2.3",
-			want:    "1.2.3",
+			tagName: testVersionV123,
+			want:    testVersion123,
 		},
 		{
 			name:    "without v prefix",
-			tagName: "1.2.3",
-			want:    "1.2.3",
+			tagName: testVersion123,
+			want:    testVersion123,
 		},
 		{
 			name:    "empty",
@@ -84,8 +106,8 @@ func TestAsset_Fields(t *testing.T) {
 
 	asset := &github.Asset{
 		ID:                 123,
-		Name:               "shelly-linux-amd64.tar.gz",
-		BrowserDownloadURL: "https://example.com/download",
+		Name:               testAssetTarGz,
+		BrowserDownloadURL: testDownloadURL,
 		Size:               1024,
 		ContentType:        "application/gzip",
 	}
@@ -93,11 +115,11 @@ func TestAsset_Fields(t *testing.T) {
 	if asset.ID != 123 {
 		t.Errorf("ID = %d, want 123", asset.ID)
 	}
-	if asset.Name != "shelly-linux-amd64.tar.gz" {
-		t.Errorf("Name = %q, want %q", asset.Name, "shelly-linux-amd64.tar.gz")
+	if asset.Name != testAssetTarGz {
+		t.Errorf("Name = %q, want %q", asset.Name, testAssetTarGz)
 	}
-	if asset.BrowserDownloadURL != "https://example.com/download" {
-		t.Errorf("BrowserDownloadURL = %q, want %q", asset.BrowserDownloadURL, "https://example.com/download")
+	if asset.BrowserDownloadURL != testDownloadURL {
+		t.Errorf("BrowserDownloadURL = %q, want %q", asset.BrowserDownloadURL, testDownloadURL)
 	}
 }
 
@@ -120,17 +142,17 @@ func TestCompareVersions(t *testing.T) {
 		v2   string
 		want int
 	}{
-		{"1.0.0", "1.0.0", 0},
-		{"1.0.0", "1.0.1", -1},
-		{"1.0.1", "1.0.0", 1},
-		{"1.0.0", "2.0.0", -1},
-		{"2.0.0", "1.0.0", 1},
-		{"1.0.0", "1.1.0", -1},
-		{"1.1.0", "1.0.0", 1},
-		{"v1.0.0", "1.0.0", 0},
-		{"1.0.0", "v1.0.0", 0},
-		{"1.0.0-beta", "1.0.0", 0}, // Pre-release suffix ignored
-		{"1.0.0+build", "1.0.0", 0},
+		{testVersion100, testVersion100, 0},
+		{testVersion100, testVersion101, -1},
+		{testVersion101, testVersion100, 1},
+		{testVersion100, testVersion200, -1},
+		{testVersion200, testVersion100, 1},
+		{testVersion100, "1.1.0", -1},
+		{"1.1.0", testVersion100, 1},
+		{testVersionV1, testVersion100, 0},
+		{testVersion100, testVersionV1, 0},
+		{"1.0.0-beta", testVersion100, 0}, // Pre-release suffix ignored
+		{"1.0.0+build", testVersion100, 0},
 	}
 
 	for _, tt := range tests {
@@ -152,10 +174,10 @@ func TestIsNewerVersion(t *testing.T) {
 		available string
 		want      bool
 	}{
-		{"1.0.0", "1.0.1", true},
-		{"1.0.1", "1.0.0", false},
-		{"1.0.0", "1.0.0", false},
-		{"1.0.0", "2.0.0", true},
+		{testVersion100, testVersion101, true},
+		{testVersion101, testVersion100, false},
+		{testVersion100, testVersion100, false},
+		{testVersion100, testVersion200, true},
 	}
 
 	for _, tt := range tests {
@@ -173,15 +195,15 @@ func TestSortReleasesByVersion(t *testing.T) {
 	t.Parallel()
 
 	releases := []github.Release{
-		{TagName: "v1.0.0"},
-		{TagName: "v2.0.0"},
+		{TagName: testVersionV1},
+		{TagName: testVersionV2},
 		{TagName: testVersionV15},
 	}
 
 	github.SortReleasesByVersion(releases)
 
 	// Should be in descending order
-	if releases[0].TagName != "v2.0.0" {
+	if releases[0].TagName != testVersionV2 {
 		t.Errorf("releases[0].TagName = %q, want v2.0.0", releases[0].TagName)
 	}
 	if releases[1].TagName != testVersionV15 {
@@ -205,32 +227,32 @@ func TestParseRepoString(t *testing.T) {
 		{
 			name:      "simple owner/repo",
 			input:     "owner/repo",
-			wantOwner: "owner",
-			wantRepo:  "repo",
+			wantOwner: testOwner,
+			wantRepo:  testRepo,
 		},
 		{
 			name:      "with gh prefix",
 			input:     "gh:owner/repo",
-			wantOwner: "owner",
-			wantRepo:  "repo",
+			wantOwner: testOwner,
+			wantRepo:  testRepo,
 		},
 		{
 			name:      "with github prefix",
 			input:     "github:owner/repo",
-			wantOwner: "owner",
-			wantRepo:  "repo",
+			wantOwner: testOwner,
+			wantRepo:  testRepo,
 		},
 		{
 			name:      "with https prefix",
 			input:     "https://github.com/owner/repo",
-			wantOwner: "owner",
-			wantRepo:  "repo",
+			wantOwner: testOwner,
+			wantRepo:  testRepo,
 		},
 		{
 			name:      "with .git suffix",
 			input:     "owner/repo.git",
-			wantOwner: "owner",
-			wantRepo:  "repo",
+			wantOwner: testOwner,
+			wantRepo:  testRepo,
 		},
 		{
 			name:    "invalid format",
@@ -272,11 +294,11 @@ func TestRelease_FindAssetForPlatform(t *testing.T) {
 
 	release := &github.Release{
 		Assets: []github.Asset{
-			{Name: "shelly-linux-amd64.tar.gz"},
+			{Name: testAssetTarGz},
 			{Name: "shelly-darwin-amd64.tar.gz"},
 			{Name: "shelly-windows-amd64.zip"},
 			{Name: "shelly-linux-arm64.tar.gz"},
-			{Name: "checksums.txt"},
+			{Name: testChecksumTxt},
 		},
 	}
 
@@ -298,14 +320,14 @@ func TestRelease_FindChecksumAsset(t *testing.T) {
 
 	release := &github.Release{
 		Assets: []github.Asset{
-			{Name: "shelly-linux-amd64.tar.gz"},
+			{Name: testAssetTarGz},
 			{Name: "shelly-linux-amd64.tar.gz.sha256"},
-			{Name: "checksums.txt"},
+			{Name: testChecksumTxt},
 		},
 	}
 
 	// Test finding specific checksum
-	asset := release.FindChecksumAsset("shelly-linux-amd64.tar.gz")
+	asset := release.FindChecksumAsset(testAssetTarGz)
 	if asset == nil {
 		t.Error("FindChecksumAsset() should find sha256 file")
 	} else if asset.Name != "shelly-linux-amd64.tar.gz.sha256" {
@@ -333,43 +355,43 @@ func TestParseChecksumFile(t *testing.T) {
 		{
 			name:      "standard format",
 			content:   "abc123  shelly-linux-amd64.tar.gz\ndef456  shelly-darwin-amd64.tar.gz",
-			assetName: "shelly-linux-amd64.tar.gz",
-			wantHash:  "abc123",
+			assetName: testAssetTarGz,
+			wantHash:  testAbc123,
 		},
 		{
 			name:      "binary mode indicator",
 			content:   "abc123 *shelly-linux-amd64.tar.gz",
-			assetName: "shelly-linux-amd64.tar.gz",
-			wantHash:  "abc123",
+			assetName: testAssetTarGz,
+			wantHash:  testAbc123,
 		},
 		{
 			name:      "with comments",
 			content:   "# This is a comment\nabc123  shelly-linux-amd64.tar.gz",
-			assetName: "shelly-linux-amd64.tar.gz",
-			wantHash:  "abc123",
+			assetName: testAssetTarGz,
+			wantHash:  testAbc123,
 		},
 		{
 			name:      "single hash only",
-			content:   "abc123",
+			content:   testAbc123,
 			assetName: "anyfile.tar.gz",
-			wantHash:  "abc123",
+			wantHash:  testAbc123,
 		},
 		{
 			name:      "case insensitive match",
 			content:   "abc123  SHELLY-LINUX-AMD64.TAR.GZ",
-			assetName: "shelly-linux-amd64.tar.gz",
-			wantHash:  "abc123",
+			assetName: testAssetTarGz,
+			wantHash:  testAbc123,
 		},
 		{
 			name:      "not found",
 			content:   "abc123  other-file.tar.gz",
-			assetName: "shelly-linux-amd64.tar.gz",
+			assetName: testAssetTarGz,
 			wantErr:   true,
 		},
 		{
 			name:      "empty content",
 			content:   "",
-			assetName: "shelly-linux-amd64.tar.gz",
+			assetName: testAssetTarGz,
 			wantErr:   true,
 		},
 	}
@@ -393,9 +415,9 @@ func TestClient_GetLatestRelease(t *testing.T) {
 	t.Parallel()
 
 	release := github.Release{
-		TagName: "v1.0.0",
-		Name:    "Release 1.0.0",
-		Body:    "Release notes",
+		TagName: testVersionV1,
+		Name:    testRelease100,
+		Body:    testReleaseNotes,
 		Assets:  []github.Asset{},
 	}
 
@@ -430,7 +452,7 @@ func TestClient_GetReleaseByTag(t *testing.T) {
 	client := github.NewClient(ios)
 
 	ctx := context.Background()
-	_, err := client.GetReleaseByTag(ctx, "nonexistent", "nonexistent", "v1.0.0")
+	_, err := client.GetReleaseByTag(ctx, "nonexistent", "nonexistent", testVersionV1)
 	// This should fail because the repo doesn't exist
 	if err == nil {
 		t.Log("GetReleaseByTag() unexpectedly succeeded for nonexistent repo")
@@ -565,21 +587,21 @@ func TestBuildIssueURL(t *testing.T) {
 			name:        "bug",
 			issueType:   github.IssueTypeBug,
 			title:       "",
-			body:        "test body",
+			body:        testBody,
 			wantContain: "labels=bug",
 		},
 		{
 			name:        "feature",
 			issueType:   github.IssueTypeFeature,
 			title:       "My Feature",
-			body:        "test body",
+			body:        testBody,
 			wantContain: "labels=enhancement",
 		},
 		{
 			name:        "device",
 			issueType:   github.IssueTypeDevice,
 			title:       "",
-			body:        "test body",
+			body:        testBody,
 			wantContain: "labels=device-compatibility",
 		},
 	}
@@ -698,14 +720,14 @@ func TestRestartCLI_Success(t *testing.T) {
 	defer restoreExec()
 
 	ctx := context.Background()
-	err := github.RestartCLI(ctx, []string{"--version"})
+	err := github.RestartCLI(ctx, []string{testVersionFlag})
 	if err != nil {
 		t.Fatalf("RestartCLI() error = %v", err)
 	}
 	if capturedPath != "/usr/bin/shelly" {
 		t.Errorf("RestartCLI() path = %q, want /usr/bin/shelly", capturedPath)
 	}
-	if len(capturedArgs) != 1 || capturedArgs[0] != "--version" {
+	if len(capturedArgs) != 1 || capturedArgs[0] != testVersionFlag {
 		t.Errorf("RestartCLI() args = %v, want [--version]", capturedArgs)
 	}
 }
@@ -718,7 +740,7 @@ func TestRestartCLI_GetExecutablePathError(t *testing.T) {
 	defer restore()
 
 	ctx := context.Background()
-	err := github.RestartCLI(ctx, []string{"--version"})
+	err := github.RestartCLI(ctx, []string{testVersionFlag})
 	if err == nil {
 		t.Fatal("expected error when GetExecutablePath fails")
 	}
@@ -745,7 +767,7 @@ func TestRestartCLI_ExecCommandStartError(t *testing.T) {
 	defer restoreExec()
 
 	ctx := context.Background()
-	err := github.RestartCLI(ctx, []string{"--version"})
+	err := github.RestartCLI(ctx, []string{testVersionFlag})
 	if err == nil {
 		t.Fatal("expected error when execCommandStart fails")
 	}
@@ -776,7 +798,7 @@ func TestCheckForUpdatesCached_UpdatesDisabled(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	ctx := context.Background()
 
-	result := github.CheckForUpdatesCached(ctx, ios, "/tmp/test-cache", "1.0.0")
+	result := github.CheckForUpdatesCached(ctx, ios, "/tmp/test-cache", testVersion100)
 	if result != nil {
 		t.Error("CheckForUpdatesCached() should return nil when updates disabled")
 	}
@@ -794,14 +816,14 @@ func TestCheckForUpdatesCached_ValidCache(t *testing.T) {
 	if err := memFs.MkdirAll("/tmp/cache", 0o750); err != nil {
 		t.Fatalf("failed to create cache dir: %v", err)
 	}
-	if err := afero.WriteFile(memFs, cachePath, []byte("2.0.0"), 0o600); err != nil {
+	if err := afero.WriteFile(memFs, cachePath, []byte(testVersion200), 0o600); err != nil {
 		t.Fatalf("failed to write cache: %v", err)
 	}
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	ctx := context.Background()
 
-	result := github.CheckForUpdatesCached(ctx, ios, cachePath, "1.0.0")
+	result := github.CheckForUpdatesCached(ctx, ios, cachePath, testVersion100)
 	if result == nil {
 		t.Error("CheckForUpdatesCached() should return release when cached version is newer")
 	}
@@ -840,7 +862,7 @@ func TestExtensionDownloadResult_Fields(t *testing.T) {
 
 	result := &github.ExtensionDownloadResult{
 		LocalPath: "/tmp/extension",
-		TagName:   "v1.0.0",
+		TagName:   testVersionV1,
 		AssetName: "extension-linux-amd64.tar.gz",
 		Cleanup:   func() {},
 	}
@@ -848,8 +870,8 @@ func TestExtensionDownloadResult_Fields(t *testing.T) {
 	if result.LocalPath != "/tmp/extension" {
 		t.Errorf("LocalPath = %q, want %q", result.LocalPath, "/tmp/extension")
 	}
-	if result.TagName != "v1.0.0" {
-		t.Errorf("TagName = %q, want %q", result.TagName, "v1.0.0")
+	if result.TagName != testVersionV1 {
+		t.Errorf("TagName = %q, want %q", result.TagName, testVersionV1)
 	}
 	if result.AssetName != "extension-linux-amd64.tar.gz" {
 		t.Errorf("AssetName = %q, want %q", result.AssetName, "extension-linux-amd64.tar.gz")
@@ -1016,14 +1038,14 @@ func TestExtractTarGz(t *testing.T) {
 
 	// Create a test tar.gz archive with a binary
 	binaryContent := []byte("#!/bin/sh\necho hello")
-	if err := createTestTarGzWithFs(memFs, archivePath, "shelly", binaryContent); err != nil {
+	if err := createTestTarGzWithFs(memFs, archivePath, testShelly, binaryContent); err != nil {
 		t.Fatalf("failed to create test archive: %v", err)
 	}
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	binaryPath, err := client.ExtractTarGz(archivePath, destDir, "shelly")
+	binaryPath, err := client.ExtractTarGz(archivePath, destDir, testShelly)
 	if err != nil {
 		t.Fatalf("ExtractTarGz() error = %v", err)
 	}
@@ -1062,7 +1084,7 @@ func TestExtractTarGz_BinaryNotFound(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.ExtractTarGz(archivePath, destDir, "shelly")
+	_, err := client.ExtractTarGz(archivePath, destDir, testShelly)
 	if err == nil {
 		t.Error("ExtractTarGz() should error when binary not found")
 	}
@@ -1088,7 +1110,7 @@ func TestExtractTarGz_InvalidArchive(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.ExtractTarGz(archivePath, destDir, "shelly")
+	_, err := client.ExtractTarGz(archivePath, destDir, testShelly)
 	if err == nil {
 		t.Error("ExtractTarGz() should error for invalid archive")
 	}
@@ -1115,7 +1137,7 @@ func TestExtractZip(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	binaryPath, err := client.ExtractZip(archivePath, destDir, "shelly")
+	binaryPath, err := client.ExtractZip(archivePath, destDir, testShelly)
 	if err != nil {
 		t.Fatalf("ExtractZip() error = %v", err)
 	}
@@ -1154,7 +1176,7 @@ func TestExtractZip_BinaryNotFound(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.ExtractZip(archivePath, destDir, "shelly")
+	_, err := client.ExtractZip(archivePath, destDir, testShelly)
 	if err == nil {
 		t.Error("ExtractZip() should error when binary not found")
 	}
@@ -1180,7 +1202,7 @@ func TestExtractZip_InvalidArchive(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.ExtractZip(archivePath, destDir, "shelly")
+	_, err := client.ExtractZip(archivePath, destDir, testShelly)
 	if err == nil {
 		t.Error("ExtractZip() should error for invalid archive")
 	}
@@ -1197,11 +1219,11 @@ func TestMatchesBinaryName(t *testing.T) {
 		binaryName string
 		want       bool
 	}{
-		{"shelly", "shelly", true},
-		{"shelly-linux-amd64", "shelly", true},
-		{"shelly.exe", "shelly", true},
-		{"other-binary", "shelly", false},
-		{"preshelly", "shelly", false},
+		{testShelly, testShelly, true},
+		{"shelly-linux-amd64", testShelly, true},
+		{"shelly.exe", testShelly, true},
+		{"other-binary", testShelly, false},
+		{"preshelly", testShelly, false},
 	}
 
 	for _, tt := range tests {
@@ -1284,14 +1306,14 @@ func TestFindBinaryAsset(t *testing.T) {
 		Assets: []github.Asset{
 			{Name: assetName},
 			{Name: "shelly-other-os.tar.gz"},
-			{Name: "checksums.txt"},
+			{Name: testChecksumTxt},
 		},
 	}
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	asset, err := client.FindBinaryAsset(release, "shelly")
+	asset, err := client.FindBinaryAsset(release, testShelly)
 	if err != nil {
 		t.Fatalf("FindBinaryAsset() error = %v", err)
 	}
@@ -1310,14 +1332,14 @@ func TestFindBinaryAsset_NotFound(t *testing.T) {
 	release := &github.Release{
 		Assets: []github.Asset{
 			{Name: "shelly-freebsd-sparc64.tar.gz"},
-			{Name: "checksums.txt"},
+			{Name: testChecksumTxt},
 		},
 	}
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	asset, err := client.FindBinaryAsset(release, "shelly")
+	asset, err := client.FindBinaryAsset(release, testShelly)
 	if err == nil {
 		t.Error("FindBinaryAsset() should return error for unsupported platform")
 	}
@@ -1329,7 +1351,7 @@ func TestFindBinaryAsset_NotFound(t *testing.T) {
 //nolint:paralleltest // modifies global base URL
 func TestListReleases(t *testing.T) {
 	releases := []github.Release{
-		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+		{TagName: testVersionV1, Name: testRelease100},
 		{TagName: "v1.1.0", Name: "Release 1.1.0"},
 	}
 
@@ -1384,7 +1406,7 @@ func TestDownloadAsset(t *testing.T) {
 	client := github.NewClient(ios)
 
 	asset := &github.Asset{
-		Name:               "shelly-linux-amd64.tar.gz",
+		Name:               testAssetTarGz,
 		BrowserDownloadURL: server.URL + "/download",
 	}
 
@@ -1416,7 +1438,7 @@ func TestDownloadAndExtract_TarGz(t *testing.T) {
 
 	content := []byte("#!/bin/sh\necho hello")
 	header := &tar.Header{
-		Name: "shelly",
+		Name: testShelly,
 		Mode: 0o755,
 		Size: int64(len(content)),
 	}
@@ -1445,11 +1467,11 @@ func TestDownloadAndExtract_TarGz(t *testing.T) {
 	client := github.NewClient(ios)
 
 	asset := &github.Asset{
-		Name:               "shelly-linux-amd64.tar.gz",
+		Name:               testAssetTarGz,
 		BrowserDownloadURL: server.URL + "/download",
 	}
 
-	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), asset, "shelly")
+	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), asset, testShelly)
 	if err != nil {
 		t.Fatalf("DownloadAndExtract() error = %v", err)
 	}
@@ -1507,7 +1529,7 @@ func TestDownloadAndExtract_Zip(t *testing.T) {
 		BrowserDownloadURL: server.URL + "/download",
 	}
 
-	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), asset, "shelly")
+	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), asset, testShelly)
 	if err != nil {
 		t.Fatalf("DownloadAndExtract() error = %v", err)
 	}
@@ -1530,9 +1552,9 @@ func TestDownloadAndExtract_Zip(t *testing.T) {
 //nolint:paralleltest // modifies global base URL
 func TestGetLatestRelease_WithMockServer(t *testing.T) {
 	release := github.Release{
-		TagName: "v1.0.0",
-		Name:    "Release 1.0.0",
-		Body:    "Release notes",
+		TagName: testVersionV1,
+		Name:    testRelease100,
+		Body:    testReleaseNotes,
 		Assets:  []github.Asset{},
 	}
 
@@ -1560,17 +1582,17 @@ func TestGetLatestRelease_WithMockServer(t *testing.T) {
 		t.Fatalf("GetLatestRelease() error = %v", err)
 	}
 
-	if result.TagName != "v1.0.0" {
-		t.Errorf("GetLatestRelease().TagName = %q, want %q", result.TagName, "v1.0.0")
+	if result.TagName != testVersionV1 {
+		t.Errorf("GetLatestRelease().TagName = %q, want %q", result.TagName, testVersionV1)
 	}
 }
 
 //nolint:paralleltest // modifies global base URL
 func TestGetReleaseByTag_WithMockServer(t *testing.T) {
 	release := github.Release{
-		TagName: "v1.2.3",
+		TagName: testVersionV123,
 		Name:    "Release 1.2.3",
-		Body:    "Release notes",
+		Body:    testReleaseNotes,
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1592,13 +1614,13 @@ func TestGetReleaseByTag_WithMockServer(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	result, err := client.GetReleaseByTag(context.Background(), "testowner", "testrepo", "v1.2.3")
+	result, err := client.GetReleaseByTag(context.Background(), "testowner", "testrepo", testVersionV123)
 	if err != nil {
 		t.Fatalf("GetReleaseByTag() error = %v", err)
 	}
 
-	if result.TagName != "v1.2.3" {
-		t.Errorf("GetReleaseByTag().TagName = %q, want %q", result.TagName, "v1.2.3")
+	if result.TagName != testVersionV123 {
+		t.Errorf("GetReleaseByTag().TagName = %q, want %q", result.TagName, testVersionV123)
 	}
 }
 
@@ -1672,7 +1694,7 @@ func TestVerifyChecksum(t *testing.T) {
 	client := github.NewClient(ios)
 
 	checksumAsset := &github.Asset{
-		Name:               "checksums.txt",
+		Name:               testChecksumTxt,
 		BrowserDownloadURL: server.URL + "/checksums.txt",
 	}
 
@@ -1709,7 +1731,7 @@ func TestVerifyChecksum_Mismatch(t *testing.T) {
 	client := github.NewClient(ios)
 
 	checksumAsset := &github.Asset{
-		Name:               "checksums.txt",
+		Name:               testChecksumTxt,
 		BrowserDownloadURL: server.URL + "/checksums.txt",
 	}
 
@@ -1729,7 +1751,7 @@ func TestVerifyChecksum_FileNotFound(t *testing.T) {
 	client := github.NewClient(ios)
 
 	checksumAsset := &github.Asset{
-		Name:               "checksums.txt",
+		Name:               testChecksumTxt,
 		BrowserDownloadURL: "http://localhost:1/checksums.txt",
 	}
 
@@ -1811,8 +1833,8 @@ func TestPerformUpdate_Cancelled(t *testing.T) {
 	client := github.NewClient(ios)
 
 	release := &github.Release{
-		TagName: "v2.0.0",
-		Name:    "Release 2.0.0",
+		TagName: testVersionV2,
+		Name:    testRelease200,
 	}
 
 	// Confirmation returns false
@@ -1820,7 +1842,7 @@ func TestPerformUpdate_Cancelled(t *testing.T) {
 		return false, nil
 	}
 
-	err := client.PerformUpdate(context.Background(), ios, release, "v1.0.0", "release notes", confirmFunc, false)
+	err := client.PerformUpdate(context.Background(), ios, release, testVersionV1, "release notes", confirmFunc, false)
 	if err == nil {
 		t.Error("PerformUpdate() should return error when cancelled")
 	}
@@ -1836,8 +1858,8 @@ func TestPerformUpdate_ConfirmError(t *testing.T) {
 	client := github.NewClient(ios)
 
 	release := &github.Release{
-		TagName: "v2.0.0",
-		Name:    "Release 2.0.0",
+		TagName: testVersionV2,
+		Name:    testRelease200,
 	}
 
 	// Confirmation returns error
@@ -1845,7 +1867,7 @@ func TestPerformUpdate_ConfirmError(t *testing.T) {
 		return false, fmt.Errorf("input error")
 	}
 
-	err := client.PerformUpdate(context.Background(), ios, release, "v1.0.0", "release notes", confirmFunc, false)
+	err := client.PerformUpdate(context.Background(), ios, release, testVersionV1, "release notes", confirmFunc, false)
 	if err == nil {
 		t.Error("PerformUpdate() should return error when confirmation fails")
 	}
@@ -1875,7 +1897,7 @@ func TestPerformRollback_NoRelease(t *testing.T) {
 		return true, nil
 	}
 
-	err := client.PerformRollback(context.Background(), ios, "v1.0.0", false, confirmFunc, false)
+	err := client.PerformRollback(context.Background(), ios, testVersionV1, false, confirmFunc, false)
 	if err == nil {
 		t.Error("PerformRollback() should return error when no previous release available")
 	}
@@ -1884,7 +1906,7 @@ func TestPerformRollback_NoRelease(t *testing.T) {
 //nolint:paralleltest // modifies global base URL
 func TestListReleases_Prereleases(t *testing.T) {
 	releases := []github.Release{
-		{TagName: "v1.0.0", Name: "Release 1.0.0", Prerelease: false},
+		{TagName: testVersionV1, Name: testRelease100, Prerelease: false},
 		{TagName: "v1.1.0-beta", Name: "Beta Release", Prerelease: true},
 		{TagName: "v1.2.0", Name: "Release 1.2.0", Prerelease: false},
 	}
@@ -1954,7 +1976,7 @@ func TestGetReleaseByTag_NotFound(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.GetReleaseByTag(context.Background(), "testowner", "testrepo", "v1.0.0")
+	_, err := client.GetReleaseByTag(context.Background(), "testowner", "testrepo", testVersionV1)
 	if err == nil {
 		t.Error("GetReleaseByTag() should return error when not found")
 	}
@@ -1972,7 +1994,7 @@ func TestDownloadAsset_Failure(t *testing.T) {
 	client := github.NewClient(ios)
 
 	asset := &github.Asset{
-		Name:               "test.tar.gz",
+		Name:               testTarGz,
 		BrowserDownloadURL: "http://localhost:1/nonexistent",
 	}
 
@@ -1985,8 +2007,8 @@ func TestDownloadAsset_Failure(t *testing.T) {
 //nolint:paralleltest // modifies global base URL
 func TestPerformRollback_Cancelled(t *testing.T) {
 	releases := []github.Release{
-		{TagName: "v2.0.0", Name: "Release 2.0.0"},
-		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+		{TagName: testVersionV2, Name: testRelease200},
+		{TagName: testVersionV1, Name: testRelease100},
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2007,7 +2029,7 @@ func TestPerformRollback_Cancelled(t *testing.T) {
 		return false, nil // User cancels
 	}
 
-	err := client.PerformRollback(context.Background(), ios, "v2.0.0", false, confirmFunc, false)
+	err := client.PerformRollback(context.Background(), ios, testVersionV2, false, confirmFunc, false)
 	// Rollback should complete without error when cancelled gracefully
 	if err != nil {
 		t.Errorf("PerformRollback() unexpected error = %v", err)
@@ -2017,8 +2039,8 @@ func TestPerformRollback_Cancelled(t *testing.T) {
 //nolint:paralleltest // modifies global base URL
 func TestPerformRollback_ConfirmError(t *testing.T) {
 	releases := []github.Release{
-		{TagName: "v2.0.0", Name: "Release 2.0.0"},
-		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+		{TagName: testVersionV2, Name: testRelease200},
+		{TagName: testVersionV1, Name: testRelease100},
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2039,7 +2061,7 @@ func TestPerformRollback_ConfirmError(t *testing.T) {
 		return false, fmt.Errorf("input error")
 	}
 
-	err := client.PerformRollback(context.Background(), ios, "v2.0.0", false, confirmFunc, false)
+	err := client.PerformRollback(context.Background(), ios, testVersionV2, false, confirmFunc, false)
 	if err == nil {
 		t.Error("PerformRollback() should return error when confirmation fails")
 	}
@@ -2056,8 +2078,8 @@ func TestInstallRelease_NoPlatformAsset(t *testing.T) {
 
 	// Release with no assets for any platform
 	release := &github.Release{
-		TagName: "v1.0.0",
-		Name:    "Release 1.0.0",
+		TagName: testVersionV1,
+		Name:    testRelease100,
 		Assets: []github.Asset{
 			{Name: "shelly-freebsd-sparc64.tar.gz"},
 		},
@@ -2098,7 +2120,7 @@ func TestDownloadAndExtract_RawBinary(t *testing.T) {
 		BrowserDownloadURL: server.URL + "/download",
 	}
 
-	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), asset, "shelly")
+	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), asset, testShelly)
 	if err != nil {
 		t.Fatalf("DownloadAndExtract() error = %v", err)
 	}
@@ -2195,7 +2217,7 @@ func TestGetReleaseByTag_ServerError(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.GetReleaseByTag(context.Background(), "testowner", "testrepo", "v1.0.0")
+	_, err := client.GetReleaseByTag(context.Background(), "testowner", "testrepo", testVersionV1)
 	if err == nil {
 		t.Error("GetReleaseByTag() should return error for server error")
 	}
@@ -2204,9 +2226,9 @@ func TestGetReleaseByTag_ServerError(t *testing.T) {
 //nolint:paralleltest // modifies global base URL
 func TestFindPreviousRelease(t *testing.T) {
 	releases := []github.Release{
-		{TagName: "v2.0.0", Name: "Release 2.0.0"},
+		{TagName: testVersionV2, Name: testRelease200},
 		{TagName: testVersionV15, Name: "Release 1.5.0"},
-		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+		{TagName: testVersionV1, Name: testRelease100},
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2223,7 +2245,7 @@ func TestFindPreviousRelease(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	result, err := client.FindPreviousRelease(context.Background(), "v2.0.0", false)
+	result, err := client.FindPreviousRelease(context.Background(), testVersionV2, false)
 	if err != nil {
 		t.Fatalf("FindPreviousRelease() error = %v", err)
 	}
@@ -2236,7 +2258,7 @@ func TestFindPreviousRelease(t *testing.T) {
 //nolint:paralleltest // modifies global base URL
 func TestFindPreviousRelease_NoPrevious(t *testing.T) {
 	releases := []github.Release{
-		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+		{TagName: testVersionV1, Name: testRelease100},
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2253,7 +2275,7 @@ func TestFindPreviousRelease_NoPrevious(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.FindPreviousRelease(context.Background(), "v1.0.0", false)
+	_, err := client.FindPreviousRelease(context.Background(), testVersionV1, false)
 	if err == nil {
 		t.Error("FindPreviousRelease() should return error when no previous release exists")
 	}
@@ -2416,8 +2438,8 @@ func TestFetchSpecificVersion(t *testing.T) {
 		inputVer string
 		wantTag  string
 	}{
-		{"with_prefix", "v2.0.0", "v2.0.0"},
-		{"without_prefix", "2.0.0", "v2.0.0"},
+		{"with_prefix", testVersionV2, testVersionV2},
+		{"without_prefix", testVersion200, testVersionV2},
 	}
 
 	for _, tc := range testCases {
@@ -2455,7 +2477,7 @@ func TestFetchLatestVersion(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasSuffix(r.URL.Path, "/releases/latest") {
 				w.Header().Set("Content-Type", "application/json")
-				if _, err := w.Write([]byte(`{"tag_name": "v2.0.0"}`)); err != nil {
+				if _, err := w.Write([]byte(`{"tag_name": "` + testVersionV2 + `"}`)); err != nil {
 					t.Errorf("failed to write response: %v", err)
 				}
 			}
@@ -2481,7 +2503,7 @@ func TestFetchLatestVersion(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasSuffix(r.URL.Path, "/releases") {
 				w.Header().Set("Content-Type", "application/json")
-				if _, err := w.Write([]byte(`[{"tag_name": "v3.0.0-beta"}, {"tag_name": "v2.0.0"}]`)); err != nil {
+				if _, err := w.Write([]byte(`[{"tag_name": "v3.0.0-beta"}, {"tag_name": "` + testVersionV2 + `"}]`)); err != nil {
 					t.Errorf("failed to write response: %v", err)
 				}
 			}
@@ -2559,7 +2581,7 @@ func TestGetTargetRelease(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasSuffix(r.URL.Path, "/releases/latest") {
 				w.Header().Set("Content-Type", "application/json")
-				if _, err := w.Write([]byte(`{"tag_name": "v2.0.0"}`)); err != nil {
+				if _, err := w.Write([]byte(`{"tag_name": "` + testVersionV2 + `"}`)); err != nil {
 					t.Errorf("failed to write response: %v", err)
 				}
 			}
@@ -2668,7 +2690,7 @@ func TestDownloadExtensionRelease(t *testing.T) {
 		case strings.HasSuffix(r.URL.Path, "/releases/latest"):
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode(map[string]any{
-				"tag_name": "v1.0.0",
+				"tag_name": testVersionV1,
 				"assets": []map[string]any{
 					{
 						"name":                 "shelly-extension_linux_amd64.tar.gz",
@@ -2696,7 +2718,7 @@ func TestDownloadExtensionRelease(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	result, err := client.DownloadExtensionRelease(context.Background(), "owner", "extension", "shelly-")
+	result, err := client.DownloadExtensionRelease(context.Background(), testOwner, "extension", "shelly-")
 	if err != nil {
 		t.Fatalf("DownloadExtensionRelease() error = %v", err)
 	}
@@ -2720,7 +2742,7 @@ func TestCheckForUpdatesCached_DisabledByEnv(t *testing.T) {
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "1")
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", testVersion100)
 	if result != nil {
 		t.Error("CheckForUpdatesCached() should return nil when disabled")
 	}
@@ -2736,17 +2758,17 @@ func TestCheckForUpdatesCached_ValidCacheWithUpdate(t *testing.T) {
 	if err := memFs.MkdirAll("/cache", 0o755); err != nil {
 		t.Fatalf("failed to create cache dir: %v", err)
 	}
-	if err := afero.WriteFile(memFs, "/cache/version", []byte("2.0.0"), 0o644); err != nil {
+	if err := afero.WriteFile(memFs, "/cache/version", []byte(testVersion200), 0o644); err != nil {
 		t.Fatalf("failed to write cache: %v", err)
 	}
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", testVersion100)
 	if result == nil {
 		t.Fatal("CheckForUpdatesCached() should return update")
 	}
-	if result.Version() != "2.0.0" {
-		t.Errorf("Version = %q, want %q", result.Version(), "2.0.0")
+	if result.Version() != testVersion200 {
+		t.Errorf("Version = %q, want %q", result.Version(), testVersion200)
 	}
 }
 
@@ -2760,12 +2782,12 @@ func TestCheckForUpdatesCached_ValidCacheNoUpdate(t *testing.T) {
 	if err := memFs.MkdirAll("/cache", 0o755); err != nil {
 		t.Fatalf("failed to create cache dir: %v", err)
 	}
-	if err := afero.WriteFile(memFs, "/cache/version", []byte("1.0.0"), 0o644); err != nil {
+	if err := afero.WriteFile(memFs, "/cache/version", []byte(testVersion100), 0o644); err != nil {
 		t.Fatalf("failed to write cache: %v", err)
 	}
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", testVersion100)
 	if result != nil {
 		t.Error("CheckForUpdatesCached() should return nil when no update available")
 	}
@@ -2791,7 +2813,7 @@ func TestCheckForUpdatesCached_FetchFromAPI(t *testing.T) {
 	defer restore()
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", testVersion100)
 	if result == nil {
 		t.Fatal("CheckForUpdatesCached() should return update")
 	}
@@ -2818,7 +2840,7 @@ func TestCheckForUpdatesCached_FetchNoUpdate(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/releases/latest") {
 			w.Header().Set("Content-Type", "application/json")
-			if _, err := w.Write([]byte(`{"tag_name": "v1.0.0"}`)); err != nil {
+			if _, err := w.Write([]byte(`{"tag_name": "` + testVersionV1 + `"}`)); err != nil {
 				t.Errorf("failed to write response: %v", err)
 			}
 		}
@@ -2829,7 +2851,7 @@ func TestCheckForUpdatesCached_FetchNoUpdate(t *testing.T) {
 	defer restore()
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", testVersion100)
 	if result != nil {
 		t.Error("CheckForUpdatesCached() should return nil when no update")
 	}
@@ -2850,7 +2872,7 @@ func TestCheckForUpdatesCached_FetchError(t *testing.T) {
 	defer restore()
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", testVersion100)
 	if result != nil {
 		t.Error("CheckForUpdatesCached() should return nil on error")
 	}
@@ -2865,7 +2887,7 @@ func TestCheckForUpdates(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/releases/latest") {
 			w.Header().Set("Content-Type", "application/json")
-			if _, err := w.Write([]byte(`{"tag_name": "v2.0.0"}`)); err != nil {
+			if _, err := w.Write([]byte(`{"tag_name": "` + testVersionV2 + `"}`)); err != nil {
 				t.Errorf("failed to write response: %v", err)
 			}
 		}
@@ -2876,7 +2898,7 @@ func TestCheckForUpdates(t *testing.T) {
 	defer restore()
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	result, err := github.CheckForUpdates(context.Background(), ios, "1.0.0")
+	result, err := github.CheckForUpdates(context.Background(), ios, testVersion100)
 	if err != nil {
 		t.Fatalf("CheckForUpdates() error = %v", err)
 	}
@@ -3113,7 +3135,7 @@ func TestVerifyChecksum_DownloadError(t *testing.T) {
 	client := github.NewClient(ios)
 
 	err := client.VerifyChecksum(context.Background(), ios, "/tmp/binary", "binary", &github.Asset{
-		Name:               "checksums.txt",
+		Name:               testChecksumTxt,
 		BrowserDownloadURL: ts.URL + "/checksums.txt",
 	})
 	if err == nil {
@@ -3140,7 +3162,7 @@ func TestDownloadAsset_Success(t *testing.T) {
 	client := github.NewClient(ios)
 
 	err := client.DownloadAsset(context.Background(), &github.Asset{
-		Name:               "test",
+		Name:               testStr,
 		BrowserDownloadURL: ts.URL + "/test",
 	}, "/tmp/downloaded/test")
 	if err != nil {
@@ -3172,7 +3194,7 @@ func TestDownloadAsset_HTTPError(t *testing.T) {
 	client := github.NewClient(ios)
 
 	err := client.DownloadAsset(context.Background(), &github.Asset{
-		Name:               "test",
+		Name:               testStr,
 		BrowserDownloadURL: ts.URL + "/test",
 	}, "/tmp/test")
 	if err == nil {
@@ -3195,7 +3217,7 @@ func TestExtractTarGz_InvalidGzip(t *testing.T) {
 	client := github.NewClient(ios)
 
 	_, _, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.tar.gz",
+		Name:               testTarGz,
 		BrowserDownloadURL: "file:///tmp/invalid.tar.gz",
 	}, "binary")
 
@@ -3215,7 +3237,7 @@ func TestExtractZip_FileNotFound(t *testing.T) {
 	client := github.NewClient(ios)
 
 	_, _, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.zip",
+		Name:               testZip,
 		BrowserDownloadURL: "file:///nonexistent.zip",
 	}, "binary")
 	if err == nil {
@@ -3332,7 +3354,7 @@ func TestFindBinaryInTar_NotFound(t *testing.T) {
 	client := github.NewClient(ios)
 
 	_, _, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.tar.gz",
+		Name:               testTarGz,
 		BrowserDownloadURL: ts.URL + "/test.tar.gz",
 	}, "notfound")
 	if err == nil {
@@ -3372,7 +3394,7 @@ func TestFindBinaryInZip_NotFound(t *testing.T) {
 	client := github.NewClient(ios)
 
 	_, _, err = client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.zip",
+		Name:               testZip,
 		BrowserDownloadURL: ts.URL + "/test.zip",
 	}, "notfound")
 	if err == nil {
@@ -3396,7 +3418,7 @@ func TestListReleases_InvalidJSON(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.ListReleases(context.Background(), "owner", "repo", false)
+	_, err := client.ListReleases(context.Background(), testOwner, testRepo, false)
 	if err == nil {
 		t.Error("ListReleases() should return error for invalid JSON")
 	}
@@ -3418,7 +3440,7 @@ func TestGetLatestRelease_InvalidJSON(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.GetLatestRelease(context.Background(), "owner", "repo")
+	_, err := client.GetLatestRelease(context.Background(), testOwner, testRepo)
 	if err == nil {
 		t.Error("GetLatestRelease() should return error for invalid JSON")
 	}
@@ -3440,7 +3462,7 @@ func TestGetReleaseByTag_InvalidJSON(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.GetReleaseByTag(context.Background(), "owner", "repo", "v1.0.0")
+	_, err := client.GetReleaseByTag(context.Background(), testOwner, testRepo, testVersionV1)
 	if err == nil {
 		t.Error("GetReleaseByTag() should return error for invalid JSON")
 	}
@@ -3470,12 +3492,12 @@ func TestFindChecksumAsset_NotFound(t *testing.T) {
 
 	release := &github.Release{
 		Assets: []github.Asset{
-			{Name: "binary.tar.gz"},
+			{Name: testBinaryTarGz},
 			{Name: "binary.zip"},
 		},
 	}
 
-	asset := release.FindChecksumAsset("binary.tar.gz")
+	asset := release.FindChecksumAsset(testBinaryTarGz)
 	if asset != nil {
 		t.Error("FindChecksumAsset() should return nil when no checksum found")
 	}
@@ -3493,7 +3515,7 @@ func TestDownloadExtensionRelease_NoBinary(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			// No assets match the platform
 			if err := json.NewEncoder(w).Encode(map[string]any{
-				"tag_name": "v1.0.0",
+				"tag_name": testVersionV1,
 				"assets": []map[string]any{
 					{
 						"name":                 "wrong_platform.tar.gz",
@@ -3514,7 +3536,7 @@ func TestDownloadExtensionRelease_NoBinary(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.DownloadExtensionRelease(context.Background(), "owner", "extension", "shelly-")
+	_, err := client.DownloadExtensionRelease(context.Background(), testOwner, "extension", "shelly-")
 	if err == nil {
 		t.Error("DownloadExtensionRelease() should return error when no binary found")
 	}
@@ -3533,7 +3555,7 @@ func TestDownloadExtensionRelease_ReleaseError(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.DownloadExtensionRelease(context.Background(), "owner", "repo", "prefix-")
+	_, err := client.DownloadExtensionRelease(context.Background(), testOwner, testRepo, "prefix-")
 	if err == nil {
 		t.Error("DownloadExtensionRelease() should return error on release fetch failure")
 	}
@@ -3555,7 +3577,7 @@ func TestCheckForUpdatesCached_EmptyCacheContent(t *testing.T) {
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	// With empty cache content and valid cache, returns nil (no update)
-	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", testVersion100)
 	if result != nil {
 		t.Error("CheckForUpdatesCached() should return nil for empty cache content")
 	}
@@ -3593,7 +3615,7 @@ func TestFindPreviousRelease_ListError(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.FindPreviousRelease(context.Background(), "v2.0.0", false)
+	_, err := client.FindPreviousRelease(context.Background(), testVersionV2, false)
 	if err == nil {
 		t.Error("FindPreviousRelease() should return error on list failure")
 	}
@@ -3604,8 +3626,8 @@ func TestFindPreviousRelease_Fallback(t *testing.T) {
 	// Test the fallback case when current version is not found
 	releases := []github.Release{
 		{TagName: "v3.0.0", Name: "Release 3.0.0"},
-		{TagName: "v2.0.0", Name: "Release 2.0.0"},
-		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+		{TagName: testVersionV2, Name: testRelease200},
+		{TagName: testVersionV1, Name: testRelease100},
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3667,7 +3689,7 @@ func TestDownloadAndExtract_ZipBinaryNotFound(t *testing.T) {
 	_, _, err = client.DownloadAndExtract(context.Background(), &github.Asset{
 		Name:               "archive.zip",
 		BrowserDownloadURL: ts.URL + "/archive.zip",
-	}, "shelly")
+	}, testShelly)
 	if err == nil {
 		t.Error("DownloadAndExtract() should return error when binary not in zip")
 	}
@@ -3720,7 +3742,7 @@ func TestDownloadAndExtract_TarBinaryNotFound(t *testing.T) {
 	_, _, err := client.DownloadAndExtract(context.Background(), &github.Asset{
 		Name:               "archive.tar.gz",
 		BrowserDownloadURL: ts.URL + "/archive.tar.gz",
-	}, "shelly")
+	}, testShelly)
 	if err == nil {
 		t.Error("DownloadAndExtract() should return error when binary not in tar")
 	}
@@ -3736,10 +3758,10 @@ func TestParseRepoString_Formats(t *testing.T) {
 		wantRepo  string
 		wantErr   bool
 	}{
-		{"owner/repo", "myorg/myrepo", "myorg", "myrepo", false},
-		{"gh:prefix", "gh:myorg/myrepo", "myorg", "myrepo", false},
-		{"github:prefix", "github:myorg/myrepo", "myorg", "myrepo", false},
-		{"url_format", "https://github.com/myorg/myrepo", "myorg", "myrepo", false},
+		{"owner/repo", "myorg/myrepo", testMyOrg, testMyRepo, false},
+		{"gh:prefix", "gh:myorg/myrepo", testMyOrg, testMyRepo, false},
+		{"github:prefix", "github:myorg/myrepo", testMyOrg, testMyRepo, false},
+		{"url_format", "https://github.com/myorg/myrepo", testMyOrg, testMyRepo, false},
 		{"no_slash", "justrepo", "", "", true},
 	}
 
@@ -3893,7 +3915,7 @@ func TestVerifyChecksum_AssetNotFound(t *testing.T) {
 	client := github.NewClient(ios)
 
 	err := client.VerifyChecksum(context.Background(), ios, "/tmp/binary", "our-asset.tar.gz", &github.Asset{
-		Name:               "checksums.txt",
+		Name:               testChecksumTxt,
 		BrowserDownloadURL: ts.URL,
 	})
 	if err == nil {
@@ -3957,7 +3979,7 @@ func TestDownloadAndExtract_ChmodError(t *testing.T) {
 	var tarBuf bytes.Buffer
 	tw := tar.NewWriter(&tarBuf)
 	hdr := &tar.Header{
-		Name: "shelly",
+		Name: testShelly,
 		Mode: 0o755,
 		Size: int64(len(content)),
 	}
@@ -3991,9 +4013,9 @@ func TestDownloadAndExtract_ChmodError(t *testing.T) {
 	client := github.NewClient(ios)
 
 	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.tar.gz",
+		Name:               testTarGz,
 		BrowserDownloadURL: ts.URL,
-	}, "shelly")
+	}, testShelly)
 	if err != nil {
 		t.Fatalf("DownloadAndExtract() error = %v", err)
 	}
@@ -4036,9 +4058,9 @@ func TestFindBinaryInTar_TarReadError(t *testing.T) {
 	client := github.NewClient(ios)
 
 	_, _, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.tar.gz",
+		Name:               testTarGz,
 		BrowserDownloadURL: ts.URL,
-	}, "shelly")
+	}, testShelly)
 	if err == nil {
 		t.Error("DownloadAndExtract() should return error for invalid tar")
 	}
@@ -4100,9 +4122,9 @@ func TestFindBinaryInTar_SkipDirectory(t *testing.T) {
 	client := github.NewClient(ios)
 
 	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.tar.gz",
+		Name:               testTarGz,
 		BrowserDownloadURL: ts.URL,
-	}, "shelly")
+	}, testShelly)
 	if err != nil {
 		t.Fatalf("DownloadAndExtract() error = %v", err)
 	}
@@ -4156,9 +4178,9 @@ func TestFindBinaryInZip_SkipDirectory(t *testing.T) {
 	client := github.NewClient(ios)
 
 	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.zip",
+		Name:               testZip,
 		BrowserDownloadURL: ts.URL,
-	}, "shelly")
+	}, testShelly)
 	if err != nil {
 		t.Fatalf("DownloadAndExtract() error = %v", err)
 	}
@@ -4218,11 +4240,11 @@ func TestMatchesBinaryName_PrefixMatch(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	// "shelly-tool" should match "shelly" due to prefix matching
+	// "shelly-tool" should match testShelly due to prefix matching
 	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.tar.gz",
+		Name:               testTarGz,
 		BrowserDownloadURL: ts.URL,
-	}, "shelly")
+	}, testShelly)
 	if err != nil {
 		t.Fatalf("DownloadAndExtract() error = %v", err)
 	}
@@ -4251,10 +4273,10 @@ func TestCompareVersions_VariousFormats(t *testing.T) {
 		v2   string
 		want int
 	}{
-		{"2.0.0", "1.0.0", 1},
-		{"1.0.0", "2.0.0", -1},
-		{"1.0.0", "1.0.0", 0},
-		{"1.2.3", "1.2.4", -1},
+		{testVersion200, testVersion100, 1},
+		{testVersion100, testVersion200, -1},
+		{testVersion100, testVersion100, 0},
+		{testVersion123, "1.2.4", -1},
 		{"10.0.0", "9.0.0", 1},
 	}
 
@@ -4279,7 +4301,7 @@ func TestCheckForUpdatesCached_OldCache(t *testing.T) {
 	// This test verifies the API fetch path works when cache is missing
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if _, err := w.Write([]byte(`{"tag_name": "v2.0.0"}`)); err != nil {
+		if _, err := w.Write([]byte(`{"tag_name": "` + testVersionV2 + `"}`)); err != nil {
 			t.Errorf("failed to write: %v", err)
 		}
 	}))
@@ -4289,7 +4311,7 @@ func TestCheckForUpdatesCached_OldCache(t *testing.T) {
 	defer restore()
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", testVersion100)
 	if result == nil {
 		t.Fatal("should return update when cache missing")
 	}
@@ -4308,10 +4330,10 @@ func TestRelease_Methods(t *testing.T) {
 
 	release := &github.Release{
 		TagName: testVersionV123,
-		Body:    "Release notes",
+		Body:    testReleaseNotes,
 		Assets: []github.Asset{
-			{Name: "checksums.txt"},
-			{Name: "shelly_linux_amd64.tar.gz"},
+			{Name: testChecksumTxt},
+			{Name: testAssetUnderscore},
 		},
 	}
 
@@ -4320,7 +4342,7 @@ func TestRelease_Methods(t *testing.T) {
 	}
 
 	// Test FindChecksumAsset
-	checksumAsset := release.FindChecksumAsset("shelly_linux_amd64.tar.gz")
+	checksumAsset := release.FindChecksumAsset(testAssetUnderscore)
 	if checksumAsset == nil {
 		t.Error("FindChecksumAsset() returned nil")
 	}
@@ -4337,9 +4359,9 @@ func TestExtractTarGz_OpenError(t *testing.T) {
 
 	// Try to extract from nonexistent archive
 	_, _, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.tar.gz",
+		Name:               testTarGz,
 		BrowserDownloadURL: "file:///nonexistent.tar.gz",
-	}, "shelly")
+	}, testShelly)
 	if err == nil {
 		t.Error("expected error for nonexistent archive")
 	}
@@ -4361,9 +4383,9 @@ func TestDownloadAndExtract_CleanupOnError(t *testing.T) {
 	client := github.NewClient(ios)
 
 	_, _, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.tar.gz",
+		Name:               testTarGz,
 		BrowserDownloadURL: ts.URL + "/file.tar.gz",
-	}, "shelly")
+	}, testShelly)
 	if err == nil {
 		t.Error("DownloadAndExtract() should return error")
 	}
@@ -4374,12 +4396,12 @@ func TestAsset_Methods(t *testing.T) {
 	t.Parallel()
 
 	asset := &github.Asset{
-		Name:               "shelly_linux_amd64.tar.gz",
-		BrowserDownloadURL: "https://example.com/download",
+		Name:               testAssetUnderscore,
+		BrowserDownloadURL: testDownloadURL,
 		Size:               1024,
 	}
 
-	if asset.Name != "shelly_linux_amd64.tar.gz" {
+	if asset.Name != testAssetUnderscore {
 		t.Errorf("Name = %q, expected shelly_linux_amd64.tar.gz", asset.Name)
 	}
 }
@@ -4516,7 +4538,7 @@ func TestCheckForUpdates_NoUpdate(t *testing.T) {
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if _, err := w.Write([]byte(`{"tag_name": "v1.0.0"}`)); err != nil {
+		if _, err := w.Write([]byte(`{"tag_name": "` + testVersionV1 + `"}`)); err != nil {
 			t.Errorf("failed to write: %v", err)
 		}
 	}))
@@ -4526,7 +4548,7 @@ func TestCheckForUpdates_NoUpdate(t *testing.T) {
 	defer restore()
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	result, err := github.CheckForUpdates(context.Background(), ios, "1.0.0")
+	result, err := github.CheckForUpdates(context.Background(), ios, testVersion100)
 	if err != nil {
 		t.Fatalf("CheckForUpdates() error = %v", err)
 	}
@@ -4550,7 +4572,7 @@ func TestCheckForUpdates_Error(t *testing.T) {
 	defer restore()
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	_, err := github.CheckForUpdates(context.Background(), ios, "1.0.0")
+	_, err := github.CheckForUpdates(context.Background(), ios, testVersion100)
 	if err == nil {
 		t.Error("CheckForUpdates() should return error")
 	}
@@ -4611,7 +4633,7 @@ func TestInstallRelease_ChecksumVerificationFails(t *testing.T) {
 	var tarBuf bytes.Buffer
 	tw := tar.NewWriter(&tarBuf)
 	hdr := &tar.Header{
-		Name: "shelly",
+		Name: testShelly,
 		Mode: 0o755,
 		Size: int64(len(binaryContent)),
 	}
@@ -4662,7 +4684,7 @@ func TestInstallRelease_ChecksumVerificationFails(t *testing.T) {
 				BrowserDownloadURL: serverURL + "/download/" + assetName,
 			},
 			{
-				Name:               "checksums.txt",
+				Name:               testChecksumTxt,
 				BrowserDownloadURL: serverURL + "/checksums/checksums.txt",
 			},
 		},
@@ -4686,10 +4708,10 @@ func TestParseVersion(t *testing.T) {
 		v2   string
 		want int
 	}{
-		{"1.0", "1.0.0", 0},
-		{"1", "1.0.0", 0},
+		{"1.0", testVersion100, 0},
+		{"1", testVersion100, 0},
 		{"1.2.3.4", "1.2.3.4", 0},
-		{"invalid", "1.0.0", -1}, // non-numeric parsed as 0
+		{"invalid", testVersion100, -1}, // non-numeric parsed as 0
 	}
 
 	for _, tt := range tests {
@@ -4708,7 +4730,7 @@ func TestGetReleaseByTag_ContextCancelled(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		w.Header().Set("Content-Type", "application/json")
-		if _, err := w.Write([]byte(`{"tag_name": "v1.0.0"}`)); err != nil {
+		if _, err := w.Write([]byte(`{"tag_name": "` + testVersionV1 + `"}`)); err != nil {
 			t.Errorf("failed to write: %v", err)
 		}
 	}))
@@ -4723,7 +4745,7 @@ func TestGetReleaseByTag_ContextCancelled(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.GetReleaseByTag(ctx, "owner", "repo", "v1.0.0")
+	_, err := client.GetReleaseByTag(ctx, testOwner, testRepo, testVersionV1)
 	if err == nil {
 		t.Error("GetReleaseByTag() should return error when context cancelled")
 	}
@@ -4749,7 +4771,7 @@ func TestListReleases_ContextCancelled(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.ListReleases(ctx, "owner", "repo", false)
+	_, err := client.ListReleases(ctx, testOwner, testRepo, false)
 	if err == nil {
 		t.Error("ListReleases() should return error when context cancelled")
 	}
@@ -4760,7 +4782,7 @@ func TestGetLatestRelease_ContextCancelled(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		w.Header().Set("Content-Type", "application/json")
-		if _, err := w.Write([]byte(`{"tag_name": "v1.0.0"}`)); err != nil {
+		if _, err := w.Write([]byte(`{"tag_name": "` + testVersionV1 + `"}`)); err != nil {
 			t.Errorf("failed to write: %v", err)
 		}
 	}))
@@ -4775,7 +4797,7 @@ func TestGetLatestRelease_ContextCancelled(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	client := github.NewClient(ios)
 
-	_, err := client.GetLatestRelease(ctx, "owner", "repo")
+	_, err := client.GetLatestRelease(ctx, testOwner, testRepo)
 	if err == nil {
 		t.Error("GetLatestRelease() should return error when context cancelled")
 	}
@@ -4802,7 +4824,7 @@ func TestDownloadAsset_ContextCancelled(t *testing.T) {
 	client := github.NewClient(ios)
 
 	err := client.DownloadAsset(ctx, &github.Asset{
-		Name:               "test",
+		Name:               testStr,
 		BrowserDownloadURL: ts.URL + "/test",
 	}, "/tmp/test")
 	if err == nil {
@@ -4829,7 +4851,7 @@ func TestDownloadAsset_MkdirAllError(t *testing.T) {
 	client := github.NewClient(ios)
 
 	err := client.DownloadAsset(context.Background(), &github.Asset{
-		Name:               "test",
+		Name:               testStr,
 		BrowserDownloadURL: ts.URL + "/test",
 	}, "/deep/nested/path/test")
 	if err == nil {
@@ -4910,7 +4932,7 @@ func TestFindAssetForPlatform_MultiplePlatforms(t *testing.T) {
 	release := &github.Release{
 		Assets: []github.Asset{
 			{Name: "shelly_darwin_amd64.tar.gz"},
-			{Name: "shelly_linux_amd64.tar.gz"},
+			{Name: testAssetUnderscore},
 			{Name: "shelly_windows_amd64.zip"},
 			{Name: "shelly_linux_arm64.tar.gz"},
 		},
@@ -4936,31 +4958,31 @@ func TestFindChecksumAsset_Variations(t *testing.T) {
 		checksumName string
 	}{
 		{
-			name: "checksums.txt",
+			name: testChecksumTxt,
 			assets: []github.Asset{
-				{Name: "checksums.txt"},
-				{Name: "binary.tar.gz"},
+				{Name: testChecksumTxt},
+				{Name: testBinaryTarGz},
 			},
-			assetName:    "binary.tar.gz",
+			assetName:    testBinaryTarGz,
 			wantChecksum: true,
-			checksumName: "checksums.txt",
+			checksumName: testChecksumTxt,
 		},
 		{
 			name: "sha256sums",
 			assets: []github.Asset{
 				{Name: "sha256sums.txt"},
-				{Name: "binary.tar.gz"},
+				{Name: testBinaryTarGz},
 			},
-			assetName:    "binary.tar.gz",
+			assetName:    testBinaryTarGz,
 			wantChecksum: true,
 			checksumName: "sha256sums.txt",
 		},
 		{
 			name: "no_checksum",
 			assets: []github.Asset{
-				{Name: "binary.tar.gz"},
+				{Name: testBinaryTarGz},
 			},
-			assetName:    "binary.tar.gz",
+			assetName:    testBinaryTarGz,
 			wantChecksum: false,
 		},
 	}
@@ -5000,7 +5022,7 @@ func TestPerformUpdate_SkipConfirm(t *testing.T) {
 	client := github.NewClient(ios)
 
 	release := &github.Release{
-		TagName: "v2.0.0",
+		TagName: testVersionV2,
 		Assets:  []github.Asset{},
 	}
 
@@ -5009,7 +5031,7 @@ func TestPerformUpdate_SkipConfirm(t *testing.T) {
 		return true, nil
 	}
 
-	err := client.PerformUpdate(context.Background(), ios, release, "v1.0.0", "notes", confirmFunc, true)
+	err := client.PerformUpdate(context.Background(), ios, release, testVersionV1, "notes", confirmFunc, true)
 	if err == nil {
 		t.Error("PerformUpdate() should return error when no platform asset")
 	}
@@ -5043,7 +5065,7 @@ func TestInstallRelease_NoChecksumAsset(t *testing.T) {
 	var tarBuf bytes.Buffer
 	tw := tar.NewWriter(&tarBuf)
 	hdr := &tar.Header{
-		Name: "shelly",
+		Name: testShelly,
 		Mode: 0o755,
 		Size: int64(len(binaryContent)),
 	}
@@ -5113,7 +5135,7 @@ func TestPerformRollback_FindPreviousError(t *testing.T) {
 		return true, nil
 	}
 
-	err := client.PerformRollback(context.Background(), ios, "v2.0.0", false, confirmFunc, false)
+	err := client.PerformRollback(context.Background(), ios, testVersionV2, false, confirmFunc, false)
 	if err == nil {
 		t.Error("PerformRollback() should return error when finding previous fails")
 	}
@@ -5161,7 +5183,7 @@ func TestInstallRelease_OsExecutableError(t *testing.T) {
 	var tarBuf bytes.Buffer
 	tw := tar.NewWriter(&tarBuf)
 	hdr := &tar.Header{
-		Name: "shelly",
+		Name: testShelly,
 		Mode: 0o755,
 		Size: int64(len(binaryContent)),
 	}
@@ -5234,7 +5256,7 @@ func TestInstallRelease_EvalSymlinksError(t *testing.T) {
 	var tarBuf bytes.Buffer
 	tw := tar.NewWriter(&tarBuf)
 	hdr := &tar.Header{
-		Name: "shelly",
+		Name: testShelly,
 		Mode: 0o755,
 		Size: int64(len(binaryContent)),
 	}
@@ -5307,7 +5329,7 @@ func TestInstallRelease_ReplaceBinaryError(t *testing.T) {
 	var tarBuf bytes.Buffer
 	tw := tar.NewWriter(&tarBuf)
 	hdr := &tar.Header{
-		Name: "shelly",
+		Name: testShelly,
 		Mode: 0o755,
 		Size: int64(len(binaryContent)),
 	}
@@ -5392,7 +5414,7 @@ func TestInstallRelease_Success(t *testing.T) {
 	var tarBuf bytes.Buffer
 	tw := tar.NewWriter(&tarBuf)
 	hdr := &tar.Header{
-		Name: "shelly",
+		Name: testShelly,
 		Mode: 0o755,
 		Size: int64(len(binaryContent)),
 	}
@@ -5502,7 +5524,7 @@ func TestVerifyChecksum_TempDirError(t *testing.T) {
 	client := github.NewClient(ios)
 
 	err := client.VerifyChecksum(context.Background(), ios, "/tmp/binary", "binary", &github.Asset{
-		Name:               "checksums.txt",
+		Name:               testChecksumTxt,
 		BrowserDownloadURL: "http://localhost:1/checksums.txt",
 	})
 	if err == nil {
@@ -5576,9 +5598,9 @@ func TestDownloadAndExtract_TempDirError(t *testing.T) {
 	client := github.NewClient(ios)
 
 	_, _, err := client.DownloadAndExtract(context.Background(), &github.Asset{
-		Name:               "test.tar.gz",
+		Name:               testTarGz,
 		BrowserDownloadURL: ts.URL + "/test.tar.gz",
-	}, "shelly")
+	}, testShelly)
 	if err == nil {
 		t.Error("DownloadAndExtract() should return error when TempDir fails")
 	}
@@ -5602,7 +5624,7 @@ func TestDownloadAsset_WriteError(t *testing.T) {
 	client := github.NewClient(ios)
 
 	err := client.DownloadAsset(context.Background(), &github.Asset{
-		Name:               "test",
+		Name:               testStr,
 		BrowserDownloadURL: ts.URL + "/test",
 	}, "/tmp/downloaded/test")
 	if err == nil {
@@ -5673,7 +5695,7 @@ func TestParseRepoString_GitSuffix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseRepoString() error = %v", err)
 	}
-	if owner != "owner" || repo != "repo" {
+	if owner != testOwner || repo != testRepo {
 		t.Errorf("ParseRepoString() = (%q, %q), want (owner, repo)", owner, repo)
 	}
 }

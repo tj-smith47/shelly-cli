@@ -411,7 +411,7 @@ func (m GroupsModel) sendGroupToggleCommand(groupID string) tea.Cmd {
 		defer cancel()
 
 		// Use SendGroupCommand with toggle action
-		results := m.fleet.SendGroupCommand(ctx, groupID, "relay", map[string]any{"id": 0, "turn": "toggle"})
+		results := m.fleet.SendGroupCommand(ctx, groupID, "relay", map[string]any{"id": 0, "turn": string(GroupCommandToggle)})
 
 		// Check for errors
 		for _, r := range results {
@@ -438,7 +438,7 @@ func (m GroupsModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "n", Desc: "new"}, {Key: "e", Desc: "edit"}, {Key: "d", Desc: "del"}, {Key: "o", Desc: "on"}, {Key: "f", Desc: "off"}, {Key: "t", Desc: "toggle"}, {Key: "r", Desc: "refresh"}}, keys.FooterHintWidth(m.Width))))
+		r.SetFooter(theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "n", Desc: "new"}, {Key: "e", Desc: "edit"}, {Key: "d", Desc: "del"}, {Key: "o", Desc: "on"}, {Key: "f", Desc: "off"}, {Key: "t", Desc: "toggle"}, {Key: "r", Desc: footerDescRefresh}}, keys.FooterHintWidth(m.Width))))
 	}
 
 	// Calculate content area for centering (accounting for panel borders)

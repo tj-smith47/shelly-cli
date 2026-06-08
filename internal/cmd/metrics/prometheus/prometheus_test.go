@@ -12,6 +12,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+const (
+	testAddrKitchen = "192.168.1.100"
+	testAddrLiving  = "192.168.1.101"
+	testDevKitchen  = "kitchen"
+)
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -236,8 +242,8 @@ func TestRun_WithDevices(t *testing.T) {
 	// Create a factory with devices in config using NewTestManager
 	mgr := config.NewTestManager(&config.Config{
 		Devices: map[string]model.Device{
-			"kitchen": {Address: "192.168.1.100"},
-			"living":  {Address: "192.168.1.101"},
+			testDevKitchen: {Address: testAddrKitchen},
+			"living":       {Address: testAddrLiving},
 		},
 	})
 	f := cmdutil.NewFactory().
@@ -291,9 +297,9 @@ func TestRun_WithSpecificDevices(t *testing.T) {
 	// Create a factory with devices in config using NewTestManager
 	mgr := config.NewTestManager(&config.Config{
 		Devices: map[string]model.Device{
-			"kitchen": {Address: "192.168.1.100"},
-			"living":  {Address: "192.168.1.101"},
-			"bedroom": {Address: "192.168.1.102"},
+			testDevKitchen: {Address: testAddrKitchen},
+			"living":       {Address: testAddrLiving},
+			"bedroom":      {Address: "192.168.1.102"},
 		},
 	})
 	f := cmdutil.NewFactory().
@@ -311,7 +317,7 @@ func TestRun_WithSpecificDevices(t *testing.T) {
 		opts := &Options{
 			Factory:  f,
 			Port:     29999,
-			Devices:  []string{"kitchen", "bedroom"},
+			Devices:  []string{testDevKitchen, "bedroom"},
 			Interval: 1 * time.Second,
 		}
 		done <- run(ctx, opts)
@@ -344,8 +350,8 @@ func TestRun_DevicesAreSorted(t *testing.T) {
 	// Create a factory with devices in config using NewTestManager
 	mgr := config.NewTestManager(&config.Config{
 		Devices: map[string]model.Device{
-			"zebra":  {Address: "192.168.1.100"},
-			"apple":  {Address: "192.168.1.101"},
+			"zebra":  {Address: testAddrKitchen},
+			"apple":  {Address: testAddrLiving},
 			"mango":  {Address: "192.168.1.102"},
 			"banana": {Address: "192.168.1.103"},
 			"cherry": {Address: "192.168.1.104"},

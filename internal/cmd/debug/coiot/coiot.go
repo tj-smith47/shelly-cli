@@ -18,6 +18,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+const (
+	// formatJSON is the JSON output format value.
+	formatJSON = "json"
+	// keyUpdatePeriod is the CoIoT update period map key.
+	keyUpdatePeriod = "update_period"
+)
+
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
@@ -81,7 +88,7 @@ CoIoT status broadcasts from all Gen1 devices on the network.`,
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", formatJSON)
 	cmd.Flags().BoolVarP(&opts.Listen, "listen", "l", false, "Listen for CoIoT multicast updates from all Gen1 devices")
 	cmd.Flags().BoolVarP(&opts.Stream, "stream", "s", false, "Stream indefinitely (until Ctrl+C)")
 	cmd.Flags().DurationVar(&opts.Duration, "duration", 30*time.Second, "Listen duration (ignored if --stream)")
@@ -128,7 +135,7 @@ func run(ctx context.Context, opts *Options) error {
 			coiotStatus["coiot"] = map[string]any{
 				"enabled":       result.CoIoT.Enabled,
 				"peer":          result.CoIoT.Peer,
-				"update_period": result.CoIoT.UpdatePeriod,
+				keyUpdatePeriod: result.CoIoT.UpdatePeriod,
 			}
 
 			// Add device info
@@ -150,7 +157,7 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.Format == "json" {
+	if opts.Format == formatJSON {
 		jsonOutput, err := json.MarshalIndent(coiotStatus, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to format JSON: %w", err)

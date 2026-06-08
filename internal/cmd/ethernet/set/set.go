@@ -11,6 +11,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// IPv4 configuration modes.
+const (
+	ipv4ModeStatic = "static"
+	ipv4ModeDHCP   = "dhcp"
+)
+
 // Options holds the command options.
 type Options struct {
 	Factory    *cmdutil.Factory
@@ -85,9 +91,9 @@ func run(ctx context.Context, opts *Options) error {
 	// Determine IPv4 mode
 	ipv4Mode := ""
 	if opts.StaticIP != "" {
-		ipv4Mode = "static"
+		ipv4Mode = ipv4ModeStatic
 	} else if opts.Enable {
-		ipv4Mode = "dhcp"
+		ipv4Mode = ipv4ModeDHCP
 	}
 
 	// Validate flags

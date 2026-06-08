@@ -10,12 +10,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 )
 
+// parentCmd is the parent command name used in generated examples.
+const parentCmd = "modbus"
+
 // NewCommand creates the modbus disable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return factories.NewEnableDisableCommand(f, factories.EnableDisableOpts{
 		Feature:       "Modbus-TCP",
 		Enable:        false,
-		ExampleParent: "modbus",
+		ExampleParent: parentCmd,
 		Long:          `Disable the Modbus-TCP server on a Shelly device.`,
 		Example: `  # Disable Modbus
   shelly modbus disable kitchen`,

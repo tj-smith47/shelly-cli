@@ -13,6 +13,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Command metadata and mode identifiers.
+const (
+	commandUse   = "exclusion <model>"
+	aliasExclude = "exclude"
+	aliasUnpair  = "unpair"
+	aliasRemove  = "remove"
+	modeSwitch   = "switch"
+)
+
 // Options holds command options.
 type Options struct {
 	Model   string
@@ -25,8 +34,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:     "exclusion <model>",
-		Aliases: []string{"exclude", "unpair", "remove"},
+		Use:     commandUse,
+		Aliases: []string{aliasExclude, aliasUnpair, aliasRemove},
 		Short:   "Show exclusion instructions",
 		Long: `Show Z-Wave exclusion (unpairing) instructions for a device.
 
@@ -67,7 +76,7 @@ func run(opts *Options) error {
 	switch strings.ToLower(opts.Mode) {
 	case "button", "s":
 		mode = zwave.InclusionButton
-	case "switch":
+	case modeSwitch:
 		mode = zwave.InclusionSwitch
 	default:
 		return fmt.Errorf("invalid mode %q, must be one of: button, switch", opts.Mode)

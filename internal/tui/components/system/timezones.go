@@ -1,13 +1,17 @@
 package system
 
+// tzAmericaNewYork is the IANA identifier for US Eastern time, used as the
+// canonical example of the IANA timezone format Shelly devices expect.
+const tzAmericaNewYork = "America/New_York"
+
 // CommonTimezones is a list of common IANA timezone identifiers.
-// Shelly devices use IANA timezone format (e.g., "America/New_York").
+// Shelly devices use IANA timezone format (e.g., America/New_York).
 var CommonTimezones = []string{
 	// UTC
 	"UTC",
 
 	// Americas
-	"America/New_York",
+	tzAmericaNewYork,
 	"America/Chicago",
 	"America/Denver",
 	"America/Los_Angeles",

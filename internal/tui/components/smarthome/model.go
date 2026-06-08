@@ -77,9 +77,16 @@ const (
 // footerSaving is the footer text shown while a save operation is in progress.
 const footerSaving = "Saving..."
 
+// Footer hint descriptions for shared keybindings.
+const (
+	descEdit    = "edit"
+	descToggle  = "toggle"
+	descRefresh = "refresh"
+)
+
 // editToggleRefreshHints returns the footer hints for protocols with edit, toggle, and refresh.
 func editToggleRefreshHints() []keys.Hint {
-	return []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "t", Desc: "toggle"}, {Key: "r", Desc: "refresh"}}
+	return []keys.Hint{{Key: "e", Desc: descEdit}, {Key: "t", Desc: descToggle}, {Key: "r", Desc: descRefresh}}
 }
 
 // StatusLoadedMsg signals that smart home statuses were loaded.
@@ -1273,13 +1280,13 @@ func (m Model) buildProtocolFooter() string {
 	case m.activeProtocol == ProtocolZigbee && m.zigbee != nil:
 		return m.buildZigbeeFooter()
 	case m.activeProtocol == ProtocolLoRa && m.lora != nil:
-		hints = []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "T", Desc: "test"}, {Key: "r", Desc: "refresh"}}
+		hints = []keys.Hint{{Key: "e", Desc: descEdit}, {Key: "T", Desc: "test"}, {Key: "r", Desc: descRefresh}}
 	case m.activeProtocol == ProtocolZWave && m.zwave != nil:
-		hints = []keys.Hint{{Key: "e", Desc: "edit"}, {Key: "r", Desc: "refresh"}}
+		hints = []keys.Hint{{Key: "e", Desc: descEdit}, {Key: "r", Desc: descRefresh}}
 	case m.activeProtocol == ProtocolModbus && m.modbus != nil:
 		hints = editToggleRefreshHints()
 	default:
-		hints = []keys.Hint{{Key: "1-5", Desc: "sel"}, {Key: "j/k", Desc: "nav"}, {Key: "r", Desc: "refresh"}}
+		hints = []keys.Hint{{Key: "1-5", Desc: "sel"}, {Key: "j/k", Desc: "nav"}, {Key: "r", Desc: descRefresh}}
 	}
 	return theme.StyledKeybindings(keys.FormatHints(hints, w))
 }
@@ -1287,7 +1294,7 @@ func (m Model) buildProtocolFooter() string {
 func (m Model) buildMatterFooter() string {
 	w := keys.FooterHintWidth(m.Width)
 	if m.matter.Enabled {
-		return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "t", Desc: "toggle"}, {Key: "c", Desc: "codes"}, {Key: "R", Desc: "reset"}, {Key: "r", Desc: "refresh"}}, w))
+		return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: descEdit}, {Key: "t", Desc: descToggle}, {Key: "c", Desc: "codes"}, {Key: "R", Desc: "reset"}, {Key: "r", Desc: descRefresh}}, w))
 	}
 	return theme.StyledKeybindings(keys.FormatHints(editToggleRefreshHints(), w))
 }
@@ -1298,9 +1305,9 @@ func (m Model) buildZigbeeFooter() string {
 		return theme.StyledKeybindings(keys.FormatHints(editToggleRefreshHints(), w))
 	}
 	if m.zigbee.NetworkState == zigbeeStateJoined {
-		return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "t", Desc: "toggle"}, {Key: "p", Desc: "pair"}, {Key: "R", Desc: "leave"}, {Key: "r", Desc: "refresh"}}, w))
+		return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: descEdit}, {Key: "t", Desc: descToggle}, {Key: "p", Desc: "pair"}, {Key: "R", Desc: "leave"}, {Key: "r", Desc: descRefresh}}, w))
 	}
-	return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: "edit"}, {Key: "t", Desc: "toggle"}, {Key: "p", Desc: "pair"}, {Key: "r", Desc: "refresh"}}, w))
+	return theme.StyledKeybindings(keys.FormatHints([]keys.Hint{{Key: "e", Desc: descEdit}, {Key: "t", Desc: descToggle}, {Key: "p", Desc: "pair"}, {Key: "r", Desc: descRefresh}}, w))
 }
 
 func (m Model) renderMatter() string {

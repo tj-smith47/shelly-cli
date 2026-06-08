@@ -13,6 +13,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+// aliasCal is the short alias for the calibrate command.
+const aliasCal = "cal"
+
 // Options holds command options.
 type Options struct {
 	flags.ComponentFlags
@@ -26,7 +29,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "calibrate <device>",
-		Aliases: []string{"cal"},
+		Aliases: []string{aliasCal},
 		Short:   "Calibrate thermostat valve",
 		Long: `Initiate valve calibration on a thermostat.
 
