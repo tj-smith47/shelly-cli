@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/provision"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
@@ -719,39 +720,123 @@ func (s *Service) OnboardBLEParallel(
 	return results
 }
 
-// GetWiFiCredentials attempts to retrieve WiFi credentials from an existing
-// registered device. Gen1 devices return both SSID and password via their
-// settings API. Gen2+ devices return only the SSID (password is write-only).
-// Returns nil if no credentials could be retrieved.
+// GetWiFiCredentials attempts to retrieve WiFi credentials from existing
+// registered devices. The network is identified by SSID, not by device
+// generation: every registered device reports the station SSID it is joined to
+// (Gen1 via /settings, Gen2+ via WiFi.GetConfig), but only Gen1 devices return
+// the key — and only when it is not masked. The results are grouped by SSID so
+// that a device whose key is masked can still be onboarded using the key
+// recovered from a different device on the same network. The most widely-used
+// SSID with a recoverable key wins. Returns nil if no key could be recovered.
 func (s *Service) GetWiFiCredentials(ctx context.Context) *OnboardWiFiConfig {
 	devices := config.ListDevices()
 
-	// Try Gen1 devices first — they return the password
+	readings := make([]wifiReading, 0, len(devices))
 	for name, dev := range devices {
-		if dev.Generation != 1 {
-			continue
-		}
-		var creds *OnboardWiFiConfig
-		err := s.WithGen1Connection(ctx, name, func(conn *client.Gen1Client) error {
-			settings, settingsErr := conn.GetSettings(ctx)
-			if settingsErr != nil {
-				return settingsErr
-			}
-			if settings.WiFiSta != nil && settings.WiFiSta.SSID != "" && settings.WiFiSta.Key != "" {
-				creds = &OnboardWiFiConfig{
-					SSID:     settings.WiFiSta.SSID,
-					Password: settings.WiFiSta.Key,
-				}
-			}
-			return nil
-		})
-		if err == nil && creds != nil {
-			return creds
-		}
-		debug.TraceEvent("onboard: could not get WiFi creds from %s: %v", name, err)
+		ssid, key := s.readStationWiFi(ctx, name, dev.Generation)
+		readings = append(readings, wifiReading{ssid: ssid, key: key})
 	}
 
-	return nil
+	creds := selectWiFiNetwork(readings)
+	if creds == nil {
+		debug.TraceEvent("onboard: no WiFi password recoverable from %d registered device(s)", len(devices))
+	}
+	return creds
+}
+
+// wifiReading is one device's reported station SSID and (Gen1, unmasked) key.
+type wifiReading struct {
+	ssid string
+	key  string
+}
+
+// selectWiFiNetwork groups readings by SSID and returns the credentials for the
+// most widely-used network that has a recoverable password, breaking ties by
+// SSID. A device whose key is masked still contributes its SSID, so the password
+// can come from a different device on the same network. Returns nil when no
+// password was recovered for any SSID.
+func selectWiFiNetwork(readings []wifiReading) *OnboardWiFiConfig {
+	type network struct {
+		devices  int
+		password string
+	}
+	networks := map[string]*network{}
+	for _, r := range readings {
+		if r.ssid == "" {
+			continue
+		}
+		n := networks[r.ssid]
+		if n == nil {
+			n = &network{}
+			networks[r.ssid] = n
+		}
+		n.devices++
+		if r.key != "" && n.password == "" {
+			n.password = r.key
+		}
+	}
+
+	best := ""
+	for ssid, n := range networks {
+		if n.password == "" {
+			continue
+		}
+		switch {
+		case best == "", n.devices > networks[best].devices:
+			best = ssid
+		case n.devices == networks[best].devices && ssid < best:
+			best = ssid
+		}
+	}
+	if best == "" {
+		return nil
+	}
+	return &OnboardWiFiConfig{SSID: best, Password: networks[best].password}
+}
+
+// readStationWiFi returns the station SSID a registered device is joined to,
+// plus its key when the device exposes it (Gen1 only, and not when masked).
+// Unreachable devices contribute nothing.
+func (s *Service) readStationWiFi(ctx context.Context, name string, generation int) (ssid, key string) {
+	var err error
+	if generation == 1 {
+		ssid, key, err = s.readGen1StationWiFi(ctx, name)
+	} else {
+		ssid, err = s.readGen2StationSSID(ctx, name)
+	}
+	if err != nil {
+		debug.TraceEvent("onboard: WiFi read from %s failed: %v", name, err)
+	}
+	return ssid, key
+}
+
+// readGen1StationWiFi reads a Gen1 device's station SSID and key from /settings.
+func (s *Service) readGen1StationWiFi(ctx context.Context, name string) (ssid, key string, err error) {
+	err = s.WithGen1Connection(ctx, name, func(conn *client.Gen1Client) error {
+		settings, settingsErr := conn.GetSettings(ctx)
+		if settingsErr != nil {
+			return settingsErr
+		}
+		if settings.WiFiSta != nil {
+			ssid = settings.WiFiSta.SSID
+			key = settings.WiFiSta.Key
+		}
+		return nil
+	})
+	return ssid, key, err
+}
+
+// readGen2StationSSID reads a Gen2+ device's station SSID (the key is write-only).
+func (s *Service) readGen2StationSSID(ctx context.Context, name string) (ssid string, err error) {
+	err = s.WithConnection(ctx, name, func(conn *client.Client) error {
+		raw, callErr := conn.Call(ctx, "WiFi.GetConfig", nil)
+		if callErr != nil {
+			return callErr
+		}
+		ssid = provision.ExtractWiFiSSID(raw)
+		return nil
+	})
+	return ssid, err
 }
 
 // ProvisionSource holds configuration to apply to newly provisioned devices.
