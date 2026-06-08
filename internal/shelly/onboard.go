@@ -60,6 +60,16 @@ type OnboardDevice struct {
 type OnboardWiFiConfig struct {
 	SSID     string
 	Password string
+	// Static IP configuration (all four required together; empty StaticIP = DHCP).
+	StaticIP string // device's static address on the target network
+	Gateway  string
+	Netmask  string
+	DNS      string
+}
+
+// IsStatic reports whether a static IP was requested (StaticIP set).
+func (c *OnboardWiFiConfig) IsStatic() bool {
+	return c != nil && c.StaticIP != ""
 }
 
 // OnboardOptions configures the onboard operation.
@@ -411,11 +421,19 @@ func (s *Service) OnboardViaBLE(
 	})
 
 	// Build config
+	bleWiFi := &provisioning.WiFiConfig{
+		SSID:     wifi.SSID,
+		Password: wifi.Password,
+	}
+	if wifi.IsStatic() {
+		bleWiFi.StaticIP = "static"
+		bleWiFi.IP = wifi.StaticIP
+		bleWiFi.Netmask = wifi.Netmask
+		bleWiFi.Gateway = wifi.Gateway
+		bleWiFi.Nameserver = wifi.DNS
+	}
 	bleConfig := &provisioning.BLEProvisionConfig{
-		WiFi: &provisioning.WiFiConfig{
-			SSID:     wifi.SSID,
-			Password: wifi.Password,
-		},
+		WiFi:       bleWiFi,
 		DeviceName: opts.DeviceName,
 		Timezone:   opts.Timezone,
 	}
@@ -499,7 +517,7 @@ func (s *Service) OnboardViaAP(
 
 	// Configure WiFi on the device at 192.168.33.1
 	// Use the provision service for Gen2+ at AP, or direct HTTP for Gen1
-	configErr := s.configureWiFiAtAP(ctx, wifi.SSID, wifi.Password, device.Generation)
+	configErr := s.configureWiFiAtAP(ctx, wifi, device.Generation)
 
 	// Always try to reconnect to home network, even if config failed.
 	// Determine the reconnect target: if the original network is different from
@@ -545,18 +563,26 @@ func (s *Service) OnboardViaAP(
 
 // configureWiFiAtAP sends WiFi credentials to a device at 192.168.33.1.
 // Uses Gen1 HTTP settings API for Gen1 devices, RPC for Gen2+.
-func (s *Service) configureWiFiAtAP(ctx context.Context, ssid, password string, generation int) error {
+func (s *Service) configureWiFiAtAP(ctx context.Context, wifi *OnboardWiFiConfig, generation int) error {
 	address := discovery.DefaultAPIP
 
 	if generation == 1 {
-		// Gen1: use WithGen1Connection → Device().SetWiFiStation
+		// Gen1: use WithGen1Connection → Device().SetWiFiStation[Static]
 		return s.WithGen1Connection(ctx, address, func(conn *client.Gen1Client) error {
-			return conn.Device().SetWiFiStation(ctx, true, ssid, password)
+			if wifi.IsStatic() {
+				return conn.Device().SetWiFiStationStatic(ctx, wifi.SSID, wifi.Password,
+					wifi.StaticIP, wifi.Gateway, wifi.Netmask, wifi.DNS)
+			}
+			return conn.Device().SetWiFiStation(ctx, true, wifi.SSID, wifi.Password)
 		})
 	}
 
-	// Gen2+: use Service.ConfigureWiFi (RPC-based)
-	return s.ConfigureWiFi(ctx, address, ssid, password)
+	// Gen2+: RPC-based WiFi.SetConfig (static or DHCP).
+	if wifi.IsStatic() {
+		return s.ConfigureWiFiStatic(ctx, address, wifi.SSID, wifi.Password,
+			wifi.StaticIP, wifi.Netmask, wifi.Gateway, wifi.DNS)
+	}
+	return s.ConfigureWiFi(ctx, address, wifi.SSID, wifi.Password)
 }
 
 // reconnectCredentials determines the SSID and password for reconnecting to
@@ -636,6 +662,25 @@ func FilterUnregistered(devices []OnboardDevice) []OnboardDevice {
 		}
 	}
 	return result
+}
+
+// FindByAP returns the single device whose AP SSID matches apSSID — an exact
+// (case-insensitive) match, or a case-insensitive substring (so a short
+// device-ID fragment from a scan diff resolves the full SSID). The bool is
+// false when no device matches. Used for non-interactive single-device onboard.
+func FindByAP(devices []OnboardDevice, apSSID string) (OnboardDevice, bool) {
+	target := strings.ToLower(apSSID)
+	if target == "" {
+		// An empty target would substring-match every SSID; treat as no match.
+		return OnboardDevice{}, false
+	}
+	for i := range devices {
+		ssid := strings.ToLower(devices[i].SSID)
+		if ssid != "" && (ssid == target || strings.Contains(ssid, target)) {
+			return devices[i], true
+		}
+	}
+	return OnboardDevice{}, false
 }
 
 // SplitBySource separates devices by their discovery source for routing

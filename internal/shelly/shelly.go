@@ -923,6 +923,12 @@ func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password str
 	return s.provisionService.ConfigureWiFi(ctx, address, ssid, password)
 }
 
+// ConfigureWiFiStatic delegates to the Provision service to configure a Gen2+
+// device's WiFi station with a static IPv4 address.
+func (s *Service) ConfigureWiFiStatic(ctx context.Context, address, ssid, password, ip, netmask, gateway, dns string) error {
+	return s.provisionService.ConfigureWiFiStatic(ctx, address, ssid, password, ip, netmask, gateway, dns)
+}
+
 // GetBTHomeStatus delegates to the Provision service for convenience.
 func (s *Service) GetBTHomeStatus(ctx context.Context, identifier string) (*provision.BTHomeDiscovery, error) {
 	return s.provisionService.GetBTHomeStatus(ctx, identifier)

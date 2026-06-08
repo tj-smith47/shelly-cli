@@ -54,6 +54,14 @@ To register already-networked devices, use: shelly discover --register
 	Only discover via BLE (Gen2+ devices)
 
 .PP
+\fB--discover-only\fP[=false]
+	List discoverable unprovisioned devices as JSON and exit (no provisioning)
+
+.PP
+\fB--dns\fP=""
+	DNS server for the static IP
+
+.PP
 \fB--from-device\fP=""
 	Clone config from existing device
 
@@ -62,12 +70,20 @@ To register already-networked devices, use: shelly discover --register
 	Apply saved template after provisioning
 
 .PP
+\fB--gateway\fP=""
+	Gateway for the static IP
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for provision
 
 .PP
 \fB--name\fP=""
 	Device name to assign after provisioning
+
+.PP
+\fB--netmask\fP=""
+	Netmask for the static IP (e.g. 255.255.254.0)
 
 .PP
 \fB--no-cloud\fP[=false]
@@ -80,6 +96,14 @@ To register already-networked devices, use: shelly discover --register
 .PP
 \fB--ssid\fP=""
 	WiFi SSID for provisioning
+
+.PP
+\fB--static-ip\fP=""
+	Assign a static IP to the device (requires --gateway and --netmask)
+
+.PP
+\fB--target-ap\fP=""
+	Provision only the device whose AP SSID matches (non-interactive single device)
 
 .PP
 \fB--timeout\fP=2m0s
@@ -164,6 +188,13 @@ To register already-networked devices, use: shelly discover --register
 
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
+
+  # List discoverable APs as JSON (for scripted before/after scan-diff)
+  shelly provision --ap-only --discover-only
+
+  # Onboard one specific AP non-interactively with a static IP
+  shelly provision --ap-only --target-ap shellycolorbulb-AABBCC --name master-bath \\
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1 --yes
 
   # Only discover via BLE (Gen2+ devices)
   shelly provision --ble-only

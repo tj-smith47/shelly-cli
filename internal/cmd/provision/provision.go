@@ -3,6 +3,7 @@ package provision
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -32,11 +33,17 @@ type Options struct {
 	DeviceName   string
 	FromDevice   string
 	FromTemplate string
+	StaticIP     string
+	Gateway      string
+	Netmask      string
+	DNS          string
+	TargetAP     string
 	Timeout      time.Duration
 	BLEOnly      bool
 	APOnly       bool
 	NoCloud      bool
 	Yes          bool
+	DiscoverOnly bool
 }
 
 // NewCommand creates the provision command.
@@ -82,6 +89,13 @@ To register already-networked devices, use: shelly discover --register`,
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
 
+  # List discoverable APs as JSON (for scripted before/after scan-diff)
+  shelly provision --ap-only --discover-only
+
+  # Onboard one specific AP non-interactively with a static IP
+  shelly provision --ap-only --target-ap shellycolorbulb-AABBCC --name master-bath \
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1 --yes
+
   # Only discover via BLE (Gen2+ devices)
   shelly provision --ble-only
 
@@ -110,7 +124,14 @@ To register already-networked devices, use: shelly discover --register`,
 	cmd.Flags().BoolVar(&opts.NoCloud, "no-cloud", false, "Disable cloud on provisioned devices")
 	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompts")
 	cmd.Flags().BoolVar(&opts.Yes, "all", false, "Provision all discovered devices (non-interactive)")
+	cmd.Flags().StringVar(&opts.StaticIP, "static-ip", "", "Assign a static IP to the device (requires --gateway and --netmask)")
+	cmd.Flags().StringVar(&opts.Gateway, "gateway", "", "Gateway for the static IP")
+	cmd.Flags().StringVar(&opts.Netmask, "netmask", "", "Netmask for the static IP (e.g. 255.255.254.0)")
+	cmd.Flags().StringVar(&opts.DNS, "dns", "", "DNS server for the static IP")
+	cmd.Flags().StringVar(&opts.TargetAP, "target-ap", "", "Provision only the device whose AP SSID matches (non-interactive single device)")
+	cmd.Flags().BoolVar(&opts.DiscoverOnly, "discover-only", false, "List discoverable unprovisioned devices as JSON and exit (no provisioning)")
 	cmd.MarkFlagsMutuallyExclusive("from-device", "from-template")
+	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
 	cmd.AddCommand(wifi.NewCommand(f))
 	cmd.AddCommand(bulk.NewCommand(f))
@@ -123,33 +144,14 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	// Load provision source (--from-device or --from-template)
+	// Load provision source + resolve WiFi credentials. Skipped for
+	// --discover-only, which just lists devices and needs no credentials.
 	var source *shelly.ProvisionSource
-	if opts.FromDevice != "" || opts.FromTemplate != "" {
-		label := opts.FromDevice
-		if label == "" {
-			label = opts.FromTemplate
-		}
-		ios.StartProgress(fmt.Sprintf("Loading config from %s...", label))
+	if !opts.DiscoverOnly {
 		var err error
-		source, err = svc.LoadProvisionSource(ctx, opts.FromDevice, opts.FromTemplate)
-		ios.StopProgress()
-		if err != nil {
+		if source, err = opts.resolveSourceAndCreds(ctx, svc); err != nil {
 			return err
 		}
-		ios.Success("Config loaded from %s", label)
-
-		// Use WiFi creds from source if available and not overridden by flags
-		if source.WiFi != nil && opts.SSID == "" {
-			opts.SSID = source.WiFi.SSID
-			opts.Password = source.WiFi.Password
-			ios.Info("Using WiFi credentials from source: %s", source.WiFi.SSID)
-		}
-	}
-
-	// Resolve WiFi credentials: flags/source → auto-detect → prompt
-	if err := opts.promptWiFiCredentials(ctx); err != nil {
-		return err
 	}
 
 	// Discovery phase
@@ -161,14 +163,20 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Filter to unregistered devices
 	unregistered := shelly.FilterUnregistered(devices)
+
+	// --discover-only: emit the list as JSON and stop (scriptable scan/diff).
+	if opts.DiscoverOnly {
+		return opts.outputDiscovered(unregistered)
+	}
+
 	ios.Println()
 	term.DisplayOnboardDevices(ios, unregistered)
 	if len(unregistered) == 0 {
 		return nil
 	}
 
-	// Interactive selection
-	selected, err := term.SelectOnboardDevices(ios, unregistered, opts.Yes)
+	// Select devices: a single --target-ap match, or interactive selection.
+	selected, err := opts.selectDevices(unregistered)
 	if err != nil {
 		return err
 	}
@@ -178,10 +186,104 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Provision and display results
-	wifiCfg := &shelly.OnboardWiFiConfig{SSID: opts.SSID, Password: opts.Password}
+	wifiCfg := opts.buildWiFiConfig()
 	results := opts.provisionAll(ctx, svc, selected, wifiCfg, onboardOpts, source)
 	term.DisplayOnboardSummary(ios, results)
 
+	return nil
+}
+
+// resolveSourceAndCreds loads the optional --from-device/--from-template config
+// source and resolves WiFi credentials (flags/source → auto-detect → prompt).
+func (o *Options) resolveSourceAndCreds(ctx context.Context, svc *shelly.Service) (*shelly.ProvisionSource, error) {
+	ios := o.Factory.IOStreams()
+	var source *shelly.ProvisionSource
+	if o.FromDevice != "" || o.FromTemplate != "" {
+		label := o.FromDevice
+		if label == "" {
+			label = o.FromTemplate
+		}
+		ios.StartProgress(fmt.Sprintf("Loading config from %s...", label))
+		var err error
+		source, err = svc.LoadProvisionSource(ctx, o.FromDevice, o.FromTemplate)
+		ios.StopProgress()
+		if err != nil {
+			return nil, err
+		}
+		ios.Success("Config loaded from %s", label)
+
+		// Use WiFi creds from source if available and not overridden by flags
+		if source.WiFi != nil && o.SSID == "" {
+			o.SSID = source.WiFi.SSID
+			o.Password = source.WiFi.Password
+			ios.Info("Using WiFi credentials from source: %s", source.WiFi.SSID)
+		}
+	}
+
+	// Resolve WiFi credentials: flags/source → auto-detect → prompt
+	if err := o.promptWiFiCredentials(ctx); err != nil {
+		return nil, err
+	}
+	return source, nil
+}
+
+// buildWiFiConfig assembles the WiFi config (including optional static IP) used
+// to provision selected devices.
+func (o *Options) buildWiFiConfig() *shelly.OnboardWiFiConfig {
+	return &shelly.OnboardWiFiConfig{
+		SSID:     o.SSID,
+		Password: o.Password,
+		StaticIP: o.StaticIP,
+		Gateway:  o.Gateway,
+		Netmask:  o.Netmask,
+		DNS:      o.DNS,
+	}
+}
+
+// selectDevices resolves which discovered devices to provision. With --target-ap
+// it returns the single device whose AP SSID matches (non-interactive); otherwise
+// it runs the interactive multi-select (bypassed by --yes/--all).
+func (o *Options) selectDevices(devices []shelly.OnboardDevice) ([]shelly.OnboardDevice, error) {
+	if o.TargetAP == "" {
+		return term.SelectOnboardDevices(o.Factory.IOStreams(), devices, o.Yes)
+	}
+	device, ok := shelly.FindByAP(devices, o.TargetAP)
+	if !ok {
+		return nil, fmt.Errorf("no unprovisioned device with AP SSID matching %q (%d discovered)", o.TargetAP, len(devices))
+	}
+	return []shelly.OnboardDevice{device}, nil
+}
+
+// outputDiscovered prints discoverable unprovisioned devices as JSON so the
+// before/after scan-diff flow can identify a specific device's AP.
+func (o *Options) outputDiscovered(devices []shelly.OnboardDevice) error {
+	type apView struct {
+		Name       string `json:"name"`
+		SSID       string `json:"ssid"`
+		Model      string `json:"model"`
+		MAC        string `json:"mac"`
+		Generation int    `json:"generation"`
+		Source     string `json:"source"`
+		Address    string `json:"address"`
+	}
+	views := make([]apView, 0, len(devices))
+	for i := range devices {
+		d := devices[i]
+		views = append(views, apView{
+			Name:       d.Name,
+			SSID:       d.SSID,
+			Model:      d.Model,
+			MAC:        d.MACAddress,
+			Generation: d.Generation,
+			Source:     string(d.Source),
+			Address:    d.Address,
+		})
+	}
+	data, err := json.MarshalIndent(views, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal discovered devices: %w", err)
+	}
+	o.Factory.IOStreams().Println(string(data))
 	return nil
 }
 
@@ -244,10 +346,7 @@ func (o *Options) buildOnboardOptions() *shelly.OnboardOptions {
 		NoCloud:    o.NoCloud,
 	}
 	if o.SSID != "" {
-		onboardOpts.WiFi = &shelly.OnboardWiFiConfig{
-			SSID:     o.SSID,
-			Password: o.Password,
-		}
+		onboardOpts.WiFi = o.buildWiFiConfig()
 	}
 	return onboardOpts
 }

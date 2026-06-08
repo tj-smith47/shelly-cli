@@ -79,6 +79,28 @@ func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password str
 	})
 }
 
+// ConfigureWiFiStatic configures a Gen2+ device's WiFi station with a static
+// IPv4 address (ipv4mode=static) instead of DHCP.
+func (s *Service) ConfigureWiFiStatic(ctx context.Context, address, ssid, password, ip, netmask, gateway, dns string) error {
+	return s.provider.WithConnection(ctx, address, func(conn *client.Client) error {
+		sta := map[string]any{
+			wifiKeySSID: ssid,
+			"pass":      password,
+			"enable":    true,
+			"ipv4mode":  "static",
+			"ip":        ip,
+			"netmask":   netmask,
+			"gw":        gateway,
+		}
+		if dns != "" {
+			sta["nameserver"] = dns
+		}
+		params := map[string]any{"config": map[string]any{wifiKeySta: sta}}
+		_, err := conn.Call(ctx, "WiFi.SetConfig", params)
+		return err
+	})
+}
+
 // GetBTHomeStatus returns the BTHome status including discovery.
 func (s *Service) GetBTHomeStatus(ctx context.Context, identifier string) (*BTHomeDiscovery, error) {
 	var result *BTHomeDiscovery
