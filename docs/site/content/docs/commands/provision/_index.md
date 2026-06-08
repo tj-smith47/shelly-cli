@@ -55,6 +55,13 @@ shelly provision [flags]
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
 
+  # List discoverable APs as JSON (for scripted before/after scan-diff)
+  shelly provision --ap-only --discover-only
+
+  # Onboard one specific AP non-interactively with a static IP
+  shelly provision --ap-only --target-ap shellycolorbulb-AABBCC --name master-bath \
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1 --yes
+
   # Only discover via BLE (Gen2+ devices)
   shelly provision --ble-only
 
@@ -74,13 +81,19 @@ shelly provision [flags]
       --all                    Provision all discovered devices (non-interactive)
       --ap-only                Only discover via WiFi AP (Gen1 devices)
       --ble-only               Only discover via BLE (Gen2+ devices)
+      --discover-only          List discoverable unprovisioned devices as JSON and exit (no provisioning)
+      --dns string             DNS server for the static IP
       --from-device string     Clone config from existing device
       --from-template string   Apply saved template after provisioning
+      --gateway string         Gateway for the static IP
   -h, --help                   help for provision
       --name string            Device name to assign after provisioning
+      --netmask string         Netmask for the static IP (e.g. 255.255.254.0)
       --no-cloud               Disable cloud on provisioned devices
       --password string        WiFi password for provisioning
       --ssid string            WiFi SSID for provisioning
+      --static-ip string       Assign a static IP to the device (requires --gateway and --netmask)
+      --target-ap string       Provision only the device whose AP SSID matches (non-interactive single device)
       --timeout duration       Discovery timeout (default 2m0s)
       --timezone string        Timezone to set on device
   -y, --yes                    Skip confirmation prompts

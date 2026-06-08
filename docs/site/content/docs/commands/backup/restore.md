@@ -39,19 +39,29 @@ shelly backup restore <device> <file> [flags]
 
   # Skip scripts during restore
   shelly backup restore living-room backup.json --skip-scripts
+
+  # Clone another bulb's backup onto this device with a different static IP
+  # (identity — MAC, serial, device ID — is never overwritten by restore)
+  shelly backup restore new-bulb master-bath-1.json \
+    --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
 ```
 
 ### Options
 
 ```
-  -d, --decrypt string   Password to decrypt backup
-      --dry-run          Show what would be restored without applying
-  -h, --help             help for restore
-      --skip-auth        Skip authentication configuration
-      --skip-network     Skip network configuration (WiFi, Ethernet)
-      --skip-schedules   Skip schedule restoration
-      --skip-scripts     Skip script restoration
-      --skip-webhooks    Skip webhook restoration
+  -d, --decrypt string     Password to decrypt backup
+      --dns string         Static IPv4 nameserver (optional, with --static-ip)
+      --dry-run            Show what would be restored without applying
+      --gateway string     Static IPv4 default gateway (with --static-ip)
+  -h, --help               help for restore
+      --name string        Override the device name (defaults to the target identifier when it is a friendly alias)
+      --netmask string     Static IPv4 subnet mask (with --static-ip)
+      --skip-auth          Skip authentication configuration
+      --skip-network       Skip network configuration (WiFi, Ethernet)
+      --skip-schedules     Skip schedule restoration
+      --skip-scripts       Skip script restoration
+      --skip-webhooks      Skip webhook restoration
+      --static-ip string   Override the backup's WiFi with this static IPv4 address
 ```
 
 ### Options inherited from parent commands
