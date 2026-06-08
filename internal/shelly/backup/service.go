@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
+	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -180,8 +181,21 @@ func (s *Service) restoreGen2Backup(ctx context.Context, identifier string, devi
 	err := s.connector.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := shellybackup.New(conn.RPCClient())
 
+		// Apply a network override (if any) onto a shallow copy so the caller's
+		// backup is left untouched; the rewritten WiFi blob is what gets restored.
+		toRestore := deviceBackup.Backup
+		if opts.NetworkOverride != nil && !opts.SkipNetwork {
+			wifi, overrideErr := applyGen2WiFiOverride(toRestore.WiFi, opts.NetworkOverride)
+			if overrideErr != nil {
+				return overrideErr
+			}
+			clone := *toRestore
+			clone.WiFi = wifi
+			toRestore = &clone
+		}
+
 		// Serialize the backup
-		data, err := json.Marshal(deviceBackup.Backup)
+		data, err := json.Marshal(toRestore)
 		if err != nil {
 			return fmt.Errorf("failed to serialize backup: %w", err)
 		}
@@ -204,10 +218,60 @@ func (s *Service) restoreGen2Backup(ctx context.Context, identifier string, devi
 			UpdateResultCounts(result, deviceBackup.Backup)
 		}
 
+		// The shelly-go restore does not apply Sys config, so a name override
+		// must be set explicitly. Failures are non-fatal warnings.
+		if opts.Name != "" && !opts.DryRun {
+			name := opts.Name
+			sys := components.NewSys(conn.RPCClient())
+			if nameErr := sys.SetConfig(ctx, &components.SysConfig{
+				Device: &components.SysDeviceConfig{Name: &name},
+			}); nameErr != nil {
+				result.Warnings = append(result.Warnings, fmt.Sprintf("set device name: %v", nameErr))
+			}
+		}
+
 		return nil
 	})
 
 	return result, err
+}
+
+// applyGen2WiFiOverride overlays a NetworkOverride onto a Gen2 WiFi config blob
+// (the raw WiFi.GetConfig result) and returns the rewritten blob. SSID and pass
+// are replaced only when explicitly provided; a static IP switches the station
+// to static IPv4 addressing. The blob shape ({ap, sta, sta1}) is preserved so it
+// round-trips through WiFi.SetConfig unchanged apart from the override.
+func applyGen2WiFiOverride(wifiBlob json.RawMessage, ov *NetworkOverride) (json.RawMessage, error) {
+	cfg := map[string]any{}
+	if len(wifiBlob) > 0 {
+		if err := json.Unmarshal(wifiBlob, &cfg); err != nil {
+			return nil, fmt.Errorf("failed to parse WiFi config for override: %w", err)
+		}
+	}
+
+	sta, ok := cfg["sta"].(map[string]any)
+	if !ok || sta == nil {
+		sta = map[string]any{}
+	}
+	sta["enable"] = true
+	if ov.SSID != "" {
+		sta["ssid"] = ov.SSID
+	}
+	if ov.Password != "" {
+		sta["pass"] = ov.Password
+	}
+	if ov.IsStatic() {
+		sta["ipv4mode"] = ipv4ModeStatic
+		sta["ip"] = ov.StaticIP
+		sta["netmask"] = ov.Netmask
+		sta["gw"] = ov.Gateway
+		if ov.DNS != "" {
+			sta["nameserver"] = ov.DNS
+		}
+	}
+	cfg["sta"] = sta
+
+	return json.Marshal(cfg)
 }
 
 // CompareBackup compares a backup with a device's current state.

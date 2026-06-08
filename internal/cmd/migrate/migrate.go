@@ -32,6 +32,11 @@ type Options struct {
 	SkipScripts   bool
 	SkipSchedules bool
 	SkipWebhooks  bool
+	StaticIP      string
+	Gateway       string
+	Netmask       string
+	DNS           string
+	Name          string
 
 	// resetSourceExplicit tracks whether --reset-source was explicitly set.
 	resetSourceExplicit bool
@@ -71,7 +76,12 @@ Use --dry-run to preview what would change without applying.`,
   shelly migrate living-room bedroom --reset-source=false
 
   # Force migration between different device types
-  shelly migrate living-room bedroom --force --yes`,
+  shelly migrate living-room bedroom --force --yes
+
+  # Clone config onto a new bulb with a distinct static IP (keeps both online,
+  # source is not reset since there is no IP conflict)
+  shelly migrate master-bath-1 new-bulb \
+    --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Source = args[0]
@@ -90,6 +100,12 @@ Use --dry-run to preview what would change without applying.`,
 	cmd.Flags().BoolVar(&opts.SkipScripts, "skip-scripts", false, "Skip script migration")
 	cmd.Flags().BoolVar(&opts.SkipSchedules, "skip-schedules", false, "Skip schedule migration")
 	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Skip webhook migration")
+	cmd.Flags().StringVar(&opts.StaticIP, "static-ip", "", "Assign this static IPv4 to the target instead of copying the source's IP")
+	cmd.Flags().StringVar(&opts.Gateway, "gateway", "", "Static IPv4 default gateway (with --static-ip)")
+	cmd.Flags().StringVar(&opts.Netmask, "netmask", "", "Static IPv4 subnet mask (with --static-ip)")
+	cmd.Flags().StringVar(&opts.DNS, "dns", "", "Static IPv4 nameserver (optional, with --static-ip)")
+	cmd.Flags().StringVar(&opts.Name, "name", "", "Override the target device name (defaults to the target identifier when it is a friendly alias)")
+	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
 	cmd.AddCommand(validate.NewCommand(f))
 	cmd.AddCommand(diff.NewCommand(f))
@@ -104,7 +120,44 @@ func (o *Options) shouldResetSource() bool {
 	if o.resetSourceExplicit {
 		return o.ResetSource
 	}
+	// A static-IP override gives the target a distinct address, so the source
+	// keeps its own IP without conflict and need not be reset.
+	if o.StaticIP != "" {
+		return false
+	}
 	return !o.SkipNetwork
+}
+
+// previewMigration renders the dry-run preview, noting any network override and
+// whether the source will be factory reset.
+func (o *Options) previewMigration(ctx context.Context, bkp *backup.DeviceBackup, override *backup.NetworkOverride) error {
+	ios := o.Factory.IOStreams()
+	d, err := o.Factory.ShellyService().CompareBackup(ctx, o.Target, bkp)
+	if err != nil {
+		return fmt.Errorf("failed to compare: %w", err)
+	}
+	term.DisplayMigrationPreview(ios, o.Source, string(backup.SourceDevice), o.Target, d)
+	if override != nil {
+		ios.Info("Target %q will get static IP %s; source %q keeps its own address", o.Target, override.StaticIP, o.Source)
+	}
+	if o.shouldResetSource() {
+		ios.Warning("Source device %q will be factory reset after migration", o.Source)
+	}
+	return nil
+}
+
+// networkOverride builds a NetworkOverride from the static-IP flags, or nil when
+// no static IP was requested.
+func (o *Options) networkOverride() *backup.NetworkOverride {
+	if o.StaticIP == "" {
+		return nil
+	}
+	return &backup.NetworkOverride{
+		StaticIP: o.StaticIP,
+		Gateway:  o.Gateway,
+		Netmask:  o.Netmask,
+		DNS:      o.DNS,
+	}
 }
 
 // confirmMigration prompts the user for confirmation unless --yes was passed.
@@ -134,6 +187,11 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
+	override := opts.networkOverride()
+	if override != nil && opts.SkipNetwork {
+		return fmt.Errorf("--static-ip cannot be used with --skip-network")
+	}
+
 	// Back up source device
 	var bkp *backup.DeviceBackup
 	err := cmdutil.RunWithSpinner(ctx, ios, "Reading source device...", func(ctx context.Context) error {
@@ -152,21 +210,14 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if opts.DryRun {
-		d, err := svc.CompareBackup(ctx, opts.Target, bkp)
-		if err != nil {
-			return fmt.Errorf("failed to compare: %w", err)
-		}
-		term.DisplayMigrationPreview(ios, opts.Source, string(backup.SourceDevice), opts.Target, d)
-		if opts.shouldResetSource() {
-			ios.Warning("Source device %q will be factory reset after migration", opts.Source)
-		}
-		return nil
+		return opts.previewMigration(ctx, bkp, override)
 	}
 
 	resetSource := opts.shouldResetSource()
 
-	// Warn about IP conflict if migrating network without resetting source
-	if !opts.SkipNetwork && !resetSource {
+	// Warn about IP conflict if migrating network without resetting source.
+	// A static-IP override gives the target a distinct address, so no conflict.
+	if !opts.SkipNetwork && !resetSource && override == nil {
 		ios.Warning("Migrating network settings without factory-resetting the source device")
 		ios.Warning("This may cause IP conflicts on your network")
 	}
@@ -178,11 +229,13 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Perform migration
 	restoreOpts := backup.RestoreOptions{
-		SkipAuth:      opts.SkipAuth,
-		SkipNetwork:   opts.SkipNetwork,
-		SkipScripts:   opts.SkipScripts,
-		SkipSchedules: opts.SkipSchedules,
-		SkipWebhooks:  opts.SkipWebhooks,
+		SkipAuth:        opts.SkipAuth,
+		SkipNetwork:     opts.SkipNetwork,
+		SkipScripts:     opts.SkipScripts,
+		SkipSchedules:   opts.SkipSchedules,
+		SkipWebhooks:    opts.SkipWebhooks,
+		NetworkOverride: override,
+		Name:            cmdutil.DeviceDisplayName(opts.Name, opts.Target),
 	}
 	var result *backup.RestoreResult
 	err = cmdutil.RunWithSpinner(ctx, ios, "Migrating configuration...", func(ctx context.Context) error {

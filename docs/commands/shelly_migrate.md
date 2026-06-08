@@ -39,21 +39,31 @@ shelly migrate <source-device> <target-device> [flags]
 
   # Force migration between different device types
   shelly migrate living-room bedroom --force --yes
+
+  # Clone config onto a new bulb with a distinct static IP (keeps both online,
+  # source is not reset since there is no IP conflict)
+  shelly migrate master-bath-1 new-bulb \
+    --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0
 ```
 
 ### Options
 
 ```
-      --dry-run          Show what would be changed without applying
-      --force            Force migration between different device types
-  -h, --help             help for migrate
-      --reset-source     Factory reset source device after migration (default true)
-      --skip-auth        Skip authentication configuration
-      --skip-network     Skip network configuration (WiFi, Ethernet)
-      --skip-schedules   Skip schedule migration
-      --skip-scripts     Skip script migration
-      --skip-webhooks    Skip webhook migration
-  -y, --yes              Skip confirmation prompt
+      --dns string         Static IPv4 nameserver (optional, with --static-ip)
+      --dry-run            Show what would be changed without applying
+      --force              Force migration between different device types
+      --gateway string     Static IPv4 default gateway (with --static-ip)
+  -h, --help               help for migrate
+      --name string        Override the target device name (defaults to the target identifier when it is a friendly alias)
+      --netmask string     Static IPv4 subnet mask (with --static-ip)
+      --reset-source       Factory reset source device after migration (default true)
+      --skip-auth          Skip authentication configuration
+      --skip-network       Skip network configuration (WiFi, Ethernet)
+      --skip-schedules     Skip schedule migration
+      --skip-scripts       Skip script migration
+      --skip-webhooks      Skip webhook migration
+      --static-ip string   Assign this static IPv4 to the target instead of copying the source's IP
+  -y, --yes                Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

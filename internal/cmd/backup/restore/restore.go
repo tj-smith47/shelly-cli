@@ -27,6 +27,11 @@ type Options struct {
 	SkipScripts   bool
 	SkipSchedules bool
 	SkipWebhooks  bool
+	StaticIP      string
+	Gateway       string
+	Netmask       string
+	DNS           string
+	Name          string
 }
 
 // NewCommand creates the backup restore command.
@@ -58,7 +63,12 @@ sections.`,
   shelly backup restore living-room backup.json --decrypt mysecret
 
   # Skip scripts during restore
-  shelly backup restore living-room backup.json --skip-scripts`,
+  shelly backup restore living-room backup.json --skip-scripts
+
+  # Clone another bulb's backup onto this device with a different static IP
+  # (identity — MAC, serial, device ID — is never overwritten by restore)
+  shelly backup restore new-bulb master-bath-1.json \
+    --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
@@ -74,6 +84,12 @@ sections.`,
 	cmd.Flags().BoolVar(&opts.SkipSchedules, "skip-schedules", false, "Skip schedule restoration")
 	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Skip webhook restoration")
 	cmd.Flags().StringVarP(&opts.Decrypt, "decrypt", "d", "", "Password to decrypt backup")
+	cmd.Flags().StringVar(&opts.StaticIP, "static-ip", "", "Override the backup's WiFi with this static IPv4 address")
+	cmd.Flags().StringVar(&opts.Gateway, "gateway", "", "Static IPv4 default gateway (with --static-ip)")
+	cmd.Flags().StringVar(&opts.Netmask, "netmask", "", "Static IPv4 subnet mask (with --static-ip)")
+	cmd.Flags().StringVar(&opts.DNS, "dns", "", "Static IPv4 nameserver (optional, with --static-ip)")
+	cmd.Flags().StringVar(&opts.Name, "name", "", "Override the device name (defaults to the target identifier when it is a friendly alias)")
+	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
 	return cmd
 }
@@ -104,20 +120,39 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("backup is encrypted, use --decrypt to provide password")
 	}
 
+	if opts.StaticIP != "" && opts.SkipNetwork {
+		return fmt.Errorf("--static-ip cannot be used with --skip-network")
+	}
+
+	var override *backup.NetworkOverride
+	if opts.StaticIP != "" {
+		override = &backup.NetworkOverride{
+			StaticIP: opts.StaticIP,
+			Gateway:  opts.Gateway,
+			Netmask:  opts.Netmask,
+			DNS:      opts.DNS,
+		}
+	}
+
 	restoreOpts := backup.RestoreOptions{
-		DryRun:        opts.DryRun,
-		SkipAuth:      opts.SkipAuth,
-		SkipNetwork:   opts.SkipNetwork,
-		SkipScripts:   opts.SkipScripts,
-		SkipSchedules: opts.SkipSchedules,
-		SkipWebhooks:  opts.SkipWebhooks,
-		Password:      opts.Decrypt,
+		DryRun:          opts.DryRun,
+		SkipAuth:        opts.SkipAuth,
+		SkipNetwork:     opts.SkipNetwork,
+		SkipScripts:     opts.SkipScripts,
+		SkipSchedules:   opts.SkipSchedules,
+		SkipWebhooks:    opts.SkipWebhooks,
+		Password:        opts.Decrypt,
+		NetworkOverride: override,
+		Name:            cmdutil.DeviceDisplayName(opts.Name, opts.Device),
 	}
 
 	if opts.DryRun {
 		ios.Title("Dry run - Restore preview")
 		ios.Println()
 		term.DisplayRestorePreview(ios, bkp, restoreOpts)
+		if override != nil {
+			ios.Info("WiFi station IP will be overridden to %s (gateway %s, netmask %s)", override.StaticIP, override.Gateway, override.Netmask)
+		}
 		return nil
 	}
 

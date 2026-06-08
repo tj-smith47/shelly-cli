@@ -95,12 +95,17 @@ func restoreGen1(ctx context.Context, conn *client.Gen1Client, bkp *DeviceBackup
 		}
 	}
 
+	// A name override replaces the backup's stored name (e.g. for a clone).
+	if opts.Name != "" {
+		settings.Name = opts.Name
+	}
+
 	// Restore device-level settings
 	restoreGen1DeviceSettings(ctx, dev, &settings, result)
 
 	// Restore WiFi (if not skipped)
 	if !opts.SkipNetwork {
-		restoreGen1WiFi(ctx, dev, bkp, result)
+		restoreGen1WiFi(ctx, dev, bkp, opts.NetworkOverride, result)
 	}
 
 	// Restore MQTT
@@ -245,9 +250,11 @@ func restoreGen1DeviceSettings(ctx context.Context, dev *gen1.Device, settings *
 	}
 }
 
-// restoreGen1WiFi restores WiFi settings from the backup.
-func restoreGen1WiFi(ctx context.Context, dev *gen1.Device, bkp *DeviceBackup, result *RestoreResult) {
-	if bkp.WiFi == nil {
+// restoreGen1WiFi restores WiFi settings from the backup. When override is
+// non-nil, its network fields replace the backup's station settings before they
+// are applied (used to clone a device's config without copying its IP address).
+func restoreGen1WiFi(ctx context.Context, dev *gen1.Device, bkp *DeviceBackup, override *NetworkOverride, result *RestoreResult) {
+	if bkp.WiFi == nil && override == nil {
 		return
 	}
 	var wifi struct {
@@ -256,9 +263,18 @@ func restoreGen1WiFi(ctx context.Context, dev *gen1.Device, bkp *DeviceBackup, r
 		Ap        *gen1.WiFiApSettings    `json:"ap,omitempty"`
 		ApRoaming *gen1.ApRoamingSettings `json:"ap_roaming,omitempty"`
 	}
-	if err := json.Unmarshal(bkp.WiFi, &wifi); err != nil {
-		addWarning(result, "parse WiFi config: %v", err)
-		return
+	if bkp.WiFi != nil {
+		if err := json.Unmarshal(bkp.WiFi, &wifi); err != nil {
+			addWarning(result, "parse WiFi config: %v", err)
+			return
+		}
+	}
+
+	if override != nil {
+		if wifi.Sta == nil {
+			wifi.Sta = &gen1.WiFiStaSettings{Enabled: true}
+		}
+		applyGen1WiFiOverride(wifi.Sta, override)
 	}
 
 	if wifi.Sta != nil {
@@ -272,9 +288,29 @@ func restoreGen1WiFi(ctx context.Context, dev *gen1.Device, bkp *DeviceBackup, r
 	}
 }
 
+// applyGen1WiFiOverride overlays a NetworkOverride onto a Gen1 station config.
+// SSID and Key are replaced only when explicitly provided; a static IP switches
+// the station to static IPv4 addressing.
+func applyGen1WiFiOverride(sta *gen1.WiFiStaSettings, ov *NetworkOverride) {
+	sta.Enabled = true
+	if ov.SSID != "" {
+		sta.SSID = ov.SSID
+	}
+	if ov.Password != "" {
+		sta.Key = ov.Password
+	}
+	if ov.IsStatic() {
+		sta.Ipv4Method = ipv4ModeStatic
+		sta.IP = ov.StaticIP
+		sta.Gw = ov.Gateway
+		sta.Mask = ov.Netmask
+		sta.DNS = ov.DNS
+	}
+}
+
 // restoreGen1WiFiStation restores a WiFi station configuration.
 func restoreGen1WiFiStation(ctx context.Context, dev *gen1.Device, sta *gen1.WiFiStaSettings, result *RestoreResult) {
-	if sta.Ipv4Method == "static" {
+	if sta.Ipv4Method == ipv4ModeStatic {
 		err := dev.SetWiFiStationStatic(ctx, sta.SSID, sta.Key, sta.IP, sta.Gw, sta.Mask, sta.DNS)
 		if err != nil {
 			addWarning(result, "set WiFi station static: %v", err)

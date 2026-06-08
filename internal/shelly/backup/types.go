@@ -7,6 +7,10 @@ import (
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 )
 
+// ipv4ModeStatic is the value used to request static IPv4 addressing on both
+// Gen1 (ipv4_method) and Gen2 (ipv4mode) WiFi station config.
+const ipv4ModeStatic = "static"
+
 // DeviceBackup wraps the shelly-go backup.Backup with CLI-specific methods.
 type DeviceBackup struct {
 	*shellybackup.Backup
@@ -70,12 +74,47 @@ func (o *Options) ToExportOptions() *shellybackup.ExportOptions {
 	return opts
 }
 
+// NetworkOverride replaces the WiFi station settings applied during restore.
+// It lets you clone one device's configuration onto another without copying the
+// source's IP address, so both devices stay online with distinct addresses.
+//
+// Identity fields (MAC, device ID, serial) are never written by restore on any
+// generation, so only network settings ever need overriding for a safe clone.
+// SSID and Password are optional: when empty, the backup's own credentials are
+// kept (a Gen1 backup includes the station key; a Gen2 backup omits it).
+type NetworkOverride struct {
+	// SSID overrides the station SSID; empty keeps the backup's SSID.
+	SSID string
+	// Password overrides the station key; empty keeps the backup's key.
+	Password string
+	// StaticIP, when set, switches the station to a static IPv4 address.
+	// Gateway and Netmask are required alongside it.
+	StaticIP string
+	// Gateway is the static IPv4 default gateway.
+	Gateway string
+	// Netmask is the static IPv4 subnet mask.
+	Netmask string
+	// DNS is the static IPv4 nameserver (optional).
+	DNS string
+}
+
+// IsStatic reports whether a static IPv4 address was requested.
+func (n *NetworkOverride) IsStatic() bool {
+	return n != nil && n.StaticIP != ""
+}
+
 // RestoreOptions configures backup restoration.
 type RestoreOptions struct {
 	// DryRun shows what would be changed without applying.
 	DryRun bool
+	// Name overrides the device's stored display name. Empty leaves the name as
+	// the backup's. Used so a cloned device is named distinctly from its source.
+	Name string
 	// SkipNetwork skips WiFi/Ethernet configuration.
 	SkipNetwork bool
+	// NetworkOverride, when non-nil, replaces the backup's WiFi station settings
+	// before they are applied. Ignored when SkipNetwork is true.
+	NetworkOverride *NetworkOverride
 	// SkipAuth skips authentication configuration.
 	SkipAuth bool
 	// SkipScripts skips script restoration.
