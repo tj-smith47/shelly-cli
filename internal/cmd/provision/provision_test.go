@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 const testSSID = "MyNetwork"
@@ -72,7 +73,7 @@ func TestNewCommand_Flags(t *testing.T) {
 	}{
 		{"ssid", "ssid", ""},
 		{"password", "password", ""},
-		{"timeout", "timeout", "30s"},
+		{"timeout", "timeout", "2m0s"},
 		{"name", "name", ""},
 		{"timezone", "timezone", ""},
 		{"ble-only", "ble-only", "false"},
@@ -293,6 +294,23 @@ func TestOptions_PromptWiFiCredentials_AlreadySet(t *testing.T) {
 	}
 	if opts.SSID != testSSID {
 		t.Errorf("SSID = %q, want %q", opts.SSID, testSSID)
+	}
+}
+
+// A flag-supplied SSID with no password configures an open network; the user
+// must be warned rather than silently provisioned with empty credentials.
+func TestOptions_PromptWiFiCredentials_FlagSSIDNoPasswordWarns(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, SSID: testSSID}
+
+	err := opts.promptWiFiCredentials(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(tf.TestIO.ErrString(), "open network") {
+		t.Errorf("expected open-network warning, got stderr: %q", tf.TestIO.ErrString())
 	}
 }
 

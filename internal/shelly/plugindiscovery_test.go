@@ -164,159 +164,67 @@ func TestToPluginDiscoveredDevice(t *testing.T) {
 	})
 }
 
-func TestGenerateSubnetAddresses(t *testing.T) {
+func TestGenerateSubnetsAddresses(t *testing.T) {
 	t.Parallel()
 
-	t.Run("valid /24 subnet", func(t *testing.T) {
+	t.Run("multiple subnets cover all address spaces", func(t *testing.T) {
 		t.Parallel()
 
-		addresses := generateSubnetAddresses("192.168.1.0/24")
+		addresses := generateSubnetsAddresses([]string{"192.168.1.0/30", "10.0.0.0/30"})
 
-		// /24 has 256 addresses, minus network (0) and broadcast (255) = 254
-		if len(addresses) != 254 {
-			t.Errorf("expected 254 addresses, got %d", len(addresses))
+		// Each /30 yields 2 usable hosts, so two subnets must produce 4.
+		if len(addresses) != 4 {
+			t.Fatalf("expected 4 addresses across both subnets, got %d: %v", len(addresses), addresses)
 		}
 
-		// First should be .1
+		has := func(want string) bool {
+			for _, a := range addresses {
+				if a == want {
+					return true
+				}
+			}
+			return false
+		}
+		// Addresses from the SECOND subnet must be present — the multi-subnet
+		// fix exists precisely so discovery does not stop at subnets[0].
+		if !has("10.0.0.1") || !has("10.0.0.2") {
+			t.Errorf("expected addresses from second subnet 10.0.0.0/30, got %v", addresses)
+		}
+		if !has("192.168.1.1") || !has("192.168.1.2") {
+			t.Errorf("expected addresses from first subnet 192.168.1.0/30, got %v", addresses)
+		}
+	})
+
+	t.Run("/24 excludes network and broadcast", func(t *testing.T) {
+		t.Parallel()
+
+		// Host enumeration is owned by discovery.GenerateSubnetAddresses; this
+		// guards that plugin discovery still skips .0/.255 for a /24 via the SDK.
+		addresses := generateSubnetsAddresses([]string{"192.168.1.0/24"})
+		if len(addresses) != 254 {
+			t.Fatalf("expected 254 addresses for /24, got %d", len(addresses))
+		}
 		if addresses[0] != "192.168.1.1" {
 			t.Errorf("expected first address '192.168.1.1', got %q", addresses[0])
 		}
-
-		// Last should be .254
 		if addresses[len(addresses)-1] != "192.168.1.254" {
 			t.Errorf("expected last address '192.168.1.254', got %q", addresses[len(addresses)-1])
 		}
 	})
 
-	t.Run("valid /30 subnet", func(t *testing.T) {
+	t.Run("invalid subnet yields no addresses", func(t *testing.T) {
 		t.Parallel()
 
-		addresses := generateSubnetAddresses("192.168.1.0/30")
-
-		// /30 has 4 addresses, minus network and broadcast = 2
-		if len(addresses) != 2 {
-			t.Errorf("expected 2 addresses, got %d", len(addresses))
-		}
-	})
-
-	t.Run("invalid subnet", func(t *testing.T) {
-		t.Parallel()
-
-		addresses := generateSubnetAddresses("invalid")
-
-		if len(addresses) != 0 {
+		if addresses := generateSubnetsAddresses([]string{"invalid"}); len(addresses) != 0 {
 			t.Errorf("expected 0 addresses for invalid subnet, got %d", len(addresses))
 		}
 	})
 
-	t.Run("empty subnet", func(t *testing.T) {
+	t.Run("empty slice yields no addresses", func(t *testing.T) {
 		t.Parallel()
 
-		addresses := generateSubnetAddresses("")
-
-		if len(addresses) != 0 {
-			t.Errorf("expected 0 addresses for empty subnet, got %d", len(addresses))
-		}
-	})
-}
-
-func TestIncIP(t *testing.T) {
-	t.Parallel()
-
-	t.Run("simple increment", func(t *testing.T) {
-		t.Parallel()
-
-		ip := net.ParseIP("192.168.1.1").To4()
-		incIP(ip)
-
-		if ip.String() != "192.168.1.2" {
-			t.Errorf("expected '192.168.1.2', got %q", ip.String())
-		}
-	})
-
-	t.Run("octet rollover", func(t *testing.T) {
-		t.Parallel()
-
-		ip := net.ParseIP("192.168.1.255").To4()
-		incIP(ip)
-
-		if ip.String() != "192.168.2.0" {
-			t.Errorf("expected '192.168.2.0', got %q", ip.String())
-		}
-	})
-
-	t.Run("multiple octet rollover", func(t *testing.T) {
-		t.Parallel()
-
-		ip := net.ParseIP("192.168.255.255").To4()
-		incIP(ip)
-
-		if ip.String() != "192.169.0.0" {
-			t.Errorf("expected '192.169.0.0', got %q", ip.String())
-		}
-	})
-}
-
-func TestIsNetworkOrBroadcast(t *testing.T) {
-	t.Parallel()
-
-	t.Run("/24 network address", func(t *testing.T) {
-		t.Parallel()
-
-		//nolint:errcheck // test uses known-valid CIDR
-		_, ipNet, _ := net.ParseCIDR("192.168.1.0/24")
-		ip := net.ParseIP("192.168.1.0").To4()
-
-		if !isNetworkOrBroadcast(ip, ipNet) {
-			t.Error("expected .0 to be network address")
-		}
-	})
-
-	t.Run("/24 broadcast address", func(t *testing.T) {
-		t.Parallel()
-
-		//nolint:errcheck // test uses known-valid CIDR
-		_, ipNet, _ := net.ParseCIDR("192.168.1.0/24")
-		ip := net.ParseIP("192.168.1.255").To4()
-
-		if !isNetworkOrBroadcast(ip, ipNet) {
-			t.Error("expected .255 to be broadcast address")
-		}
-	})
-
-	t.Run("/24 regular address", func(t *testing.T) {
-		t.Parallel()
-
-		//nolint:errcheck // test uses known-valid CIDR
-		_, ipNet, _ := net.ParseCIDR("192.168.1.0/24")
-		ip := net.ParseIP("192.168.1.100").To4()
-
-		if isNetworkOrBroadcast(ip, ipNet) {
-			t.Error("expected .100 to NOT be network or broadcast")
-		}
-	})
-
-	t.Run("/31 has no network/broadcast", func(t *testing.T) {
-		t.Parallel()
-
-		//nolint:errcheck // test uses known-valid CIDR
-		_, ipNet, _ := net.ParseCIDR("192.168.1.0/31")
-		ip := net.ParseIP("192.168.1.0").To4()
-
-		if isNetworkOrBroadcast(ip, ipNet) {
-			t.Error("/31 should not exclude any addresses")
-		}
-	})
-
-	t.Run("/32 has no network/broadcast", func(t *testing.T) {
-		t.Parallel()
-
-		//nolint:errcheck // test uses known-valid CIDR
-		_, ipNet, _ := net.ParseCIDR("192.168.1.1/32")
-		ip := net.ParseIP("192.168.1.1").To4()
-
-		if isNetworkOrBroadcast(ip, ipNet) {
-			t.Error("/32 should not exclude any addresses")
+		if addresses := generateSubnetsAddresses(nil); len(addresses) != 0 {
+			t.Errorf("expected 0 addresses for nil subnets, got %d", len(addresses))
 		}
 	})
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -73,47 +72,17 @@ func run(ctx context.Context, opts *Options) error {
 			return fmt.Errorf("failed to get SSID: %w", err)
 		}
 		opts.SSID = ssid
+		if opts.SSID == "" {
+			return fmt.Errorf("WiFi SSID is required with --no-scan")
+		}
 	}
 
-	if opts.SSID == "" { //nolint:nestif // Scan+select flow has inherent complexity
-		// Scan and select
-		ios.Info("Scanning for networks...")
-
-		results, err := svc.ScanWiFi(ctx, opts.Device)
+	if opts.SSID == "" && !opts.NoScan {
+		ssid, err := cmdutil.SelectWiFiNetwork(ctx, ios, svc, opts.Device)
 		if err != nil {
-			return fmt.Errorf("network scan failed: %w", err)
+			return err
 		}
-
-		if len(results) == 0 {
-			return fmt.Errorf("no networks found")
-		}
-
-		// Dedupe and sort networks
-		networks := shelly.DedupeWiFiNetworks(results)
-
-		// Build selection options
-		options := make([]string, len(networks))
-		for i, n := range networks {
-			signal := output.FormatWiFiSignalStrength(n.RSSI)
-			options[i] = fmt.Sprintf("%s (%s, ch %d)", n.SSID, signal, n.Channel)
-		}
-
-		selected, err := ios.Select("Select WiFi network:", options, 0)
-		if err != nil {
-			return fmt.Errorf("network selection failed: %w", err)
-		}
-
-		// Find the selected network by matching the option string
-		for i, opt := range options {
-			if opt == selected {
-				opts.SSID = networks[i].SSID
-				break
-			}
-		}
-
-		if opts.SSID == "" {
-			return fmt.Errorf("selected network not found")
-		}
+		opts.SSID = ssid
 	}
 
 	// Get password if not provided

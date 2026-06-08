@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tj-smith47/shelly-go/discovery"
-	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
@@ -115,8 +114,11 @@ func runCompletionsStep(ios *iostreams.IOStreams, rootCmd *cobra.Command, opts *
 }
 
 func runCloudStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) error {
+	// Print the step header once on every path (skip, interactive, and
+	// non-interactive) so the Step N/6 progression stays consistent.
+	printStepHeader(ios, 5, "Cloud Access (Optional)")
+
 	if opts.UseDefaults() && !opts.WantsCloudSetup() {
-		printStepHeader(ios, 5, "Cloud Access (Optional)")
 		ios.Info("Skipping cloud setup (use --cloud-email/--cloud-password to configure)")
 		ios.Println("")
 		return nil
@@ -142,8 +144,11 @@ func runCloudStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) 
 }
 
 func runTelemetryStep(ios *iostreams.IOStreams, opts *Options) error {
+	// Print the step header once on every path (skip, interactive, and
+	// non-interactive) so the Step N/6 progression stays consistent.
+	printStepHeader(ios, 6, "Anonymous Usage Statistics (Optional)")
+
 	if opts.UseDefaults() && !opts.Telemetry {
-		printStepHeader(ios, 6, "Anonymous Usage Statistics (Optional)")
 		ios.Info("Telemetry disabled (use --telemetry to enable)")
 		ios.Println("")
 		return nil
@@ -227,13 +232,20 @@ func stepConfiguration(ios *iostreams.IOStreams, opts *Options) error {
 		apiMode = "local"
 	}
 
-	theme.SetTheme(themeName)
-
 	cfg := config.Get()
 	cfg.Output = outputFormat
 	cfg.Theme = config.ThemeConfig{Name: themeName}
 	cfg.Color = colorEnabled
 	cfg.APIMode = apiMode
+
+	// Reject flag-supplied values up front so a bogus --theme/--output-format/
+	// --api-mode never mutates live theme state or persists a config the very
+	// next `shelly init --check` would flag as invalid.
+	if err := ValidateConfig(cfg); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	theme.SetTheme(themeName)
 
 	if cfg.Aliases == nil {
 		cfg.Aliases = make(map[string]config.Alias)
@@ -291,10 +303,12 @@ func stepDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts *Options)
 		return nil, nil
 	}
 
+	// Pass the flag value through unchanged: each per-method cmdutil helper
+	// applies its own appropriate zero-default (HTTP uses DefaultScanTimeout =
+	// 2m, sized for /23 subnets; the fast multicast sweeps use a short default).
+	// A single shared 15s fallback previously starved the HTTP scan on large
+	// subnets, re-introducing the very regression DefaultScanTimeout fixed.
 	timeout := opts.DiscoverTimeout
-	if timeout == 0 {
-		timeout = defaultDiscoveryTimeout
-	}
 
 	// Resolve subnets for HTTP scanning (only needed if HTTP is selected)
 	var subnets []string
@@ -303,6 +317,12 @@ func stepDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts *Options)
 			var resolveErr error
 			subnets, resolveErr = cmdutil.ResolveSubnets(ios, opts.Networks, opts.AllNetworks)
 			if resolveErr != nil {
+				// Explicit --network values are intent: a resolution failure (e.g.
+				// invalid CIDR) must abort rather than silently fall back to
+				// auto-detected subnets and scan an unintended network.
+				if len(opts.Networks) > 0 {
+					return nil, fmt.Errorf("resolve --network subnets: %w", resolveErr)
+				}
 				ios.Warning("Subnet detection failed: %v", resolveErr)
 			}
 			break
@@ -310,25 +330,20 @@ func stepDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts *Options)
 	}
 
 	// Run discovery for each method and combine results
-	var allDevices []discovery.DiscoveredDevice
-	seenAddresses := make(map[string]bool)
-
+	var combined []discovery.DiscoveredDevice
 	for _, method := range methods {
 		devices, err := runDiscoveryMethod(ctx, ios, method, timeout, subnets)
 		if err != nil {
 			ios.Warning("%s discovery failed: %v", method, err)
 			continue
 		}
-
-		// Deduplicate by address
-		for _, d := range devices {
-			addr := d.Address.String()
-			if !seenAddresses[addr] {
-				seenAddresses[addr] = true
-				allDevices = append(allDevices, d)
-			}
-		}
+		combined = append(combined, devices...)
 	}
+
+	// Deduplicate by stable identity (ID, MAC, then address). Keying on the
+	// raw address alone would collapse every address-less BLE/mDNS device onto
+	// the single "<nil>" key and silently drop all but the first.
+	allDevices := cmdutil.DedupDiscoveredDevices(combined)
 
 	ios.Println("")
 
@@ -429,7 +444,7 @@ func registerDevices(f *cmdutil.Factory, ios *iostreams.IOStreams, mode string, 
 		}
 
 		// Type is the raw model code, Model is the human-readable name
-		regErr := config.RegisterDevice(name, d.Address.String(), int(d.Generation), d.Model, types.ModelDisplayName(d.Model), nil)
+		regErr := utils.RegisterDeviceFromModelCode(name, d.Address.String(), int(d.Generation), d.Model, nil)
 		if regErr != nil {
 			ios.Warning("Failed to register %q: %v", name, regErr)
 			continue
@@ -525,8 +540,6 @@ func stepCompletionsExplicit(ios *iostreams.IOStreams, rootCmd *cobra.Command, o
 }
 
 func stepCloud(ctx context.Context, ios *iostreams.IOStreams) error {
-	printStepHeader(ios, 5, "Cloud Access (Optional)")
-
 	proceed, err := ios.Confirm("Set up Shelly Cloud access for remote control?", false)
 	if err != nil {
 		return err
@@ -764,7 +777,6 @@ func selectTheme(ios *iostreams.IOStreams, opts *Options) (string, error) {
 }
 
 func stepTelemetry(ios *iostreams.IOStreams) error {
-	printStepHeader(ios, 6, "Anonymous Usage Statistics (Optional)")
 	ios.Println("Help improve Shelly CLI by sharing anonymous usage statistics.")
 	ios.Println("")
 	ios.Println(theme.Dim().Render("What we collect:"))

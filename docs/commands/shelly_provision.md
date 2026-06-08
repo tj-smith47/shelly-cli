@@ -73,7 +73,7 @@ shelly provision [flags]
       --no-cloud               Disable cloud on provisioned devices
       --password string        WiFi password for provisioning
       --ssid string            WiFi SSID for provisioning
-      --timeout duration       Discovery timeout (default 30s)
+      --timeout duration       Discovery timeout (default 2m0s)
       --timezone string        Timezone to set on device
   -y, --yes                    Skip confirmation prompts
 ```

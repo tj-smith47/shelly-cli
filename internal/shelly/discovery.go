@@ -3,11 +3,13 @@ package shelly
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/discovery"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -49,6 +51,11 @@ const (
 // DefaultDiscoveryTimeout is the default discovery timeout.
 const DefaultDiscoveryTimeout = 10 * time.Second
 
+// DefaultHTTPScanTimeout is the timeout for HTTP subnet scanning. A 15s budget
+// truncates large subnets (a /23 has 510 hosts), missing devices; 2 minutes
+// matches the CLI's cmdutil.DefaultScanTimeout so the TUI discovers the same set.
+const DefaultHTTPScanTimeout = 2 * time.Minute
+
 // DiscoverDevices discovers devices using the specified method.
 func (s *Service) DiscoverDevices(ctx context.Context, opts DiscoveryOptions) ([]DiscoveredDevice, error) {
 	if opts.Timeout == 0 {
@@ -79,29 +86,34 @@ func (s *Service) DiscoverDevices(ctx context.Context, opts DiscoveryOptions) ([
 	return enrichDiscoveredDevices(ctx, rawDevices), nil
 }
 
-// DiscoverMDNS performs mDNS/Zeroconf discovery and returns raw discovered devices.
-// Caller is responsible for timeout handling and cleanup.
-func DiscoverMDNS(timeout time.Duration) ([]discovery.DiscoveredDevice, func(), error) {
-	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
-	cleanup := func() {
-		if err := mdnsDiscoverer.Stop(); err != nil {
+// DiscoverMDNSContext returns an mDNS discoverer plus a cleanup func so the
+// caller can drive discovery with its own context via DiscoverWithContext.
+// Threading the caller ctx into the scan is what lets Ctrl+C abort an
+// in-progress mDNS sweep promptly instead of blocking the full timeout.
+func DiscoverMDNSContext() (discoverer *discovery.MDNSDiscoverer, cleanup func()) {
+	d := discovery.NewMDNSDiscoverer()
+	cleanup = func() {
+		if err := d.Stop(); err != nil {
 			iostreams.DebugErr("stopping mDNS discoverer", err)
 		}
 	}
+	return d, cleanup
+}
 
-	devices, err := mdnsDiscoverer.Discover(timeout)
-	return devices, cleanup, err
+// DiscoverMDNS performs mDNS/Zeroconf discovery honoring ctx cancellation.
+// The timeout bounds the scan; ctx cancellation (Ctrl+C) aborts it sooner.
+func DiscoverMDNS(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
+	disc, cleanup := DiscoverMDNSContext()
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return disc.DiscoverWithContext(ctx)
 }
 
 func discoverMDNS(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
-	devices, cleanup, err := DiscoverMDNS(timeout)
-	defer cleanup()
-
-	if err != nil && ctx.Err() != nil {
-		// Context cancelled, not an error
-		return devices, nil
-	}
-	return devices, err
+	return DiscoverMDNS(ctx, timeout)
 }
 
 func discoverHTTP(ctx context.Context, opts DiscoveryOptions) ([]discovery.DiscoveredDevice, error) {
@@ -134,28 +146,46 @@ func discoverHTTP(ctx context.Context, opts DiscoveryOptions) ([]discovery.Disco
 	return discovery.ProbeAddresses(ctx, allAddresses), nil
 }
 
-// DiscoverCoIoT performs CoIoT/CoAP discovery and returns raw discovered devices.
-// Caller is responsible for timeout handling and cleanup.
-func DiscoverCoIoT(timeout time.Duration) ([]discovery.DiscoveredDevice, func(), error) {
-	coiotDiscoverer := discovery.NewCoIoTDiscoverer()
-	cleanup := func() {
-		if err := coiotDiscoverer.Stop(); err != nil {
+// DiscoverCoIoTContext returns a CoIoT discoverer plus a cleanup func so the
+// caller can drive discovery with its own context via DiscoverWithContext.
+// Threading the caller ctx into the scan is what lets Ctrl+C abort an
+// in-progress CoIoT sweep promptly instead of blocking the full timeout.
+func DiscoverCoIoTContext() (discoverer *discovery.CoIoTDiscoverer, cleanup func()) {
+	d := discovery.NewCoIoTDiscoverer()
+	cleanup = func() {
+		if err := d.Stop(); err != nil {
 			iostreams.DebugErr("stopping CoIoT discoverer", err)
 		}
 	}
+	return d, cleanup
+}
 
-	devices, err := coiotDiscoverer.Discover(timeout)
-	return devices, cleanup, err
+// DiscoverCoIoT performs CoIoT/CoAP discovery honoring ctx cancellation.
+// The timeout bounds the scan; ctx cancellation (Ctrl+C) aborts it sooner.
+func DiscoverCoIoT(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
+	disc, cleanup := DiscoverCoIoTContext()
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return disc.DiscoverWithContext(ctx)
 }
 
 func discoverCoIoT(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
-	devices, cleanup, err := DiscoverCoIoT(timeout)
-	defer cleanup()
+	return DiscoverCoIoT(ctx, timeout)
+}
 
-	if err != nil && ctx.Err() != nil {
-		return devices, nil
-	}
-	return devices, err
+// ErrBLEUnavailable indicates the BLE adapter could not be initialized
+// (no adapter, not permitted, or not supported on this platform). Callers
+// use errors.Is to distinguish a missing-adapter condition from a scan
+// failure so they can present a friendly "BLE not available" message.
+var ErrBLEUnavailable = errors.New("BLE not available")
+
+// IsBLEUnavailable reports whether err signals that BLE could not be
+// initialized on this system, as opposed to a transient scan failure.
+func IsBLEUnavailable(err error) bool {
+	return errors.Is(err, ErrBLEUnavailable)
 }
 
 // DiscoverBLE performs BLE discovery and returns raw discovered devices.
@@ -164,7 +194,7 @@ func discoverCoIoT(ctx context.Context, timeout time.Duration) ([]discovery.Disc
 func DiscoverBLE() (*discovery.BLEDiscoverer, func(), error) {
 	bleDiscoverer, err := discovery.NewBLEDiscoverer()
 	if err != nil {
-		return nil, nil, fmt.Errorf("BLE not available: %w", err)
+		return nil, nil, fmt.Errorf("%w: %w", ErrBLEUnavailable, err)
 	}
 	cleanup := func() {
 		if stopErr := bleDiscoverer.Stop(); stopErr != nil {
@@ -174,7 +204,11 @@ func DiscoverBLE() (*discovery.BLEDiscoverer, func(), error) {
 	return bleDiscoverer, cleanup, nil
 }
 
-func discoverBLE(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
+// DiscoverBLEContext performs BLE discovery, applying the timeout to ctx
+// exactly once. Returns the BLE-unavailable error so callers can decide how
+// to surface it. This is the single deadline-application point shared by all
+// BLE callers so the timeout semantics never diverge between flows.
+func DiscoverBLEContext(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
 	bleDiscoverer, cleanup, err := DiscoverBLE()
 	if err != nil {
 		return nil, err
@@ -187,36 +221,75 @@ func discoverBLE(ctx context.Context, timeout time.Duration) ([]discovery.Discov
 	return bleDiscoverer.DiscoverWithContext(ctx)
 }
 
+func discoverBLE(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
+	return DiscoverBLEContext(ctx, timeout)
+}
+
 // enrichDiscoveredDevices converts raw discovered devices and checks registry status.
+//
+// The per-device generation re-probe runs concurrently so a large result set
+// completes well within the caller's deadline; a sequential loop could exhaust
+// the enrichment budget before reaching every device, leaving some at Generation 0.
 func enrichDiscoveredDevices(ctx context.Context, rawDevices []discovery.DiscoveredDevice) []DiscoveredDevice {
-	result := make([]DiscoveredDevice, 0, len(rawDevices))
+	result := make([]DiscoveredDevice, len(rawDevices))
 
-	for _, raw := range rawDevices {
-		device := DiscoveredDevice{
-			Address: raw.Address.String(),
-			Name:    raw.Name,
-			Model:   raw.Model,
-			ID:      raw.ID,
-		}
-
-		// Try to get additional info via detection
-		detection, err := client.DetectGeneration(ctx, device.Address, nil)
-		if err == nil {
-			device.Generation = int(detection.Generation)
-			device.Firmware = detection.Firmware
-			device.AuthEn = detection.AuthEn
-			if device.Model == "" {
-				device.Model = detection.Model
+	g, gctx := errgroup.WithContext(ctx)
+	for i, raw := range rawDevices {
+		g.Go(func() error {
+			device := DiscoveredDevice{
+				Address:    raw.Address.String(),
+				Name:       raw.Name,
+				Model:      raw.Model,
+				ID:         raw.ID,
+				Generation: int(raw.Generation),
+				Firmware:   raw.Firmware,
+				AuthEn:     raw.AuthRequired,
 			}
-		}
 
-		// Check if in registry
-		device.Added = IsDeviceRegistered(device.Address)
+			// The scan already populates generation/firmware/auth for mDNS, CoIoT
+			// and HTTP results, so only re-probe when generation is still unknown;
+			// a failed fallback probe must never zero out a known generation.
+			if device.Generation == 0 {
+				probeGeneration(gctx, &device)
+			}
 
-		result = append(result, device)
+			// Concurrent registry read is safe only because config is never
+			// mutated during a discovery scan; revisit this if that changes.
+			device.Added = IsDeviceRegistered(device.Address)
+
+			result[i] = device
+			return nil
+		})
+	}
+
+	// Goroutines only report transport-level probe failures via DebugErr and
+	// never return an error, so Wait surfaces nothing actionable here.
+	if err := g.Wait(); err != nil {
+		iostreams.DebugErr("enriching discovered devices", err)
 	}
 
 	return result
+}
+
+// probeGeneration re-detects a device's generation when discovery left it at 0.
+// On success it fills Generation, AuthEn, and any empty Firmware/Model; a failed
+// probe is logged and leaves the device untouched so a known field is never
+// overwritten with an empty value.
+func probeGeneration(ctx context.Context, device *DiscoveredDevice) {
+	detection, err := client.DetectGeneration(ctx, device.Address, nil)
+	if err != nil {
+		iostreams.DebugErr("detecting generation for "+device.Address, err)
+		return
+	}
+
+	device.Generation = int(detection.Generation)
+	device.AuthEn = detection.AuthEn
+	if device.Firmware == "" {
+		device.Firmware = detection.Firmware
+	}
+	if device.Model == "" {
+		device.Model = detection.Model
+	}
 }
 
 // IsDeviceRegistered checks if a device is in the registry.
@@ -294,6 +367,31 @@ func normalizeMAC(mac string) string {
 	return string(result)
 }
 
+// fillDeviceInfo backfills empty Name/Model/ID fields on device from a live
+// DeviceInfo query. A failed query is non-fatal (the device keeps whatever the
+// scan supplied), and an empty DeviceInfo field never overwrites a value the
+// scan already populated.
+func fillDeviceInfo(ctx context.Context, device *DiscoveredDevice, svc *Service) {
+	info, err := svc.DeviceInfo(ctx, device.Address)
+	if err != nil {
+		iostreams.DebugErr("fetching device info for "+device.Address, err)
+		return
+	}
+
+	if device.Name == "" {
+		device.Name = info.ID
+	}
+	// Never replace a known value with an empty one: a Gen2 DeviceInfo can
+	// succeed with an empty Model, which would otherwise clobber a good model
+	// already supplied by the scan.
+	if device.Model == "" && info.Model != "" {
+		device.Model = info.Model
+	}
+	if device.ID == "" && info.ID != "" {
+		device.ID = info.ID
+	}
+}
+
 // RegisterDiscoveredDevice adds a discovered device to the registry.
 func RegisterDiscoveredDevice(ctx context.Context, device DiscoveredDevice, svc *Service) error {
 	// Check if already registered
@@ -301,16 +399,9 @@ func RegisterDiscoveredDevice(ctx context.Context, device DiscoveredDevice, svc 
 		return nil
 	}
 
-	// Get device info if not already populated
+	// Get device info if not already populated.
 	if device.Name == "" || device.Model == "" {
-		info, err := svc.DeviceInfo(ctx, device.Address)
-		if err == nil {
-			if device.Name == "" {
-				device.Name = info.ID
-			}
-			device.Model = info.Model
-			device.ID = info.ID
-		}
+		fillDeviceInfo(ctx, &device, svc)
 	}
 
 	name := device.Name
@@ -318,5 +409,8 @@ func RegisterDiscoveredDevice(ctx context.Context, device DiscoveredDevice, svc 
 		name = device.Address
 	}
 
-	return config.RegisterDevice(name, device.Address, device.Generation, "", device.Model, nil)
+	// device.Model is the raw model code from discovery; route through the
+	// shared helper so Type=raw-code and Model=display-name, matching every
+	// other registration path.
+	return utils.RegisterDeviceFromModelCode(name, device.Address, device.Generation, device.Model, nil)
 }

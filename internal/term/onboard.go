@@ -75,10 +75,17 @@ func DisplayOnboardResults(ios *iostreams.IOStreams, results []*shelly.OnboardRe
 			continue
 		}
 
-		msg := fmt.Sprintf("%s (%s)", name, r.Method)
-		if r.NewAddress != "" {
-			msg += fmt.Sprintf(" → %s", r.NewAddress)
+		// Provisioned but never located on the network: source config was not
+		// applied and the device is not yet browsable. Warn instead of printing
+		// a green success line with no address.
+		if r.NewAddress == "" {
+			ios.Warning("  %s (%s): %s", name, r.Method,
+				noteOrDefault(r.Note, "provisioned but not yet found on network; source config not applied"))
+			continue
 		}
+
+		// NewAddress is guaranteed non-empty here (the empty case warned and continued above).
+		msg := fmt.Sprintf("%s (%s) → %s", name, r.Method, r.NewAddress)
 		if r.Registered {
 			msg += " [registered]"
 		}
@@ -88,38 +95,54 @@ func DisplayOnboardResults(ios *iostreams.IOStreams, results []*shelly.OnboardRe
 
 // DisplayOnboardSummary shows a final summary of onboarding results.
 func DisplayOnboardSummary(ios *iostreams.IOStreams, results []*shelly.OnboardResult) {
-	var succeeded, failed int
+	var succeeded, failed, notFound int
 	for _, r := range results {
-		if r.Error != nil {
+		switch {
+		case r.Error != nil:
 			failed++
-		} else {
+		case r.NewAddress == "":
+			// Provisioned but not located on the network — a partial state, not
+			// a clean success and not an outright failure.
+			notFound++
+		default:
 			succeeded++
 		}
 	}
 
 	ios.Println()
-	if failed == 0 {
+	switch {
+	case failed == 0 && notFound == 0:
 		ios.Success("All %d devices provisioned successfully", succeeded)
-	} else {
-		ios.Warning("%d of %d devices provisioned (%d failed)", succeeded, len(results), failed)
+	case failed == 0:
+		ios.Warning("%d of %d devices provisioned (%d not yet found on network)",
+			succeeded, len(results), notFound)
+	default:
+		ios.Warning("%d of %d devices provisioned (%d failed, %d not yet found on network)",
+			succeeded, len(results), failed, notFound)
 	}
 
-	// Show address mapping for successful devices
+	// Show address mapping for devices that landed on the network.
 	if succeeded > 0 {
 		ios.Println()
 		for _, r := range results {
-			if r.Error != nil {
+			if r.Error != nil || r.NewAddress == "" {
 				continue
 			}
 			name := r.Device.Name
 			if name == "" {
 				name = r.Device.Address
 			}
-			if r.NewAddress != "" {
-				ios.Printf("  %s → %s\n", name, r.NewAddress)
-			}
+			ios.Printf("  %s → %s\n", name, r.NewAddress)
 		}
 	}
+}
+
+// noteOrDefault returns note when non-empty, otherwise the fallback string.
+func noteOrDefault(note, fallback string) string {
+	if note != "" {
+		return note
+	}
+	return fallback
 }
 
 // FormatOnboardDeviceOptions builds display strings for MultiSelect.

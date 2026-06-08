@@ -885,7 +885,8 @@ func TestRun_WithMock_NoScanNoSSID(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// NoScan=true but no SSID - should prompt
+	// NoScan=true but no SSID - prompts; empty non-TTY input must error rather
+	// than fall through into a scan the user opted out of.
 	opts := &Options{
 		Factory:  tf.Factory,
 		Device:   "test-device",
@@ -894,10 +895,11 @@ func TestRun_WithMock_NoScanNoSSID(t *testing.T) {
 		NoScan:   true,
 	}
 
-	// In test environment, SSID prompt returns empty which triggers an error path
 	err = run(context.Background(), opts)
-	// The prompt returns empty default, then the scan happens
-	if err != nil {
-		t.Logf("SSID prompt error (may be expected in non-TTY): %v", err)
+	if err == nil {
+		t.Fatal("expected error when --no-scan supplied with empty SSID")
+	}
+	if !strings.Contains(err.Error(), "required with --no-scan") {
+		t.Errorf("expected --no-scan SSID-required error, got: %v", err)
 	}
 }

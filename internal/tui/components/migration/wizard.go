@@ -550,42 +550,19 @@ func (w Wizard) compareConfigs() tea.Cmd {
 	}
 }
 
-// areModelsCompatible checks if two device models are compatible for migration.
-// Compatible means they are the same model or in the same product family.
+// areModelsCompatible reports whether a source config may be migrated onto a target.
+//
+// Migration is only permitted between identical model codes. A looser "model family"
+// heuristic (shared code prefix such as SHSW or SNSW) is unsafe: it merges devices with
+// different component layouts — Shelly 1 (one relay) vs Shelly 2.5 (two relays + cover),
+// or Plus 1PM (one switch) vs Plus 2PM (two switches) — and would push a config for
+// components the target lacks. Empty model codes are never compatible, so an undetermined
+// model surfaces the incompatibility error rather than passing the gate.
 func areModelsCompatible(source, target string) bool {
-	// Exact match is always compatible
-	if source == target {
-		return true
+	if source == "" || target == "" {
+		return false
 	}
-
-	// Extract model family (e.g., "SHSW-25" from both Plus and non-Plus variants)
-	sourceFamily := extractModelFamily(source)
-	targetFamily := extractModelFamily(target)
-
-	return sourceFamily == targetFamily && sourceFamily != ""
-}
-
-// extractModelFamily returns the model family for compatibility checking.
-func extractModelFamily(modelName string) string {
-	// Shelly model naming conventions:
-	// Gen1: SHSW-25, SHPLG-S, etc.
-	// Gen2+: Plus 1PM, Pro 2PM, etc.
-	// The first part before space/dash is typically the family
-
-	// Common Plus/Pro prefix handling - strip "Shelly " prefix if present
-	name := modelName
-	if len(name) > 7 && name[:7] == "Shelly " {
-		name = name[7:]
-	}
-
-	// For Gen1 models (contain hyphen), use the full model
-	for i, c := range name {
-		if c == ' ' || (c == '-' && i > 0) {
-			return name[:i]
-		}
-	}
-
-	return name
+	return source == target
 }
 
 func (w Wizard) applyMigration() tea.Cmd {

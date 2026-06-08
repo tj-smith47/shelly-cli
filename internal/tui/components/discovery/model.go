@@ -165,14 +165,22 @@ func (m Model) StartScan() (Model, tea.Cmd) {
 
 func (m Model) scanDevices() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
+		// HTTP subnet scans need the long budget; mDNS/CoIoT/BLE resolve fast.
+		timeout := 15 * time.Second
+		if m.method == shelly.DiscoveryHTTP {
+			timeout = shelly.DefaultHTTPScanTimeout
+		}
 
 		opts := shelly.DiscoveryOptions{
 			Method:     m.method,
-			Timeout:    15 * time.Second,
+			Timeout:    timeout,
 			AutoDetect: true,
 		}
+
+		// Outer deadline derives from the scan timeout (single source) plus a
+		// grace window for per-device enrichment, so it never truncates the scan.
+		ctx, cancel := context.WithTimeout(m.ctx, opts.Timeout+30*time.Second)
+		defer cancel()
 
 		devices, err := m.svc.DiscoverDevices(ctx, opts)
 		return ScanCompleteMsg{Devices: devices, Err: err}

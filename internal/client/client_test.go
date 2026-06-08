@@ -1600,6 +1600,51 @@ func TestDetectGeneration_Gen2Device(t *testing.T) {
 	}
 }
 
+// TestDetectGeneration_HTTPSSelfSigned verifies detection skips TLS
+// verification for https:// endpoints, since Shelly devices ship self-signed
+// certs. httptest.NewTLSServer serves such a cert; without InsecureSkipVerify
+// the probe would fail with a certificate verification error.
+func TestDetectGeneration_HTTPSSelfSigned(t *testing.T) {
+	t.Parallel()
+
+	gen2Response := map[string]any{
+		"id":      "shellyplus1pm-test123",
+		"mac":     "AA:BB:CC:DD:EE:FF",
+		"model":   "SNSW-001P16EU",
+		"gen":     2,
+		"fw_id":   "20231107-164738/1.0.0-g1234567",
+		"ver":     "1.0.0",
+		"app":     "Plus1PM",
+		"auth_en": false,
+	}
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == gen2Endpoint {
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(gen2Response); err != nil {
+				t.Logf("warning: failed to encode response: %v", err)
+			}
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := DetectGeneration(ctx, server.URL, nil)
+	if err != nil {
+		t.Fatalf("DetectGeneration() over https error = %v", err)
+	}
+	if result.Generation != Gen2 {
+		t.Errorf("Generation = %d, want %d", result.Generation, Gen2)
+	}
+	if result.Model != testModel1 {
+		t.Errorf("Model = %q, want %s", result.Model, testModel1)
+	}
+}
+
 func TestDetectGeneration_Gen1Device(t *testing.T) {
 	t.Parallel()
 

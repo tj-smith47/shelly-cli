@@ -3,6 +3,7 @@ package discover
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/term"
-	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 const methodHTTP = "http"
@@ -133,9 +133,14 @@ func run(ctx context.Context, opts *Options) error {
 		})
 	}
 
+	// "", "http", and "scan" all dispatch to the HTTP subnet scan; compute the
+	// predicate once so subnet resolution, the scan switch, and plugin detection
+	// can never disagree about which methods run an HTTP scan.
+	isHTTP := opts.Method == "" || opts.Method == methodHTTP || opts.Method == "scan"
+
 	// Resolve subnets for HTTP scanning
 	var subnets []string
-	if opts.Method == "" || opts.Method == methodHTTP || opts.Method == "scan" {
+	if isHTTP {
 		var resolveErr error
 		subnets, resolveErr = cmdutil.ResolveSubnets(ios, opts.Subnets, opts.AllNetworks)
 		if resolveErr != nil {
@@ -160,12 +165,19 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if err != nil {
+		// A handled discovery error (e.g. BLE unavailable) was already reported
+		// with actionable hints; stop cleanly before the generic NoResults
+		// summary so the user isn't told both "BLE not available" and
+		// "no devices found".
+		if errors.Is(err, cmdutil.ErrDiscoveryHandled) {
+			return nil
+		}
 		return err
 	}
 
 	// Run plugin detection if not skipped
 	var pluginDevices []term.PluginDiscoveredDevice
-	if !opts.SkipPlugins && opts.Method == methodHTTP {
+	if !opts.SkipPlugins && isHTTP && subnets != nil {
 		pluginDevices = cmdutil.RunPluginDetection(ctx, ios, subnets)
 	}
 
@@ -186,30 +198,27 @@ func run(ctx context.Context, opts *Options) error {
 		term.DisplayPluginDiscoveredDevices(ios, pluginDevices)
 	}
 
-	// Save discovered addresses to completion cache
-	addresses := make([]string, 0, totalDevices)
-	for _, d := range shellyDevices {
-		addresses = append(addresses, d.Address.String())
-	}
+	// Cache + register the native Shelly devices via the shared helper so this
+	// command and `discover http` stay in lockstep on cache/register wording.
+	addedShelly := cmdutil.CacheAndRegisterDevices(ios, shellyDevices, opts.Register, opts.SkipExisting)
+
+	// Plugin-discovered devices carry string addresses and a separate registry
+	// path, so their cache + registration stays here rather than in the helper.
+	pluginAddrs := make([]string, 0, len(pluginDevices))
 	for _, d := range pluginDevices {
 		if d.Address != "" {
-			addresses = append(addresses, d.Address)
+			pluginAddrs = append(pluginAddrs, d.Address)
 		}
 	}
-	if err := completion.SaveDiscoveryCache(addresses); err != nil {
-		ios.DebugErr("saving discovery cache", err)
+	if len(pluginAddrs) > 0 {
+		if err := completion.SaveDiscoveryCache(pluginAddrs); err != nil {
+			ios.DebugErr("saving discovery cache", err)
+		}
 	}
 
-	// Register devices if requested
 	if opts.Register {
-		addedShelly, regErr := utils.RegisterDiscoveredDevices(shellyDevices, opts.SkipExisting)
-		if regErr != nil {
-			ios.Warning("Registration error: %v", regErr)
-		}
-
 		addedPlugin := term.RegisterPluginDevices(pluginDevices, opts.SkipExisting)
-		totalAdded := addedShelly + addedPlugin
-		ios.Added("device", totalAdded)
+		ios.Added("device", addedShelly+addedPlugin)
 	}
 
 	return nil

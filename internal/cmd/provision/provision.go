@@ -94,7 +94,7 @@ To register already-networked devices, use: shelly discover --register`,
 
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "WiFi SSID for provisioning")
 	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi password for provisioning")
-	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 30*time.Second, "Discovery timeout")
+	cmd.Flags().DurationVar(&opts.Timeout, "timeout", shelly.DefaultOnboardScanTimeout, "Discovery timeout")
 	cmd.Flags().StringVar(&opts.DeviceName, "name", "", "Device name to assign after provisioning")
 	cmd.Flags().StringVar(&opts.Timezone, "timezone", "", "Timezone to set on device")
 	cmd.Flags().BoolVar(&opts.BLEOnly, "ble-only", false, "Only discover via BLE (Gen2+ devices)")
@@ -185,6 +185,9 @@ func run(ctx context.Context, opts *Options) error {
 // 3. Interactive prompt.
 func (o *Options) promptWiFiCredentials(ctx context.Context) error {
 	if o.SSID != "" {
+		if o.Password == "" {
+			o.Factory.IOStreams().Warning("No WiFi password provided for %q; configuring as an open network", o.SSID)
+		}
 		return nil
 	}
 

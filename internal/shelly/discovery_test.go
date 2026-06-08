@@ -1,6 +1,8 @@
 package shelly
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -97,6 +99,45 @@ func TestDefaultDiscoveryTimeout(t *testing.T) {
 	if DefaultDiscoveryTimeout != 10*time.Second {
 		t.Errorf("expected DefaultDiscoveryTimeout 10s, got %v", DefaultDiscoveryTimeout)
 	}
+}
+
+func TestDefaultHTTPScanTimeout(t *testing.T) {
+	t.Parallel()
+
+	// HTTP subnet scans must use the long budget; a regression back to 15s
+	// truncated large subnets (/23 = 510 hosts) and under-discovered devices.
+	if DefaultHTTPScanTimeout != 2*time.Minute {
+		t.Errorf("expected DefaultHTTPScanTimeout 2m, got %v", DefaultHTTPScanTimeout)
+	}
+}
+
+func TestIsBLEUnavailable(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sentinel and its wraps are detected", func(t *testing.T) {
+		t.Parallel()
+
+		if !IsBLEUnavailable(ErrBLEUnavailable) {
+			t.Error("expected the sentinel itself to be reported unavailable")
+		}
+		// DiscoverBLE wraps the adapter error as "%w: %w" around ErrBLEUnavailable,
+		// so the predicate must still recognize it through the wrap.
+		wrapped := fmt.Errorf("%w: %w", ErrBLEUnavailable, errors.New("no adapter"))
+		if !IsBLEUnavailable(wrapped) {
+			t.Error("expected wrapped sentinel to be reported unavailable")
+		}
+	})
+
+	t.Run("unrelated and nil errors are not unavailable", func(t *testing.T) {
+		t.Parallel()
+
+		if IsBLEUnavailable(nil) {
+			t.Error("nil must not be reported as BLE-unavailable")
+		}
+		if IsBLEUnavailable(errors.New("scan timed out")) {
+			t.Error("a generic scan error must not be reported as BLE-unavailable")
+		}
+	})
 }
 
 func TestNormalizeMAC(t *testing.T) {

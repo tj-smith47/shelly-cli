@@ -82,6 +82,10 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("no devices specified in config file")
 	}
 
+	if opts.Parallel < 1 {
+		return fmt.Errorf("--parallel must be at least 1, got %d", opts.Parallel)
+	}
+
 	// Validate all device names before starting
 	isRegistered := func(name string) bool {
 		return opts.Factory.GetDevice(name) != nil

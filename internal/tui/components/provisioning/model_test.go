@@ -12,7 +12,7 @@ import (
 
 const (
 	testSSID     = "MyNetwork"
-	testPassword = "secret"
+	testPassword = "secret12" // 8+ chars to satisfy the WPA2 minimum
 )
 
 func TestNew(t *testing.T) {
@@ -381,6 +381,86 @@ func TestModel_HandleKey_Credentials_EnterNoSSID(t *testing.T) {
 	}
 	if cmd != nil {
 		t.Error("should not return command without SSID")
+	}
+	if updated.credErr == "" {
+		t.Error("should set inline credErr when SSID is empty")
+	}
+}
+
+func TestModel_HandleKey_Credentials_EnterShortPassword(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.step = StepCredentials
+	m.ssid = testSSID
+	m.password = "short" // 5 chars, below WPA2 minimum
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if updated.step != StepCredentials {
+		t.Error("should not proceed with a too-short password")
+	}
+	if cmd != nil {
+		t.Error("should not return command with a too-short password")
+	}
+	if updated.credErr == "" {
+		t.Error("should set inline credErr for a too-short password")
+	}
+}
+
+func TestModel_HandleKey_Credentials_EnterOpenNetwork(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.step = StepCredentials
+	m.ssid = testSSID
+	m.password = "" // open network: empty password is valid
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if updated.step != StepConfiguring {
+		t.Errorf("step = %d, want %d", updated.step, StepConfiguring)
+	}
+	if cmd == nil {
+		t.Error("should return configure command for an open network")
+	}
+	if updated.credErr != "" {
+		t.Errorf("credErr = %q, want empty", updated.credErr)
+	}
+}
+
+func TestModel_HandleKey_Credentials_EnterTrimsSSID(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.step = StepCredentials
+	m.ssid = "  MyNetwork  "
+	m.password = testPassword
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if updated.step != StepConfiguring {
+		t.Errorf("step = %d, want %d", updated.step, StepConfiguring)
+	}
+	if cmd == nil {
+		t.Error("should return configure command")
+	}
+	if updated.ssid != "MyNetwork" {
+		t.Errorf("ssid = %q, want %q (trimmed)", updated.ssid, "MyNetwork")
+	}
+}
+
+func TestModel_HandleCharInput_ClearsCredErr(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.step = StepCredentials
+	m.credErr = "SSID is required"
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'a'})
+
+	if updated.credErr != "" {
+		t.Errorf("credErr = %q, want empty after typing", updated.credErr)
 	}
 }
 

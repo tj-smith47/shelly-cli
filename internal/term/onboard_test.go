@@ -127,6 +127,51 @@ func TestDisplayOnboardResults_Error(t *testing.T) {
 	}
 }
 
+func TestDisplayOnboardResults_ProvisionedNotFound(t *testing.T) {
+	t.Parallel()
+
+	ios, _, errOut := testIOStreams()
+	results := []*shelly.OnboardResult{
+		{
+			Device: &shelly.OnboardDevice{Name: "dev-lost"},
+			Method: "BLE",
+			Note:   "provisioned but not found on network: timeout",
+			// NewAddress empty, Error nil — provisioned but never located.
+		},
+	}
+	DisplayOnboardResults(ios, results)
+
+	output := errOut.String()
+	if !strings.Contains(output, "dev-lost") {
+		t.Error("expected device name in warning")
+	}
+	if !strings.Contains(output, "not found on network") {
+		t.Errorf("expected the network-detection note, got %q", output)
+	}
+}
+
+func TestDisplayOnboardSummary_ProvisionedNotFound(t *testing.T) {
+	t.Parallel()
+
+	ios, _, errOut := testIOStreams()
+	results := []*shelly.OnboardResult{
+		{Device: &shelly.OnboardDevice{Name: "dev-1"}, NewAddress: "192.168.1.50"},
+		{Device: &shelly.OnboardDevice{Name: "dev-2"}, Note: "not found"},
+	}
+	DisplayOnboardSummary(ios, results)
+
+	output := errOut.String()
+	if !strings.Contains(output, "1 of 2") {
+		t.Errorf("expected partial count, got %q", output)
+	}
+	if !strings.Contains(output, "not yet found on network") {
+		t.Errorf("expected not-found bucket in summary, got %q", output)
+	}
+	if strings.Contains(output, "provisioned successfully") {
+		t.Errorf("must not report clean success when a device was not found, got %q", output)
+	}
+}
+
 func TestDisplayOnboardSummary_AllSuccess(t *testing.T) {
 	t.Parallel()
 

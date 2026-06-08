@@ -29,7 +29,7 @@ func TestGetEMDataCSVURL(t *testing.T) {
 			resolver: &mockResolver{
 				device: model.Device{
 					Name:       testMonitorDevice,
-					Address:    "192.168.1.100",
+					Address:    testIP,
 					Generation: 2,
 				},
 			},
@@ -41,7 +41,7 @@ func TestGetEMDataCSVURL(t *testing.T) {
 			name: "URL with start timestamp",
 			resolver: &mockResolver{
 				device: model.Device{
-					Address: "192.168.1.100",
+					Address: testIP,
 				},
 			},
 			device:  testMonitorDevice,
@@ -53,7 +53,7 @@ func TestGetEMDataCSVURL(t *testing.T) {
 			name: "URL with both timestamps",
 			resolver: &mockResolver{
 				device: model.Device{
-					Address: "192.168.1.100",
+					Address: testIP,
 				},
 			},
 			device:  testMonitorDevice,
@@ -66,7 +66,7 @@ func TestGetEMDataCSVURL(t *testing.T) {
 			name: "URL with add_keys",
 			resolver: &mockResolver{
 				device: model.Device{
-					Address: "192.168.1.100",
+					Address: testIP,
 				},
 			},
 			device:  testMonitorDevice,
@@ -78,7 +78,7 @@ func TestGetEMDataCSVURL(t *testing.T) {
 			name: "URL with all parameters",
 			resolver: &mockResolver{
 				device: model.Device{
-					Address: "192.168.1.100",
+					Address: testIP,
 				},
 			},
 			device:  testMonitorDevice,
@@ -139,7 +139,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 			name: "basic URL without parameters",
 			resolver: &mockResolver{
 				device: model.Device{
-					Address: "192.168.1.100",
+					Address: testIP,
 				},
 			},
 			device:  testMonitorDevice,
@@ -150,7 +150,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 			name: "URL with start timestamp",
 			resolver: &mockResolver{
 				device: model.Device{
-					Address: "192.168.1.100",
+					Address: testIP,
 				},
 			},
 			device:  testMonitorDevice,
@@ -162,7 +162,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 			name: "URL with both timestamps",
 			resolver: &mockResolver{
 				device: model.Device{
-					Address: "192.168.1.100",
+					Address: testIP,
 				},
 			},
 			device:  testMonitorDevice,
@@ -175,7 +175,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 			name: "URL with add_keys",
 			resolver: &mockResolver{
 				device: model.Device{
-					Address: "192.168.1.100",
+					Address: testIP,
 				},
 			},
 			device:  testMonitorDevice,
@@ -187,7 +187,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 			name: "URL with all parameters",
 			resolver: &mockResolver{
 				device: model.Device{
-					Address: "192.168.1.100",
+					Address: testIP,
 				},
 			},
 			device:  testMonitorDevice,
@@ -433,14 +433,14 @@ func TestDeviceSnapshot_Fields(t *testing.T) {
 
 	snapshot := DeviceSnapshot{
 		Device:  testMonitorDevice,
-		Address: "192.168.1.100",
+		Address: testIP,
 		Error:   nil,
 	}
 
 	if snapshot.Device != testMonitorDevice {
 		t.Errorf("Device = %q, want testMonitorDevice", snapshot.Device)
 	}
-	if snapshot.Address != "192.168.1.100" {
+	if snapshot.Address != testIP {
 		t.Errorf("Address = %q, want 192.168.1.100", snapshot.Address)
 	}
 }

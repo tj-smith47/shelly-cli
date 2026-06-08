@@ -483,41 +483,21 @@ func TestAreModelsCompatible(t *testing.T) {
 		target string
 		want   bool
 	}{
-		{"SHSW-25", "SHSW-25", true},          // Exact match
-		{"Plus 1PM", "Plus 1PM", true},        // Exact match Gen2
-		{"SHSW-25", "SHSW-1", true},           // Same Gen1 family (SHSW)
-		{"Plus 1PM", "Plus 2PM", true},        // Same Gen2 family (Plus)
-		{"Plus 1PM", "Pro 1PM", false},        // Different product lines
-		{"Shelly Plus 1PM", "Plus 1PM", true}, // Same family after prefix strip
-		{"Plus 1PM", "i4", false},             // Completely different families
+		{"SHSW-25", "SHSW-25", true},               // Exact match Gen1
+		{"SNSW-001P16EU", "SNSW-001P16EU", true},   // Exact match Gen2 code
+		{"SHSW-25", "SHSW-1", false},               // Shared prefix, different layout (2.5 vs 1)
+		{"SNSW-001P16EU", "SNSW-002P16EU", false},  // Plus 1PM vs Plus 2PM — different switch count
+		{"SNSW-001P16EU", "SNPL-00112EU", false},   // Different product lines (switch vs plug)
+		{"SNSW-001P16EU", "SPSW-001PE16EU", false}, // Plus vs Pro
+		{"", "", false},                            // Both empty must not be compatible
+		{"SHSW-25", "", false},                     // Empty target is never compatible
+		{"", "SHSW-25", false},                     // Empty source is never compatible
 	}
 
 	for _, tt := range tests {
 		got := areModelsCompatible(tt.source, tt.target)
 		if got != tt.want {
 			t.Errorf("areModelsCompatible(%q, %q) = %v, want %v", tt.source, tt.target, got, tt.want)
-		}
-	}
-}
-
-func TestExtractModelFamily(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		model string
-		want  string
-	}{
-		{"SHSW-25", "SHSW"},
-		{"Plus 1PM", "Plus"},
-		{"Pro 2PM", "Pro"},
-		{"Shelly Plus 1PM", "Plus"},
-		{"1PM", "1PM"}, // No separator
-	}
-
-	for _, tt := range tests {
-		got := extractModelFamily(tt.model)
-		if got != tt.want {
-			t.Errorf("extractModelFamily(%q) = %q, want %q", tt.model, got, tt.want)
 		}
 	}
 }

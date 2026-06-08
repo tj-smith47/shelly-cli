@@ -25,10 +25,23 @@ func (s *Service) ProvisionDevice(ctx context.Context, device model.DeviceProvis
 		return fmt.Errorf("no WiFi configuration")
 	}
 
+	// An explicit address reaches an unregistered device; an empty address lets
+	// ResolveDevice map a registered name to its stored address.
+	target := device.Name
+	if device.Address != "" {
+		target = device.Address
+	}
+
 	// Apply WiFi settings
 	enable := true
-	if err := s.SetWiFiConfig(ctx, device.Name, wifi.SSID, wifi.Password, &enable); err != nil {
+	if err := s.SetWiFiConfig(ctx, target, wifi.SSID, wifi.Password, &enable); err != nil {
 		return fmt.Errorf("failed to set WiFi: %w", err)
+	}
+
+	if device.DevName != "" {
+		if err := s.SetSysName(ctx, target, device.DevName); err != nil {
+			return fmt.Errorf("failed to set device name: %w", err)
+		}
 	}
 
 	return nil
@@ -37,6 +50,12 @@ func (s *Service) ProvisionDevice(ctx context.Context, device model.DeviceProvis
 // ProvisionDevices provisions multiple devices in parallel.
 // Returns results for each device indicating success or failure.
 func (s *Service) ProvisionDevices(ctx context.Context, cfg *model.BulkProvisionConfig, parallel int) []model.ProvisionResult {
+	// A non-positive bound yields an unbuffered semaphore that self-deadlocks:
+	// every goroutine blocks on send before any slot is released.
+	if parallel < 1 {
+		parallel = 1
+	}
+
 	results := make(chan model.ProvisionResult, len(cfg.Devices))
 	sem := make(chan struct{}, parallel)
 

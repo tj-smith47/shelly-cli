@@ -111,6 +111,29 @@ func TestRegisterDiscoveredDevices_SkipExisting(t *testing.T) {
 	}
 }
 
+func TestRegisterDeviceFromModelCode_Integration(t *testing.T) {
+	setupTestConfig(t)
+
+	// The canonical convention: raw model code in Type, display name in Model.
+	if err := RegisterDeviceFromModelCode("kitchen", "192.168.1.50", 2, "SHSW-1", nil); err != nil {
+		t.Fatalf("RegisterDeviceFromModelCode() error = %v", err)
+	}
+
+	dev, ok := config.GetDevice("kitchen")
+	if !ok {
+		t.Fatal("expected device 'kitchen' to be registered")
+	}
+	if dev.Type != "SHSW-1" {
+		t.Errorf("Type = %q, want raw code %q", dev.Type, "SHSW-1")
+	}
+	if dev.Model != "Shelly 1" {
+		t.Errorf("Model = %q, want display name %q", dev.Model, "Shelly 1")
+	}
+	if dev.Generation != 2 {
+		t.Errorf("Generation = %d, want 2", dev.Generation)
+	}
+}
+
 func TestRegisterDevicesFromFlags_Integration(t *testing.T) {
 	setupTestConfig(t)
 

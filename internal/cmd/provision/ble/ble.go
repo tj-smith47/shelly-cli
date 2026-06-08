@@ -69,6 +69,8 @@ Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.
 	cmd.Flags().BoolVar(&opts.EnableCloud, "cloud", false, "Enable Shelly Cloud")
 	cmd.Flags().BoolVar(&opts.DisableCloud, "no-cloud", false, "Disable Shelly Cloud")
 
+	cmd.MarkFlagsMutuallyExclusive("cloud", "no-cloud")
+
 	return cmd
 }
 

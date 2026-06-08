@@ -973,26 +973,26 @@ func TestNewCommand_Execute_WithCloudEnabled(t *testing.T) {
 	}
 }
 
-func TestOptions_BothCloudFlagsSet(t *testing.T) {
+func TestOptions_BothCloudFlagsRejected(t *testing.T) {
 	t.Parallel()
 
-	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(cmdutil.NewFactory())
+	cmd.SetArgs([]string{
+		"device",
+		"--ssid", "network",
+		"--password", "pass",
+		"--cloud",
+		"--no-cloud",
+	})
 
-	opts := &Options{
-		Factory:       tf.Factory,
-		DeviceAddress: "device",
-		SSID:          "network",
-		Password:      "pass",
-		EnableCloud:   true,
-		DisableCloud:  true,
+	// --cloud and --no-cloud are mutually exclusive; cobra must reject the
+	// conflicting pair instead of silently letting --cloud win.
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when both --cloud and --no-cloud are set")
 	}
-
-	// Both flags set - EnableCloud takes precedence in code
-	if !opts.EnableCloud {
-		t.Error("EnableCloud should be true")
-	}
-	if !opts.DisableCloud {
-		t.Error("DisableCloud should also be true (both can be set)")
+	if !strings.Contains(err.Error(), "none of the others can be") {
+		t.Errorf("expected mutual-exclusion error, got: %v", err)
 	}
 }
 

@@ -3,6 +3,7 @@ package shelly
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // OnboardSource indicates how an unprovisioned device was discovered.
@@ -29,6 +31,14 @@ const (
 	OnboardSourceCoIoT  OnboardSource = "CoIoT"
 	OnboardSourceHTTP   OnboardSource = "HTTP"
 )
+
+// DefaultOnboardScanTimeout is the default discovery budget for onboarding when
+// no timeout is supplied. Onboard discovery runs WiFi-AP retry sweeps (multiple
+// 3s iterations) concurrently with a BLE sweep, so it needs the same 2-minute
+// budget the rest of discovery uses (cmdutil.DefaultScanTimeout); 30s truncated
+// larger subnet scans. Defined here, the lowest layer, to avoid an import cycle
+// (cmdutil already imports shelly).
+const DefaultOnboardScanTimeout = 2 * time.Minute
 
 // OnboardDevice represents a device discovered during the onboard scan.
 // Unifies BLE, WiFi AP, and network discovery results into a single type.
@@ -68,6 +78,11 @@ type OnboardResult struct {
 	Device     *OnboardDevice
 	NewAddress string
 	Error      error
+	// Note carries a non-fatal warning, e.g. the device was provisioned but
+	// could not be located on the network afterward. A non-empty Note with a
+	// nil Error and an empty NewAddress means the device is in a partial state:
+	// source config was not applied and it is not browsable yet.
+	Note       string
 	Registered bool
 	Method     string // "BLE", "WiFi AP", "register-only"
 }
@@ -91,7 +106,7 @@ func (s *Service) DiscoverForOnboard(
 ) ([]OnboardDevice, error) {
 	timeout := opts.Timeout
 	if timeout == 0 {
-		timeout = 30 * time.Second
+		timeout = DefaultOnboardScanTimeout
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -113,11 +128,11 @@ func (s *Service) DiscoverForOnboard(
 	if !opts.APOnly {
 		wg.Go(func() {
 			report("BLE", 0, false, nil)
-			found := s.discoverBLEForOnboard(ctx, timeout)
+			found, bleErr := s.discoverBLEForOnboard(ctx)
 			mu.Lock()
 			devices = append(devices, found...)
 			mu.Unlock()
-			report("BLE", len(found), true, nil)
+			report("BLE", len(found), true, bleErr)
 		})
 	}
 
@@ -149,21 +164,22 @@ func (s *Service) DiscoverForOnboard(
 }
 
 // discoverBLEForOnboard runs BLE discovery and converts results to OnboardDevice.
-func (s *Service) discoverBLEForOnboard(ctx context.Context, timeout time.Duration) []OnboardDevice {
+// The timeout is already applied to ctx by DiscoverForOnboard, so no second
+// WithTimeout is needed here. A BLE-unavailable condition is returned as an
+// error so the caller can surface it via OnboardProgress.Err, matching the
+// user-visible feedback the discover and wizard flows give for the same case.
+func (s *Service) discoverBLEForOnboard(ctx context.Context) ([]OnboardDevice, error) {
 	bleDiscoverer, cleanup, err := DiscoverBLE()
 	if err != nil {
 		debug.TraceEvent("onboard BLE discovery not available: %v", err)
-		return nil
+		return nil, err
 	}
 	defer cleanup()
 
-	bleCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	rawDevices, err := bleDiscoverer.DiscoverWithContext(bleCtx)
+	rawDevices, err := bleDiscoverer.DiscoverWithContext(ctx)
 	if err != nil {
 		debug.TraceEvent("onboard BLE discovery error: %v", err)
-		return nil
+		return nil, err
 	}
 
 	bleDetailedDevices := bleDiscoverer.GetDiscoveredDevices()
@@ -182,7 +198,11 @@ func (s *Service) discoverBLEForOnboard(ctx context.Context, timeout time.Durati
 
 		// Get RSSI from detailed BLE info
 		for _, detailed := range bleDetailedDevices {
-			if detailed.ID == raw.ID || detailed.LocalName == raw.Name {
+			// ID (the BLE address, the map key) is always non-empty and uniquely
+			// identifies the device. The LocalName fallback must guard against
+			// empty names: "" == "" would otherwise match the first nameless
+			// record and copy its RSSI onto the wrong device.
+			if detailed.ID == raw.ID || (raw.Name != "" && detailed.LocalName == raw.Name) {
 				dev.RSSI = detailed.RSSI
 				if detailed.LocalName != "" {
 					dev.Name = detailed.LocalName
@@ -198,7 +218,7 @@ func (s *Service) discoverBLEForOnboard(ctx context.Context, timeout time.Durati
 		result = append(result, dev)
 	}
 
-	return result
+	return result, nil
 }
 
 // discoverWiFiAPForOnboard scans for Shelly WiFi AP SSIDs.
@@ -211,43 +231,24 @@ func (s *Service) discoverWiFiAPForOnboard(ctx context.Context) ([]OnboardDevice
 
 	const scanInterval = 3 * time.Second
 	var lastErr error
+	firstAttempt := true
 
 	for {
 		rawDevices, err := wifiDisc.DiscoverWithContext(ctx)
 		if err != nil {
 			debug.TraceEvent("onboard WiFi AP scan attempt error: %v", err)
 			lastErr = err
-		}
-
-		wifiDetails := wifiDisc.GetDiscoveredDevices()
-		for i, raw := range rawDevices {
-			dev := OnboardDevice{
-				Name:        raw.Name,
-				Model:       raw.Model,
-				Address:     discovery.DefaultAPIP,
-				MACAddress:  raw.MACAddress,
-				Source:      OnboardSourceWiFiAP,
-				Generation:  int(raw.Generation),
-				Provisioned: false,
-			}
-
-			if i < len(wifiDetails) {
-				dev.SSID = wifiDetails[i].SSID
-				dev.RSSI = wifiDetails[i].Signal
-			}
-
-			if dev.Name == "" && dev.SSID != "" {
-				dev.Name = dev.SSID
-			}
-
-			key := dev.SSID
-			if key == "" {
-				key = dev.MACAddress
-			}
-			if key != "" {
-				seen[key] = dev
+			// A platform/tooling failure (no WiFi scanner, missing
+			// nmcli/wpa_cli/iwconfig) surfaces as a *discovery.WiFiError and
+			// recurs on every sweep; retrying only burns the discovery budget.
+			var wifiErr *discovery.WiFiError
+			if firstAttempt && errors.As(err, &wifiErr) {
+				return nil, err
 			}
 		}
+		firstAttempt = false
+
+		s.collectWiFiAPDevices(wifiDisc, rawDevices, seen)
 
 		// Wait before next scan, or exit if context is done.
 		select {
@@ -267,6 +268,72 @@ func (s *Service) discoverWiFiAPForOnboard(ctx context.Context) ([]OnboardDevice
 	}
 }
 
+// collectWiFiAPDevices merges one WiFi scan's results into seen (keyed by SSID,
+// falling back to MAC). SSID/RSSI come from the discoverer's detail map keyed by
+// SSID and joined on raw.Name (which equals network.SSID for AP-discovered
+// devices); index pairing would attach SSID/RSSI to the wrong device because
+// GetDiscoveredDevices ranges a map whose order is unrelated to rawDevices and
+// accumulates across sweeps.
+func (s *Service) collectWiFiAPDevices(
+	wifiDisc *discovery.WiFiDiscoverer,
+	rawDevices []discovery.DiscoveredDevice,
+	seen map[string]OnboardDevice,
+) {
+	wifiDetails := wifiDisc.GetDiscoveredDevices()
+	detailBySSID := make(map[string]discovery.WiFiDiscoveredDevice, len(wifiDetails))
+	for _, d := range wifiDetails {
+		detailBySSID[d.SSID] = d
+	}
+
+	for _, raw := range rawDevices {
+		dev := OnboardDevice{
+			Name:        raw.Name,
+			Model:       raw.Model,
+			Address:     discovery.DefaultAPIP,
+			MACAddress:  raw.MACAddress,
+			Source:      OnboardSourceWiFiAP,
+			Generation:  int(raw.Generation),
+			Provisioned: false,
+		}
+
+		if d, ok := detailBySSID[raw.Name]; ok {
+			dev.SSID = d.SSID
+			dev.RSSI = d.Signal
+		}
+		if dev.SSID == "" {
+			dev.SSID = raw.Name // raw.Name is the SSID; keeps the dedup key correct
+		}
+
+		if dev.Name == "" && dev.SSID != "" {
+			dev.Name = dev.SSID
+		}
+
+		key := dev.SSID
+		if key == "" {
+			key = dev.MACAddress
+		}
+		if key != "" {
+			seen[key] = dev
+		}
+	}
+}
+
+// shellyDeviceIDSuffix extracts the trailing hex device-ID from a Shelly
+// LocalName or AP SSID (e.g. "ShellyPlus1PM-AABBCC" → "aabbcc"). This suffix is
+// shared across a device's BLE and WiFi-AP advertisements, so it is the stable
+// key for collapsing BLE and AP rows for the same physical device — their MACs
+// differ (BT radio vs WiFi BSSID) and never collide. Only Shelly-formatted
+// names (with the "shelly" prefix) are considered, so arbitrary names cannot
+// produce a spurious suffix that splits a legitimate MAC-keyed duplicate.
+// Returns "" when the input is not a Shelly name or carries no device ID.
+func shellyDeviceIDSuffix(name string) string {
+	if !strings.HasPrefix(strings.ToLower(name), "shelly") {
+		return ""
+	}
+	_, deviceID := discovery.ParseShellySSID(name)
+	return strings.ToLower(deviceID)
+}
+
 // deduplicateOnboardDevices merges duplicate devices found by multiple
 // discovery methods. Prefers BLE source over others since it carries
 // more provisioning information.
@@ -275,7 +342,17 @@ func deduplicateOnboardDevices(devices []OnboardDevice) []OnboardDevice {
 	result := make([]OnboardDevice, 0, len(devices))
 
 	for _, dev := range devices {
-		key := normalizeMAC(dev.MACAddress)
+		// A device advertising both BLE and a WiFi AP has DISTINCT MACs (BT radio
+		// vs WiFi BSSID), so a MAC key never collapses the two sources. The shared
+		// Shelly device-ID hex suffix is the only stable cross-source key, so try
+		// it first (from BLE LocalName, then AP SSID) before falling back to MAC.
+		key := shellyDeviceIDSuffix(dev.Name)
+		if key == "" {
+			key = shellyDeviceIDSuffix(dev.SSID)
+		}
+		if key == "" {
+			key = normalizeMAC(dev.MACAddress)
+		}
 		if key == "" {
 			key = strings.ToLower(dev.Name)
 		}
@@ -318,8 +395,14 @@ func (s *Service) OnboardViaBLE(
 	bleProvisioner := provisioning.NewBLEProvisioner()
 	bleProvisioner.Transmitter = transmitter
 
-	// Register device
-	model, _ := provisioning.ParseBLEDeviceName(device.BLEAddress)
+	// Register device. ParseBLEDeviceName expects the Shelly LocalName
+	// (e.g. "ShellyPlus1-AABBCC"), not the BLE hardware address — the address
+	// never starts with "Shelly" so IsShellyDevice would reject it and the
+	// model would always come back empty.
+	model, _ := provisioning.ParseBLEDeviceName(device.Name)
+	if model == "" {
+		model = device.Model
+	}
 	bleProvisioner.AddDiscoveredDevice(&provisioning.BLEDevice{
 		Name:     device.Name,
 		Address:  device.BLEAddress,
@@ -348,15 +431,24 @@ func (s *Service) OnboardViaBLE(
 		return result
 	}
 	if !bleResult.Success {
-		result.Error = fmt.Errorf("BLE provisioning completed with errors")
+		// Defensive: today a failed provision surfaces via the err != nil branch
+		// above, but if the SDK ever returns Success=false with a nil err, carry
+		// the result-level detail instead of a fixed, non-actionable string.
+		if bleResult.Error != nil {
+			result.Error = fmt.Errorf("BLE provisioning failed: %w", bleResult.Error)
+		} else {
+			result.Error = fmt.Errorf("BLE provisioning reported failure with no detail")
+		}
 		return result
 	}
 
 	// Wait for device to appear on network
 	newIP, err := s.WaitForDeviceOnNetwork(ctx, device.Name, device.MACAddress, 30*time.Second)
 	if err != nil {
-		// Provisioning succeeded but couldn't find device on network
+		// Provisioning succeeded but couldn't find device on network. Carry the
+		// cause so the UI can warn instead of falsely reporting clean success.
 		debug.TraceEvent("onboard BLE post-provision detection failed for %s: %v", device.Name, err)
+		result.Note = fmt.Sprintf("provisioned but not found on network: %v", err)
 	}
 	result.NewAddress = newIP
 
@@ -432,7 +524,10 @@ func (s *Service) OnboardViaAP(
 	// Wait for device to appear on network
 	newIP, err := s.WaitForDeviceOnNetwork(ctx, device.Name, device.MACAddress, 30*time.Second)
 	if err != nil {
+		// Provisioning succeeded but couldn't find device on network. Carry the
+		// cause so the UI can warn instead of falsely reporting clean success.
 		debug.TraceEvent("onboard AP post-provision detection failed for %s: %v", device.Name, err)
+		result.Note = fmt.Sprintf("provisioned but not found on network: %v", err)
 	}
 	result.NewAddress = newIP
 
@@ -477,8 +572,8 @@ func reconnectCredentials(originalNet *discovery.WiFiNetwork, wifi *OnboardWiFiC
 }
 
 // WaitForDeviceOnNetwork waits for a provisioned device to appear on the
-// network by repeatedly scanning via mDNS (using MAC) with HTTP fallback.
-// Returns the device's new IP address or an error if not found within timeout.
+// network by repeatedly scanning via mDNS by MAC address. Returns the device's
+// new IP address or an error if not found within timeout.
 func (s *Service) WaitForDeviceOnNetwork(
 	ctx context.Context,
 	name string,
@@ -489,12 +584,6 @@ func (s *Service) WaitForDeviceOnNetwork(
 	interval := 2 * time.Second
 
 	for time.Now().Before(deadline) {
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		default:
-		}
-
 		// Try mDNS discovery by MAC
 		if mac != "" {
 			ip, err := s.DiscoverByMAC(ctx, mac)
@@ -503,7 +592,13 @@ func (s *Service) WaitForDeviceOnNetwork(
 			}
 		}
 
-		time.Sleep(interval)
+		// Cancellable wait between polls so Ctrl+C is observed promptly rather
+		// than after the full interval elapses.
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(interval):
+		}
 	}
 
 	return "", fmt.Errorf("device %q not found on network within %s", name, timeout)
@@ -526,7 +621,10 @@ func RegisterOnboardedDevice(device *OnboardDevice, newAddress string) error {
 		name = newAddress
 	}
 
-	return config.RegisterDevice(name, newAddress, device.Generation, device.Model, "", nil)
+	// device.Model is the raw model code; route through the shared helper so
+	// Type=raw-code and Model=display-name, matching every other registration
+	// path (previously Model was stored empty here).
+	return utils.RegisterDeviceFromModelCode(name, newAddress, device.Generation, device.Model, nil)
 }
 
 // FilterUnregistered returns only devices that are not already in the config registry.

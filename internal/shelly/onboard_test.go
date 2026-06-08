@@ -355,6 +355,62 @@ func TestDeduplicateOnboardDevices_MACCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestDeduplicateOnboardDevices_BLEAndAPCollapseBySuffix(t *testing.T) {
+	t.Parallel()
+
+	// One physical device advertising both BLE (LocalName) and a WiFi AP (SSID).
+	// Their MACs differ — the BLE entry carries the BT radio MAC while the AP
+	// entry carries the WiFi BSSID — so only the shared Shelly device-ID suffix
+	// can collapse them.
+	devices := []OnboardDevice{
+		{
+			Name:       "shellyplus1pm-aabbcc",
+			SSID:       "shellyplus1pm-aabbcc",
+			MACAddress: "11:22:33:44:55:66", // WiFi BSSID
+			Source:     OnboardSourceWiFiAP,
+			Address:    "192.168.33.1",
+		},
+		{
+			Name:       "ShellyPlus1PM-AABBCC",
+			MACAddress: "AA:BB:CC:00:11:22", // BT radio MAC (distinct from BSSID)
+			BLEAddress: "AA:BB:CC:00:11:22",
+			Source:     OnboardSourceBLE,
+		},
+	}
+
+	deduped := deduplicateOnboardDevices(devices)
+	if len(deduped) != 1 {
+		t.Fatalf("len(deduped) = %d, want 1 (BLE+AP rows for one device must collapse)", len(deduped))
+	}
+	if deduped[0].Source != OnboardSourceBLE {
+		t.Errorf("Source = %q, want %q (BLE preferred)", deduped[0].Source, OnboardSourceBLE)
+	}
+}
+
+func TestShellyDeviceIDSuffix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"ble local name", "ShellyPlus1PM-AABBCC", "aabbcc"},
+		{"ap ssid lowercase", "shellyplus1pm-aabbcc", "aabbcc"},
+		{"non-shelly name returns empty", "kitchen-light", ""},
+		{"empty returns empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := shellyDeviceIDSuffix(tt.input); got != tt.want {
+				t.Errorf("shellyDeviceIDSuffix(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRegisterNetworkDevices(t *testing.T) {
 	t.Parallel()
 

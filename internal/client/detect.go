@@ -3,6 +3,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -45,7 +46,14 @@ func DetectGeneration(ctx context.Context, address string, auth *model.Auth) (*D
 		url = "http://" + url
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	transport := cloneDefaultTransport()
+	if strings.HasPrefix(url, "https") {
+		// Shelly devices ship self-signed certs, matching the convention in
+		// client.go/gen1.go which skip verification for https:// endpoints.
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // Shelly devices use self-signed TLS certs; skipping verification is intentional
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second, Transport: transport}
 
 	// Try Gen2 RPC endpoint first (more common for newer devices)
 	gen2Result, gen2Err := tryGen2Detection(ctx, client, url, auth)
@@ -191,6 +199,17 @@ func tryGen1Detection(ctx context.Context, client *http.Client, baseURL string, 
 		Firmware:   info.FW,
 		AuthEn:     info.Auth,
 	}, nil
+}
+
+// cloneDefaultTransport returns a clone of http.DefaultTransport, falling back
+// to a fresh *http.Transport if the default is ever replaced with a type that
+// is not *http.Transport (so the detection client always has a transport whose
+// TLSClientConfig can be customized for self-signed Shelly certs).
+func cloneDefaultTransport() *http.Transport {
+	if t, ok := http.DefaultTransport.(*http.Transport); ok {
+		return t.Clone()
+	}
+	return &http.Transport{}
 }
 
 // httpStatusError returns a user-friendly error for common HTTP status codes.

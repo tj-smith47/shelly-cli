@@ -1,13 +1,71 @@
 package shelly
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
+
+// recordingResolver captures the identifier passed to Resolve so tests can
+// assert which target ProvisionDevice connects to, then aborts the connection
+// by returning an error before any network call is attempted.
+type recordingResolver struct {
+	lastIdentifier string
+}
+
+func (r *recordingResolver) Resolve(identifier string) (model.Device, error) {
+	r.lastIdentifier = identifier
+	return model.Device{}, errors.New("resolve aborted for test")
+}
+
+func TestProvisionDeviceTarget(t *testing.T) {
+	t.Parallel()
+
+	wifi := &model.ProvisionWiFiConfig{SSID: "net", Password: "pw"}
+
+	t.Run("explicit address is used as connection target", func(t *testing.T) {
+		t.Parallel()
+
+		resolver := &recordingResolver{}
+		svc := New(resolver)
+
+		err := svc.ProvisionDevice(context.Background(), model.DeviceProvisionConfig{
+			Name:    "bedroom",
+			Address: "192.168.1.100",
+		}, wifi)
+
+		if err == nil {
+			t.Fatal("expected error from aborted resolve")
+		}
+		if resolver.lastIdentifier != "192.168.1.100" {
+			t.Errorf("expected connection target %q, got %q", "192.168.1.100", resolver.lastIdentifier)
+		}
+	})
+
+	t.Run("name is used as connection target when address is empty", func(t *testing.T) {
+		t.Parallel()
+
+		resolver := &recordingResolver{}
+		svc := New(resolver)
+
+		err := svc.ProvisionDevice(context.Background(), model.DeviceProvisionConfig{
+			Name: "bedroom",
+		}, wifi)
+
+		if err == nil {
+			t.Fatal("expected error from aborted resolve")
+		}
+		if resolver.lastIdentifier != "bedroom" {
+			t.Errorf("expected connection target %q, got %q", "bedroom", resolver.lastIdentifier)
+		}
+	})
+}
 
 func TestValidateBulkProvisionConfig(t *testing.T) {
 	t.Parallel()
@@ -112,6 +170,40 @@ func TestValidateBulkProvisionConfig(t *testing.T) {
 			t.Error("expected error for mixed config")
 		}
 	})
+}
+
+func TestProvisionDevicesParallelClamp(t *testing.T) {
+	t.Parallel()
+
+	cfg := &model.BulkProvisionConfig{
+		WiFi: &model.ProvisionWiFiConfig{SSID: "net", Password: "pw"},
+		Devices: []model.DeviceProvisionConfig{
+			{Name: "a", Address: "192.168.1.1"},
+			{Name: "b", Address: "192.168.1.2"},
+		},
+	}
+
+	for _, parallel := range []int{0, -1} {
+		t.Run("does not deadlock", func(t *testing.T) {
+			t.Parallel()
+
+			svc := New(&recordingResolver{})
+
+			done := make(chan []model.ProvisionResult, 1)
+			go func() {
+				done <- svc.ProvisionDevices(context.Background(), cfg, parallel)
+			}()
+
+			select {
+			case results := <-done:
+				if len(results) != len(cfg.Devices) {
+					t.Errorf("expected %d results, got %d", len(cfg.Devices), len(results))
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatalf("ProvisionDevices deadlocked with parallel=%d", parallel)
+			}
+		})
+	}
 }
 
 //nolint:paralleltest // Test modifies global state via config.SetFs

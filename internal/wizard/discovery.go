@@ -8,14 +8,12 @@ import (
 
 	"github.com/tj-smith47/shelly-go/discovery"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
-const (
-	defaultDiscoveryTimeout = 15 * time.Second
-	methodHTTP              = "http"
-)
+const methodHTTP = "http"
 
 // selectDiscoveryMethods selects which discovery methods to use.
 func selectDiscoveryMethods(ios *iostreams.IOStreams, opts *Options) []string {
@@ -86,17 +84,22 @@ func parseDiscoverModes(modes string) []string {
 	return result
 }
 
-// runDiscoveryMethod runs a single discovery method.
+// runDiscoveryMethod runs a single discovery method, delegating to the
+// canonical cmdutil discovery helpers so the wizard, discover, and onboard
+// paths share one implementation (subnet/address generation, timeouts,
+// ctx-driven cancellation, and progress rendering).
 func runDiscoveryMethod(ctx context.Context, ios *iostreams.IOStreams, method string, timeout time.Duration, subnets []string) ([]discovery.DiscoveredDevice, error) {
 	switch method {
 	case methodHTTP:
 		return runHTTPDiscovery(ctx, ios, timeout, subnets)
 	case "mdns":
-		return runMDNSDiscovery(ios, timeout)
+		// mDNS is a fast multicast sweep, not a per-host scan, so it uses the
+		// helper's short default rather than the 2-minute HTTP scan timeout.
+		return cmdutil.RunMDNSDiscovery(ctx, ios, timeout)
 	case "coiot":
-		return runCoIoTDiscovery(ios, timeout)
+		return cmdutil.RunCoIoTDiscovery(ctx, ios, timeout)
 	case "ble":
-		return runBLEDiscovery(ctx, ios, timeout)
+		return cmdutil.RunBLEDiscovery(ctx, ios, timeout)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
@@ -111,73 +114,9 @@ func runHTTPDiscovery(ctx context.Context, ios *iostreams.IOStreams, timeout tim
 		}
 	}
 
-	// Generate addresses across all subnets
-	var allAddresses []string
-	for _, subnet := range subnets {
-		allAddresses = append(allAddresses, discovery.GenerateSubnetAddresses(subnet)...)
-	}
-	if len(allAddresses) == 0 {
-		return nil, fmt.Errorf("no addresses in %s", strings.Join(subnets, ", "))
-	}
-
-	subnetLabel := strings.Join(subnets, ", ")
-	ios.StartProgress(fmt.Sprintf("Scanning %s (timeout: %s)...", subnetLabel, timeout))
-	defer ios.StopProgress()
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	devices := discovery.ProbeAddressesWithProgress(ctx, allAddresses, func(_ discovery.ProbeProgress) bool {
-		return ctx.Err() == nil
-	})
-
-	return devices, nil
-}
-
-func runMDNSDiscovery(ios *iostreams.IOStreams, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
-	ios.StartProgress(fmt.Sprintf("Discovering via mDNS (timeout: %s)...", timeout))
-	defer ios.StopProgress()
-
-	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
-	defer func() {
-		if err := mdnsDiscoverer.Stop(); err != nil {
-			ios.DebugErr("stopping mDNS discoverer", err)
-		}
-	}()
-
-	return mdnsDiscoverer.Discover(timeout)
-}
-
-func runCoIoTDiscovery(ios *iostreams.IOStreams, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
-	ios.StartProgress(fmt.Sprintf("Discovering via CoIoT (timeout: %s)...", timeout))
-	defer ios.StopProgress()
-
-	coiotDiscoverer := discovery.NewCoIoTDiscoverer()
-	defer func() {
-		if err := coiotDiscoverer.Stop(); err != nil {
-			ios.DebugErr("stopping CoIoT discoverer", err)
-		}
-	}()
-
-	return coiotDiscoverer.Discover(timeout)
-}
-
-func runBLEDiscovery(ctx context.Context, ios *iostreams.IOStreams, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
-	ios.StartProgress(fmt.Sprintf("Discovering via BLE (timeout: %s)...", timeout))
-	defer ios.StopProgress()
-
-	bleDiscoverer, err := discovery.NewBLEDiscoverer()
-	if err != nil {
-		return nil, fmt.Errorf("BLE not available: %w", err)
-	}
-	defer func() {
-		if stopErr := bleDiscoverer.Stop(); stopErr != nil {
-			ios.DebugErr("stopping BLE discoverer", stopErr)
-		}
-	}()
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	return bleDiscoverer.DiscoverWithContext(ctx)
+	// Delegate to the single canonical HTTP scan. It applies DefaultScanTimeout
+	// when timeout==0, generates probe addresses (with per-subnet CIDR
+	// validation), and honors ctx cancellation — keeping the wizard's HTTP path
+	// from drifting away from `shelly discover`.
+	return cmdutil.RunHTTPDiscovery(ctx, ios, timeout, subnets)
 }

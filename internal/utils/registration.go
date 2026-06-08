@@ -156,6 +156,15 @@ func RegisterDevice(reg DeviceRegistration, skipExisting bool) (bool, error) {
 	return true, nil
 }
 
+// RegisterDeviceFromModelCode registers a single device given its raw model
+// code, storing the code in the Type field and the human-readable display name
+// in the Model field. This is the single canonical convention shared by every
+// discovery/onboarding registration path, so a device's stored Type/Model is
+// identical no matter which flow added it.
+func RegisterDeviceFromModelCode(name, address string, generation int, modelCode string, auth *model.Auth) error {
+	return config.RegisterDevice(name, address, generation, modelCode, types.ModelDisplayName(modelCode), auth)
+}
+
 // RegisterDevicesBatch registers multiple devices from registrations.
 // Returns the number of devices added and the first error encountered.
 func RegisterDevicesBatch(regs []DeviceRegistration, skipExisting bool) (int, error) {

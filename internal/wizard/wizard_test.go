@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/discovery"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -711,8 +712,10 @@ func TestOptions_DiscoverTimeout(t *testing.T) {
 func TestDefaultDiscoveryTimeout(t *testing.T) {
 	t.Parallel()
 
-	if defaultDiscoveryTimeout != 15*time.Second {
-		t.Errorf("defaultDiscoveryTimeout = %v, want 15s", defaultDiscoveryTimeout)
+	// The wizard's zero-value HTTP timeout is owned by cmdutil so the scan
+	// timeout cannot drift back to the too-short 15s that starved /23 subnets.
+	if cmdutil.DefaultScanTimeout != 2*time.Minute {
+		t.Errorf("cmdutil.DefaultScanTimeout = %v, want 2m", cmdutil.DefaultScanTimeout)
 	}
 }
 
@@ -1687,13 +1690,14 @@ func TestParseDiscoverModes_Comprehensive(t *testing.T) {
 	}
 }
 
-// TestDefaultDiscoveryTimeoutValue tests the default discovery timeout constant.
+// TestDefaultDiscoveryTimeoutValue verifies the canonical scan timeout the
+// wizard now defers to for its zero-value HTTP discovery timeout.
 func TestDefaultDiscoveryTimeoutValue(t *testing.T) {
 	t.Parallel()
 
-	expected := 15 * time.Second
-	if defaultDiscoveryTimeout != expected {
-		t.Errorf("defaultDiscoveryTimeout = %v, want %v", defaultDiscoveryTimeout, expected)
+	expected := 2 * time.Minute
+	if cmdutil.DefaultScanTimeout != expected {
+		t.Errorf("cmdutil.DefaultScanTimeout = %v, want %v", cmdutil.DefaultScanTimeout, expected)
 	}
 }
 
@@ -1870,6 +1874,39 @@ func TestRunDiscoveryMethod_ValidMethods(t *testing.T) {
 			// The error will be about network failure, not "unknown method"
 			if err != nil && strings.Contains(err.Error(), "unknown method") {
 				t.Errorf("method %q should be recognized, got: %v", method, err)
+			}
+		})
+	}
+}
+
+// TestRunDiscoveryMethod_CtxCancel verifies mDNS and CoIoT honor ctx
+// cancellation: a cancelled ctx must abort the sweep promptly instead of
+// blocking for the full timeout, so Ctrl+C propagates during a wizard scan.
+func TestRunDiscoveryMethod_CtxCancel(t *testing.T) {
+	t.Parallel()
+
+	for _, method := range []string{"mdns", "coiot"} {
+		t.Run(method, func(t *testing.T) {
+			t.Parallel()
+			ios, _, _ := testIOStreams()
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel() // cancel before the scan starts
+
+			errCh := make(chan error, 1)
+			go func() {
+				// A 2-minute timeout would block here if ctx were ignored.
+				_, scanErr := runDiscoveryMethod(ctx, ios, method, 2*time.Minute, nil)
+				errCh <- scanErr
+			}()
+
+			select {
+			case err := <-errCh:
+				// The contract under test is promptness, not a specific outcome:
+				// a cancelled sweep may return either a ctx error or an empty
+				// (nil-error) result, so only an outright block is a failure.
+				t.Logf("%s discovery returned promptly after cancel (err=%v)", method, err)
+			case <-time.After(10 * time.Second):
+				t.Fatalf("%s discovery ignored ctx cancellation (blocked past 10s)", method)
 			}
 		})
 	}
@@ -2277,6 +2314,37 @@ func TestCheckAndConfirmConfig_InteractiveNoConfig(t *testing.T) {
 	}
 	if !shouldContinue {
 		t.Error("CheckAndConfirmConfig() should continue when no config exists")
+	}
+}
+
+// TestStepConfiguration_RejectsInvalidFlags verifies that flag-supplied
+// theme/output-format/api-mode values are validated before being persisted, so
+// the wizard never ships a config the next `shelly init --check` would reject.
+func TestStepConfiguration_RejectsInvalidFlags(t *testing.T) {
+	cases := []struct {
+		name string
+		opts *Options
+	}{
+		{"bad theme", &Options{Defaults: true, Theme: "bogus-theme"}},
+		{"bad output format", &Options{Defaults: true, OutputFormat: "xml"}},
+		{"bad api mode", &Options{Defaults: true, APIMode: "foo"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			config.SetFs(afero.NewMemMapFs())
+			t.Cleanup(func() { config.SetFs(nil) })
+			t.Setenv("HOME", "/test/home")
+
+			ios, _, _ := testIOStreams()
+			err := stepConfiguration(ios, tc.opts)
+			if err == nil {
+				t.Fatalf("stepConfiguration(%s) = nil, want validation error", tc.name)
+			}
+			if !strings.Contains(err.Error(), "invalid configuration") {
+				t.Errorf("stepConfiguration(%s) error = %q, want 'invalid configuration'", tc.name, err.Error())
+			}
+		})
 	}
 }
 

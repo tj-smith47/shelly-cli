@@ -3,17 +3,12 @@ package httpscan
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/term"
-	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // DefaultTimeout is the default scan timeout.
@@ -110,36 +105,13 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	// Generate addresses across all subnets
-	var allAddresses []string
-	for _, subnet := range subnets {
-		allAddresses = append(allAddresses, discovery.GenerateSubnetAddresses(subnet)...)
+	// Delegate the address generation + subnet scan to the single canonical
+	// HTTP discovery helper so this command, the wizard, and onboard cannot
+	// drift apart on timeout, address-gen, or cancellation behavior.
+	devices, err := cmdutil.RunHTTPDiscovery(ctx, ios, opts.Timeout, subnets)
+	if err != nil {
+		return err
 	}
-	if len(allAddresses) == 0 {
-		return fmt.Errorf("no addresses to scan in %s", strings.Join(subnets, ", "))
-	}
-
-	subnetLabel := strings.Join(subnets, ", ")
-	ios.Success("Scanning %d addresses in %s", len(allAddresses), subnetLabel)
-
-	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
-	defer cancel()
-
-	// Use animated spinner for scan progress
-	ios.StartProgress(fmt.Sprintf("0/%d addresses probed", len(allAddresses)))
-
-	devices := discovery.ProbeAddressesWithProgress(ctx, allAddresses, func(p discovery.ProbeProgress) bool {
-		msg := fmt.Sprintf("%d/%d addresses probed", p.Done, p.Total)
-		if p.Found && p.Device != nil {
-			msg = fmt.Sprintf("%d/%d - found %s (%s)", p.Done, p.Total, p.Device.Name, p.Device.Model)
-		}
-		ios.UpdateProgress(msg)
-		return ctx.Err() == nil // Continue unless context canceled
-	})
-
-	// Stop spinner with success summary
-	ios.StopProgressWithSuccess(fmt.Sprintf("%d/%d addresses probed, %d devices found",
-		len(allAddresses), len(allAddresses), len(devices)))
 
 	if len(devices) == 0 {
 		ios.NoResults("devices", "Ensure devices are powered on and accessible on the network")
@@ -148,20 +120,8 @@ func run(ctx context.Context, opts *Options) error {
 
 	term.DisplayDiscoveredDevices(ios, devices)
 
-	// Save discovered addresses to completion cache
-	deviceAddrs := make([]string, 0, len(devices))
-	for _, d := range devices {
-		deviceAddrs = append(deviceAddrs, d.Address.String())
-	}
-	if err := completion.SaveDiscoveryCache(deviceAddrs); err != nil {
-		ios.DebugErr("saving discovery cache", err)
-	}
-
+	added := cmdutil.CacheAndRegisterDevices(ios, devices, opts.Register, opts.SkipExisting)
 	if opts.Register {
-		added, regErr := utils.RegisterDiscoveredDevices(devices, opts.SkipExisting)
-		if regErr != nil {
-			ios.Warning("Registration error: %v", regErr)
-		}
 		ios.Added("device", added)
 	}
 

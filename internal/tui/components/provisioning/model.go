@@ -87,6 +87,7 @@ type Model struct {
 	password     string
 	inputField   int // 0 = SSID, 1 = password
 	err          error
+	credErr      string // inline validation error during credential entry
 	focused      bool
 	panelIndex   int
 	polling      bool
@@ -175,6 +176,7 @@ func (m Model) Reset() Model {
 	m.password = ""
 	m.inputField = 0
 	m.err = nil
+	m.credErr = ""
 	m.polling = false
 	return m
 }
@@ -332,7 +334,15 @@ func (m Model) handleCredentialsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		// Tab cycles through fields (NavigationMsg handles j/k/arrows)
 		m.inputField = (m.inputField + 1) % 2
 	case keyconst.KeyEnter:
-		if m.ssid != "" {
+		ssid := strings.TrimSpace(m.ssid)
+		switch {
+		case ssid == "":
+			m.credErr = "SSID is required"
+		case m.password != "" && len(m.password) < 8:
+			m.credErr = "Password must be at least 8 characters (WPA2); leave empty for an open network"
+		default:
+			m.ssid = ssid
+			m.credErr = ""
 			m.step = StepConfiguring
 			return m, tea.Batch(m.configLoader.Tick(), m.configureDevice())
 		}
@@ -347,6 +357,7 @@ func (m Model) handleCredentialsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleBackspace() Model {
+	m.credErr = ""
 	if m.inputField == 0 && m.ssid != "" {
 		m.ssid = m.ssid[:len(m.ssid)-1]
 	} else if m.inputField == 1 && m.password != "" {
@@ -359,6 +370,7 @@ func (m Model) handleCharInput(char string) Model {
 	if len(char) != 1 {
 		return m
 	}
+	m.credErr = ""
 	if m.inputField == 0 && len(m.ssid) < 32 {
 		m.ssid += char
 	} else if m.inputField == 1 && len(m.password) < 64 {
@@ -547,7 +559,12 @@ func (m Model) renderCredentials() string {
 	content.WriteString(m.styles.Input.Render(passValue))
 	content.WriteString("\n\n")
 
-	content.WriteString(m.styles.Muted.Render("Tab: switch field | Enter: configure | Esc: cancel"))
+	if m.credErr != "" {
+		content.WriteString(m.styles.Error.Render(m.credErr))
+		content.WriteString("\n\n")
+	}
+
+	content.WriteString(m.styles.Muted.Render("Tab: switch field | Enter: configure | Esc: cancel (leave Password empty for open network)"))
 
 	return content.String()
 }
