@@ -32,8 +32,15 @@ func ConnectGen1(ctx context.Context, device model.Device) (*Gen1Client, error) 
 	if device.HasAuth() {
 		opts = append(opts, transport.WithAuth(device.Auth.Username, device.Auth.Password))
 	}
-	if strings.HasPrefix(url, "https") {
+	isHTTPS := strings.HasPrefix(url, "https")
+	if isHTTPS {
 		opts = append(opts, transport.WithInsecureSkipVerify())
+	}
+	// Egress a specific interface when the context pins one (the --to-ap confirm
+	// path; see WithBindInterface). WithClient supersedes the default client, so
+	// the bound client carries the TLS-skip itself.
+	if iface := bindInterfaceFromContext(ctx); iface != "" {
+		opts = append(opts, transport.WithClient(boundHTTPClient(iface, isHTTPS)))
 	}
 
 	httpTransport := transport.NewHTTP(url, opts...)

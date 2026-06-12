@@ -154,7 +154,7 @@ func TestLocateRejoinedDevice_ReturnsErrorWhenUnconfirmed(t *testing.T) {
 		cancel() // poll returns immediately
 		svc := New(NewConfigResolver(), WithRateLimiter(ratelimit.New()))
 
-		addr, err := svc.locateRejoinedDevice(ctx, 1, "bulb", "192.0.2.10", "AA:BB:CC:DD:EE:FF")
+		addr, _, err := svc.locateRejoinedDevice(ctx, 1, "bulb", "192.0.2.10", "AA:BB:CC:DD:EE:FF")
 		if err == nil {
 			t.Fatal("expected error when static address is unreachable, got nil (blind success)")
 		}
@@ -174,7 +174,7 @@ func TestLocateRejoinedDevice_ReturnsErrorWhenUnconfirmed(t *testing.T) {
 
 		// No static IP and empty MAC: the MAC scan is skipped and the cancelled
 		// context returns at once with the not-found error.
-		addr, err := svc.locateRejoinedDevice(ctx, 1, "bulb", "", "")
+		addr, _, err := svc.locateRejoinedDevice(ctx, 1, "bulb", "", "")
 		if err == nil {
 			t.Fatal("expected error when DHCP device is not found, got nil (blind success)")
 		}

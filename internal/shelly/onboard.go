@@ -548,7 +548,7 @@ func (s *Service) confirmRejoinedLAN(
 	if wifi.IsStatic() {
 		staticIP = wifi.StaticIP
 	}
-	ip, err := s.locateRejoinedDevice(ctx, device.Generation, device.Name, staticIP, device.MACAddress)
+	ip, _, err := s.locateRejoinedDevice(ctx, device.Generation, device.Name, staticIP, device.MACAddress)
 	if err != nil {
 		// Provisioning succeeded but the device could not be located; carry the
 		// cause so the UI warns instead of reporting a success it cannot prove.

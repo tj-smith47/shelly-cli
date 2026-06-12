@@ -3,6 +3,7 @@ package shelly
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/discovery"
@@ -100,7 +101,7 @@ func (s *Service) RestoreToAP(
 	if opts.NetworkOverride != nil {
 		staticIP = opts.NetworkOverride.StaticIP
 	}
-	newAddr, confErr := s.locateRejoinedDevice(ctx, generation, registryName, staticIP, bkp.Device().MAC)
+	newAddr, bindIface, confErr := s.locateRejoinedDevice(ctx, generation, registryName, staticIP, bkp.Device().MAC)
 	if confErr != nil {
 		return result, "", fmt.Errorf(
 			"restore applied at AP %q but %s could not be confirmed back on the LAN (%w); the device may "+
@@ -111,8 +112,10 @@ func (s *Service) RestoreToAP(
 	// On the LAN the device finally has a clock (NTP), so re-apply the config it
 	// rejected at its clockless factory AP — notably Gen1 light config, which
 	// returns "Timezone and time should be set" at the AP and would otherwise leave
-	// colour temperature and other light settings at factory defaults.
-	result = s.reapplyConfigOnLAN(ctx, newAddr, generation, bkp, opts, result)
+	// colour temperature and other light settings at factory defaults. Pin the
+	// re-apply to the interface that confirmed the device, so it lands even when
+	// the default route to the device would be dropped by AP client isolation.
+	result = s.reapplyConfigOnLAN(client.WithBindInterface(ctx, bindIface), newAddr, generation, bkp, opts, result)
 	updateRegistryAddress(registryName, newAddr, bkp)
 
 	return result, newAddr, nil
@@ -244,42 +247,67 @@ const (
 	lanRejoinProbeTimeout = 8 * time.Second
 )
 
-// waitForAddressReachable polls a device's known LAN address until it answers or
-// the timeout elapses, used after a --to-ap flow to confirm the device rejoined
-// the network at its static address.
-func (s *Service) waitForAddressReachable(ctx context.Context, addr string, generation int, timeout time.Duration) error {
-	return s.pollReachable(ctx, addr, generation, timeout, lanRejoinPollInterval, lanRejoinProbeTimeout)
-}
-
 // locateRejoinedDevice confirms a device returned to the LAN after an AP hop and
-// returns the address it answered on. With staticIP set the address is known, so it
-// is polled directly; on DHCP the address is unknown, so the device is located by
-// MAC over mDNS. The returned error is the raw cause, leaving the policy to the
-// caller: restore/migrate --to-ap treat it as fatal (a restore must not claim a
-// success it cannot prove), while onboard surfaces it as a non-fatal note. Both
-// waits use lanRejoinTimeout so all three flows confirm over the same window.
+// returns the address it answered on along with the host interface that reached it
+// ("" = the default route). With staticIP set the address is known, so it is
+// polled directly over the default route first, falling back to a same-subnet
+// interface only if that fails — which happens on a network whose AP isolates
+// wireless clients, where the device rejoined over the host's own wireless AP is
+// reached station-to-station and dropped, while a wired interface still reaches it
+// (see selectProbeBindInterfaces). On DHCP the address is unknown, so the device
+// is located by MAC over mDNS, which this path cannot interface-bind, so the
+// returned interface is "". The returned error is the raw cause, leaving the
+// policy to the caller: restore/migrate --to-ap treat it as fatal (a restore must
+// not claim a success it cannot prove), while onboard surfaces it as a non-fatal
+// note. Both waits use lanRejoinTimeout so all flows confirm over the same window.
 func (s *Service) locateRejoinedDevice(
 	ctx context.Context,
 	generation int,
 	name, staticIP, mac string,
-) (string, error) {
+) (addr, bindIface string, err error) {
 	if staticIP != "" {
-		if err := s.waitForAddressReachable(ctx, staticIP, generation, lanRejoinTimeout); err != nil {
-			return "", fmt.Errorf("not confirmed at %s: %w", staticIP, err)
+		ifaces, ifErr := hostProbeIfaces()
+		if ifErr != nil {
+			debug.TraceEvent("restore-to-ap: host interface enumeration failed, using default route: %v", ifErr)
 		}
-		return staticIP, nil
+		candidates := selectProbeBindInterfaces(net.ParseIP(staticIP), ifaces)
+		win, pollErr := s.pollReachableVia(ctx, staticIP, generation, candidates,
+			lanRejoinTimeout, lanRejoinPollInterval, lanRejoinProbeTimeout)
+		if pollErr != nil {
+			return "", "", fmt.Errorf("not confirmed at %s: %w", staticIP, pollErr)
+		}
+		return staticIP, win, nil
 	}
-	ip, err := s.WaitForDeviceOnNetwork(ctx, name, mac, lanRejoinTimeout)
-	if err != nil {
-		return "", fmt.Errorf("not found on network: %w", err)
+	ip, dErr := s.WaitForDeviceOnNetwork(ctx, name, mac, lanRejoinTimeout)
+	if dErr != nil {
+		return "", "", fmt.Errorf("not found on network: %w", dErr)
 	}
-	return ip, nil
+	return ip, "", nil
 }
 
-// pollReachable is the parameterized core of waitForAddressReachable. The probe
-// is generation-aware (Gen1 settings vs a Gen2+ RPC) because the freshly-
-// provisioned target keeps the source's generation and a Gen2 device does not
-// serve the Gen1 /settings endpoint. Each probe runs under its own probeTimeout.
+// probeReachableOnce runs a single generation-aware reachability probe against
+// addr over whatever egress interface the context pins (see
+// client.WithBindInterface). The probe is generation-aware (Gen1 /settings vs a
+// Gen2+ RPC) because the freshly-provisioned target keeps the source's generation
+// and a Gen2 device does not serve the Gen1 /settings endpoint.
+func (s *Service) probeReachableOnce(ctx context.Context, addr string, generation int) error {
+	if generation == 1 {
+		return s.WithGen1Connection(ctx, addr, func(conn *client.Gen1Client) error {
+			_, settingsErr := conn.GetSettings(ctx)
+			return settingsErr
+		})
+	}
+	return s.WithConnection(ctx, addr, func(conn *client.Client) error {
+		_, callErr := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
+		return callErr
+	})
+}
+
+// pollReachableVia polls addr until a generation-aware probe succeeds over one of
+// the candidate egress interfaces, returning the interface that reached it ("" =
+// default route). Candidates are tried in order on every tick, so a working wired
+// path is preferred but the device is still confirmed if only the default route
+// reaches it. Each probe runs under its own probeTimeout.
 //
 // The poll context is marked as a polling request so its expected early failures
 // — the host is still reacquiring its DHCP lease after returning from the AP and
@@ -288,48 +316,58 @@ func (s *Service) locateRejoinedDevice(
 // every subsequent probe short-circuits with ErrCircuitOpen before the device, now
 // actually up, is contacted again; the LAN reconfirm (and the clockless-config
 // second pass it gates) would then never run even though the device is reachable.
+func (s *Service) pollReachableVia(
+	ctx context.Context,
+	addr string,
+	generation int,
+	candidates []string,
+	timeout, interval, probeTimeout time.Duration,
+) (string, error) {
+	ctx = ratelimit.MarkAsPolling(ctx)
+	deadline := time.Now().Add(timeout)
+
+	probe := func(bindIface string) error {
+		pctx, cancel := context.WithTimeout(client.WithBindInterface(ctx, bindIface), probeTimeout)
+		defer cancel()
+		return s.probeReachableOnce(pctx, addr, generation)
+	}
+
+	var lastErr error
+	for time.Now().Before(deadline) {
+		for _, cand := range candidates {
+			err := probe(cand)
+			if err == nil {
+				return cand, nil
+			}
+			lastErr = err
+			if ctx.Err() != nil {
+				return "", ctx.Err()
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(interval):
+		}
+	}
+	if lastErr != nil {
+		return "", lastErr
+	}
+	return "", fmt.Errorf("device at %s not reachable within %s", addr, timeout)
+}
+
+// pollReachable polls addr over the default route until a generation-aware probe
+// succeeds or the timeout elapses. It is the single-interface form of
+// pollReachableVia, kept for callers that need no egress selection.
 func (s *Service) pollReachable(
 	ctx context.Context,
 	addr string,
 	generation int,
 	timeout, interval, probeTimeout time.Duration,
 ) error {
-	ctx = ratelimit.MarkAsPolling(ctx)
-	deadline := time.Now().Add(timeout)
-
-	probe := func() error {
-		pctx, cancel := context.WithTimeout(ctx, probeTimeout)
-		defer cancel()
-		if generation == 1 {
-			return s.WithGen1Connection(pctx, addr, func(conn *client.Gen1Client) error {
-				_, settingsErr := conn.GetSettings(pctx)
-				return settingsErr
-			})
-		}
-		return s.WithConnection(pctx, addr, func(conn *client.Client) error {
-			_, callErr := conn.Call(pctx, "Shelly.GetDeviceInfo", nil)
-			return callErr
-		})
-	}
-
-	var lastErr error
-	for time.Now().Before(deadline) {
-		err := probe()
-		if err == nil {
-			return nil
-		}
-		lastErr = err
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(interval):
-		}
-	}
-	if lastErr != nil {
-		return lastErr
-	}
-	return fmt.Errorf("device at %s not reachable within %s", addr, timeout)
+	_, err := s.pollReachableVia(ctx, addr, generation, []string{""}, timeout, interval, probeTimeout)
+	return err
 }
 
 // updateRegistryAddress points the named registry entry at the device's new LAN
