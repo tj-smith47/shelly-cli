@@ -3,6 +3,7 @@ package backup
 
 import (
 	"encoding/json"
+	"io"
 
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 )
@@ -134,6 +135,21 @@ type RestoreOptions struct {
 	SkipMeters bool
 	// Password for decryption (required if backup is encrypted).
 	Password string
+	// ClockDependentOnly restores only the clock-gated configuration (Gen1 light
+	// component config and captured light state). Set for the LAN second pass of a
+	// --to-ap restore, where everything else already applied at the factory AP and
+	// only the time-dependent writes the clockless AP rejected need re-applying.
+	ClockDependentOnly bool
+	// AllowFirmwareDowngrade overrides the Gen1 firmware-downgrade refusal, which by
+	// default blocks restoring a backup captured from newer firmware onto a device
+	// running older firmware (a proven reboot-loop trigger). Set only when updating
+	// the device firmware first is not possible and the risk is accepted.
+	AllowFirmwareDowngrade bool
+	// StepTrace, when non-nil, receives a per-step diagnostic line during a Gen1
+	// restore (each setting group's warnings/errors and the device's post-write
+	// uptime/stability). It is the debug seam behind --trace-file for pinpointing
+	// which setting destabilizes a fragile device; nil on a normal restore.
+	StepTrace io.Writer
 }
 
 // ToRestoreOptions converts RestoreOptions to shelly-go RestoreOptions.
@@ -152,13 +168,18 @@ func (o *RestoreOptions) ToRestoreOptions() *shellybackup.RestoreOptions {
 
 // RestoreResult contains the result of a restore operation.
 type RestoreResult struct {
+	// DestabilizedStep names the restore step after which the device failed to
+	// restabilize — a write drove it into a reboot loop and the restore halted.
+	// Empty on a clean restore.
+	DestabilizedStep  string
+	Warnings          []string
+	Errors            []string
 	Success           bool
 	ConfigRestored    bool
 	ScriptsRestored   int
 	SchedulesRestored int
 	WebhooksRestored  int
 	RestartRequired   bool
-	Warnings          []string
 }
 
 // Script is a compatibility type for backup scripts.

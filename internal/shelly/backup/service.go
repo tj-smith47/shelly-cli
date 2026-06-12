@@ -195,16 +195,28 @@ func (s *Service) restoreGen1Backup(ctx context.Context, identifier string, devi
 			return err
 		}
 		result = &RestoreResult{
-			Success:         r.Success,
-			ConfigRestored:  true,
-			RestartRequired: r.RestartRequired,
-			Warnings:        r.Warnings,
+			Success:          r.Success,
+			ConfigRestored:   r.Success,
+			RestartRequired:  r.RestartRequired,
+			Warnings:         r.Warnings,
+			Errors:           gen1ErrorStrings(r.Errors),
+			DestabilizedStep: r.DestabilizedStep,
 		}
 		// The library result carries no per-section counts; recover the webhook
 		// count the same way the old in-CLI restore did (number of action entries
-		// in the backup), gated on the webhook restore actually running.
-		if !opts.SkipWebhooks {
+		// in the backup), gated on the webhook restore actually running and the
+		// restore reaching the webhook step (a halted restore never does).
+		if !opts.SkipWebhooks && r.Success {
 			result.WebhooksRestored = countGen1Actions(deviceBackup.Backup)
+		}
+		// A destabilizing step is a hard failure: the restore halted with the device
+		// in a reboot loop. Surface it as an error so the command never reports a
+		// false success, naming the breaking step for diagnosis.
+		if r.DestabilizedStep != "" {
+			return fmt.Errorf(
+				"restore halted: device became unstable after the %q step — a write drove it "+
+					"into a reboot loop; capture the per-step trace with --trace-file to confirm",
+				r.DestabilizedStep)
 		}
 		return nil
 	})
@@ -212,16 +224,33 @@ func (s *Service) restoreGen1Backup(ctx context.Context, identifier string, devi
 	return result, err
 }
 
+// gen1ErrorStrings renders the library restore errors as display strings for the
+// CLI result, so per-setting failures surface to the user instead of being
+// dropped. Returns nil for an empty slice (a clean restore).
+func gen1ErrorStrings(errs []error) []string {
+	if len(errs) == 0 {
+		return nil
+	}
+	out := make([]string, len(errs))
+	for i, err := range errs {
+		out[i] = err.Error()
+	}
+	return out
+}
+
 // toGen1RestoreOptions translates the CLI RestoreOptions into the shelly-go
 // Gen1RestoreOptions consumed by shellybackup.RestoreGen1.
 func toGen1RestoreOptions(opts RestoreOptions) *shellybackup.Gen1RestoreOptions {
 	out := &shellybackup.Gen1RestoreOptions{
-		Name:         opts.Name,
-		SkipNetwork:  opts.SkipNetwork,
-		SkipAuth:     opts.SkipAuth,
-		SkipState:    opts.SkipState,
-		SkipMeters:   opts.SkipMeters,
-		SkipWebhooks: opts.SkipWebhooks,
+		Name:                   opts.Name,
+		SkipNetwork:            opts.SkipNetwork,
+		SkipAuth:               opts.SkipAuth,
+		SkipState:              opts.SkipState,
+		SkipMeters:             opts.SkipMeters,
+		SkipWebhooks:           opts.SkipWebhooks,
+		ClockDependentOnly:     opts.ClockDependentOnly,
+		AllowFirmwareDowngrade: opts.AllowFirmwareDowngrade,
+		StepTrace:              opts.StepTrace,
 	}
 	if opts.NetworkOverride != nil {
 		out.NetworkOverride = &shellybackup.Gen1NetworkOverride{

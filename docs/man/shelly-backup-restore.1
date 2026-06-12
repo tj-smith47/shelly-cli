@@ -19,6 +19,10 @@ sections.
 
 
 .SH OPTIONS
+\fB--allow-firmware-downgrade\fP[=false]
+	Allow restoring a backup captured from newer firmware onto an older-firmware device (refused by default; this can trigger a reboot loop — update the device firmware first instead)
+
+.PP
 \fB--ap-ip\fP=""
 	Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)
 

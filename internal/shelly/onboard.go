@@ -636,18 +636,44 @@ func (s *Service) withAPHop(
 		return fmt.Errorf("failed to connect to Shelly AP %q: %w", apSSID, err)
 	}
 
+	// Return to the home network no matter how fn exits — a normal return, an
+	// error, or a panic — so a failure mid-hop never strands the host on the
+	// device AP. A cancel-immune context lets the reconnect (and AP-block cleanup)
+	// run even when ctx was already cancelled, bounded by its own timeout.
+	defer func() {
+		returnCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), apReturnHomeTimeout)
+		defer cancel()
+		s.returnFromAPHop(returnCtx, scanner, apSSID, originalNet, homeWiFi)
+	}()
+
 	// Wait until the AP link is actually up and the device answers at its AP
 	// address before sending any request. A fixed DHCP delay races association
 	// on slower WiFi stacks, so the first request would leave before a route to
 	// the AP subnet exists and fail with a deadline-exceeded error.
 	s.waitForAPReady(ctx, apReadyTimeout)
 
-	fnErr := fn(ctx)
+	return fn(ctx)
+}
 
-	// Always return to the home network, even if fn failed. Try the previously
-	// joined network first (NetworkManager may have saved creds); fall back to
-	// the supplied home credentials when that SSID differs and the first attempt
-	// fails (nl80211 has no credential store).
+// apReturnHomeTimeout bounds the reconnect-to-home (and AP-block cleanup) that
+// runs on return from an AP hop. It runs on a cancel-immune context so it still
+// executes when the hop's own context was cancelled, but must not block shutdown
+// indefinitely.
+const apReturnHomeTimeout = 30 * time.Second
+
+// returnFromAPHop reconnects the host to its home network after an AP hop and
+// drops the transient device-AP block. It prefers the previously-joined network
+// (NetworkManager may have saved creds), falling back to the supplied home
+// credentials when that SSID differs and the first attempt fails (nl80211 has no
+// credential store). Best-effort: it runs as cleanup on the AP-hop return, so
+// failures are traced, not returned.
+func (s *Service) returnFromAPHop(
+	ctx context.Context,
+	scanner discovery.WiFiScanner,
+	apSSID string,
+	originalNet *discovery.WiFiNetwork,
+	homeWiFi *OnboardWiFiConfig,
+) {
 	reconnectSSID, reconnectPass := reconnectCredentials(originalNet, homeWiFi)
 	if reconnErr := scanner.Connect(ctx, reconnectSSID, reconnectPass); reconnErr != nil {
 		debug.TraceEvent("AP hop reconnect to %s failed: %v", reconnectSSID, reconnErr)
@@ -658,7 +684,14 @@ func (s *Service) withAPHop(
 		}
 	}
 
-	return fnErr
+	// Drop the transient AP block so hops across a fleet of devices do not leave
+	// stale (disabled) wpa_supplicant blocks behind. Only the Linux/wpa_cli
+	// scanner needs this; other platforms manage AP profiles through the OS.
+	if forgetter, ok := scanner.(discovery.APNetworkForgetter); ok {
+		if err := forgetter.ForgetNetwork(ctx, apSSID); err != nil {
+			debug.TraceEvent("AP hop: forget AP network %s failed: %v", apSSID, err)
+		}
+	}
 }
 
 // apReadyTimeout bounds how long withAPHop waits for the host to associate with

@@ -127,6 +127,19 @@ func DisplayRestoreResult(ios *iostreams.IOStreams, result *backup.RestoreResult
 			ios.Printf("  - %s\n", w)
 		}
 	}
+
+	if len(result.Errors) > 0 {
+		ios.Println()
+		ios.Error("Errors:")
+		for _, e := range result.Errors {
+			ios.Printf("  - %s\n", e)
+		}
+	}
+
+	if result.DestabilizedStep != "" {
+		ios.Println()
+		ios.Error("Restore halted: the device entered a reboot loop after the %q step.", result.DestabilizedStep)
+	}
 }
 
 // DisplayBackupsTable prints a table of backup files.

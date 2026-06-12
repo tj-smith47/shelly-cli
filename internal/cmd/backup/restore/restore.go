@@ -17,27 +17,29 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Factory       *cmdutil.Factory
-	Decrypt       string
-	Device        string
-	DryRun        bool
-	FilePath      string
-	SkipAuth      bool
-	SkipNetwork   bool
-	SkipScripts   bool
-	SkipSchedules bool
-	SkipWebhooks  bool
-	SkipState     bool
-	SkipMeters    bool
-	StaticIP      string
-	Gateway       string
-	Netmask       string
-	DNS           string
-	Name          string
-	ToAP          string
-	APIP          string
-	SSID          string
-	Password      string
+	Factory                *cmdutil.Factory
+	Decrypt                string
+	Device                 string
+	DryRun                 bool
+	FilePath               string
+	SkipAuth               bool
+	SkipNetwork            bool
+	SkipScripts            bool
+	SkipSchedules          bool
+	SkipWebhooks           bool
+	SkipState              bool
+	SkipMeters             bool
+	StaticIP               string
+	Gateway                string
+	Netmask                string
+	DNS                    string
+	Name                   string
+	ToAP                   string
+	APIP                   string
+	SSID                   string
+	Password               string
+	AllowFirmwareDowngrade bool
+	TraceFile              string
 }
 
 // NewCommand creates the backup restore command.
@@ -107,9 +109,37 @@ sections.`,
 	cmd.Flags().StringVar(&opts.APIP, "ap-ip", "", "Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)")
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the device joins (defaults to the backup's network)")
 	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)")
+	cmd.Flags().BoolVar(&opts.AllowFirmwareDowngrade, "allow-firmware-downgrade", false, "Allow restoring a backup captured from newer firmware onto an older-firmware device (refused by default; this can trigger a reboot loop — update the device firmware first instead)")
+	cmd.Flags().StringVar(&opts.TraceFile, "trace-file", "", "Write a per-step Gen1 restore diagnostic (which setting destabilizes the device) to this file")
+	if err := cmd.Flags().MarkHidden("trace-file"); err != nil {
+		// MarkHidden only fails on an unknown flag name; the flag is defined above.
+		panic(err)
+	}
 	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
 	return cmd
+}
+
+// attachTrace wires the --trace-file diagnostic sink onto restoreOpts when the
+// flag is set, returning a cleanup that closes the file. It returns a no-op
+// cleanup (never nil) when no trace was requested, so callers can defer it
+// unconditionally.
+func (o *Options) attachTrace(restoreOpts *backup.RestoreOptions) (func(), error) {
+	if o.TraceFile == "" {
+		return func() {}, nil
+	}
+	ios := o.Factory.IOStreams()
+	traceFile, err := config.Fs().Create(o.TraceFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open trace file: %w", err)
+	}
+	restoreOpts.StepTrace = traceFile
+	ios.Info("Writing per-step restore trace to %s", o.TraceFile)
+	return func() {
+		if closeErr := traceFile.Close(); closeErr != nil {
+			ios.DebugErr("close trace file", closeErr)
+		}
+	}, nil
 }
 
 // validateFlags rejects incompatible flag combinations before any device I/O.
@@ -180,17 +210,18 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	restoreOpts := backup.RestoreOptions{
-		DryRun:          opts.DryRun,
-		SkipAuth:        opts.SkipAuth,
-		SkipNetwork:     opts.SkipNetwork,
-		SkipScripts:     opts.SkipScripts,
-		SkipSchedules:   opts.SkipSchedules,
-		SkipWebhooks:    opts.SkipWebhooks,
-		SkipState:       opts.SkipState,
-		SkipMeters:      opts.SkipMeters,
-		Password:        opts.Decrypt,
-		NetworkOverride: override,
-		Name:            cmdutil.DeviceDisplayName(opts.Name, opts.Device),
+		DryRun:                 opts.DryRun,
+		SkipAuth:               opts.SkipAuth,
+		SkipNetwork:            opts.SkipNetwork,
+		SkipScripts:            opts.SkipScripts,
+		SkipSchedules:          opts.SkipSchedules,
+		SkipWebhooks:           opts.SkipWebhooks,
+		SkipState:              opts.SkipState,
+		SkipMeters:             opts.SkipMeters,
+		Password:               opts.Decrypt,
+		NetworkOverride:        override,
+		Name:                   cmdutil.DeviceDisplayName(opts.Name, opts.Device),
+		AllowFirmwareDowngrade: opts.AllowFirmwareDowngrade,
 	}
 
 	if opts.DryRun {
@@ -204,6 +235,14 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	svc := opts.Factory.ShellyService()
+
+	// --trace-file streams a per-step Gen1 restore diagnostic to a file: which
+	// setting each device tolerated and which one drove it into a reboot loop.
+	cleanupTrace, err := opts.attachTrace(&restoreOpts)
+	if err != nil {
+		return err
+	}
+	defer cleanupTrace()
 
 	// --to-ap: hop onto the device's factory AP, restore there, and let the
 	// network override move it onto the LAN — provisioning and restore in one.

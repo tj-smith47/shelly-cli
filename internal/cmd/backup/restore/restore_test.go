@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	clibackup "github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
 
 const testFalseValue = "false"
@@ -569,4 +570,77 @@ func TestNewCommand_SkipStateAndMetersFlags(t *testing.T) {
 			t.Errorf("--%s default = %q, want %q", name, f.DefValue, testFalseValue)
 		}
 	}
+}
+
+func TestNewCommand_FirmwareAndTraceFlags(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	downgrade := cmd.Flags().Lookup("allow-firmware-downgrade")
+	if downgrade == nil {
+		t.Fatal("--allow-firmware-downgrade flag not registered")
+	}
+	if downgrade.DefValue != testFalseValue {
+		t.Errorf("--allow-firmware-downgrade default = %q, want %q", downgrade.DefValue, testFalseValue)
+	}
+
+	trace := cmd.Flags().Lookup("trace-file")
+	if trace == nil {
+		t.Fatal("--trace-file flag not registered")
+	}
+	// The trace file is a debug seam, hidden from normal help so the command's
+	// surface stays clean.
+	if !trace.Hidden {
+		t.Error("--trace-file should be hidden")
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestAttachTrace(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	t.Run("no trace file is a no-op cleanup", func(t *testing.T) {
+		opts := &Options{Factory: f}
+		restoreOpts := &clibackup.RestoreOptions{}
+		cleanup, err := opts.attachTrace(restoreOpts)
+		if err != nil {
+			t.Fatalf("attachTrace: %v", err)
+		}
+		if cleanup == nil {
+			t.Fatal("cleanup must never be nil")
+		}
+		cleanup() // must not panic
+		if restoreOpts.StepTrace != nil {
+			t.Error("StepTrace should stay nil without --trace-file")
+		}
+	})
+
+	t.Run("trace file wires a writable sink", func(t *testing.T) {
+		opts := &Options{Factory: f, TraceFile: "/test/trace.log"}
+		restoreOpts := &clibackup.RestoreOptions{}
+		cleanup, err := opts.attachTrace(restoreOpts)
+		if err != nil {
+			t.Fatalf("attachTrace: %v", err)
+		}
+		if restoreOpts.StepTrace == nil {
+			t.Fatal("StepTrace was not wired from --trace-file")
+		}
+		if _, err := restoreOpts.StepTrace.Write([]byte("step=mqtt ok\n")); err != nil {
+			t.Errorf("trace sink not writable: %v", err)
+		}
+		cleanup()
+		data, err := afero.ReadFile(config.Fs(), "/test/trace.log")
+		if err != nil {
+			t.Fatalf("read trace file: %v", err)
+		}
+		if !strings.Contains(string(data), "step=mqtt") {
+			t.Errorf("trace file missing written content: %q", data)
+		}
+	})
 }

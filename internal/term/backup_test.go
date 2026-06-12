@@ -7,7 +7,39 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
+
+func TestDisplayRestoreResult_SurfacesErrorsAndDestabilizedStep(t *testing.T) {
+	t.Parallel()
+
+	t.Run("errors and destabilized step are shown", func(t *testing.T) {
+		t.Parallel()
+		ios, out, errOut := testIOStreams()
+		DisplayRestoreResult(ios, &backup.RestoreResult{
+			Success:          false,
+			Warnings:         []string{"light schedule rejected (no clock)"},
+			Errors:           []string{"device became unstable after writing coiot"},
+			DestabilizedStep: "coiot",
+		})
+		got := out.String() + errOut.String()
+		for _, want := range []string{"Warnings", "Errors", "coiot", "reboot loop"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("output missing %q; got:\n%s", want, got)
+			}
+		}
+	})
+
+	t.Run("clean result shows neither errors nor halt", func(t *testing.T) {
+		t.Parallel()
+		ios, out, errOut := testIOStreams()
+		DisplayRestoreResult(ios, &backup.RestoreResult{Success: true, ConfigRestored: true})
+		got := out.String() + errOut.String()
+		if strings.Contains(got, "Errors") || strings.Contains(got, "reboot loop") {
+			t.Errorf("clean restore should not mention errors or a halt; got:\n%s", got)
+		}
+	})
+}
 
 func TestDisplayBackupsTable(t *testing.T) {
 	t.Parallel()

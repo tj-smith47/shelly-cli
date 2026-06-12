@@ -55,25 +55,26 @@ shelly backup restore <device> <file> [flags]
 ### Options
 
 ```
-      --ap-ip string       Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)
-  -d, --decrypt string     Password to decrypt backup
-      --dns string         Static IPv4 nameserver (optional, with --static-ip)
-      --dry-run            Show what would be restored without applying
-      --gateway string     Static IPv4 default gateway (with --static-ip)
-  -h, --help               help for restore
-      --name string        Override the device name (defaults to the target identifier when it is a friendly alias)
-      --netmask string     Static IPv4 subnet mask (with --static-ip)
-      --password string    WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
-      --skip-auth          Skip authentication configuration
-      --skip-meters        Skip restoring meter/energy-meter configuration (e.g. overpower limits)
-      --skip-network       Skip network configuration (WiFi, Ethernet)
-      --skip-schedules     Skip schedule restoration
-      --skip-scripts       Skip script restoration
-      --skip-state         Skip restoring live component state (color temperature, brightness); apply configuration only
-      --skip-webhooks      Skip webhook restoration
-      --ssid string        Override the WiFi SSID the device joins (defaults to the backup's network)
-      --static-ip string   Override the backup's WiFi with this static IPv4 address
-      --to-ap string       Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)
+      --allow-firmware-downgrade   Allow restoring a backup captured from newer firmware onto an older-firmware device (refused by default; this can trigger a reboot loop — update the device firmware first instead)
+      --ap-ip string               Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)
+  -d, --decrypt string             Password to decrypt backup
+      --dns string                 Static IPv4 nameserver (optional, with --static-ip)
+      --dry-run                    Show what would be restored without applying
+      --gateway string             Static IPv4 default gateway (with --static-ip)
+  -h, --help                       help for restore
+      --name string                Override the device name (defaults to the target identifier when it is a friendly alias)
+      --netmask string             Static IPv4 subnet mask (with --static-ip)
+      --password string            WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
+      --skip-auth                  Skip authentication configuration
+      --skip-meters                Skip restoring meter/energy-meter configuration (e.g. overpower limits)
+      --skip-network               Skip network configuration (WiFi, Ethernet)
+      --skip-schedules             Skip schedule restoration
+      --skip-scripts               Skip script restoration
+      --skip-state                 Skip restoring live component state (color temperature, brightness); apply configuration only
+      --skip-webhooks              Skip webhook restoration
+      --ssid string                Override the WiFi SSID the device joins (defaults to the backup's network)
+      --static-ip string           Override the backup's WiFi with this static IPv4 address
+      --to-ap string               Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)
 ```
 
 ### Options inherited from parent commands

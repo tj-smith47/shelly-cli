@@ -22,7 +22,7 @@ type probeIface struct {
 //
 // The default route is tried FIRST so a network where it already reaches the
 // device (the common case) is never perturbed: the probe binds nothing, behaves
-// exactly as before, and the later candidates are never reached. The fallbacks
+// exactly as before, and the remaining candidates are never reached. The fallbacks
 // exist only for a network whose AP isolates wireless clients — there a device
 // rejoined over the host's own wireless AP is reached station-to-station and may
 // be dropped, while a wired interface on the same subnet still reaches it. So the

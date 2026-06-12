@@ -126,12 +126,21 @@ func (s *Service) RestoreToAP(
 // error they did at the AP.
 const lanSettleDelay = 8 * time.Second
 
-// reapplyConfigOnLAN re-runs the config restore at the device's LAN address once
-// it has joined and obtained a clock, applying settings the device rejected at its
-// clockless factory AP (notably Gen1 light/colour-temperature config). Network is
-// skipped — already applied — so the live connection is not disturbed. The LAN
-// result supersedes the AP result; if the LAN pass fails, the AP result is
-// returned with a warning so the caller still sees that the device landed.
+// lanReapplyBudget caps the whole LAN re-apply. The device was just confirmed
+// reachable, but it can drop again mid-pass (a restored setting restarts it, or
+// AP-isolation flaps the path); without a bound each write would then burn the
+// transport's full retry budget (30s × 3) and the pass could hang for minutes.
+// The re-apply is best-effort, so exceeding this just records a warning.
+const lanReapplyBudget = 90 * time.Second
+
+// reapplyConfigOnLAN re-applies, at the device's LAN address once it has joined
+// and obtained a clock, only the configuration the device rejected at its
+// clockless factory AP — Gen1 light/colour-temperature config and captured light
+// state. Everything else already took at the AP, so re-writing it would needlessly
+// thrash the device (a redundant mode write can even restart it again); the pass
+// is therefore scoped via ClockDependentOnly rather than re-running the whole
+// restore. The LAN result supersedes the AP result; if the LAN pass fails, the AP
+// result is returned with a warning so the caller still sees that the device landed.
 func (s *Service) reapplyConfigOnLAN(
 	ctx context.Context,
 	addr string,
@@ -147,12 +156,16 @@ func (s *Service) reapplyConfigOnLAN(
 	}
 
 	lanOpts := opts
-	lanOpts.SkipNetwork = true // network is live; the LAN pass only re-applies device config
-	lanResult, err := s.RestoreBackupGen(ctx, addr, generation, bkp, lanOpts)
+	lanOpts.SkipNetwork = true        // network is live; do not disturb the connection
+	lanOpts.ClockDependentOnly = true // only the clock-gated config the AP rejected
+
+	reapplyCtx, cancel := context.WithTimeout(ctx, lanReapplyBudget)
+	defer cancel()
+	lanResult, err := s.RestoreBackupGen(reapplyCtx, addr, generation, bkp, lanOpts)
 	if err != nil {
 		debug.TraceEvent("restore-to-ap: LAN config re-apply failed: %v", err)
 		apResult.Warnings = append(apResult.Warnings,
-			fmt.Sprintf("device joined %s but re-applying full config on the LAN failed: %v", addr, err))
+			fmt.Sprintf("device joined %s but re-applying clock-dependent config on the LAN failed: %v", addr, err))
 		return apResult
 	}
 	return lanResult
