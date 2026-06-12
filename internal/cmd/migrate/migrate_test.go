@@ -577,3 +577,64 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 		t.Fatal("NewCommand returned nil with test IOStreams")
 	}
 }
+
+func TestValidateFlags(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		opts        Options
+		wantErrSubs string
+	}{
+		{name: "no flags", opts: Options{}},
+		{name: "to-ap with static-ip", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", StaticIP: "10.0.0.5", Gateway: "10.0.0.1", Netmask: "255.255.255.0"}},
+		{name: "static-ip with skip-network", opts: Options{StaticIP: "10.0.0.5", Gateway: "10.0.0.1", Netmask: "255.255.255.0", SkipNetwork: true}, wantErrSubs: "static-ip cannot be used with --skip-network"},
+		{name: "to-ap with skip-network", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", SkipNetwork: true}, wantErrSubs: "to-ap cannot be used with --skip-network"},
+		{name: "to-ap with dry-run", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", DryRun: true}, wantErrSubs: "to-ap cannot be combined with --dry-run"},
+		{name: "ap-ip without to-ap", opts: Options{APIP: "192.168.33.140"}, wantErrSubs: "ap-ip only applies with --to-ap"},
+		{name: "ap-ip with to-ap", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", APIP: "192.168.33.140"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := tt.opts.validateFlags(tt.opts.networkOverride())
+			if tt.wantErrSubs == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErrSubs) {
+				t.Fatalf("got %v, want error containing %q", err, tt.wantErrSubs)
+			}
+		})
+	}
+}
+
+func TestShouldResetSource_ToAP(t *testing.T) {
+	t.Parallel()
+	// A --to-ap target is a distinct physical device, so the source is never
+	// reset even when network settings are migrated.
+	opts := Options{ToAP: "ShellyBulbDuo-AABBCC"}
+	if opts.shouldResetSource() {
+		t.Error("shouldResetSource() = true for --to-ap, want false")
+	}
+}
+
+func TestToAPFlagRegistered(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+	if cmd.Flags().Lookup("to-ap") == nil {
+		t.Error("--to-ap flag not registered")
+	}
+}
+
+func TestNewCommand_SkipStateAndMetersFlags(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	for _, name := range []string{"skip-state", "skip-meters"} {
+		if cmd.Flags().Lookup(name) == nil {
+			t.Errorf("--%s flag not registered", name)
+		}
+	}
+}

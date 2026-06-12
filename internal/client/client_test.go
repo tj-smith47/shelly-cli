@@ -1778,6 +1778,72 @@ func TestDetectGeneration_Gen1Device(t *testing.T) {
 	}
 }
 
+// TestDetectGeneration_Gen1DeviceRPCHangs reproduces the failure that misrouted
+// Gen1 devices reached by a bare IP (e.g. a device at its factory AP): the
+// Gen1-only HTTP server accepts a connection on the Gen2 /rpc path but never
+// answers, so a Gen2-first probe would stall on its timeout and an inconclusive
+// result would be silently treated as Gen2. Detection must identify Gen1 via the
+// universal /shelly endpoint without ever blocking on /rpc.
+func TestDetectGeneration_Gen1DeviceRPCHangs(t *testing.T) {
+	t.Parallel()
+
+	gen1Response := map[string]any{
+		typeKey:       testModelSHSW1,
+		macKey:        testMAC2,
+		authKey:       false,
+		"fw":          "20210226-091923/v1.10.0-rc2@28a456c3",
+		numOutputsKey: 1,
+		numMetersKey:  0,
+	}
+
+	rpcCalled := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == gen2Endpoint {
+			// Mimic a Gen1 device's behavior on the Gen2 endpoint: accept the
+			// request but never respond, so a Gen2-first probe would hang.
+			select {
+			case rpcCalled <- struct{}{}:
+			default:
+			}
+			<-r.Context().Done()
+			return
+		}
+		if r.URL.Path == gen1Endpoint {
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(gen1Response); err != nil {
+				t.Logf("warning: failed to encode response: %v", err)
+			}
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	result, err := DetectGeneration(ctx, server.URL, nil)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("DetectGeneration() error = %v", err)
+	}
+	if result.Generation != Gen1 {
+		t.Errorf("Generation = %d, want %d", result.Generation, Gen1)
+	}
+	// /shelly answers immediately; if detection had waited on the hung /rpc probe
+	// it would approach the 5s client timeout.
+	if elapsed > 2*time.Second {
+		t.Errorf("detection took %s, expected near-instant via /shelly (did it stall on /rpc?)", elapsed)
+	}
+	select {
+	case <-rpcCalled:
+		t.Error("/rpc was probed before /shelly resolved the generation; Gen1 must not depend on the Gen2 endpoint")
+	default:
+	}
+}
+
 func TestDetectGeneration_AuthRequired(t *testing.T) {
 	t.Parallel()
 

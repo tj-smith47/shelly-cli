@@ -835,7 +835,7 @@ func TestGen1RollerStatusToCover(t *testing.T) {
 			}
 
 			// Position should only be set if valid and non-negative
-			positionShouldBeSet := tt.status.CurrentPos >= 0 && tt.status.IsValid
+			positionShouldBeSet := tt.status.CurrentPos >= 0 && tt.status.IsValid.Bool()
 			checkIntParam(t, "CurrentPosition", got.CurrentPosition, tt.status.CurrentPos, positionShouldBeSet)
 
 			// Power should only be set if > 0

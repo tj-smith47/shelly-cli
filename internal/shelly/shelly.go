@@ -385,6 +385,24 @@ func (s *Service) withGenAwareAction(
 	return s.WithConnection(ctx, identifier, gen2Fn)
 }
 
+// withComponentAction runs a gen-aware component mutation (switch/cover/light/
+// rgb/rgbw on/off/brightness/colour/…) and, on success, drops the device's
+// cached component status so a follow-up `status` read reflects the change
+// instead of waiting out the cache TTL. Use this rather than withGenAwareAction
+// for any call that changes a component's live state.
+func (s *Service) withComponentAction(
+	ctx context.Context,
+	identifier string,
+	gen1Fn func(*client.Gen1Client) error,
+	gen2Fn func(*client.Client) error,
+) error {
+	err := s.withGenAwareAction(ctx, identifier, gen1Fn, gen2Fn)
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
+	return err
+}
+
 // WithDevice executes a function with a unified device connection.
 // The DeviceClient auto-detects the device generation and provides
 // access to both Gen1 and Gen2 APIs through a single interface.

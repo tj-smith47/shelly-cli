@@ -7,6 +7,7 @@ import (
 
 	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -44,7 +45,7 @@ func (l LightInfo) ListRow() []string {
 // LightOn turns on a light component.
 // For Gen1 devices, this controls the light/dimmer.
 func (s *Service) LightOn(ctx context.Context, identifier string, lightID int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			light, err := conn.Light(lightID)
 			if err != nil {
@@ -61,7 +62,7 @@ func (s *Service) LightOn(ctx context.Context, identifier string, lightID int) e
 // LightOff turns off a light component.
 // For Gen1 devices, this controls the light/dimmer.
 func (s *Service) LightOff(ctx context.Context, identifier string, lightID int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			light, err := conn.Light(lightID)
 			if err != nil {
@@ -105,13 +106,16 @@ func (s *Service) LightToggle(ctx context.Context, identifier string, lightID in
 		result, err = dev.Gen2().Light(lightID).GetStatus(ctx)
 		return err
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
 	return result, err
 }
 
 // LightBrightness sets the brightness of a light component (0-100).
 // For Gen1 devices, this controls the light/dimmer brightness.
 func (s *Service) LightBrightness(ctx context.Context, identifier string, lightID, brightness int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			light, err := conn.Light(lightID)
 			if err != nil {
@@ -154,11 +158,63 @@ func (s *Service) LightStatus(ctx context.Context, identifier string, lightID in
 	return result, err
 }
 
-// LightSet sets parameters of a light component.
-// For Gen1 devices, use LightOn/LightOff/LightBrightness instead (Gen1 doesn't support combined set).
-func (s *Service) LightSet(ctx context.Context, identifier string, lightID int, brightness *int, on *bool) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		return conn.Light(lightID).Set(ctx, brightness, on)
+// LightSet sets a light's brightness, white color temperature, and on/off state,
+// auto-detecting the device generation. Color temperature is applied for Gen1
+// white-temp bulbs (e.g. the Duo); Gen2+ tunable white is a separate component,
+// so a non-nil temp on a Gen2+ device is reported as unsupported rather than
+// silently ignored.
+func (s *Service) LightSet(ctx context.Context, identifier string, lightID int, brightness, temp *int, on *bool) error {
+	isGen1, _, err := s.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return err
+	}
+
+	var setErr error
+	switch {
+	case isGen1:
+		setErr = s.lightSetGen1(ctx, identifier, lightID, brightness, temp, on)
+	case temp != nil:
+		return fmt.Errorf("setting color temperature is not supported for Gen2+ lights via this command")
+	default:
+		setErr = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+			return conn.Light(lightID).Set(ctx, brightness, on)
+		})
+	}
+
+	// A successful write makes any cached component status stale; drop it so the
+	// next `light status` reflects the change instead of waiting out the TTL.
+	if setErr == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
+	return setErr
+}
+
+// lightSetGen1 applies brightness, color temperature, and on/off to a Gen1 light.
+// Temperature is applied before brightness so the bulb lands on its final colour
+// and level together.
+func (s *Service) lightSetGen1(ctx context.Context, identifier string, lightID int, brightness, temp *int, on *bool) error {
+	return s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		light, err := conn.Light(lightID)
+		if err != nil {
+			return err
+		}
+		if temp != nil {
+			if tErr := light.SetColorTemp(ctx, *temp); tErr != nil {
+				return tErr
+			}
+		}
+		if brightness != nil {
+			if bErr := light.SetBrightness(ctx, *brightness); bErr != nil {
+				return bErr
+			}
+		}
+		if on != nil {
+			if *on {
+				return light.TurnOn(ctx)
+			}
+			return light.TurnOff(ctx)
+		}
+		return nil
 	})
 }
 
@@ -204,9 +260,15 @@ func (s *Service) LightList(ctx context.Context, identifier string) ([]LightInfo
 // gen1LightStatusToLight converts Gen1 light status to model.LightStatus.
 func gen1LightStatusToLight(id int, status *gen1comp.LightStatus) *model.LightStatus {
 	brightness := status.Brightness
-	return &model.LightStatus{
+	light := &model.LightStatus{
 		ID:         id,
 		Output:     status.IsOn,
 		Brightness: &brightness,
 	}
+	// White-temp bulbs (Duo) report a color temperature; plain dimmers report 0.
+	if status.Temp > 0 {
+		temp := status.Temp
+		light.Temp = &temp
+	}
+	return light
 }

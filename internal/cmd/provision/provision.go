@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision/ble"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision/bulk"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/provision/inspect"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision/wifi"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -136,6 +137,7 @@ To register already-networked devices, use: shelly discover --register`,
 	cmd.AddCommand(wifi.NewCommand(f))
 	cmd.AddCommand(bulk.NewCommand(f))
 	cmd.AddCommand(ble.NewCommand(f))
+	cmd.AddCommand(inspect.NewCommand(f))
 
 	return cmd
 }

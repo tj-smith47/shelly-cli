@@ -157,6 +157,12 @@ func (s *Service) SetComponentConfig(ctx context.Context, identifier, component 
 	return s.SetConfig(ctx, identifier, fullConfig)
 }
 
+// WiFi station connectivity status values surfaced by GetWiFiStatus.
+const (
+	wifiStatusConnected    = "connected"
+	wifiStatusDisconnected = "disconnected"
+)
+
 // WiFiStatus holds WiFi status information.
 type WiFiStatus struct {
 	StaIP   string `json:"sta_ip"`
@@ -166,10 +172,20 @@ type WiFiStatus struct {
 	APCount int    `json:"ap_client_count,omitempty"`
 }
 
-// GetWiFiStatus returns the WiFi status.
+// GetWiFiStatus returns the WiFi status, auto-detecting the device generation:
+// Gen2+ devices answer the WiFi.GetStatus RPC, while Gen1 devices expose the same
+// data under /status (wifi_sta), which has no RPC endpoint and would otherwise 404.
 func (s *Service) GetWiFiStatus(ctx context.Context, identifier string) (*WiFiStatus, error) {
+	isGen1, _, err := s.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+	if isGen1 {
+		return s.getWiFiStatusGen1(ctx, identifier)
+	}
+
 	var result *WiFiStatus
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		wifi := components.NewWiFi(conn.RPCClient())
 		status, err := wifi.GetStatus(ctx)
 		if err != nil {
@@ -189,6 +205,32 @@ func (s *Service) GetWiFiStatus(ctx context.Context, identifier string) (*WiFiSt
 		}
 		if status.APClientCount != nil {
 			result.APCount = *status.APClientCount
+		}
+		return nil
+	})
+	return result, err
+}
+
+// getWiFiStatusGen1 reads WiFi station status from a Gen1 device's /status
+// endpoint (wifi_sta), mapping it onto the shared WiFiStatus shape. Gen1 reports
+// connectivity as a boolean, surfaced here as a "connected"/"disconnected" status.
+func (s *Service) getWiFiStatusGen1(ctx context.Context, identifier string) (*WiFiStatus, error) {
+	var result *WiFiStatus
+	err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		status, statusErr := conn.GetStatus(ctx)
+		if statusErr != nil {
+			return statusErr
+		}
+		result = &WiFiStatus{}
+		if status.WiFiSta != nil {
+			result.SSID = status.WiFiSta.SSID
+			result.StaIP = status.WiFiSta.IP
+			result.RSSI = status.WiFiSta.RSSI
+			if status.WiFiSta.Connected {
+				result.Status = wifiStatusConnected
+			} else {
+				result.Status = wifiStatusDisconnected
+			}
 		}
 		return nil
 	})

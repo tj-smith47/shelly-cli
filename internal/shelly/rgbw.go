@@ -7,6 +7,7 @@ import (
 
 	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -99,7 +100,7 @@ func BuildRGBWSetParams(red, green, blue, white, brightness int, on bool) RGBWSe
 // RGBWOn turns on an RGBW component.
 // For Gen1 devices, this controls the color light.
 func (s *Service) RGBWOn(ctx context.Context, identifier string, rgbwID int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbwID)
 			if err != nil {
@@ -116,7 +117,7 @@ func (s *Service) RGBWOn(ctx context.Context, identifier string, rgbwID int) err
 // RGBWOff turns off an RGBW component.
 // For Gen1 devices, this controls the color light.
 func (s *Service) RGBWOff(ctx context.Context, identifier string, rgbwID int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbwID)
 			if err != nil {
@@ -156,13 +157,16 @@ func (s *Service) RGBWToggle(ctx context.Context, identifier string, rgbwID int)
 		result, err = dev.Gen2().RGBW(rgbwID).Toggle(ctx)
 		return err
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
 	return result, err
 }
 
 // RGBWBrightness sets the brightness of an RGBW component (0-100).
 // For Gen1 devices, this sets the gain (brightness) of the color light.
 func (s *Service) RGBWBrightness(ctx context.Context, identifier string, rgbwID, brightness int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbwID)
 			if err != nil {
@@ -179,7 +183,7 @@ func (s *Service) RGBWBrightness(ctx context.Context, identifier string, rgbwID,
 // RGBWWhite sets the white channel of an RGBW component (0-100).
 // For Gen1 devices, this sets the white channel of the color light.
 func (s *Service) RGBWWhite(ctx context.Context, identifier string, rgbwID, white int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbwID)
 			if err != nil {
@@ -201,7 +205,7 @@ func (s *Service) RGBWWhite(ctx context.Context, identifier string, rgbwID, whit
 // RGBWColor sets the color of an RGBW component.
 // For Gen1 devices, this sets the RGB color of the color light.
 func (s *Service) RGBWColor(ctx context.Context, identifier string, rgbwID, r, g, b int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbwID)
 			if err != nil {
@@ -218,7 +222,7 @@ func (s *Service) RGBWColor(ctx context.Context, identifier string, rgbwID, r, g
 // RGBWColorAndWhite sets both color and white channel of an RGBW component.
 // For Gen1 devices, this sets RGBW on the color light.
 func (s *Service) RGBWColorAndWhite(ctx context.Context, identifier string, rgbwID, r, g, b, white int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbwID)
 			if err != nil {
@@ -265,9 +269,13 @@ func (s *Service) RGBWStatus(ctx context.Context, identifier string, rgbwID int)
 // RGBWSet sets parameters of an RGBW component.
 // For Gen1 devices, use RGBWOn/RGBWOff/RGBWColor/RGBWBrightness instead (Gen1 doesn't support combined set).
 func (s *Service) RGBWSet(ctx context.Context, identifier string, rgbwID int, params RGBWSetParams) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		return conn.RGBW(rgbwID).Set(ctx, params.Red, params.Green, params.Blue, params.Brightness, params.White, params.On)
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
+	return err
 }
 
 // RGBWList lists all RGBW components on a device with their status.

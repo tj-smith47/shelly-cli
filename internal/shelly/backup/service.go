@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
+	"github.com/tj-smith47/shelly-go/gen1"
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
@@ -100,11 +101,24 @@ func (s *Service) createGen1Backup(ctx context.Context, identifier string) (*Dev
 	var result *DeviceBackup
 
 	err := s.connector.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-		bkp, err := exportGen1(ctx, conn)
+		bkp, err := shellybackup.ExportGen1(ctx, conn.Device())
 		if err != nil {
 			return err
 		}
-		result = bkp
+
+		// Enrich DeviceInfo from the connector's probe, which carries the full
+		// identity (ID, App) that the minimal /shelly-derived DeviceInfo omits.
+		info := conn.Info()
+		bkp.DeviceInfo = &shellybackup.DeviceInfo{
+			ID:         info.ID,
+			MAC:        info.MAC,
+			Model:      info.Model,
+			Generation: info.Generation,
+			Version:    info.Firmware,
+			App:        info.App,
+		}
+
+		result = &DeviceBackup{Backup: bkp}
 		return nil
 	})
 
@@ -158,20 +172,82 @@ func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBa
 	return s.restoreGen2Backup(ctx, identifier, deviceBackup, opts)
 }
 
+// RestoreBackupGen restores a backup using an explicitly supplied generation,
+// skipping the device-probing that RestoreBackup performs. It is used when the
+// target's generation is already known from the backup — e.g. a device sitting
+// at its factory WiFi AP, where generation auto-detection is unreliable (a Gen1
+// device's bare AP IP carries no generation hint and can be misrouted to the
+// Gen2 RPC path). generation < 2 selects the Gen1 REST path; otherwise Gen2 RPC.
+func (s *Service) RestoreBackupGen(ctx context.Context, identifier string, generation int, deviceBackup *DeviceBackup, opts RestoreOptions) (*RestoreResult, error) {
+	if generation == 1 {
+		return s.restoreGen1Backup(ctx, identifier, deviceBackup, opts)
+	}
+	return s.restoreGen2Backup(ctx, identifier, deviceBackup, opts)
+}
+
 // restoreGen1Backup restores a backup to a Gen1 device via HTTP REST.
 func (s *Service) restoreGen1Backup(ctx context.Context, identifier string, deviceBackup *DeviceBackup, opts RestoreOptions) (*RestoreResult, error) {
 	var result *RestoreResult
 
 	err := s.connector.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-		r, err := restoreGen1(ctx, conn, deviceBackup, opts)
+		r, err := shellybackup.RestoreGen1(ctx, conn.Device(), deviceBackup.Backup, toGen1RestoreOptions(opts))
 		if err != nil {
 			return err
 		}
-		result = r
+		result = &RestoreResult{
+			Success:         r.Success,
+			ConfigRestored:  true,
+			RestartRequired: r.RestartRequired,
+			Warnings:        r.Warnings,
+		}
+		// The library result carries no per-section counts; recover the webhook
+		// count the same way the old in-CLI restore did (number of action entries
+		// in the backup), gated on the webhook restore actually running.
+		if !opts.SkipWebhooks {
+			result.WebhooksRestored = countGen1Actions(deviceBackup.Backup)
+		}
 		return nil
 	})
 
 	return result, err
+}
+
+// toGen1RestoreOptions translates the CLI RestoreOptions into the shelly-go
+// Gen1RestoreOptions consumed by shellybackup.RestoreGen1.
+func toGen1RestoreOptions(opts RestoreOptions) *shellybackup.Gen1RestoreOptions {
+	out := &shellybackup.Gen1RestoreOptions{
+		Name:         opts.Name,
+		SkipNetwork:  opts.SkipNetwork,
+		SkipAuth:     opts.SkipAuth,
+		SkipState:    opts.SkipState,
+		SkipMeters:   opts.SkipMeters,
+		SkipWebhooks: opts.SkipWebhooks,
+	}
+	if opts.NetworkOverride != nil {
+		out.NetworkOverride = &shellybackup.Gen1NetworkOverride{
+			SSID:     opts.NetworkOverride.SSID,
+			Password: opts.NetworkOverride.Password,
+			StaticIP: opts.NetworkOverride.StaticIP,
+			Gateway:  opts.NetworkOverride.Gateway,
+			Netmask:  opts.NetworkOverride.Netmask,
+			DNS:      opts.NetworkOverride.DNS,
+		}
+	}
+	return out
+}
+
+// countGen1Actions reports the number of action-URL entries stored in a Gen1
+// backup's webhook blob, matching the WebhooksRestored value the previous
+// in-CLI restore reported. A nil or unparseable blob counts as zero.
+func countGen1Actions(bkp *shellybackup.Backup) int {
+	if bkp.Webhooks == nil {
+		return 0
+	}
+	var actions gen1.ActionSettings
+	if err := json.Unmarshal(bkp.Webhooks, &actions); err != nil {
+		return 0
+	}
+	return len(actions.Actions)
 }
 
 // restoreGen2Backup restores a backup to a Gen2+ device via RPC.

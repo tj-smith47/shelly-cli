@@ -472,6 +472,9 @@ func FormatLightStatusFields(status *model.LightStatus) []StatusField {
 	if status.Brightness != nil {
 		fields = append(fields, StatusField{Label: LabelBrightness, Value: fmt.Sprintf("%d%%", *status.Brightness)})
 	}
+	if status.Temp != nil {
+		fields = append(fields, StatusField{Label: "Color Temp", Value: fmt.Sprintf("%dK", *status.Temp)})
+	}
 	fields = appendPowerFields(fields, status.Power, status.Voltage, status.Current)
 	return fields
 }

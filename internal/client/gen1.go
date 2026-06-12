@@ -334,6 +334,11 @@ func (l *Gen1LightComponent) SetBrightness(ctx context.Context, brightness int) 
 	return l.light.SetBrightness(ctx, brightness)
 }
 
+// SetColorTemp sets the white color temperature in Kelvin (Duo range 2700-6500).
+func (l *Gen1LightComponent) SetColorTemp(ctx context.Context, temp int) error {
+	return l.light.SetColorTemp(ctx, temp)
+}
+
 // GetStatus returns the light status.
 func (l *Gen1LightComponent) GetStatus(ctx context.Context) (*gen1comp.LightStatus, error) {
 	return l.light.GetStatus(ctx)
@@ -393,6 +398,11 @@ func (c *Gen1ColorComponent) SetRGBW(ctx context.Context, red, green, blue, whit
 // SetGain sets the gain (brightness) for the color light.
 func (c *Gen1ColorComponent) SetGain(ctx context.Context, gain int) error {
 	return c.color.SetGain(ctx, gain)
+}
+
+// SetEffect sets the color light effect (0 = none, 1+ = device-specific animations).
+func (c *Gen1ColorComponent) SetEffect(ctx context.Context, effect int) error {
+	return c.color.SetEffect(ctx, effect)
 }
 
 // GetStatus returns the color light status.

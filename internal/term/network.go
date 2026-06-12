@@ -28,6 +28,26 @@ func DisplayWiFiStatus(ios *iostreams.IOStreams, status *shelly.WiFiStatus) {
 	}
 }
 
+// DisplayAPInspection prints the identity and persisted WiFi station config read
+// from a device at its factory AP.
+func DisplayAPInspection(ios *iostreams.IOStreams, insp *shelly.APInspection) {
+	ios.Title("Device at AP")
+	ios.Println()
+
+	ios.Printf("  Generation:  Gen%d\n", insp.Generation)
+	ios.Printf("  Model:       %s\n", valueOrEmpty(insp.Model))
+	ios.Printf("  MAC:         %s\n", valueOrEmpty(insp.MAC))
+	ios.Printf("  Firmware:    %s\n", valueOrEmpty(insp.Firmware))
+	ios.Println()
+
+	ios.Printf("  STA SSID:    %s\n", valueOrEmpty(insp.StaSSID))
+	ios.Printf("  STA key set: %v\n", insp.StaKeySet)
+	ios.Printf("  IPv4 method: %s\n", valueOrEmpty(insp.Ipv4Method))
+	ios.Printf("  STA IP:      %s\n", valueOrEmpty(insp.StaIP))
+	ios.Printf("  STA gateway: %s\n", valueOrEmpty(insp.StaGateway))
+	ios.Printf("  Associated:  %v\n", insp.StaConnected)
+}
+
 // DisplayWiFiAPClients prints a table of connected WiFi AP clients.
 func DisplayWiFiAPClients(ios *iostreams.IOStreams, clients []shelly.WiFiAPClient) {
 	ios.Title("Connected Clients")

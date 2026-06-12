@@ -259,7 +259,7 @@ func TestRun_WithDevices(t *testing.T) {
 	go func() {
 		opts := &Options{
 			Factory:  f,
-			Port:     19999, // Use high port to avoid conflicts
+			Port:     0, // ephemeral port (OS-assigned) avoids cross-test collisions
 			Devices:  nil,
 			Interval: 1 * time.Second,
 		}
@@ -316,7 +316,7 @@ func TestRun_WithSpecificDevices(t *testing.T) {
 		// Only include kitchen and bedroom
 		opts := &Options{
 			Factory:  f,
-			Port:     29999,
+			Port:     0, // ephemeral port (OS-assigned)
 			Devices:  []string{testDevKitchen, "bedroom"},
 			Interval: 1 * time.Second,
 		}
@@ -370,7 +370,7 @@ func TestRun_DevicesAreSorted(t *testing.T) {
 	go func() {
 		opts := &Options{
 			Factory:  f,
-			Port:     39999,
+			Port:     0, // ephemeral port (OS-assigned)
 			Devices:  nil,
 			Interval: 1 * time.Second,
 		}

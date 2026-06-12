@@ -144,6 +144,12 @@ func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBa
 	return s.BackupService().RestoreBackup(ctx, identifier, deviceBackup, opts)
 }
 
+// RestoreBackupGen restores a backup using an explicitly supplied generation,
+// skipping device probing. Delegates to BackupService.
+func (s *Service) RestoreBackupGen(ctx context.Context, identifier string, generation int, deviceBackup *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, error) {
+	return s.BackupService().RestoreBackupGen(ctx, identifier, generation, deviceBackup, opts)
+}
+
 // CompareBackup compares a backup with a device's current state.
 // This is a convenience method that delegates to BackupService.
 func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBackup *backup.DeviceBackup) (*model.BackupDiff, error) {

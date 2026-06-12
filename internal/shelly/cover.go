@@ -51,7 +51,7 @@ func (c CoverInfo) ListRow() []string {
 // CoverOpen opens a cover component with optional duration in seconds.
 // For Gen1 devices, this controls the roller. Duration is only supported on Gen2+.
 func (s *Service) CoverOpen(ctx context.Context, identifier string, coverID int, duration *int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			roller, err := conn.Roller(coverID)
 			if err != nil {
@@ -72,7 +72,7 @@ func (s *Service) CoverOpen(ctx context.Context, identifier string, coverID int,
 // CoverClose closes a cover component with optional duration in seconds.
 // For Gen1 devices, this controls the roller.
 func (s *Service) CoverClose(ctx context.Context, identifier string, coverID int, duration *int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			roller, err := conn.Roller(coverID)
 			if err != nil {
@@ -92,7 +92,7 @@ func (s *Service) CoverClose(ctx context.Context, identifier string, coverID int
 // CoverStop stops a cover component.
 // For Gen1 devices, this controls the roller.
 func (s *Service) CoverStop(ctx context.Context, identifier string, coverID int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			roller, err := conn.Roller(coverID)
 			if err != nil {
@@ -109,7 +109,7 @@ func (s *Service) CoverStop(ctx context.Context, identifier string, coverID int)
 // CoverPosition moves a cover to a specific position (0-100).
 // For Gen1 devices, this controls the roller position.
 func (s *Service) CoverPosition(ctx context.Context, identifier string, coverID, position int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			roller, err := conn.Roller(coverID)
 			if err != nil {
@@ -155,7 +155,7 @@ func (s *Service) CoverStatus(ctx context.Context, identifier string, coverID in
 // CoverCalibrate starts cover calibration.
 // For Gen1 devices, this starts roller calibration.
 func (s *Service) CoverCalibrate(ctx context.Context, identifier string, coverID int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			roller, err := conn.Roller(coverID)
 			if err != nil {

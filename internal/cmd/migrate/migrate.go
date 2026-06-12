@@ -32,11 +32,17 @@ type Options struct {
 	SkipScripts   bool
 	SkipSchedules bool
 	SkipWebhooks  bool
+	SkipState     bool
+	SkipMeters    bool
 	StaticIP      string
 	Gateway       string
 	Netmask       string
 	DNS           string
 	Name          string
+	ToAP          string
+	APIP          string
+	SSID          string
+	Password      string
 
 	// resetSourceExplicit tracks whether --reset-source was explicitly set.
 	resetSourceExplicit bool
@@ -81,7 +87,13 @@ Use --dry-run to preview what would change without applying.`,
   # Clone config onto a new bulb with a distinct static IP (keeps both online,
   # source is not reset since there is no IP conflict)
   shelly migrate master-bath-1 new-bulb \
-    --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0`,
+    --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0
+
+  # Clone a live sibling straight onto a brand-new device at its factory WiFi AP:
+  # hops the host onto the AP, applies the config + static IP, the device joins
+  # the LAN, and the source is left untouched (target name = "fr")
+  shelly migrate sr fr --to-ap ShellyBulbDuo-D0DCFF \
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Source = args[0]
@@ -100,11 +112,17 @@ Use --dry-run to preview what would change without applying.`,
 	cmd.Flags().BoolVar(&opts.SkipScripts, "skip-scripts", false, "Skip script migration")
 	cmd.Flags().BoolVar(&opts.SkipSchedules, "skip-schedules", false, "Skip schedule migration")
 	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Skip webhook migration")
+	cmd.Flags().BoolVar(&opts.SkipState, "skip-state", false, "Skip migrating live component state (color temperature, brightness); apply configuration only")
+	cmd.Flags().BoolVar(&opts.SkipMeters, "skip-meters", false, "Skip migrating meter/energy-meter configuration (e.g. overpower limits)")
 	cmd.Flags().StringVar(&opts.StaticIP, "static-ip", "", "Assign this static IPv4 to the target instead of copying the source's IP")
 	cmd.Flags().StringVar(&opts.Gateway, "gateway", "", "Static IPv4 default gateway (with --static-ip)")
 	cmd.Flags().StringVar(&opts.Netmask, "netmask", "", "Static IPv4 subnet mask (with --static-ip)")
 	cmd.Flags().StringVar(&opts.DNS, "dns", "", "Static IPv4 nameserver (optional, with --static-ip)")
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Override the target device name (defaults to the target identifier when it is a friendly alias)")
+	cmd.Flags().StringVar(&opts.ToAP, "to-ap", "", "Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)")
+	cmd.Flags().StringVar(&opts.APIP, "ap-ip", "", "Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)")
+	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the target joins (defaults to the source's network)")
+	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)")
 	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
 	cmd.AddCommand(validate.NewCommand(f))
@@ -117,6 +135,11 @@ Use --dry-run to preview what would change without applying.`,
 // If the user explicitly set --reset-source, use that value.
 // Otherwise, auto-compute: reset when network is being migrated.
 func (o *Options) shouldResetSource() bool {
+	// A --to-ap target is a different physical device reached through its own AP,
+	// so the source is never reset (it keeps its address and stays online).
+	if o.ToAP != "" {
+		return false
+	}
 	if o.resetSourceExplicit {
 		return o.ResetSource
 	}
@@ -146,13 +169,34 @@ func (o *Options) previewMigration(ctx context.Context, bkp *backup.DeviceBackup
 	return nil
 }
 
+// validateFlags rejects incompatible flag combinations before any device I/O.
+func (o *Options) validateFlags(override *backup.NetworkOverride) error {
+	if override != nil && o.SkipNetwork {
+		return fmt.Errorf("--static-ip cannot be used with --skip-network")
+	}
+	if o.ToAP != "" {
+		if o.SkipNetwork {
+			return fmt.Errorf("--to-ap cannot be used with --skip-network (the device needs WiFi to leave its AP)")
+		}
+		if o.DryRun {
+			return fmt.Errorf("--to-ap cannot be combined with --dry-run (the target is not reachable until it joins the network)")
+		}
+	}
+	if o.APIP != "" && o.ToAP == "" {
+		return fmt.Errorf("--ap-ip only applies with --to-ap")
+	}
+	return nil
+}
+
 // networkOverride builds a NetworkOverride from the static-IP flags, or nil when
 // no static IP was requested.
 func (o *Options) networkOverride() *backup.NetworkOverride {
-	if o.StaticIP == "" {
+	if o.StaticIP == "" && o.SSID == "" && o.Password == "" {
 		return nil
 	}
 	return &backup.NetworkOverride{
+		SSID:     o.SSID,
+		Password: o.Password,
 		StaticIP: o.StaticIP,
 		Gateway:  o.Gateway,
 		Netmask:  o.Netmask,
@@ -180,16 +224,73 @@ func (o *Options) confirmMigration(resetSource bool) (bool, error) {
 	return confirmed, nil
 }
 
+// migrateViaAP clones the source backup onto a target sitting at its factory
+// WiFi AP, moving it onto the LAN in one step. Network settings are always
+// applied (they are what take the device off its AP), the source is never reset
+// (the target is a different physical device), and compatibility is not
+// pre-checked since the target is unreachable until it joins the network.
+func (o *Options) migrateViaAP(
+	ctx context.Context,
+	svc *shelly.Service,
+	bkp *backup.DeviceBackup,
+	override *backup.NetworkOverride,
+) error {
+	ios := o.Factory.IOStreams()
+
+	if confirmed, err := o.confirmMigration(false); err != nil || !confirmed {
+		return err
+	}
+
+	restoreOpts := backup.RestoreOptions{
+		SkipAuth:        o.SkipAuth,
+		SkipScripts:     o.SkipScripts,
+		SkipSchedules:   o.SkipSchedules,
+		SkipWebhooks:    o.SkipWebhooks,
+		SkipState:       o.SkipState,
+		SkipMeters:      o.SkipMeters,
+		NetworkOverride: override,
+		Name:            cmdutil.DeviceDisplayName(o.Name, o.Target),
+	}
+
+	var (
+		result  *backup.RestoreResult
+		newAddr string
+	)
+	err := cmdutil.RunWithSpinner(ctx, ios,
+		fmt.Sprintf("Restoring onto %s at AP %s (hopping host WiFi)...", o.Target, o.ToAP),
+		func(ctx context.Context) error {
+			var restoreErr error
+			result, newAddr, restoreErr = svc.RestoreToAP(ctx, o.ToAP, o.APIP, o.Target, bkp, restoreOpts)
+			return restoreErr
+		})
+	if err != nil {
+		return fmt.Errorf("migration via AP failed: %w", err)
+	}
+
+	ios.Success("Migration completed!")
+	if newAddr != "" {
+		ios.Info("%s is live at %s", o.Target, newAddr)
+	}
+	term.DisplayMigrationResult(ios, result)
+	return nil
+}
+
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*5)
+	// --to-ap performs a WiFi hop, a full restore at the AP, and a LAN-rejoin
+	// poll, which together far exceed a normal migration's budget.
+	timeout := shelly.DefaultTimeout * 5
+	if opts.ToAP != "" {
+		timeout = shelly.DefaultTimeout * 30
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
 	override := opts.networkOverride()
-	if override != nil && opts.SkipNetwork {
-		return fmt.Errorf("--static-ip cannot be used with --skip-network")
+	if err := opts.validateFlags(override); err != nil {
+		return err
 	}
 
 	// Back up source device
@@ -201,6 +302,13 @@ func run(ctx context.Context, opts *Options) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to read source device: %w", err)
+	}
+
+	// --to-ap: target sits at its factory AP, unreachable until provisioned, so
+	// the on-network compatibility/dry-run paths are skipped; the Gen-aware
+	// restore handles the device directly at the AP.
+	if opts.ToAP != "" {
+		return opts.migrateViaAP(ctx, svc, bkp, override)
 	}
 
 	// Check target device compatibility
@@ -234,6 +342,8 @@ func run(ctx context.Context, opts *Options) error {
 		SkipScripts:     opts.SkipScripts,
 		SkipSchedules:   opts.SkipSchedules,
 		SkipWebhooks:    opts.SkipWebhooks,
+		SkipState:       opts.SkipState,
+		SkipMeters:      opts.SkipMeters,
 		NetworkOverride: override,
 		Name:            cmdutil.DeviceDisplayName(opts.Name, opts.Target),
 	}

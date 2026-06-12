@@ -4,8 +4,6 @@ package backup
 import (
 	"encoding/json"
 	"testing"
-
-	"github.com/tj-smith47/shelly-go/gen1"
 )
 
 func TestNetworkOverride_IsStatic(t *testing.T) {
@@ -27,54 +25,6 @@ func TestNetworkOverride_IsStatic(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestApplyGen1WiFiOverride(t *testing.T) {
-	t.Parallel()
-	t.Run("static ip with backup credentials preserved", func(t *testing.T) {
-		t.Parallel()
-		sta := &gen1.WiFiStaSettings{SSID: "OnyxCheetah4.7", Key: "secret", Ipv4Method: "dhcp"}
-		applyGen1WiFiOverride(sta, &NetworkOverride{
-			StaticIP: "10.23.47.221",
-			Gateway:  "10.23.47.1",
-			Netmask:  "255.255.254.0",
-			DNS:      "10.23.47.1",
-		})
-
-		if !sta.Enabled {
-			t.Error("station should be enabled")
-		}
-		if sta.SSID != "OnyxCheetah4.7" || sta.Key != "secret" {
-			t.Errorf("credentials should be preserved, got SSID=%q Key=%q", sta.SSID, sta.Key)
-		}
-		if sta.Ipv4Method != "static" {
-			t.Errorf("Ipv4Method = %q, want static", sta.Ipv4Method)
-		}
-		if sta.IP != "10.23.47.221" || sta.Gw != "10.23.47.1" || sta.Mask != "255.255.254.0" || sta.DNS != "10.23.47.1" {
-			t.Errorf("static fields not applied: %+v", sta)
-		}
-	})
-
-	t.Run("explicit ssid and password override", func(t *testing.T) {
-		t.Parallel()
-		sta := &gen1.WiFiStaSettings{SSID: "old", Key: "oldkey"}
-		applyGen1WiFiOverride(sta, &NetworkOverride{SSID: "new", Password: "newkey", StaticIP: "10.0.0.5", Gateway: "10.0.0.1", Netmask: "255.255.255.0"})
-		if sta.SSID != "new" || sta.Key != "newkey" {
-			t.Errorf("credentials not overridden, got SSID=%q Key=%q", sta.SSID, sta.Key)
-		}
-	})
-
-	t.Run("non-static override leaves ipv4 method untouched", func(t *testing.T) {
-		t.Parallel()
-		sta := &gen1.WiFiStaSettings{SSID: "net", Key: "k", Ipv4Method: "dhcp", IP: "10.0.0.9"}
-		applyGen1WiFiOverride(sta, &NetworkOverride{SSID: "net2"})
-		if sta.Ipv4Method != "dhcp" || sta.IP != "10.0.0.9" {
-			t.Errorf("non-static override mutated addressing: %+v", sta)
-		}
-		if sta.SSID != "net2" {
-			t.Errorf("ssid override not applied: %q", sta.SSID)
-		}
-	})
 }
 
 func TestApplyGen2WiFiOverride(t *testing.T) {

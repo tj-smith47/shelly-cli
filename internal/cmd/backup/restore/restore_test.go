@@ -515,3 +515,58 @@ func TestRun_DirectoryAsFile(t *testing.T) {
 		t.Logf("Got expected error: %v", err)
 	}
 }
+
+func TestValidateFlags(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		opts        Options
+		wantErrSubs string
+	}{
+		{name: "no flags", opts: Options{}},
+		{name: "to-ap with static-ip", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", StaticIP: "10.0.0.5"}},
+		{name: "static-ip with skip-network", opts: Options{StaticIP: "10.0.0.5", SkipNetwork: true}, wantErrSubs: "static-ip cannot be used with --skip-network"},
+		{name: "to-ap with skip-network", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", SkipNetwork: true}, wantErrSubs: "to-ap cannot be used with --skip-network"},
+		{name: "to-ap with dry-run", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", DryRun: true}, wantErrSubs: "to-ap cannot be combined with --dry-run"},
+		{name: "ap-ip without to-ap", opts: Options{APIP: "192.168.33.140"}, wantErrSubs: "ap-ip only applies with --to-ap"},
+		{name: "ap-ip with to-ap", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", APIP: "192.168.33.140"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := tt.opts.validateFlags()
+			if tt.wantErrSubs == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErrSubs) {
+				t.Fatalf("got %v, want error containing %q", err, tt.wantErrSubs)
+			}
+		})
+	}
+}
+
+func TestToAPFlagRegistered(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+	if cmd.Flags().Lookup("to-ap") == nil {
+		t.Error("--to-ap flag not registered")
+	}
+}
+
+func TestNewCommand_SkipStateAndMetersFlags(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	for _, name := range []string{"skip-state", "skip-meters"} {
+		f := cmd.Flags().Lookup(name)
+		if f == nil {
+			t.Fatalf("--%s flag not registered", name)
+		}
+		if f.DefValue != testFalseValue {
+			t.Errorf("--%s default = %q, want %q", name, f.DefValue, testFalseValue)
+		}
+	}
+}

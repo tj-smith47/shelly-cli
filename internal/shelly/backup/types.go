@@ -125,6 +125,13 @@ type RestoreOptions struct {
 	SkipWebhooks bool
 	// SkipKVS skips KVS data restoration.
 	SkipKVS bool
+	// SkipState skips restoring captured live component state — color temperature
+	// and brightness — so a restore leaves the target's current light look intact
+	// and applies configuration only.
+	SkipState bool
+	// SkipMeters skips restoring meter / energy-meter configuration (e.g. Gen1
+	// overpower limits), leaving the target's protection settings untouched.
+	SkipMeters bool
 	// Password for decryption (required if backup is encrypted).
 	Password string
 }

@@ -7,6 +7,7 @@ import (
 
 	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -87,7 +88,7 @@ func BuildRGBSetParams(red, green, blue, brightness int, on bool) RGBSetParams {
 // RGBOn turns on an RGB component.
 // For Gen1 devices, this controls the color light.
 func (s *Service) RGBOn(ctx context.Context, identifier string, rgbID int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbID)
 			if err != nil {
@@ -104,7 +105,7 @@ func (s *Service) RGBOn(ctx context.Context, identifier string, rgbID int) error
 // RGBOff turns off an RGB component.
 // For Gen1 devices, this controls the color light.
 func (s *Service) RGBOff(ctx context.Context, identifier string, rgbID int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbID)
 			if err != nil {
@@ -148,13 +149,16 @@ func (s *Service) RGBToggle(ctx context.Context, identifier string, rgbID int) (
 		result, err = dev.Gen2().RGB(rgbID).GetStatus(ctx)
 		return err
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
 	return result, err
 }
 
 // RGBBrightness sets the brightness of an RGB component (0-100).
 // For Gen1 devices, this sets the gain (brightness) of the color light.
 func (s *Service) RGBBrightness(ctx context.Context, identifier string, rgbID, brightness int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbID)
 			if err != nil {
@@ -171,7 +175,7 @@ func (s *Service) RGBBrightness(ctx context.Context, identifier string, rgbID, b
 // RGBColor sets the color of an RGB component.
 // For Gen1 devices, this sets the RGB color of the color light.
 func (s *Service) RGBColor(ctx context.Context, identifier string, rgbID, r, g, b int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbID)
 			if err != nil {
@@ -188,7 +192,7 @@ func (s *Service) RGBColor(ctx context.Context, identifier string, rgbID, r, g, 
 // RGBColorAndBrightness sets both color and brightness of an RGB component.
 // For Gen1 devices, this sets RGB and gain on the color light.
 func (s *Service) RGBColorAndBrightness(ctx context.Context, identifier string, rgbID, r, g, b, brightness int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			color, err := conn.Color(rgbID)
 			if err != nil {
@@ -235,9 +239,13 @@ func (s *Service) RGBStatus(ctx context.Context, identifier string, rgbID int) (
 // RGBSet sets parameters of an RGB component.
 // For Gen1 devices, use RGBOn/RGBOff/RGBColor/RGBBrightness instead (Gen1 doesn't support combined set).
 func (s *Service) RGBSet(ctx context.Context, identifier string, rgbID int, params RGBSetParams) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		return conn.RGB(rgbID).Set(ctx, params.Red, params.Green, params.Blue, params.Brightness, params.On)
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
+	return err
 }
 
 // RGBList lists all RGB components on a device with their status.

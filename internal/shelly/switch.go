@@ -7,6 +7,7 @@ import (
 
 	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -37,7 +38,7 @@ func (s SwitchInfo) ListRow() []string {
 // SwitchOn turns on a switch component.
 // For Gen1 devices, this controls the relay.
 func (s *Service) SwitchOn(ctx context.Context, identifier string, switchID int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			relay, err := conn.Relay(switchID)
 			if err != nil {
@@ -54,7 +55,7 @@ func (s *Service) SwitchOn(ctx context.Context, identifier string, switchID int)
 // SwitchOff turns off a switch component.
 // For Gen1 devices, this controls the relay.
 func (s *Service) SwitchOff(ctx context.Context, identifier string, switchID int) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withComponentAction(ctx, identifier,
 		func(conn *client.Gen1Client) error {
 			relay, err := conn.Relay(switchID)
 			if err != nil {
@@ -103,6 +104,9 @@ func (s *Service) SwitchToggle(ctx context.Context, identifier string, switchID 
 		}
 		return nil
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
 	return result, err
 }
 

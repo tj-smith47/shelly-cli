@@ -89,6 +89,7 @@ type LightStatus struct {
 	ID         int
 	Output     bool
 	Brightness *int // 0-100
+	Temp       *int // white color temperature in Kelvin (Gen1 white-temp bulbs)
 	Source     string
 	Power      *float64
 	Voltage    *float64

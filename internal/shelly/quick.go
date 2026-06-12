@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/connection"
@@ -65,6 +66,9 @@ func (s *Service) QuickOn(ctx context.Context, identifier string, componentID *i
 		}
 		return quickOnGen2(ctx, dev.Gen2(), componentID, result)
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
 
 	return result, err
 }
@@ -99,6 +103,9 @@ func (s *Service) QuickOff(ctx context.Context, identifier string, componentID *
 		}
 		return quickOffGen2(ctx, dev.Gen2(), componentID, result)
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
 
 	return result, err
 }
@@ -133,6 +140,9 @@ func (s *Service) QuickToggle(ctx context.Context, identifier string, componentI
 		}
 		return quickToggleGen2(ctx, dev.Gen2(), componentID, result)
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeComponents)
+	}
 
 	return result, err
 }

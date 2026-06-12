@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -494,45 +495,17 @@ func (s *Service) OnboardViaAP(
 ) *OnboardResult {
 	result := &OnboardResult{Device: device, Method: "WiFi AP"}
 
-	wifiDisc := discovery.NewWiFiDiscoverer()
-	scanner := wifiDisc.Scanner
-	if scanner == nil {
-		result.Error = fmt.Errorf("WiFi scanning not supported on this platform")
+	// Configure WiFi on the device at 192.168.33.1 while the host is hopped onto
+	// the device's own AP (Gen2+ via RPC, Gen1 via HTTP settings). The host
+	// returns to the home network (wifi) once configuration completes.
+	var configErr error
+	if hopErr := s.withAPHop(ctx, device.SSID, "", wifi, func(ctx context.Context) error {
+		configErr = s.configureWiFiAtAP(ctx, wifi, device.Generation)
+		return configErr
+	}); hopErr != nil && configErr == nil {
+		// hopErr with no configErr means the host could not reach the AP.
+		result.Error = hopErr
 		return result
-	}
-
-	// Remember current network for reconnection (may fail if not connected)
-	originalNet, netErr := scanner.CurrentNetwork(ctx)
-	if netErr != nil {
-		debug.TraceEvent("onboard: could not detect current network: %v", netErr)
-	}
-
-	// Connect to Shelly AP (open network, no password)
-	if err := scanner.Connect(ctx, device.SSID, ""); err != nil {
-		result.Error = fmt.Errorf("failed to connect to Shelly AP %q: %w", device.SSID, err)
-		return result
-	}
-
-	// Wait for DHCP assignment
-	time.Sleep(2 * time.Second)
-
-	// Configure WiFi on the device at 192.168.33.1
-	// Use the provision service for Gen2+ at AP, or direct HTTP for Gen1
-	configErr := s.configureWiFiAtAP(ctx, wifi, device.Generation)
-
-	// Always try to reconnect to home network, even if config failed.
-	// Determine the reconnect target: if the original network is different from
-	// the provisioning target, try it first with saved creds (NetworkManager).
-	// Otherwise use the target WiFi credentials — nl80211 has no credential store.
-	reconnectSSID, reconnectPass := reconnectCredentials(originalNet, wifi)
-	if reconnErr := scanner.Connect(ctx, reconnectSSID, reconnectPass); reconnErr != nil {
-		debug.TraceEvent("onboard reconnect to %s failed: %v", reconnectSSID, reconnErr)
-		// If we tried the original network, fall back to the provisioning target.
-		if reconnectSSID != wifi.SSID {
-			if err := scanner.Connect(ctx, wifi.SSID, wifi.Password); err != nil {
-				debug.TraceEvent("onboard fallback connect to %s also failed: %v", wifi.SSID, err)
-			}
-		}
 	}
 
 	if configErr != nil {
@@ -540,15 +513,13 @@ func (s *Service) OnboardViaAP(
 		return result
 	}
 
-	// Wait for device to appear on network
-	newIP, err := s.WaitForDeviceOnNetwork(ctx, device.Name, device.MACAddress, 30*time.Second)
-	if err != nil {
-		// Provisioning succeeded but couldn't find device on network. Carry the
-		// cause so the UI can warn instead of falsely reporting clean success.
-		debug.TraceEvent("onboard AP post-provision detection failed for %s: %v", device.Name, err)
-		result.Note = fmt.Sprintf("provisioned but not found on network: %v", err)
-	}
+	// Confirm the device rejoined the LAN, then carry the address (and any
+	// non-fatal note) onto the result.
+	newIP, note := s.confirmRejoinedLAN(ctx, device, wifi)
 	result.NewAddress = newIP
+	if note != "" {
+		result.Note = note
+	}
 
 	// Register
 	if newIP != "" {
@@ -560,6 +531,31 @@ func (s *Service) OnboardViaAP(
 	}
 
 	return result
+}
+
+// confirmRejoinedLAN confirms a device rejoined the LAN after an AP hop and
+// returns its address plus a non-fatal note describing any failure to locate it.
+// It delegates to the shared locateRejoinedDevice confirm — a static address is
+// polled directly, a DHCP one is located by MAC over mDNS — so onboard and the
+// restore/migrate --to-ap flows confirm identically; only the policy differs, with
+// onboard reporting a failure as a note rather than treating it as fatal.
+func (s *Service) confirmRejoinedLAN(
+	ctx context.Context,
+	device *OnboardDevice,
+	wifi *OnboardWiFiConfig,
+) (addr, note string) {
+	staticIP := ""
+	if wifi.IsStatic() {
+		staticIP = wifi.StaticIP
+	}
+	ip, err := s.locateRejoinedDevice(ctx, device.Generation, device.Name, staticIP, device.MACAddress)
+	if err != nil {
+		// Provisioning succeeded but the device could not be located; carry the
+		// cause so the UI warns instead of reporting a success it cannot prove.
+		debug.TraceEvent("onboard AP post-provision confirm failed for %s: %v", device.Name, err)
+		return "", fmt.Sprintf("provisioned but %v", err)
+	}
+	return ip, ""
 }
 
 // configureWiFiAtAP sends WiFi credentials to a device at 192.168.33.1.
@@ -596,6 +592,106 @@ func reconnectCredentials(originalNet *discovery.WiFiNetwork, wifi *OnboardWiFiC
 		return originalNet.SSID, ""
 	}
 	return wifi.SSID, wifi.Password
+}
+
+// withAPHop connects the host's WiFi to an open Shelly AP, runs fn (which talks
+// to the device at discovery.DefaultAPIP), then returns the host to its original
+// network — even if fn fails. homeWiFi supplies the credentials to rejoin the
+// home network on platforms without a saved-credential store (nl80211);
+// reconnectCredentials prefers the previously-joined network when NetworkManager
+// can restore it from saved profiles. An error reaching the AP is returned
+// before fn runs; otherwise fn's error is returned. Shared by AP-based onboard
+// and restore/migrate --to-ap.
+func (s *Service) withAPHop(
+	ctx context.Context,
+	apSSID string,
+	apHostIP string,
+	homeWiFi *OnboardWiFiConfig,
+	fn func(context.Context) error,
+) error {
+	if homeWiFi == nil {
+		homeWiFi = &OnboardWiFiConfig{}
+	}
+
+	wifiDisc := discovery.NewWiFiDiscoverer()
+	scanner := wifiDisc.Scanner
+	if scanner == nil {
+		return fmt.Errorf("WiFi scanning not supported on this platform")
+	}
+
+	// Override the host's static AP-subnet IP when requested (empty is ignored,
+	// keeping discovery.DefaultAPHostIP). Only the Linux scanner needs this.
+	if setter, ok := scanner.(discovery.APHostIPSetter); ok {
+		setter.SetAPHostIP(apHostIP)
+	}
+
+	// Remember current network for reconnection (may fail if not connected).
+	originalNet, netErr := scanner.CurrentNetwork(ctx)
+	if netErr != nil {
+		debug.TraceEvent("AP hop: could not detect current network: %v", netErr)
+	}
+
+	// Connect to the Shelly AP (open network, no password).
+	if err := scanner.Connect(ctx, apSSID, ""); err != nil {
+		return fmt.Errorf("failed to connect to Shelly AP %q: %w", apSSID, err)
+	}
+
+	// Wait until the AP link is actually up and the device answers at its AP
+	// address before sending any request. A fixed DHCP delay races association
+	// on slower WiFi stacks, so the first request would leave before a route to
+	// the AP subnet exists and fail with a deadline-exceeded error.
+	s.waitForAPReady(ctx, apReadyTimeout)
+
+	fnErr := fn(ctx)
+
+	// Always return to the home network, even if fn failed. Try the previously
+	// joined network first (NetworkManager may have saved creds); fall back to
+	// the supplied home credentials when that SSID differs and the first attempt
+	// fails (nl80211 has no credential store).
+	reconnectSSID, reconnectPass := reconnectCredentials(originalNet, homeWiFi)
+	if reconnErr := scanner.Connect(ctx, reconnectSSID, reconnectPass); reconnErr != nil {
+		debug.TraceEvent("AP hop reconnect to %s failed: %v", reconnectSSID, reconnErr)
+		if reconnectSSID != homeWiFi.SSID {
+			if err := scanner.Connect(ctx, homeWiFi.SSID, homeWiFi.Password); err != nil {
+				debug.TraceEvent("AP hop fallback connect to %s also failed: %v", homeWiFi.SSID, err)
+			}
+		}
+	}
+
+	return fnErr
+}
+
+// apReadyTimeout bounds how long withAPHop waits for the host to associate with
+// a Shelly AP and obtain a route to it before sending the first device request.
+const apReadyTimeout = 25 * time.Second
+
+// waitForAPReady polls the device's AP address until a TCP connection to its
+// HTTP port succeeds or the deadline elapses, confirming the host has associated
+// with the AP and obtained a route. This replaces a fixed DHCP delay, which
+// races WiFi association — the device is unreachable for the first second or two
+// after scanner.Connect returns, so an immediate request fails before any route
+// to the 192.168.33.0/24 AP subnet exists.
+func (s *Service) waitForAPReady(ctx context.Context, timeout time.Duration) {
+	addr := net.JoinHostPort(discovery.DefaultAPIP, "80")
+	deadline := time.Now().Add(timeout)
+	dialer := net.Dialer{Timeout: 2 * time.Second}
+
+	for time.Now().Before(deadline) {
+		conn, err := dialer.DialContext(ctx, "tcp", addr)
+		if err == nil {
+			if cerr := conn.Close(); cerr != nil {
+				debug.TraceEvent("AP hop: closing readiness probe: %v", cerr)
+			}
+			return
+		}
+		debug.TraceEvent("AP hop: waiting for %s: %v", addr, err)
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(1 * time.Second):
+		}
+	}
 }
 
 // WaitForDeviceOnNetwork waits for a provisioned device to appear on the

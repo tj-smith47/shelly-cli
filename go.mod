@@ -91,3 +91,5 @@ require (
 	golang.org/x/text v0.32.0 // indirect
 	tinygo.org/x/bluetooth v0.13.0 // indirect
 )
+
+replace github.com/tj-smith47/shelly-go => /opt/repos/shelly-go

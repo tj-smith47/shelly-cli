@@ -38,8 +38,17 @@ type DetectionResult struct {
 }
 
 // DetectGeneration probes a device to determine its generation.
-// Gen2+ devices respond to /rpc/Shelly.GetDeviceInfo.
-// Gen1 devices respond to /shelly.
+//
+// The /shelly endpoint is the universal probe: BOTH Gen1 and Gen2+ devices serve
+// it and report their generation (Gen2+ via the "gen" field, Gen1 via gen<2 or
+// its absence). /rpc/Shelly.GetDeviceInfo, by contrast, is Gen2-only — a Gen1
+// device cannot answer it and will burn the full client timeout before failing.
+// So /shelly is tried FIRST: a Gen1 device is identified on the first round-trip
+// and never waits on the Gen2 probe. /rpc is kept only as a fallback for the rare
+// Gen2+ device whose /shelly compatibility endpoint is unavailable. Probing Gen2
+// first (the previous order) misrouted every Gen1 device reached by a bare IP —
+// detection would stall on /rpc, and an inconclusive result left the generation
+// unknown, which downstream routing silently treats as Gen2 (RPC).
 func DetectGeneration(ctx context.Context, address string, auth *model.Auth) (*DetectionResult, error) {
 	url := address
 	if url != "" && !strings.HasPrefix(url, "http") {
@@ -55,19 +64,22 @@ func DetectGeneration(ctx context.Context, address string, auth *model.Auth) (*D
 
 	client := &http.Client{Timeout: 5 * time.Second, Transport: transport}
 
-	// Try Gen2 RPC endpoint first (more common for newer devices)
-	gen2Result, gen2Err := tryGen2Detection(ctx, client, url, auth)
-	if gen2Err == nil {
-		return gen2Result, nil
-	}
-
-	// Try Gen1 endpoint
+	// Try the universal /shelly endpoint first — it identifies a Gen1 device on
+	// the first round-trip and never stalls on the Gen2-only /rpc probe.
 	gen1Result, gen1Err := tryGen1Detection(ctx, client, url, auth)
 	if gen1Err == nil {
 		return gen1Result, nil
 	}
 
-	return nil, fmt.Errorf("failed to detect device generation: gen2 error: %w, gen1 error: %w", gen2Err, gen1Err)
+	// Fallback: a Gen2+ device whose /shelly compatibility endpoint did not
+	// answer (or reported gen>=2, which tryGen1Detection rejects) is confirmed
+	// via the Gen2 RPC endpoint.
+	gen2Result, gen2Err := tryGen2Detection(ctx, client, url, auth)
+	if gen2Err == nil {
+		return gen2Result, nil
+	}
+
+	return nil, fmt.Errorf("failed to detect device generation: gen1 error: %w, gen2 error: %w", gen1Err, gen2Err)
 }
 
 // tryGen2Detection attempts to detect a Gen2+ device.

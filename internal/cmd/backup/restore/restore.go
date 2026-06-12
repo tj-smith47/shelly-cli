@@ -27,11 +27,17 @@ type Options struct {
 	SkipScripts   bool
 	SkipSchedules bool
 	SkipWebhooks  bool
+	SkipState     bool
+	SkipMeters    bool
 	StaticIP      string
 	Gateway       string
 	Netmask       string
 	DNS           string
 	Name          string
+	ToAP          string
+	APIP          string
+	SSID          string
+	Password      string
 }
 
 // NewCommand creates the backup restore command.
@@ -68,7 +74,13 @@ sections.`,
   # Clone another bulb's backup onto this device with a different static IP
   # (identity — MAC, serial, device ID — is never overwritten by restore)
   shelly backup restore new-bulb master-bath-1.json \
-    --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1`,
+    --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
+
+  # Restore a sibling's backup straight onto a brand-new device at its factory
+  # WiFi AP: hops the host onto the AP, applies the config + static IP, and the
+  # device joins the LAN — no separate provisioning step (target name = "fr")
+  shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF \
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
@@ -83,19 +95,50 @@ sections.`,
 	cmd.Flags().BoolVar(&opts.SkipScripts, "skip-scripts", false, "Skip script restoration")
 	cmd.Flags().BoolVar(&opts.SkipSchedules, "skip-schedules", false, "Skip schedule restoration")
 	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Skip webhook restoration")
+	cmd.Flags().BoolVar(&opts.SkipState, "skip-state", false, "Skip restoring live component state (color temperature, brightness); apply configuration only")
+	cmd.Flags().BoolVar(&opts.SkipMeters, "skip-meters", false, "Skip restoring meter/energy-meter configuration (e.g. overpower limits)")
 	cmd.Flags().StringVarP(&opts.Decrypt, "decrypt", "d", "", "Password to decrypt backup")
 	cmd.Flags().StringVar(&opts.StaticIP, "static-ip", "", "Override the backup's WiFi with this static IPv4 address")
 	cmd.Flags().StringVar(&opts.Gateway, "gateway", "", "Static IPv4 default gateway (with --static-ip)")
 	cmd.Flags().StringVar(&opts.Netmask, "netmask", "", "Static IPv4 subnet mask (with --static-ip)")
 	cmd.Flags().StringVar(&opts.DNS, "dns", "", "Static IPv4 nameserver (optional, with --static-ip)")
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Override the device name (defaults to the target identifier when it is a friendly alias)")
+	cmd.Flags().StringVar(&opts.ToAP, "to-ap", "", "Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)")
+	cmd.Flags().StringVar(&opts.APIP, "ap-ip", "", "Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)")
+	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the device joins (defaults to the backup's network)")
+	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)")
 	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
 	return cmd
 }
 
+// validateFlags rejects incompatible flag combinations before any device I/O.
+func (o *Options) validateFlags() error {
+	if o.StaticIP != "" && o.SkipNetwork {
+		return fmt.Errorf("--static-ip cannot be used with --skip-network")
+	}
+	if o.ToAP != "" {
+		if o.SkipNetwork {
+			return fmt.Errorf("--to-ap cannot be used with --skip-network (the device needs WiFi to leave its AP)")
+		}
+		if o.DryRun {
+			return fmt.Errorf("--to-ap cannot be combined with --dry-run (the target is not reachable until it joins the network)")
+		}
+	}
+	if o.APIP != "" && o.ToAP == "" {
+		return fmt.Errorf("--ap-ip only applies with --to-ap")
+	}
+	return nil
+}
+
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*5)
+	// --to-ap performs a WiFi hop, a full restore at the AP, and a LAN-rejoin
+	// poll, which together far exceed a normal restore's budget.
+	timeout := shelly.DefaultTimeout * 5
+	if opts.ToAP != "" {
+		timeout = shelly.DefaultTimeout * 30
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
@@ -120,13 +163,15 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("backup is encrypted, use --decrypt to provide password")
 	}
 
-	if opts.StaticIP != "" && opts.SkipNetwork {
-		return fmt.Errorf("--static-ip cannot be used with --skip-network")
+	if err := opts.validateFlags(); err != nil {
+		return err
 	}
 
 	var override *backup.NetworkOverride
-	if opts.StaticIP != "" {
+	if opts.StaticIP != "" || opts.SSID != "" || opts.Password != "" {
 		override = &backup.NetworkOverride{
+			SSID:     opts.SSID,
+			Password: opts.Password,
 			StaticIP: opts.StaticIP,
 			Gateway:  opts.Gateway,
 			Netmask:  opts.Netmask,
@@ -141,6 +186,8 @@ func run(ctx context.Context, opts *Options) error {
 		SkipScripts:     opts.SkipScripts,
 		SkipSchedules:   opts.SkipSchedules,
 		SkipWebhooks:    opts.SkipWebhooks,
+		SkipState:       opts.SkipState,
+		SkipMeters:      opts.SkipMeters,
 		Password:        opts.Decrypt,
 		NetworkOverride: override,
 		Name:            cmdutil.DeviceDisplayName(opts.Name, opts.Device),
@@ -157,6 +204,13 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	svc := opts.Factory.ShellyService()
+
+	// --to-ap: hop onto the device's factory AP, restore there, and let the
+	// network override move it onto the LAN — provisioning and restore in one.
+	if opts.ToAP != "" {
+		return opts.restoreViaAP(ctx, svc, bkp, restoreOpts)
+	}
+
 	var result *backup.RestoreResult
 	err = cmdutil.RunWithSpinner(ctx, ios, "Restoring backup...", func(ctx context.Context) error {
 		var restoreErr error
@@ -171,5 +225,39 @@ func run(ctx context.Context, opts *Options) error {
 	ios.Success("Backup restored to %s", opts.Device)
 	term.DisplayRestoreResult(ios, result)
 
+	return nil
+}
+
+// restoreViaAP restores the backup onto a device at its factory WiFi AP: it hops
+// the host onto the AP, applies the config (with network + name overrides) at
+// the AP address, and the restored station config moves the device onto the LAN.
+func (o *Options) restoreViaAP(
+	ctx context.Context,
+	svc *shelly.Service,
+	bkp *backup.DeviceBackup,
+	restoreOpts backup.RestoreOptions,
+) error {
+	ios := o.Factory.IOStreams()
+
+	var (
+		result  *backup.RestoreResult
+		newAddr string
+	)
+	err := cmdutil.RunWithSpinner(ctx, ios,
+		fmt.Sprintf("Restoring onto %s at AP %s (hopping host WiFi)...", o.Device, o.ToAP),
+		func(ctx context.Context) error {
+			var restoreErr error
+			result, newAddr, restoreErr = svc.RestoreToAP(ctx, o.ToAP, o.APIP, o.Device, bkp, restoreOpts)
+			return restoreErr
+		})
+	if err != nil {
+		return fmt.Errorf("failed to restore via AP: %w", err)
+	}
+
+	ios.Success("Backup restored to %s", o.Device)
+	if newAddr != "" {
+		ios.Info("%s is live at %s", o.Device, newAddr)
+	}
+	term.DisplayRestoreResult(ios, result)
 	return nil
 }
