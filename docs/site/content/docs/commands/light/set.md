@@ -11,8 +11,8 @@ Set light parameters
 
 Set parameters of a light component on the specified device.
 
-You can set brightness and on/off state.
-Values not specified will be left unchanged.
+You can set brightness, white color temperature (Gen1 white-temp bulbs such as
+the Duo), and on/off state. Values not specified are left unchanged.
 
 ```
 shelly light set <device> [flags]
@@ -23,6 +23,9 @@ shelly light set <device> [flags]
 ```
   # Set brightness to 50%
   shelly light set kitchen --brightness 50
+
+  # Set white color temperature to 4200K (Gen1 Duo)
+  shelly light set master-bath --temp 4200
 
   # Turn on and set brightness
   shelly light br kitchen -b 75 --on
@@ -35,6 +38,7 @@ shelly light set <device> [flags]
   -h, --help             help for set
   -i, --id int           Light component ID (default 0)
       --on               Turn on
+  -t, --temp int         White color temperature in Kelvin (Gen1 Duo: 2700-6500) (default -1)
 ```
 
 ### Options inherited from parent commands

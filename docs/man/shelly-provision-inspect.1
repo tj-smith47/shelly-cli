@@ -2,40 +2,32 @@
 .TH "SHELLY" "1" "Jun 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-light-set - Set light parameters
+shelly-provision-inspect - Read a device's persisted config at its factory WiFi AP
 
 
 .SH SYNOPSIS
-\fBshelly light set  [flags]\fP
+\fBshelly provision inspect  [flags]\fP
 
 
 .SH DESCRIPTION
-Set parameters of a light component on the specified device.
+Hop onto a device's factory WiFi access point, read the configuration it has
+actually persisted (identity plus WiFi station settings), and return to the home
+network.
 
 .PP
-You can set brightness, white color temperature (Gen1 white-temp bulbs such as
-the Duo), and on/off state. Values not specified are left unchanged.
+Use this when a device configures but never appears on the LAN: it shows whether
+the station SSID, key, and static IP took, and whether the device has associated
+yet — answering "did the onboard / restore --to-ap actually write what I expected?"
+without the device having to join the network first.
 
 
 .SH OPTIONS
-\fB-b\fP, \fB--brightness\fP=-1
-	Brightness (0-100)
+\fB--ap-ip\fP=""
+	Static host IP to use on the device's AP subnet (default 192.168.33.133)
 
 .PP
 \fB-h\fP, \fB--help\fP[=false]
-	help for set
-
-.PP
-\fB-i\fP, \fB--id\fP=0
-	Light component ID (default 0)
-
-.PP
-\fB--on\fP[=false]
-	Turn on
-
-.PP
-\fB-t\fP, \fB--temp\fP=-1
-	White color temperature in Kelvin (Gen1 Duo: 2700-6500)
+	help for inspect
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -97,16 +89,16 @@ the Duo), and on/off state. Values not specified are left unchanged.
 
 .SH EXAMPLE
 .EX
-  # Set brightness to 50%
-  shelly light set kitchen --brightness 50
+  # Inspect a Shelly bulb sitting at its factory AP
+  shelly provision inspect ShellyBulbDuo-D0DCFF
 
-  # Set white color temperature to 4200K (Gen1 Duo)
-  shelly light set master-bath --temp 4200
+  # Use a specific host IP on the AP subnet
+  shelly provision inspect ShellyBulbDuo-D0DCFF --ap-ip 192.168.33.150
 
-  # Turn on and set brightness
-  shelly light br kitchen -b 75 --on
+  # JSON output
+  shelly provision inspect ShellyBulbDuo-D0DCFF -o json
 .EE
 
 
 .SH SEE ALSO
-\fBshelly-light(1)\fP
+\fBshelly-provision(1)\fP

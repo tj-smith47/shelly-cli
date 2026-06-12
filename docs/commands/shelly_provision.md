@@ -115,5 +115,6 @@ shelly provision [flags]
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
 * [shelly provision ble](shelly_provision_ble.md)	 - Provision a device via Bluetooth Low Energy
 * [shelly provision bulk](shelly_provision_bulk.md)	 - Bulk provision from config file
+* [shelly provision inspect](shelly_provision_inspect.md)	 - Read a device's persisted config at its factory WiFi AP
 * [shelly provision wifi](shelly_provision_wifi.md)	 - Interactive WiFi provisioning
 

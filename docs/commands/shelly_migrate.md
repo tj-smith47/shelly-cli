@@ -44,11 +44,18 @@ shelly migrate <source-device> <target-device> [flags]
   # source is not reset since there is no IP conflict)
   shelly migrate master-bath-1 new-bulb \
     --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0
+
+  # Clone a live sibling straight onto a brand-new device at its factory WiFi AP:
+  # hops the host onto the AP, applies the config + static IP, the device joins
+  # the LAN, and the source is left untouched (target name = "fr")
+  shelly migrate sr fr --to-ap ShellyBulbDuo-D0DCFF \
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
 ```
 
 ### Options
 
 ```
+      --ap-ip string       Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)
       --dns string         Static IPv4 nameserver (optional, with --static-ip)
       --dry-run            Show what would be changed without applying
       --force              Force migration between different device types
@@ -56,13 +63,18 @@ shelly migrate <source-device> <target-device> [flags]
   -h, --help               help for migrate
       --name string        Override the target device name (defaults to the target identifier when it is a friendly alias)
       --netmask string     Static IPv4 subnet mask (with --static-ip)
+      --password string    WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
       --reset-source       Factory reset source device after migration (default true)
       --skip-auth          Skip authentication configuration
+      --skip-meters        Skip migrating meter/energy-meter configuration (e.g. overpower limits)
       --skip-network       Skip network configuration (WiFi, Ethernet)
       --skip-schedules     Skip schedule migration
       --skip-scripts       Skip script migration
+      --skip-state         Skip migrating live component state (color temperature, brightness); apply configuration only
       --skip-webhooks      Skip webhook migration
+      --ssid string        Override the WiFi SSID the target joins (defaults to the source's network)
       --static-ip string   Assign this static IPv4 to the target instead of copying the source's IP
+      --to-ap string       Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)
   -y, --yes                Skip confirmation prompt
 ```
 

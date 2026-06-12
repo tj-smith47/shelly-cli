@@ -19,6 +19,10 @@ sections.
 
 
 .SH OPTIONS
+\fB--ap-ip\fP=""
+	Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)
+
+.PP
 \fB-d\fP, \fB--decrypt\fP=""
 	Password to decrypt backup
 
@@ -47,8 +51,16 @@ sections.
 	Static IPv4 subnet mask (with --static-ip)
 
 .PP
+\fB--password\fP=""
+	WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
+
+.PP
 \fB--skip-auth\fP[=false]
 	Skip authentication configuration
+
+.PP
+\fB--skip-meters\fP[=false]
+	Skip restoring meter/energy-meter configuration (e.g. overpower limits)
 
 .PP
 \fB--skip-network\fP[=false]
@@ -63,12 +75,24 @@ sections.
 	Skip script restoration
 
 .PP
+\fB--skip-state\fP[=false]
+	Skip restoring live component state (color temperature, brightness); apply configuration only
+
+.PP
 \fB--skip-webhooks\fP[=false]
 	Skip webhook restoration
 
 .PP
+\fB--ssid\fP=""
+	Override the WiFi SSID the device joins (defaults to the backup's network)
+
+.PP
 \fB--static-ip\fP=""
 	Override the backup's WiFi with this static IPv4 address
+
+.PP
+\fB--to-ap\fP=""
+	Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -152,6 +176,12 @@ sections.
   # (identity — MAC, serial, device ID — is never overwritten by restore)
   shelly backup restore new-bulb master-bath-1.json \\
     --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
+
+  # Restore a sibling's backup straight onto a brand-new device at its factory
+  # WiFi AP: hops the host onto the AP, applies the config + static IP, and the
+  # device joins the LAN — no separate provisioning step (target name = "fr")
+  shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF \\
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
 .EE
 
 

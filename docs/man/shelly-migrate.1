@@ -29,6 +29,10 @@ Use --dry-run to preview what would change without applying.
 
 
 .SH OPTIONS
+\fB--ap-ip\fP=""
+	Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)
+
+.PP
 \fB--dns\fP=""
 	Static IPv4 nameserver (optional, with --static-ip)
 
@@ -57,12 +61,20 @@ Use --dry-run to preview what would change without applying.
 	Static IPv4 subnet mask (with --static-ip)
 
 .PP
+\fB--password\fP=""
+	WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
+
+.PP
 \fB--reset-source\fP[=true]
 	Factory reset source device after migration
 
 .PP
 \fB--skip-auth\fP[=false]
 	Skip authentication configuration
+
+.PP
+\fB--skip-meters\fP[=false]
+	Skip migrating meter/energy-meter configuration (e.g. overpower limits)
 
 .PP
 \fB--skip-network\fP[=false]
@@ -77,12 +89,24 @@ Use --dry-run to preview what would change without applying.
 	Skip script migration
 
 .PP
+\fB--skip-state\fP[=false]
+	Skip migrating live component state (color temperature, brightness); apply configuration only
+
+.PP
 \fB--skip-webhooks\fP[=false]
 	Skip webhook migration
 
 .PP
+\fB--ssid\fP=""
+	Override the WiFi SSID the target joins (defaults to the source's network)
+
+.PP
 \fB--static-ip\fP=""
 	Assign this static IPv4 to the target instead of copying the source's IP
+
+.PP
+\fB--to-ap\fP=""
+	Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)
 
 .PP
 \fB-y\fP, \fB--yes\fP[=false]
@@ -167,6 +191,12 @@ Use --dry-run to preview what would change without applying.
   # source is not reset since there is no IP conflict)
   shelly migrate master-bath-1 new-bulb \\
     --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0
+
+  # Clone a live sibling straight onto a brand-new device at its factory WiFi AP:
+  # hops the host onto the AP, applies the config + static IP, the device joins
+  # the LAN, and the source is left untouched (target name = "fr")
+  shelly migrate sr fr --to-ap ShellyBulbDuo-D0DCFF \\
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
 .EE
 
 

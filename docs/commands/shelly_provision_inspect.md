@@ -1,39 +1,40 @@
-## shelly light set
+## shelly provision inspect
 
-Set light parameters
+Read a device's persisted config at its factory WiFi AP
 
 ### Synopsis
 
-Set parameters of a light component on the specified device.
+Hop onto a device's factory WiFi access point, read the configuration it has
+actually persisted (identity plus WiFi station settings), and return to the home
+network.
 
-You can set brightness, white color temperature (Gen1 white-temp bulbs such as
-the Duo), and on/off state. Values not specified are left unchanged.
+Use this when a device configures but never appears on the LAN: it shows whether
+the station SSID, key, and static IP took, and whether the device has associated
+yet — answering "did the onboard / restore --to-ap actually write what I expected?"
+without the device having to join the network first.
 
 ```
-shelly light set <device> [flags]
+shelly provision inspect <ap-ssid> [flags]
 ```
 
 ### Examples
 
 ```
-  # Set brightness to 50%
-  shelly light set kitchen --brightness 50
+  # Inspect a Shelly bulb sitting at its factory AP
+  shelly provision inspect ShellyBulbDuo-D0DCFF
 
-  # Set white color temperature to 4200K (Gen1 Duo)
-  shelly light set master-bath --temp 4200
+  # Use a specific host IP on the AP subnet
+  shelly provision inspect ShellyBulbDuo-D0DCFF --ap-ip 192.168.33.150
 
-  # Turn on and set brightness
-  shelly light br kitchen -b 75 --on
+  # JSON output
+  shelly provision inspect ShellyBulbDuo-D0DCFF -o json
 ```
 
 ### Options
 
 ```
-  -b, --brightness int   Brightness (0-100) (default -1)
-  -h, --help             help for set
-  -i, --id int           Light component ID (default 0)
-      --on               Turn on
-  -t, --temp int         White color temperature in Kelvin (Gen1 Duo: 2700-6500) (default -1)
+      --ap-ip string   Static host IP to use on the device's AP subnet (default 192.168.33.133)
+  -h, --help           help for inspect
 ```
 
 ### Options inherited from parent commands
@@ -57,5 +58,5 @@ shelly light set <device> [flags]
 
 ### SEE ALSO
 
-* [shelly light](shelly_light.md)	 - Control light components
+* [shelly provision](shelly_provision.md)	 - Discover and provision new Shelly devices
 
