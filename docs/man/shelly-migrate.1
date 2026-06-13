@@ -118,7 +118,7 @@ Use --dry-run to preview what would change without applying.
 
 .PP
 \fB--update-firmware\fP[=false]
-	When the source runs newer firmware than the target, update the target to current stable firmware before migrating (Gen1; with --to-ap the update runs on the LAN after the target joins)
+	When the source runs newer firmware than the target, update the target to current stable firmware before migrating (Gen1; with --to-ap the update runs at the factory AP before the target joins, since corrupt firmware reboot-loops once on the LAN)
 
 .PP
 \fB-y\fP, \fB--yes\fP[=false]

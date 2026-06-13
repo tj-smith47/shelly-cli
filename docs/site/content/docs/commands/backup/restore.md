@@ -53,7 +53,8 @@ shelly backup restore <device> <file> [flags]
 
   # Same, but the target runs older firmware than the backup: update it first so
   # the full restore lands on matched firmware and cannot reboot-loop. With --to-ap
-  # the device is bootstrapped onto the LAN, updated there, then fully restored.
+  # the update runs AT the factory AP (where the device is stable) — the image is
+  # fetched before the hop and re-served on the AP subnet — then the full restore.
   shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF --update-firmware \
     --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0
 ```
@@ -82,7 +83,7 @@ shelly backup restore <device> <file> [flags]
       --ssid string                Override the WiFi SSID the device joins (defaults to the backup's network)
       --static-ip string           Override the backup's WiFi with this static IPv4 address
       --to-ap string               Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)
-      --update-firmware            When the backup is from newer firmware than the target, update the device to current stable firmware before restoring (Gen1; with --to-ap the update runs on the LAN after the device joins)
+      --update-firmware            When the backup is from newer firmware than the target, update the device to current stable firmware before restoring (Gen1; with --to-ap the update runs at the factory AP before the device joins, since corrupt firmware reboot-loops once on the LAN)
 ```
 
 ### Options inherited from parent commands

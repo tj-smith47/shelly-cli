@@ -150,16 +150,14 @@ type RestoreOptions struct {
 	// device is OTA-updated to current stable firmware (FirmwareURL, or derived from
 	// the backup's model) before the configuration is applied, so the full restore
 	// lands on matched firmware and cannot reboot-loop. For a --to-ap restore the
-	// update runs on the LAN after the device joins (a factory AP has no internet).
+	// update runs at the device's factory AP (where it is stable): a factory AP has
+	// no internet, so the image is fetched before the host hops onto the AP and
+	// re-served from the host's AP-subnet address — corrupt firmware would reboot-loop
+	// the device the instant station mode came up, so it can never update on the LAN.
 	UpdateFirmware bool
 	// FirmwareURL overrides the firmware image UpdateFirmware flashes. Empty derives
 	// the official current-stable URL from the backup's device model.
 	FirmwareURL string
-	// NetworkOnly writes only the WiFi station configuration and returns, bypassing
-	// every other step and the firmware-downgrade gate. It is the factory-AP
-	// bootstrap of an --update-firmware --to-ap restore: it moves the device onto
-	// the LAN, where the firmware update and full restore then run.
-	NetworkOnly bool
 	// StepTrace, when non-nil, receives a per-step diagnostic line during a Gen1
 	// restore (each setting group's warnings/errors and the device's post-write
 	// uptime/stability). It is the debug seam behind --trace-file for pinpointing

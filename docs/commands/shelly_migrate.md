@@ -77,7 +77,7 @@ shelly migrate <source-device> <target-device> [flags]
       --ssid string                Override the WiFi SSID the target joins (defaults to the source's network)
       --static-ip string           Assign this static IPv4 to the target instead of copying the source's IP
       --to-ap string               Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)
-      --update-firmware            When the source runs newer firmware than the target, update the target to current stable firmware before migrating (Gen1; with --to-ap the update runs on the LAN after the target joins)
+      --update-firmware            When the source runs newer firmware than the target, update the target to current stable firmware before migrating (Gen1; with --to-ap the update runs at the factory AP before the target joins, since corrupt firmware reboot-loops once on the LAN)
   -y, --yes                        Skip confirmation prompt
 ```
 

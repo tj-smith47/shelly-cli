@@ -128,7 +128,7 @@ Use --dry-run to preview what would change without applying.`,
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the target joins (defaults to the source's network)")
 	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)")
 	cmd.Flags().BoolVar(&opts.AllowFirmwareDowngrade, "allow-firmware-downgrade", false, "Allow migrating a backup captured from newer firmware onto an older-firmware target (refused by default; this can trigger a reboot loop — prefer --update-firmware)")
-	cmd.Flags().BoolVar(&opts.UpdateFirmware, "update-firmware", false, "When the source runs newer firmware than the target, update the target to current stable firmware before migrating (Gen1; with --to-ap the update runs on the LAN after the target joins)")
+	cmd.Flags().BoolVar(&opts.UpdateFirmware, "update-firmware", false, "When the source runs newer firmware than the target, update the target to current stable firmware before migrating (Gen1; with --to-ap the update runs at the factory AP before the target joins, since corrupt firmware reboot-loops once on the LAN)")
 	cmd.Flags().StringVar(&opts.FirmwareURL, "firmware-url", "", "Firmware image for --update-firmware (default: derived from the source device model)")
 	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 

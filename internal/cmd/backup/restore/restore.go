@@ -88,7 +88,8 @@ sections.`,
 
   # Same, but the target runs older firmware than the backup: update it first so
   # the full restore lands on matched firmware and cannot reboot-loop. With --to-ap
-  # the device is bootstrapped onto the LAN, updated there, then fully restored.
+  # the update runs AT the factory AP (where the device is stable) — the image is
+  # fetched before the hop and re-served on the AP subnet — then the full restore.
   shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF --update-firmware \
     --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0`,
 		Args: cobra.ExactArgs(2),
@@ -118,7 +119,7 @@ sections.`,
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the device joins (defaults to the backup's network)")
 	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)")
 	cmd.Flags().BoolVar(&opts.AllowFirmwareDowngrade, "allow-firmware-downgrade", false, "Allow restoring a backup captured from newer firmware onto an older-firmware device (refused by default; this can trigger a reboot loop — prefer --update-firmware)")
-	cmd.Flags().BoolVar(&opts.UpdateFirmware, "update-firmware", false, "When the backup is from newer firmware than the target, update the device to current stable firmware before restoring (Gen1; with --to-ap the update runs on the LAN after the device joins)")
+	cmd.Flags().BoolVar(&opts.UpdateFirmware, "update-firmware", false, "When the backup is from newer firmware than the target, update the device to current stable firmware before restoring (Gen1; with --to-ap the update runs at the factory AP before the device joins, since corrupt firmware reboot-loops once on the LAN)")
 	cmd.Flags().StringVar(&opts.FirmwareURL, "firmware-url", "", "Firmware image for --update-firmware (default: derived from the backup's device model)")
 	cmd.Flags().StringVar(&opts.TraceFile, "trace-file", "", "Write a per-step Gen1 restore diagnostic (which setting destabilizes the device) to this file")
 	if err := cmd.Flags().MarkHidden("trace-file"); err != nil {
