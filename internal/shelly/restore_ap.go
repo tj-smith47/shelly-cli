@@ -73,10 +73,20 @@ func (s *Service) RestoreToAP(
 	// image is fetched now (while the host still has internet — the factory AP has
 	// none) and re-served to the device from the host's AP-subnet address during the
 	// hop, before any station config is written; the device flashes while stable at
-	// its AP and the restore then proceeds on matched firmware. So the AP pass stays
-	// a FULL restore, and RestoreGen1's own (LAN-only) firmware path is disabled here.
+	// its AP. The AP pass then writes ONLY the station config (NetworkOnly) so the
+	// device joins the LAN, and the full configuration is applied on the LAN — where
+	// the device has a clock, is stable on matched firmware, and a write that makes it
+	// reboot to join the network cannot be misread as a destabilizing reboot loop.
+	// RestoreGen1's own (LAN-only) firmware path is disabled here regardless.
 	apOpts := opts
 	apOpts.UpdateFirmware = false
+	// The AP pass runs against a clockless factory AP (no internet, so no NTP). Skip
+	// the pre-schedule-write clock wait there — it could never succeed — and let the
+	// LAN second pass apply the clock-gated schedule rules once the device has synced.
+	apOpts.SkipClockWait = true
+	if opts.UpdateFirmware {
+		apOpts.NetworkOnly = true
+	}
 	fwPath, fwErr := prefetchAPFirmware(ctx, generation, bkp, opts)
 	if fwErr != nil {
 		return nil, "", fwErr
@@ -93,7 +103,7 @@ func (s *Service) RestoreToAP(
 		// Flash the device while it is stable at its AP, before the station config
 		// that would otherwise reboot-loop it onto a dead LAN.
 		if fwPath != "" {
-			if fwErr := s.updateGen1FirmwareAtAP(ctx, apHostIP, fwPath, bkp.DeviceInfo.Version); fwErr != nil {
+			if fwErr := s.updateGen1FirmwareAtAP(ctx, apFirmwareBindIP(apHostIP), fwPath, bkp.DeviceInfo.Version); fwErr != nil {
 				return fwErr
 			}
 		}
@@ -134,16 +144,47 @@ func (s *Service) RestoreToAP(
 			apSSID, registryName, confErr)
 	}
 
-	// Re-apply on the LAN only the config the device rejected at its clockless
-	// factory AP — notably Gen1 light config ("Timezone and time should be set") —
-	// which would otherwise be left at factory defaults. Any firmware update already
-	// happened AT THE AP (a device on corrupt/older firmware reboot-loops the instant
-	// station mode is active and so can never OTA on the LAN), and the full restore
-	// took at the AP too; everything else already applied. Pin the pass to the
-	// interface that confirmed the device, so it lands even when the default route
-	// would be dropped by AP client isolation.
+	// Complete the configuration on the LAN. Pin the pass to the interface that
+	// confirmed the device, so it lands even when the default route would be dropped
+	// by AP client isolation.
 	bindCtx := client.WithBindInterface(ctx, bindIface)
-	result = s.reapplyConfigOnLAN(bindCtx, newAddr, generation, bkp, opts, result)
+	return s.completeRestoreOnLAN(bindCtx, newAddr, registryName, generation, bkp, opts, result)
+}
+
+// completeRestoreOnLAN finishes a --to-ap restore once the device has rejoined the
+// LAN at newAddr. With a firmware update the AP pass only flashed and wrote the
+// station config, so the full configuration is applied here (fatal on failure);
+// without one the AP pass already applied everything, so only the clock-gated
+// config the AP rejected is re-applied (best-effort). The registry address is
+// recorded regardless, since the device has joined the LAN either way.
+func (s *Service) completeRestoreOnLAN(
+	ctx context.Context,
+	newAddr, registryName string,
+	generation int,
+	bkp *backup.DeviceBackup,
+	opts backup.RestoreOptions,
+	apResult *backup.RestoreResult,
+) (*backup.RestoreResult, string, error) {
+	if opts.UpdateFirmware {
+		// The firmware was flashed and only the station config written at the AP; the
+		// full configuration is applied here, where the device is on matched firmware,
+		// has an NTP clock, and is stable. This pass IS the restore, so its failure is
+		// fatal — but the device has joined the LAN, so record its address regardless.
+		lanResult, lanErr := s.fullRestoreOnLAN(ctx, newAddr, generation, bkp, opts)
+		updateRegistryAddress(registryName, newAddr, bkp)
+		if lanErr != nil {
+			return lanResult, newAddr, fmt.Errorf(
+				"%s joined the LAN at %s but the full configuration restore failed: %w",
+				registryName, newAddr, lanErr)
+		}
+		return lanResult, newAddr, nil
+	}
+
+	// No firmware update: the AP pass applied the full config, so here only re-apply
+	// the config the clockless factory AP rejected — notably Gen1 light config
+	// ("Timezone and time should be set") — which would otherwise be left at factory
+	// defaults. Everything else already took at the AP.
+	result := s.reapplyConfigOnLAN(ctx, newAddr, generation, bkp, opts, apResult)
 	updateRegistryAddress(registryName, newAddr, bkp)
 
 	return result, newAddr, nil
@@ -190,9 +231,40 @@ func (s *Service) reapplyConfigOnLAN(
 	return lanResult
 }
 
+// lanFullRestoreBudget caps the LAN pass that applies the full configuration after
+// an at-AP firmware update: it writes every setting group and the device can restart
+// mid-pass (a restored mode write, or the reboot to join the network), so it is far
+// larger than the clock-dependent re-apply. The firmware is already done at the AP,
+// so this is config-only — minutes, not the OTA's tens of minutes.
+const lanFullRestoreBudget = 4 * time.Minute
+
+// fullRestoreOnLAN applies the complete configuration at the device's LAN address
+// after the AP pass flashed the firmware and wrote only the station config. Here —
+// on matched firmware, with an NTP clock, and stable — RestoreBackupGen writes the
+// whole backup in one pass. SkipNetwork is set because the station config already
+// took at the AP and must not be disturbed; UpdateFirmware is cleared because the
+// flash already happened at the AP (a LAN OTA would reboot-loop the device anyway).
+// Unlike the clock-dependent re-apply, this pass IS the restore, so its failure is
+// returned to the caller as fatal rather than downgraded to a warning.
+func (s *Service) fullRestoreOnLAN(
+	ctx context.Context,
+	addr string,
+	generation int,
+	bkp *backup.DeviceBackup,
+	opts backup.RestoreOptions,
+) (*backup.RestoreResult, error) {
+	lanOpts := opts
+	lanOpts.SkipNetwork = true         // station config already applied at the AP
+	lanOpts.NetworkOnly = false        // the LAN pass applies the full configuration
+	lanOpts.ClockDependentOnly = false // not a re-apply: everything is written here
+	lanOpts.UpdateFirmware = false     // firmware already flashed at the AP
+	return s.restoreOnLAN(ctx, addr, generation, bkp, lanOpts, lanFullRestoreBudget)
+}
+
 // restoreOnLAN runs a bounded LAN restore pass after a settle delay, returning the
-// raw result and error. It backs the best-effort clock-dependent re-apply, which
-// sets its own failure policy on the result it returns.
+// raw result and error. It is the shared core of the best-effort clock-dependent
+// re-apply and the fatal post-firmware full restore; each caller sets its own
+// failure policy.
 func (s *Service) restoreOnLAN(
 	ctx context.Context,
 	addr string,

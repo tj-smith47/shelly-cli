@@ -252,6 +252,8 @@ func toGen1RestoreOptions(opts RestoreOptions) *shellybackup.Gen1RestoreOptions 
 		AllowFirmwareDowngrade: opts.AllowFirmwareDowngrade,
 		UpdateFirmware:         opts.UpdateFirmware,
 		FirmwareURL:            opts.FirmwareURL,
+		NetworkOnly:            opts.NetworkOnly,
+		SkipClockWait:          opts.SkipClockWait,
 		StepTrace:              opts.StepTrace,
 	}
 	if opts.NetworkOverride != nil {

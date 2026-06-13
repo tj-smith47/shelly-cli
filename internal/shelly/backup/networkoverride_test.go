@@ -112,6 +112,8 @@ func TestToGen1RestoreOptions(t *testing.T) {
 		AllowFirmwareDowngrade: true,
 		UpdateFirmware:         true,
 		FirmwareURL:            "http://firmware.shelly.cloud/gen1/SHBDUO-1.zip",
+		NetworkOnly:            true,
+		SkipClockWait:          true,
 		NetworkOverride: &NetworkOverride{
 			SSID: "Home", Password: "pw",
 			StaticIP: "10.23.47.227", Gateway: "10.23.47.1",
@@ -129,7 +131,9 @@ func TestToGen1RestoreOptions(t *testing.T) {
 		out.ClockDependentOnly != in.ClockDependentOnly ||
 		out.AllowFirmwareDowngrade != in.AllowFirmwareDowngrade ||
 		out.UpdateFirmware != in.UpdateFirmware ||
-		out.FirmwareURL != in.FirmwareURL {
+		out.FirmwareURL != in.FirmwareURL ||
+		out.NetworkOnly != in.NetworkOnly ||
+		out.SkipClockWait != in.SkipClockWait {
 		t.Errorf("scalar option dropped in translation: in=%+v out=%+v", in, out)
 	}
 	if out.NetworkOverride == nil {

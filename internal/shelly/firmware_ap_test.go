@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
+	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
@@ -109,6 +110,19 @@ func TestServeFirmwareFile_ServesImage(t *testing.T) {
 	}
 	if string(body) != fakeFirmwareBody {
 		t.Errorf("served body = %q, want %q", body, fakeFirmwareBody)
+	}
+}
+
+func TestAPFirmwareBindIP(t *testing.T) {
+	t.Parallel()
+	// Regression: an empty --ap-ip must resolve to the same default the AP hop uses,
+	// not stay "" — a "" bind produced http://:8512/firmware.zip, which the device
+	// could not fetch, so the at-AP OTA timed out with the device still on its build.
+	if got := apFirmwareBindIP(""); got != discovery.DefaultAPHostIP {
+		t.Errorf("apFirmwareBindIP(\"\") = %q, want default %q", got, discovery.DefaultAPHostIP)
+	}
+	if got := apFirmwareBindIP("192.168.33.150"); got != "192.168.33.150" {
+		t.Errorf("apFirmwareBindIP(explicit) = %q, want it unchanged", got)
 	}
 }
 

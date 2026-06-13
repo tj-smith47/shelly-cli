@@ -69,6 +69,18 @@ func fetchGen1Firmware(ctx context.Context, url string) (string, error) {
 	return f.Name(), nil
 }
 
+// apFirmwareBindIP resolves the host's actual AP-subnet address for serving the
+// firmware image. withAPHop keeps discovery.DefaultAPHostIP when --ap-ip is unset
+// (an empty apHostIP means "use the default"), so the same resolution must happen
+// here — otherwise the served URL would carry no host (http://:8512/...) and the
+// device at its AP could never fetch the image.
+func apFirmwareBindIP(apHostIP string) string {
+	if apHostIP == "" {
+		return discovery.DefaultAPHostIP
+	}
+	return apHostIP
+}
+
 // prefetchAPFirmware downloads, before the host hops onto the device's factory AP,
 // the Gen1 firmware image to flash at that AP — for a --to-ap restore that requested
 // a firmware update on a Gen1 target. It resolves the image URL (an explicit

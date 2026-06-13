@@ -158,6 +158,19 @@ type RestoreOptions struct {
 	// FirmwareURL overrides the firmware image UpdateFirmware flashes. Empty derives
 	// the official current-stable URL from the backup's device model.
 	FirmwareURL string
+	// NetworkOnly writes only the WiFi station configuration and returns, bypassing
+	// every other step and the firmware-downgrade gate. It is the factory-AP pass of
+	// an --update-firmware --to-ap restore: after the firmware is flashed at the AP,
+	// only the station config is written there so the device joins the LAN cleanly,
+	// and the full configuration is then applied on the LAN — where the device has a
+	// clock and is stable, and where writes cannot be misread as a reboot loop when
+	// the device reboots to join the network.
+	NetworkOnly bool
+	// SkipClockWait disables the bounded wait for the device's NTP clock that
+	// otherwise precedes writing time-based schedule rules. Set it for the full-config
+	// pass run at a clockless factory AP, where the device can never sync time and the
+	// LAN second pass re-applies those rules once it has joined the network.
+	SkipClockWait bool
 	// StepTrace, when non-nil, receives a per-step diagnostic line during a Gen1
 	// restore (each setting group's warnings/errors and the device's post-write
 	// uptime/stability). It is the debug seam behind --trace-file for pinpointing
