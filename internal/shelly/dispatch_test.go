@@ -71,7 +71,7 @@ func TestSupportsPluginCommand_WithHints(t *testing.T) {
 
 	// Create a dummy binary so the plugin is considered valid
 	binaryPath := filepath.Join(pluginDir, "shelly-tasmota")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho test"), 0o700); err != nil { //nolint:gosec // G306: test binary needs execute permission
+	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho test"), 0o700); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -206,7 +206,7 @@ func TestSupportsPluginCommand_NoHintsInManifest(t *testing.T) {
 
 	// Create a dummy binary
 	binaryPath := filepath.Join(pluginDir, "shelly-esphome")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho test"), 0o700); err != nil { //nolint:gosec // G306: test binary needs execute permission
+	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho test"), 0o700); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
