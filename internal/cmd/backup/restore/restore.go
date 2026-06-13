@@ -39,6 +39,8 @@ type Options struct {
 	SSID                   string
 	Password               string
 	AllowFirmwareDowngrade bool
+	UpdateFirmware         bool
+	FirmwareURL            string
 	TraceFile              string
 }
 
@@ -82,7 +84,13 @@ sections.`,
   # WiFi AP: hops the host onto the AP, applies the config + static IP, and the
   # device joins the LAN — no separate provisioning step (target name = "fr")
   shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF \
-    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1`,
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
+
+  # Same, but the target runs older firmware than the backup: update it first so
+  # the full restore lands on matched firmware and cannot reboot-loop. With --to-ap
+  # the device is bootstrapped onto the LAN, updated there, then fully restored.
+  shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF --update-firmware \
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
@@ -109,7 +117,9 @@ sections.`,
 	cmd.Flags().StringVar(&opts.APIP, "ap-ip", "", "Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)")
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the device joins (defaults to the backup's network)")
 	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)")
-	cmd.Flags().BoolVar(&opts.AllowFirmwareDowngrade, "allow-firmware-downgrade", false, "Allow restoring a backup captured from newer firmware onto an older-firmware device (refused by default; this can trigger a reboot loop — update the device firmware first instead)")
+	cmd.Flags().BoolVar(&opts.AllowFirmwareDowngrade, "allow-firmware-downgrade", false, "Allow restoring a backup captured from newer firmware onto an older-firmware device (refused by default; this can trigger a reboot loop — prefer --update-firmware)")
+	cmd.Flags().BoolVar(&opts.UpdateFirmware, "update-firmware", false, "When the backup is from newer firmware than the target, update the device to current stable firmware before restoring (Gen1; with --to-ap the update runs on the LAN after the device joins)")
+	cmd.Flags().StringVar(&opts.FirmwareURL, "firmware-url", "", "Firmware image for --update-firmware (default: derived from the backup's device model)")
 	cmd.Flags().StringVar(&opts.TraceFile, "trace-file", "", "Write a per-step Gen1 restore diagnostic (which setting destabilizes the device) to this file")
 	if err := cmd.Flags().MarkHidden("trace-file"); err != nil {
 		// MarkHidden only fails on an unknown flag name; the flag is defined above.
@@ -222,6 +232,8 @@ func run(ctx context.Context, opts *Options) error {
 		NetworkOverride:        override,
 		Name:                   cmdutil.DeviceDisplayName(opts.Name, opts.Device),
 		AllowFirmwareDowngrade: opts.AllowFirmwareDowngrade,
+		UpdateFirmware:         opts.UpdateFirmware,
+		FirmwareURL:            opts.FirmwareURL,
 	}
 
 	if opts.DryRun {

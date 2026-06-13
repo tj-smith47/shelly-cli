@@ -63,27 +63,30 @@ shelly migrate <source-device> <target-device> [flags]
 ### Options
 
 ```
-      --ap-ip string       Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)
-      --dns string         Static IPv4 nameserver (optional, with --static-ip)
-      --dry-run            Show what would be changed without applying
-      --force              Force migration between different device types
-      --gateway string     Static IPv4 default gateway (with --static-ip)
-  -h, --help               help for migrate
-      --name string        Override the target device name (defaults to the target identifier when it is a friendly alias)
-      --netmask string     Static IPv4 subnet mask (with --static-ip)
-      --password string    WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
-      --reset-source       Factory reset source device after migration (default true)
-      --skip-auth          Skip authentication configuration
-      --skip-meters        Skip migrating meter/energy-meter configuration (e.g. overpower limits)
-      --skip-network       Skip network configuration (WiFi, Ethernet)
-      --skip-schedules     Skip schedule migration
-      --skip-scripts       Skip script migration
-      --skip-state         Skip migrating live component state (color temperature, brightness); apply configuration only
-      --skip-webhooks      Skip webhook migration
-      --ssid string        Override the WiFi SSID the target joins (defaults to the source's network)
-      --static-ip string   Assign this static IPv4 to the target instead of copying the source's IP
-      --to-ap string       Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)
-  -y, --yes                Skip confirmation prompt
+      --allow-firmware-downgrade   Allow migrating a backup captured from newer firmware onto an older-firmware target (refused by default; this can trigger a reboot loop — prefer --update-firmware)
+      --ap-ip string               Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)
+      --dns string                 Static IPv4 nameserver (optional, with --static-ip)
+      --dry-run                    Show what would be changed without applying
+      --firmware-url string        Firmware image for --update-firmware (default: derived from the source device model)
+      --force                      Force migration between different device types
+      --gateway string             Static IPv4 default gateway (with --static-ip)
+  -h, --help                       help for migrate
+      --name string                Override the target device name (defaults to the target identifier when it is a friendly alias)
+      --netmask string             Static IPv4 subnet mask (with --static-ip)
+      --password string            WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
+      --reset-source               Factory reset source device after migration (default true)
+      --skip-auth                  Skip authentication configuration
+      --skip-meters                Skip migrating meter/energy-meter configuration (e.g. overpower limits)
+      --skip-network               Skip network configuration (WiFi, Ethernet)
+      --skip-schedules             Skip schedule migration
+      --skip-scripts               Skip script migration
+      --skip-state                 Skip migrating live component state (color temperature, brightness); apply configuration only
+      --skip-webhooks              Skip webhook migration
+      --ssid string                Override the WiFi SSID the target joins (defaults to the source's network)
+      --static-ip string           Assign this static IPv4 to the target instead of copying the source's IP
+      --to-ap string               Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)
+      --update-firmware            When the source runs newer firmware than the target, update the target to current stable firmware before migrating (Gen1; with --to-ap the update runs on the LAN after the target joins)
+  -y, --yes                        Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

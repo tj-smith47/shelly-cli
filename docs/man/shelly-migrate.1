@@ -29,6 +29,10 @@ Use --dry-run to preview what would change without applying.
 
 
 .SH OPTIONS
+\fB--allow-firmware-downgrade\fP[=false]
+	Allow migrating a backup captured from newer firmware onto an older-firmware target (refused by default; this can trigger a reboot loop — prefer --update-firmware)
+
+.PP
 \fB--ap-ip\fP=""
 	Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)
 
@@ -39,6 +43,10 @@ Use --dry-run to preview what would change without applying.
 .PP
 \fB--dry-run\fP[=false]
 	Show what would be changed without applying
+
+.PP
+\fB--firmware-url\fP=""
+	Firmware image for --update-firmware (default: derived from the source device model)
 
 .PP
 \fB--force\fP[=false]
@@ -107,6 +115,10 @@ Use --dry-run to preview what would change without applying.
 .PP
 \fB--to-ap\fP=""
 	Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)
+
+.PP
+\fB--update-firmware\fP[=false]
+	When the source runs newer firmware than the target, update the target to current stable firmware before migrating (Gen1; with --to-ap the update runs on the LAN after the target joins)
 
 .PP
 \fB-y\fP, \fB--yes\fP[=false]

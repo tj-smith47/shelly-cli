@@ -95,3 +95,58 @@ func TestApplyGen2WiFiOverride(t *testing.T) {
 		}
 	})
 }
+
+// TestToGen1RestoreOptions guards the CLI→engine translation: every restore option
+// the user can set must reach the shelly-go Gen1 restore unchanged. A silently
+// dropped field here would, for example, make --update-firmware a no-op.
+func TestToGen1RestoreOptions(t *testing.T) {
+	t.Parallel()
+	in := RestoreOptions{
+		Name:                   "FR",
+		SkipNetwork:            true,
+		SkipAuth:               true,
+		SkipState:              true,
+		SkipMeters:             true,
+		SkipWebhooks:           true,
+		ClockDependentOnly:     true,
+		AllowFirmwareDowngrade: true,
+		UpdateFirmware:         true,
+		FirmwareURL:            "http://firmware.shelly.cloud/gen1/SHBDUO-1.zip",
+		NetworkOnly:            true,
+		NetworkOverride: &NetworkOverride{
+			SSID: "Home", Password: "pw",
+			StaticIP: "10.23.47.227", Gateway: "10.23.47.1",
+			Netmask: "255.255.254.0", DNS: "10.23.47.1",
+		},
+	}
+	out := toGen1RestoreOptions(in)
+
+	if out.Name != in.Name ||
+		out.SkipNetwork != in.SkipNetwork ||
+		out.SkipAuth != in.SkipAuth ||
+		out.SkipState != in.SkipState ||
+		out.SkipMeters != in.SkipMeters ||
+		out.SkipWebhooks != in.SkipWebhooks ||
+		out.ClockDependentOnly != in.ClockDependentOnly ||
+		out.AllowFirmwareDowngrade != in.AllowFirmwareDowngrade ||
+		out.UpdateFirmware != in.UpdateFirmware ||
+		out.FirmwareURL != in.FirmwareURL ||
+		out.NetworkOnly != in.NetworkOnly {
+		t.Errorf("scalar option dropped in translation: in=%+v out=%+v", in, out)
+	}
+	if out.NetworkOverride == nil {
+		t.Fatal("NetworkOverride dropped in translation")
+	}
+	if out.NetworkOverride.SSID != "Home" || out.NetworkOverride.Password != "pw" ||
+		out.NetworkOverride.StaticIP != "10.23.47.227" || out.NetworkOverride.Gateway != "10.23.47.1" ||
+		out.NetworkOverride.Netmask != "255.255.254.0" || out.NetworkOverride.DNS != "10.23.47.1" {
+		t.Errorf("NetworkOverride fields not translated: %+v", out.NetworkOverride)
+	}
+}
+
+func TestToGen1RestoreOptions_NilOverride(t *testing.T) {
+	t.Parallel()
+	if out := toGen1RestoreOptions(RestoreOptions{}); out.NetworkOverride != nil {
+		t.Errorf("expected nil NetworkOverride, got %+v", out.NetworkOverride)
+	}
+}

@@ -145,6 +145,21 @@ type RestoreOptions struct {
 	// running older firmware (a proven reboot-loop trigger). Set only when updating
 	// the device firmware first is not possible and the risk is accepted.
 	AllowFirmwareDowngrade bool
+	// UpdateFirmware resolves a firmware downgrade by updating the device rather than
+	// refusing: when the backup is from newer firmware than the target runs, the
+	// device is OTA-updated to current stable firmware (FirmwareURL, or derived from
+	// the backup's model) before the configuration is applied, so the full restore
+	// lands on matched firmware and cannot reboot-loop. For a --to-ap restore the
+	// update runs on the LAN after the device joins (a factory AP has no internet).
+	UpdateFirmware bool
+	// FirmwareURL overrides the firmware image UpdateFirmware flashes. Empty derives
+	// the official current-stable URL from the backup's device model.
+	FirmwareURL string
+	// NetworkOnly writes only the WiFi station configuration and returns, bypassing
+	// every other step and the firmware-downgrade gate. It is the factory-AP
+	// bootstrap of an --update-firmware --to-ap restore: it moves the device onto
+	// the LAN, where the firmware update and full restore then run.
+	NetworkOnly bool
 	// StepTrace, when non-nil, receives a per-step diagnostic line during a Gen1
 	// restore (each setting group's warnings/errors and the device's post-write
 	// uptime/stability). It is the debug seam behind --trace-file for pinpointing

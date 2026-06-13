@@ -44,6 +44,10 @@ type Options struct {
 	SSID          string
 	Password      string
 
+	AllowFirmwareDowngrade bool
+	UpdateFirmware         bool
+	FirmwareURL            string
+
 	// resetSourceExplicit tracks whether --reset-source was explicitly set.
 	resetSourceExplicit bool
 }
@@ -123,6 +127,9 @@ Use --dry-run to preview what would change without applying.`,
 	cmd.Flags().StringVar(&opts.APIP, "ap-ip", "", "Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)")
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the target joins (defaults to the source's network)")
 	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)")
+	cmd.Flags().BoolVar(&opts.AllowFirmwareDowngrade, "allow-firmware-downgrade", false, "Allow migrating a backup captured from newer firmware onto an older-firmware target (refused by default; this can trigger a reboot loop — prefer --update-firmware)")
+	cmd.Flags().BoolVar(&opts.UpdateFirmware, "update-firmware", false, "When the source runs newer firmware than the target, update the target to current stable firmware before migrating (Gen1; with --to-ap the update runs on the LAN after the target joins)")
+	cmd.Flags().StringVar(&opts.FirmwareURL, "firmware-url", "", "Firmware image for --update-firmware (default: derived from the source device model)")
 	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
 	cmd.AddCommand(validate.NewCommand(f))
@@ -250,6 +257,10 @@ func (o *Options) migrateViaAP(
 		SkipMeters:      o.SkipMeters,
 		NetworkOverride: override,
 		Name:            cmdutil.DeviceDisplayName(o.Name, o.Target),
+
+		AllowFirmwareDowngrade: o.AllowFirmwareDowngrade,
+		UpdateFirmware:         o.UpdateFirmware,
+		FirmwareURL:            o.FirmwareURL,
 	}
 
 	var (
@@ -346,6 +357,10 @@ func run(ctx context.Context, opts *Options) error {
 		SkipMeters:      opts.SkipMeters,
 		NetworkOverride: override,
 		Name:            cmdutil.DeviceDisplayName(opts.Name, opts.Target),
+
+		AllowFirmwareDowngrade: opts.AllowFirmwareDowngrade,
+		UpdateFirmware:         opts.UpdateFirmware,
+		FirmwareURL:            opts.FirmwareURL,
 	}
 	var result *backup.RestoreResult
 	err = cmdutil.RunWithSpinner(ctx, ios, "Migrating configuration...", func(ctx context.Context) error {
