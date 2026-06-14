@@ -27,7 +27,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/tj-smith47/shelly-go v0.5.0
+	github.com/tj-smith47/shelly-go v0.6.1
 	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.40.0
 	golang.org/x/term v0.38.0
@@ -91,5 +91,3 @@ require (
 	golang.org/x/text v0.32.0 // indirect
 	tinygo.org/x/bluetooth v0.13.0 // indirect
 )
-
-replace github.com/tj-smith47/shelly-go => /opt/repos/shelly-go
