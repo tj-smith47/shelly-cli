@@ -9,25 +9,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
-// excludedCommands lists commands that should not be exposed via MCP.
-// These are interactive, TUI, or otherwise incompatible with AI assistant usage.
-var excludedCommands = []string{
-	// TUI commands
-	"dash", "dashboard", "ui",
-	// Interactive commands
-	"repl", "interactive", "i", "shell", "sh", "console",
-	// Monitoring (requires terminal)
-	"monitor", "mon",
-	// Setup wizards
-	"init", "setup",
-	// Provisioning (requires hardware access)
-	"ble", "wifi",
-	// Streaming commands
-	"follow", "tail",
-	// External browser commands
-	"feedback",
-}
-
 // NewCommand creates the mcp command group.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
@@ -58,12 +39,12 @@ assistant configuration files automatically.`,
   shelly mcp tools`,
 	}
 
-	// Configure ophis with excluded commands
+	// Expose every command as an MCP tool except the interactive/TUI/provisioning
+	// subtrees cmdutil excludes by exact name (substring matching would drop all tools
+	// — the binary is "shelly" and most subcommands contain "i"; see the helper).
 	cfg := &ophis.Config{
 		Selectors: []ophis.Selector{
-			{
-				CmdSelector: ophis.ExcludeCmdsContaining(excludedCommands...),
-			},
+			{CmdSelector: cmdutil.IncludeCommandAsMCPTool},
 		},
 	}
 
