@@ -15,6 +15,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// restoreService is the subset of *shelly.Service the restore command drives.
+// Depending on this narrow interface instead of the concrete service keeps the
+// command testable with a stub: the concrete service reaches a real device (and,
+// for --to-ap, hops the host's WiFi), which a unit test cannot exercise.
+type restoreService interface {
+	RestoreBackup(ctx context.Context, identifier string, deviceBackup *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, error)
+	RestoreToAP(ctx context.Context, apSSID, apHostIP, registryName string, bkp *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, string, error)
+}
+
 // Options holds the command options.
 type Options struct {
 	Factory                *cmdutil.Factory
@@ -41,6 +50,19 @@ type Options struct {
 	AllowFirmwareDowngrade bool
 	FirmwareURL            string
 	TraceFile              string
+
+	// svc, when non-nil, overrides the service resolved from the Factory. It is the
+	// test injection seam; production leaves it nil and uses Factory.ShellyService().
+	svc restoreService
+}
+
+// service returns the injected restoreService when set, otherwise the concrete
+// service from the Factory.
+func (o *Options) service() restoreService {
+	if o.svc != nil {
+		return o.svc
+	}
+	return o.Factory.ShellyService()
 }
 
 // NewCommand creates the backup restore command.
@@ -243,7 +265,7 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	svc := opts.Factory.ShellyService()
+	svc := opts.service()
 
 	// --trace-file streams a per-step Gen1 restore diagnostic to a file: which
 	// setting each device tolerated and which one drove it into a reboot loop.
@@ -281,7 +303,7 @@ func run(ctx context.Context, opts *Options) error {
 // the AP address, and the restored station config moves the device onto the LAN.
 func (o *Options) restoreViaAP(
 	ctx context.Context,
-	svc *shelly.Service,
+	svc restoreService,
 	bkp *backup.DeviceBackup,
 	restoreOpts backup.RestoreOptions,
 ) error {

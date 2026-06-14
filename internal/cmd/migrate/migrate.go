@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate/diff"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate/validate"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -17,6 +18,19 @@ import (
 
 // aliasMig is the migrate command alias.
 const aliasMig = "mig"
+
+// migrateService is the subset of *shelly.Service the migrate command drives.
+// Depending on this narrow interface instead of the concrete service keeps the
+// command testable with a stub: the concrete service reaches real devices (and,
+// for --to-ap, hops the host's WiFi), which a unit test cannot exercise.
+type migrateService interface {
+	CreateBackup(ctx context.Context, identifier string, opts backup.Options) (*backup.DeviceBackup, error)
+	CheckMigrationCompatibility(ctx context.Context, bkp *backup.DeviceBackup, target string, force bool) error
+	CompareBackup(ctx context.Context, identifier string, deviceBackup *backup.DeviceBackup) (*model.BackupDiff, error)
+	RestoreBackup(ctx context.Context, identifier string, deviceBackup *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, error)
+	RestoreToAP(ctx context.Context, apSSID, apHostIP, registryName string, bkp *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, string, error)
+	DeviceFactoryReset(ctx context.Context, identifier string) error
+}
 
 // Options holds command options.
 type Options struct {
@@ -49,6 +63,19 @@ type Options struct {
 
 	// resetSourceExplicit tracks whether --reset-source was explicitly set.
 	resetSourceExplicit bool
+
+	// svc, when non-nil, overrides the service resolved from the Factory. It is the
+	// test injection seam; production leaves it nil and uses Factory.ShellyService().
+	svc migrateService
+}
+
+// service returns the injected migrateService when set, otherwise the concrete
+// service from the Factory.
+func (o *Options) service() migrateService {
+	if o.svc != nil {
+		return o.svc
+	}
+	return o.Factory.ShellyService()
 }
 
 // NewCommand creates the migrate command and its subcommands.
@@ -160,7 +187,7 @@ func (o *Options) shouldResetSource() bool {
 // whether the source will be factory reset.
 func (o *Options) previewMigration(ctx context.Context, bkp *backup.DeviceBackup, override *backup.NetworkOverride) error {
 	ios := o.Factory.IOStreams()
-	d, err := o.Factory.ShellyService().CompareBackup(ctx, o.Target, bkp)
+	d, err := o.service().CompareBackup(ctx, o.Target, bkp)
 	if err != nil {
 		return fmt.Errorf("failed to compare: %w", err)
 	}
@@ -236,7 +263,7 @@ func (o *Options) confirmMigration(resetSource bool) (bool, error) {
 // pre-checked since the target is unreachable until it joins the network.
 func (o *Options) migrateViaAP(
 	ctx context.Context,
-	svc *shelly.Service,
+	svc migrateService,
 	bkp *backup.DeviceBackup,
 	override *backup.NetworkOverride,
 ) error {
@@ -294,7 +321,7 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
+	svc := opts.service()
 
 	override := opts.networkOverride()
 	if err := opts.validateFlags(override); err != nil {
