@@ -102,9 +102,8 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // SetTheme + run() mutate and read the process-global theme singleton.
 func TestRun_ExportToStdout(t *testing.T) {
-	t.Parallel()
-
 	var outBuf, errBuf bytes.Buffer
 	ios := iostreams.Test(strings.NewReader(""), &outBuf, &errBuf)
 	f := cmdutil.NewWithIOStreams(ios)
@@ -193,9 +192,8 @@ func TestRun_ExportToFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // SetTheme + run() mutate and read the process-global theme singleton.
 func TestRun_ExportContainsAllColors(t *testing.T) {
-	t.Parallel()
-
 	var outBuf, errBuf bytes.Buffer
 	ios := iostreams.Test(strings.NewReader(""), &outBuf, &errBuf)
 	f := cmdutil.NewWithIOStreams(ios)
@@ -271,9 +269,8 @@ func TestRun_ExportShowsSuccessMessage(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // SetTheme + run() mutate and read the process-global theme singleton.
 func TestRun_ExportInvalidPath(t *testing.T) {
-	t.Parallel()
-
 	// Use a path that should fail (directory doesn't exist)
 	invalidPath := "/nonexistent-dir-xyz/subdir/theme.yaml"
 

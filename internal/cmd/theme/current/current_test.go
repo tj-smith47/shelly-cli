@@ -118,9 +118,8 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Execute() -> run() reads the process-global theme singleton.
 func TestExecute_ShowsCurrentTheme(t *testing.T) {
-	t.Parallel()
-
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -142,9 +141,8 @@ func TestExecute_ShowsCurrentTheme(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Execute() -> run() reads the process-global theme singleton.
 func TestExecute_WithOutputFlagJSON(t *testing.T) {
-	t.Parallel()
-
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -163,9 +161,8 @@ func TestExecute_WithOutputFlagJSON(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Execute() -> run() reads the process-global theme singleton.
 func TestExecute_WithOutputFlagYAML(t *testing.T) {
-	t.Parallel()
-
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -332,9 +329,8 @@ func TestNewCommand_AllFlagsExist(t *testing.T) {
 	// Output flag may be inherited from parent command, so not requiring it here
 }
 
+//nolint:paralleltest // Execute() -> run() reads the process-global theme singleton.
 func TestExecute_CalledMultipleTimes(t *testing.T) {
-	t.Parallel()
-
 	tf := factory.NewTestFactory(t)
 
 	cmd1 := NewCommand(tf.Factory)

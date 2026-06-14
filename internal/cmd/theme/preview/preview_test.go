@@ -97,9 +97,8 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // run() mutates the process-global theme singleton; concurrent theme tests would race on it.
 func TestRun_CurrentTheme(t *testing.T) {
-	t.Parallel()
-
 	var outBuf, errBuf bytes.Buffer
 	ios := iostreams.Test(strings.NewReader(""), &outBuf, &errBuf)
 	f := cmdutil.NewWithIOStreams(ios)
@@ -151,9 +150,8 @@ func TestRun_CurrentTheme(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // run() mutates the process-global theme singleton.
 func TestRun_SpecificTheme(t *testing.T) {
-	t.Parallel()
-
 	var outBuf, errBuf bytes.Buffer
 	ios := iostreams.Test(strings.NewReader(""), &outBuf, &errBuf)
 	f := cmdutil.NewWithIOStreams(ios)
@@ -175,9 +173,8 @@ func TestRun_SpecificTheme(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // run() reads the process-global theme singleton.
 func TestRun_InvalidTheme(t *testing.T) {
-	t.Parallel()
-
 	var outBuf, errBuf bytes.Buffer
 	ios := iostreams.Test(strings.NewReader(""), &outBuf, &errBuf)
 	f := cmdutil.NewWithIOStreams(ios)
@@ -193,9 +190,8 @@ func TestRun_InvalidTheme(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // run() mutates the process-global theme singleton.
 func TestRun_ColorSections(t *testing.T) {
-	t.Parallel()
-
 	var outBuf, errBuf bytes.Buffer
 	ios := iostreams.Test(strings.NewReader(""), &outBuf, &errBuf)
 	f := cmdutil.NewWithIOStreams(ios)
