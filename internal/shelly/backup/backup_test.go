@@ -3,7 +3,10 @@ package backup
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +14,7 @@ import (
 	"github.com/spf13/afero"
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
+	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -899,5 +903,228 @@ func TestLoadAndValidate_InvalidBackup(t *testing.T) {
 	_, err := LoadAndValidate(filePath)
 	if err == nil {
 		t.Error("expected error for invalid backup")
+	}
+}
+
+// gen1RestoreFixture drives a real shelly-go Gen1 restore against an in-process
+// HTTP server so restoreGen1Backup's result-shaping branches run without any host
+// or device I/O. fw seeds the device's live firmware; uptime/unixtime control the
+// stability and clock the restore observes.
+type gen1RestoreFixture struct {
+	fw       string
+	uptime   int
+	unixtime int64
+}
+
+// newGen1Server starts an httptest server emulating the Gen1 REST endpoints a
+// restore touches (/shelly, /settings, /status) and 200-replies to every write.
+func (f gen1RestoreFixture) newGen1Server(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/shelly", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, map[string]any{
+			"type": "SHSW-1", "mac": "AABBCCDDEEFF", "fw": f.fw, "gen": 1, "model": "SHSW-1",
+		})
+	})
+	mux.HandleFunc("/status", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, map[string]any{"uptime": f.uptime, "unixtime": f.unixtime})
+	})
+	// /settings is both the live-firmware read (no query) and the write target for
+	// every paced step (with a query); a flat object satisfies both.
+	mux.HandleFunc("/settings", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, map[string]any{"fw": f.fw, "name": "shelly1"})
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, map[string]any{})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func writeJSON(t *testing.T, w http.ResponseWriter, body any) {
+	t.Helper()
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		t.Errorf("encode response: %v", err)
+	}
+}
+
+// fakeGen1Connector is a ShellyConnector whose WithGen1Connection bridges the
+// restore onto a real client.Gen1Client pointed at serverURL. Only the Gen1 hook
+// is exercised by restoreGen1Backup; the rest satisfy the interface.
+type fakeGen1Connector struct {
+	t         *testing.T
+	serverURL string
+}
+
+func (c fakeGen1Connector) WithGen1Connection(ctx context.Context, _ string, fn func(*client.Gen1Client) error) error {
+	gc, err := client.ConnectGen1(ctx, model.Device{Address: c.serverURL})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := gc.Close(); cerr != nil {
+			c.t.Logf("warning: gen1 close error: %v", cerr)
+		}
+	}()
+	return fn(gc)
+}
+
+func (c fakeGen1Connector) WithConnection(context.Context, string, func(*client.Client) error) error {
+	return nil
+}
+func (c fakeGen1Connector) IsGen1Device(context.Context, string) (bool, error) { return true, nil }
+func (c fakeGen1Connector) DeviceInfo(context.Context, string) (*DeviceInfoResult, error) {
+	return &DeviceInfoResult{}, nil
+}
+func (c fakeGen1Connector) GetConfig(context.Context, string) (map[string]any, error) {
+	return map[string]any{}, nil
+}
+func (c fakeGen1Connector) ListScripts(context.Context, string) ([]ScriptInfoResult, error) {
+	return nil, nil
+}
+func (c fakeGen1Connector) ListSchedules(context.Context, string) ([]ScheduleJobResult, error) {
+	return nil, nil
+}
+func (c fakeGen1Connector) ListWebhooks(context.Context, string) ([]WebhookInfoResult, error) {
+	return nil, nil
+}
+
+// modernGen1Backup builds a minimal backup carrying modern firmware (fast 750ms
+// pacing) and two webhook actions, with everything but webhooks skippable so the
+// success path runs a short sequence.
+func modernGen1Backup(fw string) *DeviceBackup {
+	return &DeviceBackup{Backup: &shellybackup.Backup{
+		DeviceInfo: &shellybackup.DeviceInfo{Model: "SHSW-1"},
+		Config:     json.RawMessage(`{"fw":"` + fw + `","name":"shelly1"}`),
+		Webhooks:   json.RawMessage(`{"actions":[{"index":0},{"index":1}]}`),
+	}}
+}
+
+const modernGen1FW = "20230913-111821/v1.14.0-gcb84623"
+
+func TestRestoreGen1Backup_Success(t *testing.T) {
+	t.Parallel()
+	srv := gen1RestoreFixture{fw: modernGen1FW, uptime: 120, unixtime: 1699300000}.newGen1Server(t)
+	svc := NewService(fakeGen1Connector{t: t, serverURL: srv.URL})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Skip every step except webhooks so a stable device completes quickly while
+	// still exercising the success result-shaping and the webhook-count branch.
+	res, err := svc.restoreGen1Backup(ctx, "dev", modernGen1Backup(modernGen1FW), RestoreOptions{
+		SkipNetwork: true, SkipAuth: true, SkipState: true, SkipMeters: true,
+	})
+	if err != nil {
+		t.Fatalf("restoreGen1Backup() error = %v", err)
+	}
+	if res == nil || !res.Success {
+		t.Fatalf("expected successful result, got %+v", res)
+	}
+	if !res.ConfigRestored {
+		t.Error("ConfigRestored should mirror Success on a clean restore")
+	}
+	if res.WebhooksRestored != 2 {
+		t.Errorf("WebhooksRestored = %d, want 2", res.WebhooksRestored)
+	}
+	if len(res.Errors) != 0 {
+		t.Errorf("expected no errors, got %v", res.Errors)
+	}
+	if res.DestabilizedStep != "" {
+		t.Errorf("expected no destabilized step, got %q", res.DestabilizedStep)
+	}
+}
+
+func TestRestoreGen1Backup_SuccessSkipWebhooks(t *testing.T) {
+	t.Parallel()
+	srv := gen1RestoreFixture{fw: modernGen1FW, uptime: 120, unixtime: 1699300000}.newGen1Server(t)
+	svc := NewService(fakeGen1Connector{t: t, serverURL: srv.URL})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	res, err := svc.restoreGen1Backup(ctx, "dev", modernGen1Backup(modernGen1FW), RestoreOptions{
+		SkipNetwork: true, SkipAuth: true, SkipState: true, SkipMeters: true, SkipWebhooks: true,
+	})
+	if err != nil {
+		t.Fatalf("restoreGen1Backup() error = %v", err)
+	}
+	if res == nil || !res.Success {
+		t.Fatalf("expected successful result, got %+v", res)
+	}
+	// The webhook count must stay zero when the webhook restore is skipped.
+	if res.WebhooksRestored != 0 {
+		t.Errorf("WebhooksRestored = %d, want 0 when skipped", res.WebhooksRestored)
+	}
+}
+
+func TestRestoreGen1Backup_FirmwareDowngradeRefused(t *testing.T) {
+	t.Parallel()
+	// Device runs older firmware than the backup; with no derivable image (the
+	// backup carries no model) and downgrade not allowed, RestoreGen1 returns an
+	// error before any write, so restoreGen1Backup returns a nil result + error.
+	srv := gen1RestoreFixture{fw: "20200101-000000/v1.9.0", uptime: 120, unixtime: 1699300000}.newGen1Server(t)
+	svc := NewService(fakeGen1Connector{t: t, serverURL: srv.URL})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	backup := &DeviceBackup{Backup: &shellybackup.Backup{
+		Config: json.RawMessage(`{"fw":"` + modernGen1FW + `"}`),
+	}}
+	res, err := svc.restoreGen1Backup(ctx, "dev", backup, RestoreOptions{})
+	if err == nil {
+		t.Fatal("expected firmware-downgrade refusal error")
+	}
+	if res != nil {
+		t.Errorf("expected nil result on restore error, got %+v", res)
+	}
+}
+
+func TestRestoreGen1Backup_Destabilized(t *testing.T) {
+	t.Parallel()
+	// A device stuck at uptime 0 never restabilizes; a short context bounds the
+	// recovery poll so the first step halts the restore with a destabilized step.
+	srv := gen1RestoreFixture{fw: modernGen1FW, uptime: 0, unixtime: 1699300000}.newGen1Server(t)
+	svc := NewService(fakeGen1Connector{t: t, serverURL: srv.URL})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	res, err := svc.restoreGen1Backup(ctx, "dev", modernGen1Backup(modernGen1FW), RestoreOptions{
+		SkipNetwork: true, SkipAuth: true, SkipState: true, SkipMeters: true,
+	})
+	if err == nil {
+		t.Fatal("expected restore-halted error on a destabilized device")
+	}
+	if !strings.Contains(err.Error(), "restore halted") {
+		t.Errorf("error should name the halt, got %v", err)
+	}
+	if res == nil {
+		t.Fatal("expected a populated result alongside the halt error")
+	}
+	if res.DestabilizedStep == "" {
+		t.Error("DestabilizedStep should be set on a halted restore")
+	}
+	if res.Success {
+		t.Error("Success must be false on a halted restore")
+	}
+	// The library's per-step error must surface through gen1ErrorStrings.
+	if len(res.Errors) == 0 {
+		t.Error("expected the destabilization error to surface in Errors")
+	}
+}
+
+func TestGen1ErrorStrings(t *testing.T) {
+	t.Parallel()
+	if got := gen1ErrorStrings(nil); got != nil {
+		t.Errorf("nil slice should map to nil, got %v", got)
+	}
+	errs := []error{context.Canceled, http.ErrServerClosed}
+	got := gen1ErrorStrings(errs)
+	if len(got) != 2 || got[0] != context.Canceled.Error() || got[1] != http.ErrServerClosed.Error() {
+		t.Errorf("gen1ErrorStrings rendered errors wrong: %v", got)
 	}
 }

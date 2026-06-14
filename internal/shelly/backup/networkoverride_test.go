@@ -2,6 +2,7 @@
 package backup
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 )
@@ -98,9 +99,10 @@ func TestApplyGen2WiFiOverride(t *testing.T) {
 
 // TestToGen1RestoreOptions guards the CLI→engine translation: every restore option
 // the user can set must reach the shelly-go Gen1 restore unchanged. A silently
-// dropped field here would, for example, make --update-firmware a no-op.
+// dropped field here would, for example, make --allow-firmware-downgrade a no-op.
 func TestToGen1RestoreOptions(t *testing.T) {
 	t.Parallel()
+	var trace bytes.Buffer
 	in := RestoreOptions{
 		Name:                   "FR",
 		SkipNetwork:            true,
@@ -110,10 +112,10 @@ func TestToGen1RestoreOptions(t *testing.T) {
 		SkipWebhooks:           true,
 		ClockDependentOnly:     true,
 		AllowFirmwareDowngrade: true,
-		UpdateFirmware:         true,
 		FirmwareURL:            "http://firmware.shelly.cloud/gen1/SHBDUO-1.zip",
 		NetworkOnly:            true,
 		SkipClockWait:          true,
+		StepTrace:              &trace,
 		NetworkOverride: &NetworkOverride{
 			SSID: "Home", Password: "pw",
 			StaticIP: "10.23.47.227", Gateway: "10.23.47.1",
@@ -130,11 +132,15 @@ func TestToGen1RestoreOptions(t *testing.T) {
 		out.SkipWebhooks != in.SkipWebhooks ||
 		out.ClockDependentOnly != in.ClockDependentOnly ||
 		out.AllowFirmwareDowngrade != in.AllowFirmwareDowngrade ||
-		out.UpdateFirmware != in.UpdateFirmware ||
 		out.FirmwareURL != in.FirmwareURL ||
 		out.NetworkOnly != in.NetworkOnly ||
 		out.SkipClockWait != in.SkipClockWait {
 		t.Errorf("scalar option dropped in translation: in=%+v out=%+v", in, out)
+	}
+	// StepTrace is the debug seam behind --trace-file; a dropped writer would
+	// silently disable per-step tracing on a fragile device.
+	if out.StepTrace != &trace {
+		t.Error("StepTrace writer dropped in translation")
 	}
 	if out.NetworkOverride == nil {
 		t.Fatal("NetworkOverride dropped in translation")

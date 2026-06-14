@@ -342,12 +342,40 @@ func TestRun_OnlyConfirmFlag(t *testing.T) {
 	}
 }
 
-func TestRun_BothFlagsButCancelled(t *testing.T) {
-	t.Parallel()
+// TestRun_BothFlagsSkipInteractivePrompt is the regression for the non-TTY hang:
+// with both --yes and --confirm the reset must proceed WITHOUT consulting stdin, so
+// it works over ssh / in scripts / in CI where no TTY can answer a prompt. A stale
+// "n" on stdin must be ignored — the reset still runs to completion.
+//
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_BothFlagsSkipInteractivePrompt(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
 
 	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
 
-	// Provide "n" response for final interactive confirmation
+	// A stale "n" that the (now removed) interactive prompt would have consumed to
+	// cancel: it must be ignored entirely.
 	tf.TestIO.In.WriteString("n\n")
 
 	opts := &Options{
@@ -357,15 +385,11 @@ func TestRun_BothFlagsButCancelled(t *testing.T) {
 	opts.Yes = true
 	opts.Confirm = true
 
-	err := run(context.Background(), opts)
-	if err != nil {
-		t.Errorf("Expected nil error when user cancels, got: %v", err)
+	if err := run(context.Background(), opts); err != nil {
+		t.Errorf("both flags set: reset should proceed without prompting, got: %v", err)
 	}
-
-	// Should print cancelled message
-	output := tf.OutString()
-	if output == "" {
-		t.Error("Expected output when cancelled")
+	if out := tf.OutString(); !bytes.Contains([]byte(out), []byte("factory reset")) {
+		t.Errorf("expected success output mentioning the reset, got: %q", out)
 	}
 }
 
@@ -442,21 +466,39 @@ func TestNewCommand_AcceptsDeviceName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestNewCommand_RunE_SetsDevice(t *testing.T) {
-	t.Parallel()
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "my-test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
 
 	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
 
 	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
 	cmd.SetArgs([]string{"my-test-device", "-y", "--confirm"})
 
-	// Provide "n" response for final confirmation to avoid actual reset
-	tf.TestIO.In.WriteString("n\n")
-
-	err := cmd.Execute()
-	// No error expected when user cancels at final confirmation
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	if err := cmd.Execute(); err != nil {
+		t.Errorf("RunE with both flags should set Device and proceed, got: %v", err)
 	}
 }
 
@@ -514,19 +556,21 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	}
 }
 
+// TestNewCommand_RequiresBothFlags covers the validation guard: any invocation
+// missing --yes or --confirm must error before a reset is ever attempted. The
+// both-flags happy path (which proceeds straight to the reset, no prompt) is
+// covered by TestRun_FactoryResetSuccess and TestRun_BothFlagsSkipInteractivePrompt.
 func TestNewCommand_RequiresBothFlags(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		yes       bool
-		confirm   bool
-		expectErr bool
+		name    string
+		yes     bool
+		confirm bool
 	}{
-		{"neither flag", false, false, true},
-		{"only yes", true, false, true},
-		{"only confirm", false, true, true},
-		{"both flags", true, true, false}, // Will fail at actual reset, but passes validation
+		{"neither flag", false, false},
+		{"only yes", true, false},
+		{"only confirm", false, true},
 	}
 
 	for _, tt := range tests {
@@ -534,7 +578,6 @@ func TestNewCommand_RequiresBothFlags(t *testing.T) {
 			t.Parallel()
 
 			tf := factory.NewTestFactory(t)
-			tf.TestIO.In.WriteString("n\n") // Cancel at confirmation
 
 			opts := &Options{
 				Factory: tf.Factory,
@@ -544,16 +587,8 @@ func TestNewCommand_RequiresBothFlags(t *testing.T) {
 			opts.Confirm = tt.confirm
 
 			err := run(context.Background(), opts)
-
-			if tt.expectErr {
-				if err == nil {
-					t.Error("Expected error for insufficient flags")
-				}
-			} else {
-				// When both flags are set and user cancels, no error
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+			if err == nil {
+				t.Error("Expected error for insufficient flags")
 			}
 		})
 	}
@@ -606,9 +641,6 @@ func TestRun_FactoryResetSuccess(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Provide "y" response for final confirmation
-	tf.TestIO.In.WriteString("y\n")
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -637,9 +669,6 @@ func TestRun_FactoryResetDeviceNotFound(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
-
-	// Provide "y" response for final confirmation
-	tf.TestIO.In.WriteString("y\n")
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)

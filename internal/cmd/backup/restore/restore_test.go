@@ -2,6 +2,7 @@ package restore
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	clibackup "github.com/tj-smith47/shelly-cli/internal/shelly/backup"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 const testFalseValue = "false"
@@ -592,6 +594,222 @@ func TestNewCommand_FirmwareAndTraceFlags(t *testing.T) {
 	// surface stays clean.
 	if !trace.Hidden {
 		t.Error("--trace-file should be hidden")
+	}
+}
+
+// writeValidBackup writes a minimal but valid Gen2 backup (no WiFi blob) to the
+// in-memory FS and returns its path. A WiFi-less backup is what lets the --to-ap
+// paths fail safely in resolveJoinNetwork before any host WiFi mutation.
+func writeValidBackup(t *testing.T, path string) {
+	t.Helper()
+	bkp := shellybackup.Backup{
+		Version: 1,
+		DeviceInfo: &shellybackup.DeviceInfo{
+			ID:         "shellybulbduo-test",
+			Name:       "src",
+			Model:      "SHBDUO-1",
+			Generation: 2,
+			Version:    "1.0.0",
+			MAC:        "AA:BB:CC:DD:EE:FF",
+		},
+		Config:    json.RawMessage(`{"sys":{"device":{"name":"src"}}}`),
+		CreatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+	}
+	data, err := json.Marshal(bkp)
+	if err != nil {
+		t.Fatalf("marshal backup: %v", err)
+	}
+	if err := afero.WriteFile(config.Fs(), path, data, 0o600); err != nil {
+		t.Fatalf("write backup: %v", err)
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_RestoreBackupFails(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	tf := factory.NewTestFactory(t)
+	const backupFile = "/test/restore-fail.json"
+	writeValidBackup(t, backupFile)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// TEST-NET-1 device: run reaches the RestoreBackup call (covering the full
+	// non-dry-run, non-AP body) and fails dialing the unreachable device.
+	opts := &Options{Factory: tf.Factory, Device: "192.0.2.30", FilePath: backupFile}
+	err := run(ctx, opts)
+	if err == nil {
+		t.Fatal("expected restore to fail against an unreachable device")
+	}
+	if !strings.Contains(err.Error(), "failed to restore backup") {
+		t.Errorf("got %v, want error containing %q", err, "failed to restore backup")
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_ToAP_RestoreViaAPFails(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	tf := factory.NewTestFactory(t)
+	const backupFile = "/test/to-ap.json"
+	writeValidBackup(t, backupFile)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// --to-ap drives run through restoreViaAP -> RestoreToAP. The WiFi-less backup
+	// resolves no station passphrase, so it fails in resolveJoinNetwork BEFORE any
+	// host WiFi hop is attempted.
+	opts := &Options{Factory: tf.Factory, Device: "dst", FilePath: backupFile, ToAP: "ShellyBulbDuo-AABBCC"}
+	err := run(ctx, opts)
+	if err == nil {
+		t.Fatal("expected restore-via-AP to fail without a resolvable passphrase")
+	}
+	if !strings.Contains(err.Error(), "failed to restore via AP") {
+		t.Errorf("got %v, want error containing %q", err, "failed to restore via AP")
+	}
+	// not covered: restoreViaAP's success tail (ios.Success / newAddr / display)
+	// requires RestoreToAP to finish a real AP hop + device write, which mutates
+	// host WiFi and contacts hardware — never exercised in a unit test.
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRestoreViaAP_DirectFailsBeforeHop(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	tf := factory.NewTestFactory(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	bkp := &clibackup.DeviceBackup{Backup: &shellybackup.Backup{
+		Version:    1,
+		DeviceInfo: &shellybackup.DeviceInfo{ID: "shellybulbduo-test", Generation: 2, Version: "1.0.0"},
+		Config:     json.RawMessage(`{}`),
+	}}
+	opts := &Options{Factory: tf.Factory, Device: "dst", ToAP: "ShellyBulbDuo-AABBCC"}
+	err := opts.restoreViaAP(ctx, tf.ShellyService(), bkp, clibackup.RestoreOptions{})
+	if err == nil {
+		t.Fatal("expected restoreViaAP to fail without a resolvable passphrase")
+	}
+	if !strings.Contains(err.Error(), "failed to restore via AP") {
+		t.Errorf("got %v, want error containing %q", err, "failed to restore via AP")
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_InvalidFlagCombo(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	tf := factory.NewTestFactory(t)
+	const backupFile = "/test/bad-flags.json"
+	writeValidBackup(t, backupFile)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// --static-ip with --skip-network is rejected by validateFlags inside run,
+	// after the backup is read but before any device I/O.
+	opts := &Options{
+		Factory:     tf.Factory,
+		Device:      "dst",
+		FilePath:    backupFile,
+		StaticIP:    "10.0.0.9",
+		SkipNetwork: true,
+	}
+	err := run(ctx, opts)
+	if err == nil {
+		t.Fatal("expected validateFlags to reject --static-ip with --skip-network")
+	}
+	if !strings.Contains(err.Error(), "static-ip cannot be used with --skip-network") {
+		t.Errorf("got %v, want error containing %q", err, "static-ip cannot be used with --skip-network")
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_TraceFileOpenError(t *testing.T) {
+	// Stage the backup in a writable base, then wrap it read-only: the backup read
+	// still succeeds while attachTrace's Create fails, covering run's
+	// attachTrace-error branch before any device I/O.
+	base := afero.NewMemMapFs()
+	const backupFile = "/test/trace-run.json"
+	config.SetFs(base)
+	writeValidBackup(t, backupFile)
+	config.SetFs(afero.NewReadOnlyFs(base))
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	tf := factory.NewTestFactory(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	opts := &Options{Factory: tf.Factory, Device: "dst", FilePath: backupFile, TraceFile: "/test/trace.log"}
+	err := run(ctx, opts)
+	if err == nil {
+		t.Fatal("expected run to fail opening a trace file over a directory")
+	}
+	if !strings.Contains(err.Error(), "failed to open trace file") {
+		t.Errorf("got %v, want error containing %q", err, "failed to open trace file")
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_DryRun_WithStaticIPOverride(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	tf := factory.NewTestFactory(t)
+	const backupFile = "/test/dry-override.json"
+	writeValidBackup(t, backupFile)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Dry-run with a static-IP override exercises the override branch of run and
+	// the override-info line, all without device I/O.
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "dst",
+		FilePath: backupFile,
+		DryRun:   true,
+		StaticIP: "10.0.0.9",
+		Gateway:  "10.0.0.1",
+		Netmask:  "255.255.255.0",
+	}
+	if err := run(ctx, opts); err != nil {
+		t.Fatalf("dry-run restore: %v", err)
+	}
+	out := tf.OutString()
+	if !strings.Contains(out, "Dry run") {
+		t.Errorf("expected dry-run preview, got %q", out)
+	}
+	if !strings.Contains(out, "10.0.0.9") {
+		t.Errorf("expected static-IP override note, got %q", out)
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestAttachTrace_CreateError(t *testing.T) {
+	// A read-only FS makes Create fail, covering attachTrace's open-error branch.
+	config.SetFs(afero.NewReadOnlyFs(afero.NewMemMapFs()))
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, TraceFile: "/test/trace.log"}
+	restoreOpts := &clibackup.RestoreOptions{}
+	cleanup, err := opts.attachTrace(restoreOpts)
+	if err == nil {
+		t.Fatal("expected attachTrace to fail on a read-only filesystem")
+	}
+	if cleanup != nil {
+		t.Error("cleanup must be nil when attachTrace errors")
+	}
+	if !strings.Contains(err.Error(), "failed to open trace file") {
+		t.Errorf("got %v, want error containing %q", err, "failed to open trace file")
 	}
 }
 

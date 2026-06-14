@@ -83,30 +83,47 @@ func apFirmwareBindIP(apHostIP string) string {
 
 // prefetchAPFirmware downloads, before the host hops onto the device's factory AP,
 // the Gen1 firmware image to flash at that AP — for a --to-ap restore that requested
-// a firmware update on a Gen1 target. It resolves the image URL (an explicit
-// --firmware-url override, else one derived from the backup's model) and downloads
-// it now, while the host still has internet (the factory AP has none). It returns an
-// empty path and no error when no at-AP update applies (not a firmware update, or not
-// Gen1), so the caller can branch on the path. The caller removes the returned file.
+// a possible firmware update on a Gen1 target. It resolves the image URL (an explicit
+// --firmware-url override, else one derived from the backup's model) and downloads it
+// now, while the host still has internet (the factory AP has none). It is best-effort:
+// it returns an empty path whenever no image can or should be staged (a Gen2 target, a
+// forced downgrade, an underivable URL, or a failed download), leaving the at-AP check
+// to fail loudly only if an update turns out to be required. The caller removes the
+// returned file.
 func prefetchAPFirmware(
 	ctx context.Context,
 	generation int,
 	bkp *backup.DeviceBackup,
 	opts backup.RestoreOptions,
-) (string, error) {
-	if !opts.UpdateFirmware || generation != 1 {
-		return "", nil
+) string {
+	// A firmware update is automatic: whether the device needs one is only knowable
+	// at the AP (its live build cannot be read until the host has hopped onto it),
+	// and the factory AP has no internet — so the image must be fetched NOW, before
+	// the hop, while the host still has connectivity. The at-AP check then decides
+	// whether to actually flash. AllowFirmwareDowngrade opts out (force the older
+	// config write, no update), so skip the prefetch then.
+	if generation != 1 || opts.AllowFirmwareDowngrade {
+		return ""
 	}
 	fwURL := opts.FirmwareURL
 	if fwURL == "" {
 		fwURL = shellybackup.OfficialGen1FirmwareURL(bkp.Device().Model)
 	}
 	if fwURL == "" {
-		return "", fmt.Errorf(
-			"cannot update firmware: the backup carries no device model to derive a firmware " +
-				"URL from and none was supplied — set --firmware-url")
+		// No derivable URL: cannot pre-stage an image. Not fatal here — if the device
+		// turns out to need an update, ensureGen1FirmwareAtAP fails loudly at the AP.
+		debug.TraceEvent("firmware-at-ap: no firmware URL derivable from model %q; skipping prefetch", bkp.Device().Model)
+		return ""
 	}
-	return fetchGen1Firmware(ctx, fwURL)
+	// Best-effort: a download hiccup must not block a restore that may not even need
+	// an update. If an update IS needed and the image is missing, the at-AP check
+	// surfaces it loudly.
+	fwPath, err := fetchGen1Firmware(ctx, fwURL)
+	if err != nil {
+		debug.TraceEvent("firmware-at-ap: prefetch of %s failed (continuing; at-AP check decides if it mattered): %v", fwURL, err)
+		return ""
+	}
+	return fwPath
 }
 
 // removeFirmwareTemp deletes a downloaded firmware temp file, logging a failure
@@ -154,38 +171,81 @@ func serveFirmwareFile(ctx context.Context, bindIP, path string) (url string, st
 	return "http://" + addr + "/firmware.zip", stop, nil
 }
 
-// updateGen1FirmwareAtAP flashes the device at its factory AP to the backup's
-// firmware before the config restore, for a device whose build is older than the
-// backup's — notably a corrupt build that reboot-loops the instant WiFi station
-// mode is active and so can never complete an OTA once on the LAN. The device is
-// stable at its AP but has no internet, so the image (already downloaded to fwPath)
-// is re-served from the host's AP-subnet address and the device is pointed at it.
-// It is a no-op when the device is already at or beyond the backup's firmware.
+// ensureGen1FirmwareAtAP brings the device at its factory AP up to the backup's
+// firmware before the config restore when its build is older than the backup's —
+// notably a corrupt build that reboot-loops the instant WiFi station mode is active
+// and so can never complete an OTA once on the LAN. Whether an update is needed is
+// decided here, at the AP, because the device's live build cannot be read until the
+// host has hopped onto it. It is a no-op when the device is already at or beyond the
+// backup's firmware, and skips the update entirely when allowDowngrade forces the
+// older config write.
+//
+// The device is stable at its AP but has no internet, so the image (prefetched to
+// fwPath before the hop) is re-served from the host's AP-subnet address and the
+// device is pointed at it. If an update is needed but no image was prefetched (an
+// underivable URL or a failed download), this fails loudly rather than writing a
+// station config that would reboot-loop the device onto a dead LAN.
 //
 // Must be called while the host is hopped onto the device's AP (so bindIP is live
 // and the device is reachable at discovery.DefaultAPIP), before any station config
 // is written.
-func (s *Service) updateGen1FirmwareAtAP(ctx context.Context, bindIP, fwPath, backupFW string) error {
-	fwURL, stop, err := serveFirmwareFile(ctx, bindIP, fwPath)
-	if err != nil {
-		return err
-	}
-	defer stop()
-
+func (s *Service) ensureGen1FirmwareAtAP(ctx context.Context, bindIP, fwPath, backupFW string, allowDowngrade bool) error {
 	return s.WithGen1Connection(ctx, discovery.DefaultAPIP, func(conn *client.Gen1Client) error {
 		dev := conn.Device()
 		liveFW := shellybackup.Gen1LiveFirmware(ctx, dev)
 		if liveFW == "" {
 			return errors.New("could not read the device's firmware at its AP to decide on an update")
 		}
-		if !shellybackup.Gen1FirmwareDowngrade(liveFW, backupFW) {
-			debug.TraceEvent("firmware-at-ap: device on %q already >= backup %q; skipping OTA", liveFW, backupFW)
+		if allowDowngrade || !shellybackup.Gen1FirmwareDowngrade(liveFW, backupFW) {
+			debug.TraceEvent("firmware-at-ap: device on %q vs backup %q; no update (allowDowngrade=%v)", liveFW, backupFW, allowDowngrade)
 			return nil
 		}
+		if fwPath == "" {
+			return fmt.Errorf(
+				"device on firmware %q needs an update to the backup's %q before restore, but no "+
+					"firmware image is available (the factory AP has no internet, so the image is "+
+					"prefetched before the hop — its URL was underivable or the download failed); "+
+					"retry with connectivity, pass --firmware-url, or --allow-firmware-downgrade to "+
+					"force the downgrade and accept the reboot-loop risk",
+				liveFW, backupFW)
+		}
+		fwURL, stop, err := serveFirmwareFile(ctx, bindIP, fwPath)
+		if err != nil {
+			return err
+		}
+		defer stop()
 		debug.TraceEvent("firmware-at-ap: serving %s, OTA from %q toward backup %q", fwURL, liveFW, backupFW)
 		if updErr := shellybackup.UpdateGen1FirmwareAndWait(ctx, dev, fwURL, liveFW); updErr != nil {
 			return fmt.Errorf("at-AP firmware update failed: %w", updErr)
 		}
+		return nil
+	})
+}
+
+// confirmGen1StableAtAP verifies the Gen1 device is booted and holding at its
+// factory AP — not caught in a reboot loop — immediately before the station config
+// write. That write reboots the device, and on firmware that cannot survive station
+// mode it would strand it off the LAN, so gating it on confirmed stability means the
+// one write that can brick is never issued to a device that is not provably healthy.
+// The device is still on its recoverable AP here, so a failure aborts the restore
+// with the device intact rather than bricked. ensureGen1FirmwareAtAP runs first, so
+// an unstable device at this point is one that did not come up clean even on matched
+// firmware — precisely the device a station write would lose.
+//
+// Must be called while the host is hopped onto the device's AP, after
+// ensureGen1FirmwareAtAP and before any station config is written.
+func (s *Service) confirmGen1StableAtAP(ctx context.Context) error {
+	return s.WithGen1Connection(ctx, discovery.DefaultAPIP, func(conn *client.Gen1Client) error {
+		uptime, required, stable := shellybackup.Gen1ConfirmStable(ctx, conn.Device())
+		if !stable {
+			return fmt.Errorf(
+				"refusing to write the station config: the device is not stable at its factory AP "+
+					"(highest uptime %ds, need %ds held — the signature of a reboot loop); writing it now "+
+					"would reboot the device onto firmware it cannot hold and strand it off the LAN. The "+
+					"device remains on its recoverable factory AP",
+				uptime, required)
+		}
+		debug.TraceEvent("firmware-at-ap: device stable at AP (uptime %ds >= %ds); safe to write station config", uptime, required)
 		return nil
 	})
 }

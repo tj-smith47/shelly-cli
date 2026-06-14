@@ -20,7 +20,7 @@ sections.
 
 .SH OPTIONS
 \fB--allow-firmware-downgrade\fP[=false]
-	Allow restoring a backup captured from newer firmware onto an older-firmware device (refused by default; this can trigger a reboot loop — prefer --update-firmware)
+	Force the older-firmware config write instead of the automatic firmware update (Gen1; the device is updated to matched firmware by default when the backup is newer — this skips that and accepts the reboot-loop risk)
 
 .PP
 \fB--ap-ip\fP=""
@@ -40,7 +40,7 @@ sections.
 
 .PP
 \fB--firmware-url\fP=""
-	Firmware image for --update-firmware (default: derived from the backup's device model)
+	Firmware image for the automatic downgrade-recovery update (default: derived from the backup's device model)
 
 .PP
 \fB--gateway\fP=""
@@ -101,10 +101,6 @@ sections.
 .PP
 \fB--to-ap\fP=""
 	Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)
-
-.PP
-\fB--update-firmware\fP[=false]
-	When the backup is from newer firmware than the target, update the device to current stable firmware before restoring (Gen1; with --to-ap the update runs at the factory AP before the device joins, since corrupt firmware reboot-loops once on the LAN)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -195,12 +191,11 @@ sections.
   shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF \\
     --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
 
-  # Same, but the target runs older firmware than the backup: update it first so
-  # the full restore lands on matched firmware and cannot reboot-loop. With --to-ap
-  # the update runs AT the factory AP (where the device is stable) — the image is
-  # fetched before the hop and re-served on the AP subnet — then the full restore.
-  shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF --update-firmware \\
-    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0
+  # If the target runs older firmware than the backup, it is updated automatically
+  # before the restore so the configuration lands on matched firmware and cannot
+  # reboot-loop — no flag needed. With --to-ap the update runs AT the factory AP
+  # (where the device is stable): the image is fetched before the hop and re-served
+  # on the AP subnet, then the full restore proceeds once the device joins the LAN.
 .EE
 
 

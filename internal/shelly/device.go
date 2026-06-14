@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
@@ -37,17 +38,62 @@ type DeviceStatus struct {
 	Status map[string]any
 }
 
-// DeviceReboot reboots the device.
+// DeviceReboot reboots the device. Supports both Gen1 (HTTP REST /reboot) and Gen2+
+// (RPC). delayMS applies only to Gen2 — Gen1's reboot has no delay parameter.
 func (s *Service) DeviceReboot(ctx context.Context, identifier string, delayMS int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		return conn.Reboot(ctx, delayMS)
-	})
+	return s.withGenAwareRestart(ctx, identifier, "reboot",
+		func(conn *client.Gen1Client) error { return conn.Reboot(ctx) },
+		func(conn *client.Client) error { return conn.Reboot(ctx, delayMS) },
+	)
 }
 
-// DeviceFactoryReset performs a factory reset on the device.
-// Supports both Gen1 (HTTP REST) and Gen2+ (RPC) devices.
+// withGenAwareRestart runs a gen-aware action whose purpose is to restart the device
+// (reboot, factory reset). Such a device tears down the connection as it restarts, so
+// a connectivity error from the action is the SUCCESS signal, not a failure.
+// Generation detection runs first and must reach the device — so an unreachable device
+// (which was never restarted) still errors honestly — while a non-connectivity error
+// from the action itself (refused, unsupported, auth) is returned as a real failure.
+func (s *Service) withGenAwareRestart(
+	ctx context.Context,
+	identifier, op string,
+	gen1Fn func(*client.Gen1Client) error,
+	gen2Fn func(*client.Client) error,
+) error {
+	isGen1, _, err := s.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return err
+	}
+
+	if isGen1 {
+		err = s.WithGen1Connection(ctx, identifier, gen1Fn)
+	} else {
+		err = s.WithConnection(ctx, identifier, gen2Fn)
+	}
+	if err == nil {
+		return nil
+	}
+	// If the caller's own context was cancelled or timed out, the operation was
+	// aborted — surface that, never silently swallow it as a "successful" restart.
+	// (IsConnectivityFailure treats context cancellation as a connectivity error, so
+	// this check must come first.)
+	if ctx.Err() != nil {
+		return err
+	}
+	// With a still-live context, a connectivity error means the device tore down the
+	// connection as it restarted — the success signal. Any other error is a real
+	// failure (the request was refused, unsupported, or the device was never reached).
+	if !ratelimit.IsConnectivityFailure(err) {
+		return err
+	}
+	debug.TraceEvent("%s: device dropped the connection as it restarted (expected): %v", op, err)
+	return nil
+}
+
+// DeviceFactoryReset performs a factory reset on the device, restarting it into AP
+// mode. Supports both Gen1 (HTTP REST) and Gen2+ (RPC) devices. The device drops the
+// connection as it wipes, which withGenAwareRestart treats as the reset taking effect.
 func (s *Service) DeviceFactoryReset(ctx context.Context, identifier string) error {
-	return s.withGenAwareAction(ctx, identifier,
+	return s.withGenAwareRestart(ctx, identifier, "factory-reset",
 		func(conn *client.Gen1Client) error { return conn.FactoryReset(ctx) },
 		func(conn *client.Client) error { return conn.FactoryReset(ctx) },
 	)

@@ -140,31 +140,22 @@ type RestoreOptions struct {
 	// --to-ap restore, where everything else already applied at the factory AP and
 	// only the time-dependent writes the clockless AP rejected need re-applying.
 	ClockDependentOnly bool
-	// AllowFirmwareDowngrade overrides the Gen1 firmware-downgrade refusal, which by
-	// default blocks restoring a backup captured from newer firmware onto a device
-	// running older firmware (a proven reboot-loop trigger). Set only when updating
-	// the device firmware first is not possible and the risk is accepted.
+	// AllowFirmwareDowngrade forces the older-firmware config write instead of the
+	// automatic firmware update. By default, when the backup is from newer firmware
+	// than the target runs, the device is OTA-updated to matched firmware first (the
+	// safe resolution of a downgrade — a proven reboot-loop trigger otherwise). Set
+	// this only to skip that update and force the downgrade, accepting the risk.
 	AllowFirmwareDowngrade bool
-	// UpdateFirmware resolves a firmware downgrade by updating the device rather than
-	// refusing: when the backup is from newer firmware than the target runs, the
-	// device is OTA-updated to current stable firmware (FirmwareURL, or derived from
-	// the backup's model) before the configuration is applied, so the full restore
-	// lands on matched firmware and cannot reboot-loop. For a --to-ap restore the
-	// update runs at the device's factory AP (where it is stable): a factory AP has
-	// no internet, so the image is fetched before the host hops onto the AP and
-	// re-served from the host's AP-subnet address — corrupt firmware would reboot-loop
-	// the device the instant station mode came up, so it can never update on the LAN.
-	UpdateFirmware bool
-	// FirmwareURL overrides the firmware image UpdateFirmware flashes. Empty derives
-	// the official current-stable URL from the backup's device model.
+	// FirmwareURL overrides the firmware image the automatic downgrade-recovery update
+	// flashes. Empty derives the official current-stable URL from the device's model.
 	FirmwareURL string
 	// NetworkOnly writes only the WiFi station configuration and returns, bypassing
 	// every other step and the firmware-downgrade gate. It is the factory-AP pass of
-	// an --update-firmware --to-ap restore: after the firmware is flashed at the AP,
-	// only the station config is written there so the device joins the LAN cleanly,
-	// and the full configuration is then applied on the LAN — where the device has a
-	// clock and is stable, and where writes cannot be misread as a reboot loop when
-	// the device reboots to join the network.
+	// a --to-ap restore: after any needed firmware update is flashed at the AP, only
+	// the station config is written there so the device joins the LAN cleanly, and the
+	// full configuration is then applied on the LAN — where the device has a clock and
+	// is stable, and where writes cannot be misread as a reboot loop when the device
+	// reboots to join the network.
 	NetworkOnly bool
 	// SkipClockWait disables the bounded wait for the device's NTP clock that
 	// otherwise precedes writing time-based schedule rules. Set it for the full-config

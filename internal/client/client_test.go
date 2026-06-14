@@ -3932,9 +3932,11 @@ func TestGen1Client_FactoryReset_Success(t *testing.T) {
 		handle("/shelly", func(_ string) (any, int) {
 			return standardGen1DeviceInfo(), http.StatusOK
 		}).
-		// Gen1 factory reset uses /reset endpoint
-		handle("/reset", func(_ string) (any, int) {
-			factoryResetCalled = true
+		// Gen1 factory reset is GET /settings?reset=true (a real device 404s on /reset).
+		handle("/settings", func(query string) (any, int) {
+			if query == "reset=true" {
+				factoryResetCalled = true
+			}
 			return map[string]any{}, http.StatusOK
 		})
 

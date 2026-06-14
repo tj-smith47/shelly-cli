@@ -78,22 +78,17 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("missing required confirmation flags")
 	}
 
-	// Final interactive confirmation (default to false for safety)
-	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("FINAL WARNING: Factory reset device %q? This cannot be undone!", opts.Device), false)
-	if err != nil {
-		return fmt.Errorf("confirmation failed: %w", err)
-	}
-	if !confirmed {
-		ios.Info("Factory reset cancelled")
-		return nil
-	}
+	// The required --yes and --confirm flags ARE the double-confirmation for this
+	// destructive op (--yes means "skip the prompt"); adding an interactive prompt
+	// on top would make the documented invocation impossible to run non-interactively
+	// (over ssh, in scripts, in CI), where there is no TTY to answer it.
 
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := opts.Factory.ShellyService()
 
-	err = cmdutil.RunWithSpinner(ctx, ios, "Factory resetting device...", func(ctx context.Context) error {
+	err := cmdutil.RunWithSpinner(ctx, ios, "Factory resetting device...", func(ctx context.Context) error {
 		return svc.DeviceFactoryReset(ctx, opts.Device)
 	})
 	if err != nil {

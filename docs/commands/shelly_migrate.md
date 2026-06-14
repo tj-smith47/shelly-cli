@@ -55,11 +55,11 @@ shelly migrate <source-device> <target-device> [flags]
 ### Options
 
 ```
-      --allow-firmware-downgrade   Allow migrating a backup captured from newer firmware onto an older-firmware target (refused by default; this can trigger a reboot loop — prefer --update-firmware)
+      --allow-firmware-downgrade   Force the older-firmware config write instead of the automatic firmware update (Gen1; the target is updated to matched firmware by default when the source is newer — this skips that and accepts the reboot-loop risk)
       --ap-ip string               Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)
       --dns string                 Static IPv4 nameserver (optional, with --static-ip)
       --dry-run                    Show what would be changed without applying
-      --firmware-url string        Firmware image for --update-firmware (default: derived from the source device model)
+      --firmware-url string        Firmware image for the automatic downgrade-recovery update (default: derived from the source device model)
       --force                      Force migration between different device types
       --gateway string             Static IPv4 default gateway (with --static-ip)
   -h, --help                       help for migrate
@@ -77,7 +77,6 @@ shelly migrate <source-device> <target-device> [flags]
       --ssid string                Override the WiFi SSID the target joins (defaults to the source's network)
       --static-ip string           Assign this static IPv4 to the target instead of copying the source's IP
       --to-ap string               Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)
-      --update-firmware            When the source runs newer firmware than the target, update the target to current stable firmware before migrating (Gen1; with --to-ap the update runs at the factory AP before the target joins, since corrupt firmware reboot-loops once on the LAN)
   -y, --yes                        Skip confirmation prompt
 ```
 

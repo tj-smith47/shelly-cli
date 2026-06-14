@@ -7,9 +7,31 @@ import (
 	"testing"
 	"time"
 
+	shellybackup "github.com/tj-smith47/shelly-go/backup"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	clibackup "github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+// noWiFiBackup returns a minimal Gen2 backup whose WiFi blob is absent. A
+// --to-ap restore on such a backup resolves no station passphrase (no backup
+// SSID, no override, no host creds) and so fails in resolveJoinNetwork BEFORE
+// any WiFi/host mutation — the only safe way to exercise the AP code paths in a
+// unit test without hopping the host onto a real network.
+func noWiFiBackup() *clibackup.DeviceBackup {
+	return &clibackup.DeviceBackup{Backup: &shellybackup.Backup{
+		Version: 1,
+		DeviceInfo: &shellybackup.DeviceInfo{
+			ID:         "shellybulbduo-test",
+			Name:       "src",
+			Model:      "SHBDUO-1",
+			Generation: 2,
+			Version:    "1.0.0",
+			MAC:        "AA:BB:CC:DD:EE:FF",
+		},
+	}}
+}
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -636,5 +658,176 @@ func TestNewCommand_SkipStateAndMetersFlags(t *testing.T) {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("--%s flag not registered", name)
 		}
+	}
+}
+
+func TestNewCommand_FirmwareFlags(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	downgrade := cmd.Flags().Lookup("allow-firmware-downgrade")
+	if downgrade == nil {
+		t.Fatal("--allow-firmware-downgrade flag not registered")
+	}
+	if downgrade.DefValue != "false" {
+		t.Errorf("--allow-firmware-downgrade default = %q, want %q", downgrade.DefValue, "false")
+	}
+	if cmd.Flags().Lookup("firmware-url") == nil {
+		t.Error("--firmware-url flag not registered")
+	}
+}
+
+func TestConfirmMigration(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		yes         bool
+		resetSource bool
+		wantOK      bool
+		wantOut     string
+	}{
+		{name: "yes skips prompt", yes: true, wantOK: true},
+		{name: "non-tty declines without reset", wantOK: false, wantOut: "Migration cancelled"},
+		{name: "non-tty declines with reset note", resetSource: true, wantOK: false, wantOut: "Migration cancelled"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tf := factory.NewTestFactory(t)
+			opts := &Options{Factory: tf.Factory, Source: "src", Target: "dst", Yes: tt.yes}
+
+			ok, err := opts.confirmMigration(tt.resetSource)
+			if err != nil {
+				t.Fatalf("confirmMigration: %v", err)
+			}
+			if ok != tt.wantOK {
+				t.Errorf("confirmMigration() = %v, want %v", ok, tt.wantOK)
+			}
+			if tt.wantOut != "" && !strings.Contains(tf.OutString(), tt.wantOut) {
+				t.Errorf("output %q does not contain %q", tf.OutString(), tt.wantOut)
+			}
+		})
+	}
+}
+
+func TestPreviewMigration_CompareFails(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	// TEST-NET-1 target: CompareBackup cannot reach a device, so previewMigration
+	// returns the wrapped compare error before any display work.
+	opts := &Options{Factory: tf.Factory, Source: "src", Target: "192.0.2.10"}
+	err := opts.previewMigration(ctx, noWiFiBackup(), nil)
+	if err == nil {
+		t.Fatal("expected previewMigration to fail against an unreachable target")
+	}
+	if !strings.Contains(err.Error(), "failed to compare") {
+		t.Errorf("got %v, want error containing %q", err, "failed to compare")
+	}
+}
+
+func TestMigrateViaAP_ConfirmCancels(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	// Non-TTY confirm declines, so migrateViaAP returns nil before RestoreToAP —
+	// no WiFi hop is attempted.
+	opts := &Options{Factory: tf.Factory, Source: "src", Target: "dst", ToAP: "ShellyBulbDuo-AABBCC"}
+	if err := opts.migrateViaAP(ctx, tf.ShellyService(), noWiFiBackup(), nil); err != nil {
+		t.Fatalf("migrateViaAP with declined confirm: %v", err)
+	}
+	if !strings.Contains(tf.OutString(), "Migration cancelled") {
+		t.Errorf("expected cancellation notice, got %q", tf.OutString())
+	}
+}
+
+func TestMigrateViaAP_RestoreFailsBeforeHop(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Yes skips the prompt so RestoreToAP runs; the WiFi-less backup resolves no
+	// passphrase, so it fails in resolveJoinNetwork BEFORE any host WiFi hop.
+	opts := &Options{Factory: tf.Factory, Source: "src", Target: "dst", ToAP: "ShellyBulbDuo-AABBCC", Yes: true}
+	err := opts.migrateViaAP(ctx, tf.ShellyService(), noWiFiBackup(), nil)
+	if err == nil {
+		t.Fatal("expected migrateViaAP to fail without a resolvable WiFi passphrase")
+	}
+	if !strings.Contains(err.Error(), "migration via AP failed") {
+		t.Errorf("got %v, want error containing %q", err, "migration via AP failed")
+	}
+	// not covered: the success tail (ios.Success / newAddr / DisplayMigrationResult)
+	// requires RestoreToAP to complete a real AP hop + device write, which would
+	// mutate host WiFi and contact hardware — never exercised in a unit test.
+}
+
+func TestRun_ToAP_SourceBackupFails(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// --to-ap takes the longer-timeout branch and the migrateViaAP dispatch, but
+	// CreateBackup against TEST-NET-1 fails first, so no AP hop is attempted.
+	opts := &Options{
+		Factory: tf.Factory,
+		Source:  "192.0.2.20",
+		Target:  "dst",
+		ToAP:    "ShellyBulbDuo-AABBCC",
+		Yes:     true,
+	}
+	err := run(ctx, opts)
+	if err == nil {
+		t.Fatal("expected run to fail reading an unreachable source")
+	}
+	if !strings.Contains(err.Error(), "failed to read source device") {
+		t.Errorf("got %v, want error containing %q", err, "failed to read source device")
+	}
+}
+
+func TestRun_ToAP_InvalidFlagCombo(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	// --to-ap with --skip-network is rejected by validateFlags before any device
+	// I/O, covering run's validation-error branch on the --to-ap path.
+	opts := &Options{
+		Factory:     tf.Factory,
+		Source:      "src",
+		Target:      "dst",
+		ToAP:        "ShellyBulbDuo-AABBCC",
+		SkipNetwork: true,
+		Yes:         true,
+	}
+	err := run(ctx, opts)
+	if err == nil {
+		t.Fatal("expected validateFlags to reject --to-ap with --skip-network")
+	}
+	if !strings.Contains(err.Error(), "to-ap cannot be used with --skip-network") {
+		t.Errorf("got %v, want error containing %q", err, "to-ap cannot be used with --skip-network")
+	}
+}
+
+func TestShouldResetSource_StaticIP(t *testing.T) {
+	t.Parallel()
+	// A static-IP override gives the target a distinct address, so the source is
+	// not reset even though network settings are migrated.
+	opts := &Options{StaticIP: "10.0.0.9"}
+	if opts.shouldResetSource() {
+		t.Error("shouldResetSource() = true with --static-ip, want false")
 	}
 }
