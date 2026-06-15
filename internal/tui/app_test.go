@@ -383,8 +383,8 @@ func TestModel_ViewRendersWithoutPanic(t *testing.T) {
 
 	view := m.View()
 	// View should have content when model is ready
-	if view.Content == nil {
-		t.Error("View() returned nil content")
+	if view.Content == "" {
+		t.Error("View() returned empty content")
 	}
 }
 
@@ -395,7 +395,7 @@ func TestModel_ViewBeforeReady(t *testing.T) {
 
 	view := m.View()
 	// View should still return content (initializing message)
-	if view.Content == nil {
+	if view.Content == "" {
 		t.Error("View() should return content when not ready")
 	}
 }
@@ -407,7 +407,7 @@ func TestModel_ViewNarrowTerminal(t *testing.T) {
 	m = applyWindowSize(m, 60, 30)
 
 	view := m.View()
-	if view.Content == nil {
+	if view.Content == "" {
 		t.Error("View() should return content in narrow mode")
 	}
 }
