@@ -1,4 +1,4 @@
-FROM alpine:3.21
+FROM alpine:3.24
 # Labels set via CI
 
 # Install runtime dependencies
