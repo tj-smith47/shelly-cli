@@ -27,7 +27,16 @@ device_name: &amp;ldquo;Living Room Light&amp;rdquo; # optional device name to s
 - name: bedroom
 wifi: # optional per-device WiFi override
 ssid: &amp;ldquo;OtherNetwork&amp;rdquo;
-password: &amp;ldquo;other-secret&amp;rdquo;&lt;/p&gt;</description></item><item><title>shelly provision wifi</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/wifi/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/wifi/</guid><description>&lt;h2 id="shelly-provision-wifi"&gt;shelly provision wifi&lt;/h2&gt;
+password: &amp;ldquo;other-secret&amp;rdquo;&lt;/p&gt;</description></item><item><title>shelly provision inspect</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/inspect/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/inspect/</guid><description>&lt;h2 id="shelly-provision-inspect"&gt;shelly provision inspect&lt;/h2&gt;
+&lt;p&gt;Read a device&amp;rsquo;s persisted config at its factory WiFi AP&lt;/p&gt;
+&lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
+&lt;p&gt;Hop onto a device&amp;rsquo;s factory WiFi access point, read the configuration it has
+actually persisted (identity plus WiFi station settings), and return to the home
+network.&lt;/p&gt;
+&lt;p&gt;Use this when a device configures but never appears on the LAN: it shows whether
+the station SSID, key, and static IP took, and whether the device has associated
+yet — answering &amp;ldquo;did the onboard / restore &amp;ndash;to-ap actually write what I expected?&amp;rdquo;
+without the device having to join the network first.&lt;/p&gt;</description></item><item><title>shelly provision wifi</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/wifi/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/wifi/</guid><description>&lt;h2 id="shelly-provision-wifi"&gt;shelly provision wifi&lt;/h2&gt;
 &lt;p&gt;Interactive WiFi provisioning&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Provision WiFi settings interactively for a device.&lt;/p&gt;
