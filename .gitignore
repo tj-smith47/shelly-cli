@@ -19,6 +19,7 @@
 !NOTICE
 !README.md
 !SECURITY.md
+!Taskfile.yml
 !go.mod
 !go.sum
 

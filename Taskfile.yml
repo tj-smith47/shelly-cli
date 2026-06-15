@@ -1,0 +1,280 @@
+# shelly-cli — task runner (https://taskfile.dev)
+# Run `task` (or `task --list`) to see available tasks.
+version: "3"
+
+vars:
+  GO_VERSION: "1.26.4"
+  BINARY: shelly
+  # Pinned to match CI (.github/workflows/*). Keep in sync.
+  GOLANGCI_VERSION: v2.12.2
+  LINT_TIMEOUT: 5m
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+  COMMIT:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo unknown
+  DATE:
+    sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+  # Optional production telemetry endpoint (set TELEMETRY_ENDPOINT in the env).
+  TELEMETRY_LDFLAG:
+    sh: '[ -n "$TELEMETRY_ENDPOINT" ] && echo "-X github.com/tj-smith47/shelly-cli/internal/telemetry.Endpoint=$TELEMETRY_ENDPOINT" || true'
+  LDFLAGS: >-
+    -s -w
+    -X github.com/tj-smith47/shelly-cli/internal/version.Version={{.VERSION}}
+    -X github.com/tj-smith47/shelly-cli/internal/version.Commit={{.COMMIT}}
+    -X github.com/tj-smith47/shelly-cli/internal/version.Date={{.DATE}}
+    -X github.com/tj-smith47/shelly-cli/internal/version.BuiltBy=task
+    {{.TELEMETRY_LDFLAG}}
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  ci:
+    desc: Full local CI pipeline (lint, test, build, audit)
+    cmds:
+      - task: lint
+      - task: test
+      - task: build
+      - task: audit
+
+  # ===========================================================================
+  # Build
+  # ===========================================================================
+  build:
+    desc: Build the shelly binary into bin/
+    aliases: [b]
+    cmds:
+      - go build -ldflags "{{.LDFLAGS}}" -trimpath -o bin/{{.BINARY}} ./cmd/shelly
+
+  build:test:
+    desc: Quick build to a temp path (compile check only)
+    cmds:
+      - go build -o /tmp/shelly-test ./cmd/shelly
+
+  install:
+    desc: Install the shelly binary to GOPATH/bin
+    cmds:
+      - go install -ldflags "{{.LDFLAGS}}" -trimpath ./cmd/shelly
+
+  completions:
+    desc: Generate shell completions (bash, zsh, fish, powershell)
+    deps: [build]
+    cmds:
+      - mkdir -p completions
+      - ./bin/{{.BINARY}} completion bash > completions/shelly.bash
+      - ./bin/{{.BINARY}} completion zsh > completions/shelly.zsh
+      - ./bin/{{.BINARY}} completion fish > completions/shelly.fish
+      - ./bin/{{.BINARY}} completion powershell > completions/shelly.ps1
+
+  # ===========================================================================
+  # Testing
+  # ===========================================================================
+  test:
+    desc: Run tests with the race detector (extra args after --, e.g. task test -- -run TestX)
+    aliases: [t]
+    cmds:
+      - go test -race {{.CLI_ARGS}} ./...
+
+  test:coverage:
+    desc: Run tests and generate an HTML coverage report
+    cmds:
+      - go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - cmd: echo "Coverage report -> coverage.html"
+        silent: true
+
+  test:cov:
+    desc: Quick total-coverage percentage
+    cmds:
+      - go test -coverprofile=coverage.out ./... 2>&1 | tail -5
+      - go tool cover -func=coverage.out | tail -1
+      - rm -f coverage.out
+
+  # ===========================================================================
+  # Code Quality
+  # ===========================================================================
+  lint:
+    desc: Run golangci-lint (single file via -- <path>, e.g. task lint -- internal/foo.go)
+    aliases: [l]
+    cmds:
+      - golangci-lint run --timeout {{.LINT_TIMEOUT}} {{.CLI_ARGS}}
+
+  lint:fix:
+    desc: Run golangci-lint with auto-fix
+    cmds:
+      - golangci-lint run --fix --timeout {{.LINT_TIMEOUT}}
+
+  fmt:
+    desc: Format code (go fmt + goimports)
+    cmds:
+      - go fmt ./...
+      - goimports -w -local github.com/tj-smith47/shelly-cli .
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  vuln:
+    desc: Scan for known vulnerabilities (govulncheck)
+    cmds:
+      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  audit:
+    desc: Run the convention audit (CLAUDE.md enforcement)
+    cmds:
+      - ./scripts/audit-conventions.sh
+
+  generate:
+    desc: Run go generate
+    cmds:
+      - go generate ./...
+
+  # ===========================================================================
+  # Documentation
+  # ===========================================================================
+  docs:
+    desc: Regenerate command docs, man pages, and the Hugo site
+    cmds:
+      - go run ./cmd/docgen ./docs/commands
+      - go run ./cmd/mangen ./docs/man
+      - ./scripts/migrate-docs.sh
+      - ./scripts/migrate-commands.sh
+      - ./scripts/migrate-examples.sh
+
+  docs:man:
+    desc: Regenerate man pages only
+    cmds:
+      - go run ./cmd/mangen ./docs/man
+
+  docs:serve:
+    desc: Run the Hugo dev server on http://0.0.0.0:1313
+    dir: docs/site
+    cmds:
+      - hugo server --bind 0.0.0.0 --port 1313
+
+  # ===========================================================================
+  # Dependencies & Tooling
+  # ===========================================================================
+  deps:
+    desc: Download and tidy dependencies
+    cmds:
+      - go mod download
+      - go mod tidy
+
+  deps:outdated:
+    desc: List dependencies with newer versions available
+    cmds:
+      - go list -u -m all 2>/dev/null | grep -F '[' || echo "All dependencies up to date"
+
+  tools:install:
+    desc: Install pinned dev tools (golangci-lint, goimports, govulncheck)
+    cmds:
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_VERSION}}
+      - go install golang.org/x/tools/cmd/goimports@latest
+      - go install golang.org/x/vuln/cmd/govulncheck@latest
+    status:
+      - command -v golangci-lint
+      - command -v goimports
+      - command -v govulncheck
+
+  # ===========================================================================
+  # Go toolchain
+  # ===========================================================================
+  go:upgrade:*:
+    desc: Bump the Go version across go.mod, CI workflows, docs & this Taskfile (task go:upgrade:1.27.0)
+    vars:
+      VERSION: "{{index .MATCH 0}}"
+    cmds:
+      - go mod edit -go={{.VERSION}}
+      - |
+        # Pinned go-version / GO_VERSION in GitHub Actions workflows.
+        for wf in .github/workflows/*.yml; do
+          [ -f "$wf" ] || continue
+          sed -i -E 's/(go-version:[[:space:]]*\[?"?)[0-9]+\.[0-9]+(\.[0-9]+)?/\1{{.VERSION}}/g' "$wf"
+          sed -i -E 's/(GO_VERSION:[[:space:]]*")[0-9]+\.[0-9]+\.[0-9]+/\1{{.VERSION}}/g' "$wf"
+        done
+      - |
+        # "Go x.y.z" requirement references in docs & the project hook.
+        for f in CONTRIBUTING.md docs/site/go.mod .claude/hooks/rules-reminder.sh; do
+          [ -f "$f" ] && sed -i -E 's/(Go |go )[0-9]+\.[0-9]+\.[0-9]+/\1{{.VERSION}}/g' "$f"
+        done
+      - sed -i -E 's/(GO_VERSION:[[:space:]]*")[0-9]+\.[0-9]+\.[0-9]+/\1{{.VERSION}}/' Taskfile.yml
+      - go mod tidy
+      - cmd: echo "Go -> {{.VERSION}}. Review 'git diff', then run 'task ci'. Update CLAUDE.md note if needed."
+        silent: true
+
+  # ===========================================================================
+  # Commit (guarded — runs the pre-commit chain, then commits staged work)
+  # ===========================================================================
+  commit:
+    desc: "Run the pre-commit chain (regenerates docs), re-stage the user's files, then commit. Stage with `git add` first, then `task commit -- -m 'msg'`."
+    preconditions:
+      - sh: test -n "$(git diff --cached --name-only)"
+        msg: "Nothing staged. Stage files with `git add <path>` before running task commit."
+    vars:
+      STAGED_PRE:
+        sh: git diff --cached --name-only
+      MODIFIED_PRE:
+        sh: git diff --name-only
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: test
+      - task: build
+      - task: docs
+      - task: audit
+      - task: _commit:restage
+        vars:
+          STAGED_LIST: "{{.STAGED_PRE}}"
+          MODIFIED_LIST: "{{.MODIFIED_PRE}}"
+      - git commit {{.CLI_ARGS}}
+
+  commit:quick:
+    desc: "Lightweight commit: commit already-staged files WITHOUT the pre-commit chain. Use only when the full chain is blocked by an unrelated issue AND you ran the gates manually. Usage: `git add <paths>` then `task commit:quick -- -m 'msg'`."
+    preconditions:
+      - sh: test -n "$(git diff --cached --name-only)"
+        msg: "Nothing staged. Stage files with `git add <path>` before running task commit:quick."
+    cmds:
+      - git commit {{.CLI_ARGS}}
+
+  _commit:restage:
+    internal: true
+    desc: "Internal: re-stage files staged at task start (capture fmt/doc touch-ups) plus files the chain NEWLY generated (e.g. regenerated docs). Files modified-but-unstaged at task start are left untouched."
+    cmds:
+      - |
+        # (a) Re-add files that were staged before the chain ran, so any fmt/doc
+        # regeneration touching them is captured. -A keeps staged deletes/renames.
+        while IFS= read -r f; do
+          [ -z "$f" ] && continue
+          if [ -e "$f" ] || git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+            git add -A -- "$f"
+          fi
+        done <<'STAGED_EOF'
+        {{.STAGED_LIST}}
+        STAGED_EOF
+        # (b) Add files the chain NEWLY modified (regenerated docs/man pages):
+        # not in the pre-task staged OR modified lists.
+        git diff --name-only | while IFS= read -r f; do
+          [ -z "$f" ] && continue
+          printf '%s\n' '{{.STAGED_LIST}}' | grep -qxF -- "$f" && continue
+          printf '%s\n' '{{.MODIFIED_LIST}}' | grep -qxF -- "$f" && continue
+          git add -- "$f"
+        done
+
+  # ===========================================================================
+  # Release & Cleanup
+  # ===========================================================================
+  release:local:
+    desc: Run goreleaser locally (snapshot build)
+    cmds:
+      - goreleaser release --snapshot --clean
+
+  clean:
+    desc: Remove build and coverage artifacts
+    cmds:
+      - rm -rf bin/ dist/
+      - rm -f coverage.out coverage.html *.test
