@@ -47,7 +47,7 @@ jobs:
       should_run: ${{ steps.get-tag.outputs.should_run }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -115,12 +115,12 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -197,7 +197,7 @@ jobs:
           "$hash  ${{ matrix.artifact }}.zip" | Out-File -FilePath "${{ matrix.artifact }}.zip.sha256" -Encoding utf8
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: |
@@ -212,16 +212,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download Linux amd64 binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: shelly_linux_amd64
           path: artifacts/
 
       - name: Download Linux arm64 binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: shelly_linux_arm64
           path: artifacts/
@@ -234,20 +234,20 @@ jobs:
           tar -xzf artifacts/shelly_linux_arm64.tar.gz -C linux/arm64
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
@@ -273,10 +273,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts/
 
@@ -298,7 +298,7 @@ jobs:
             -o release/shelly_${{ needs.prepare.outputs.version }}_source.tar.gz HEAD
 
       - name: Get PR
-        uses: 8BitJonny/gh-get-current-pr@3.0.0
+        uses: 8BitJonny/gh-get-current-pr@4.0.0
         id: pr
 
       - name: Create Release
@@ -369,25 +369,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download macOS amd64 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: shelly_darwin_amd64
           path: artifacts/darwin_amd64/
 
       - name: Download macOS arm64 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: shelly_darwin_arm64
           path: artifacts/darwin_arm64/
 
       - name: Download Linux amd64 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: shelly_linux_amd64
           path: artifacts/linux_amd64/
 
       - name: Download Linux arm64 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: shelly_linux_arm64
           path: artifacts/linux_arm64/
