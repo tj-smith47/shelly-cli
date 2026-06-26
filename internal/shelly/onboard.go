@@ -1062,10 +1062,18 @@ func extractWiFiFromBlob(data json.RawMessage) *OnboardWiFiConfig {
 func (s *Service) ApplyProvisionSource(ctx context.Context, deviceAddr string, source *ProvisionSource) error {
 	switch {
 	case source.Backup != nil:
-		_, err := s.RestoreBackup(ctx, deviceAddr, source.Backup, backup.RestoreOptions{
+		result, err := s.RestoreBackup(ctx, deviceAddr, source.Backup, backup.RestoreOptions{
 			SkipNetwork: true,
 		})
-		return err
+		if err != nil {
+			return err
+		}
+		// A restore can reject sections while reporting no top-level error;
+		// provisioning must not report success when the device refused config.
+		if restoreErr := result.Err(); restoreErr != nil {
+			return fmt.Errorf("apply backup during provisioning: %w", restoreErr)
+		}
+		return nil
 
 	case source.Template != nil:
 		_, err := s.ApplyTemplate(ctx, deviceAddr, source.Template.Config, false)

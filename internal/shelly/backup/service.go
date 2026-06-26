@@ -199,7 +199,7 @@ func (s *Service) restoreGen1Backup(ctx context.Context, identifier string, devi
 			ConfigRestored:   r.Success,
 			RestartRequired:  r.RestartRequired,
 			Warnings:         r.Warnings,
-			Errors:           gen1ErrorStrings(r.Errors),
+			Errors:           errorStrings(r.Errors),
 			DestabilizedStep: r.DestabilizedStep,
 		}
 		// The library result carries no per-section counts; recover the webhook
@@ -224,10 +224,10 @@ func (s *Service) restoreGen1Backup(ctx context.Context, identifier string, devi
 	return result, err
 }
 
-// gen1ErrorStrings renders the library restore errors as display strings for the
-// CLI result, so per-setting failures surface to the user instead of being
+// errorStrings renders the library restore errors as display strings for the
+// CLI result, so per-section failures surface to the user instead of being
 // dropped. Returns nil for an empty slice (a clean restore).
-func gen1ErrorStrings(errs []error) []string {
+func errorStrings(errs []error) []string {
 	if len(errs) == 0 {
 		return nil
 	}
@@ -314,11 +314,17 @@ func (s *Service) restoreGen2Backup(ctx context.Context, identifier string, devi
 			return fmt.Errorf("failed to restore backup: %w", err)
 		}
 
-		// Convert result
+		// Convert result. Errors and DestabilizedStep MUST be copied: the
+		// shelly-go restore reports per-section rejections (WiFi/Cloud/MQTT/BLE/
+		// auth/schedules/webhooks) in Errors with Success=false and a nil
+		// top-level error. Dropping them here let the command print a false
+		// "Backup restored" and exit 0 while sections were silently rejected.
 		result = &RestoreResult{
-			Success:         restoreResult.Success,
-			RestartRequired: restoreResult.RestartRequired,
-			Warnings:        restoreResult.Warnings,
+			Success:          restoreResult.Success,
+			RestartRequired:  restoreResult.RestartRequired,
+			Warnings:         restoreResult.Warnings,
+			Errors:           errorStrings(restoreResult.Errors),
+			DestabilizedStep: restoreResult.DestabilizedStep,
 		}
 
 		// Count restored items from backup

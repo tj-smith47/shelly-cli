@@ -511,12 +511,8 @@ func TestRun_DirectoryAsFile(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when file is a directory")
 	}
-
-	// Should fail with some file-related error
-	if err != nil {
-		// Any error is acceptable since directories can't be read as backup files
-		t.Logf("Got expected error: %v", err)
-	}
+	// Any error is acceptable since directories can't be read as backup files.
+	t.Logf("Got expected error: %v", err)
 }
 
 func TestValidateFlags(t *testing.T) {

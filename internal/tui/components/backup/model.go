@@ -493,12 +493,21 @@ func (m Model) importBackup(backupFile File) tea.Cmd {
 		}
 
 		// Restore backup
-		_, err = m.svc.RestoreBackup(ctx, targetDevice, bkp, shellybackup.RestoreOptions{})
+		result, err := m.svc.RestoreBackup(ctx, targetDevice, bkp, shellybackup.RestoreOptions{})
 		if err != nil {
 			return ImportCompleteMsg{
 				Name:    backupFile.Name,
 				Success: false,
 				Err:     err,
+			}
+		}
+		// A restore can reject sections while reporting no top-level error; the
+		// import is only a success when the device accepted the whole backup.
+		if restoreErr := result.Err(); restoreErr != nil {
+			return ImportCompleteMsg{
+				Name:    backupFile.Name,
+				Success: false,
+				Err:     restoreErr,
 			}
 		}
 

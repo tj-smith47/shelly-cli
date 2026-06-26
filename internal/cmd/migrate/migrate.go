@@ -302,11 +302,20 @@ func (o *Options) migrateViaAP(
 		return fmt.Errorf("migration via AP failed: %w", err)
 	}
 
-	ios.Success("Migration completed!")
+	// A restore can reject sections while reporting no top-level error; gate the
+	// completion message and the exit code on the target accepting it. (No source
+	// reset on this path — the target is a different physical device.)
+	if reportErr := term.ReportMigrationResult(ios, o.Target, result); reportErr != nil {
+		if newAddr != "" {
+			// The device still rejoined the LAN even though some sections were
+			// rejected; surface the address so the user can finish by hand.
+			ios.Info("%s is live at %s", o.Target, newAddr)
+		}
+		return reportErr
+	}
 	if newAddr != "" {
 		ios.Info("%s is live at %s", o.Target, newAddr)
 	}
-	term.DisplayMigrationResult(ios, result)
 	return nil
 }
 
@@ -395,21 +404,32 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("migration failed: %w", err)
 	}
 
-	ios.Success("Migration completed!")
-	term.DisplayMigrationResult(ios, result)
-
-	// Factory reset source device if needed
-	if resetSource {
-		err = cmdutil.RunWithSpinner(ctx, ios, "Factory resetting source device...", func(ctx context.Context) error {
-			return svc.DeviceFactoryReset(ctx, opts.Source)
-		})
-		if err != nil {
-			ios.Warning("Migration succeeded but factory reset of source failed: %v", err)
-			ios.Info("You may need to manually factory reset %q to avoid IP conflicts", opts.Source)
-			return nil
-		}
-		ios.Success("Source device %q has been factory reset", opts.Source)
+	// A restore can reject sections while reporting no top-level error. Abort
+	// BEFORE the source factory-reset on any such failure — otherwise the target
+	// is left misconfigured AND the source is wiped, destroying both ends.
+	if reportErr := term.ReportMigrationResult(ios, opts.Target, result); reportErr != nil {
+		return reportErr
 	}
 
+	opts.factoryResetSource(ctx, svc, resetSource)
 	return nil
+}
+
+// factoryResetSource factory-resets the source device after a successful
+// migration when one was requested, freeing its IP/name so it cannot collide
+// with the newly-migrated target. A reset failure is a warning, not fatal: the
+// migration itself already succeeded. A no-op when resetSource is false.
+func (o *Options) factoryResetSource(ctx context.Context, svc migrateService, resetSource bool) {
+	if !resetSource {
+		return
+	}
+	ios := o.Factory.IOStreams()
+	if err := cmdutil.RunWithSpinner(ctx, ios, "Factory resetting source device...", func(ctx context.Context) error {
+		return svc.DeviceFactoryReset(ctx, o.Source)
+	}); err != nil {
+		ios.Warning("Migration succeeded but factory reset of source failed: %v", err)
+		ios.Info("You may need to manually factory reset %q to avoid IP conflicts", o.Source)
+		return
+	}
+	ios.Success("Source device %q has been factory reset", o.Source)
 }

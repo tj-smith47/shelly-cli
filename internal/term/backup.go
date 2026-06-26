@@ -1,6 +1,7 @@
 package term
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -140,6 +141,36 @@ func DisplayRestoreResult(ios *iostreams.IOStreams, result *backup.RestoreResult
 		ios.Println()
 		ios.Error("Restore halted: the device entered a reboot loop after the %q step.", result.DestabilizedStep)
 	}
+}
+
+// RestoreResultError returns a non-nil error describing why a restore did not
+// fully succeed, or nil when the device accepted the whole restore (or there is
+// no result, for callers that short-circuit before restoring). Commands use it
+// to gate success messaging and any destructive follow-up — a migrate source
+// factory-reset must never run after a partial or failed target restore.
+func RestoreResultError(target string, result *backup.RestoreResult) error {
+	if err := result.Err(); err != nil {
+		return fmt.Errorf("restore to %s failed: %w", target, err)
+	}
+	return nil
+}
+
+// ReportRestoreResult prints the outcome of a restore and returns a non-nil
+// error when the device rejected any part of it, so the command exits non-zero
+// instead of printing a false success. On success it prints the standard
+// "Backup restored to <target>" line; either way it renders the per-section
+// detail via DisplayRestoreResult.
+func ReportRestoreResult(ios *iostreams.IOStreams, target string, result *backup.RestoreResult) error {
+	if err := RestoreResultError(target, result); err != nil {
+		ios.Error("Restore to %s did not complete cleanly:", target)
+		DisplayRestoreResult(ios, result)
+		return err
+	}
+	ios.Success("Backup restored to %s", target)
+	if result != nil {
+		DisplayRestoreResult(ios, result)
+	}
+	return nil
 }
 
 // DisplayBackupsTable prints a table of backup files.

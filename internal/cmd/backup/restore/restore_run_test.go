@@ -119,6 +119,34 @@ func TestRun_Restore_Fails(t *testing.T) {
 	}
 }
 
+// TestRun_Restore_PartialFailure covers B4: shelly-go reports a per-section
+// rejection as Success=false with a nil top-level error. run must NOT print a
+// success line, must surface the rejected section, and must return an error so
+// the exit code is non-zero.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_Restore_PartialFailure(t *testing.T) {
+	out, errOut, f := setupRestore(t)
+	stub := &stubRestoreService{
+		restore: func(context.Context, string, *clibackup.DeviceBackup, clibackup.RestoreOptions) (*clibackup.RestoreResult, error) {
+			return &clibackup.RestoreResult{Success: false, Errors: []string{"wifi section rejected"}}, nil
+		},
+	}
+	opts := &Options{Factory: f, Device: "dev", FilePath: testBackupPath, svc: stub}
+
+	err := run(restoreTestCtx(t), opts)
+	if err == nil {
+		t.Fatal("a partial restore failure must return a non-nil error")
+	}
+	combined := out.String() + errOut.String()
+	if strings.Contains(combined, "Backup restored to") {
+		t.Errorf("must not print a success line on partial failure, got %q", combined)
+	}
+	if !strings.Contains(combined, "wifi section rejected") {
+		t.Errorf("the rejected section must be surfaced, got %q", combined)
+	}
+}
+
 // TestRun_RestoreViaAP_Success drives the --to-ap dispatch through restoreViaAP to
 // a successful at-AP restore that reports the device's new LAN address.
 //

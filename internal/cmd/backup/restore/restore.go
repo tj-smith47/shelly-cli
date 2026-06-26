@@ -291,11 +291,9 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("failed to restore backup: %w", err)
 	}
 
-	// Print results
-	ios.Success("Backup restored to %s", opts.Device)
-	term.DisplayRestoreResult(ios, result)
-
-	return nil
+	// A restore can fail per-section while reporting no top-level error; gate the
+	// success line and the exit code on the device actually accepting it.
+	return term.ReportRestoreResult(ios, opts.Device, result)
 }
 
 // restoreViaAP restores the backup onto a device at its factory WiFi AP: it hops
@@ -324,10 +322,12 @@ func (o *Options) restoreViaAP(
 		return fmt.Errorf("failed to restore via AP: %w", err)
 	}
 
-	ios.Success("Backup restored to %s", o.Device)
+	reportErr := term.ReportRestoreResult(ios, o.Device, result)
 	if newAddr != "" {
+		// The device rejoined the LAN at newAddr regardless of whether every
+		// section applied; surface the address either way so a partial failure
+		// can be finished by hand.
 		ios.Info("%s is live at %s", o.Device, newAddr)
 	}
-	term.DisplayRestoreResult(ios, result)
-	return nil
+	return reportErr
 }

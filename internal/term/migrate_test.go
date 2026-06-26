@@ -8,6 +8,44 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
 
+func TestReportMigrationResult(t *testing.T) {
+	t.Parallel()
+
+	t.Run("rejected restore returns an error and warns the source is intact", func(t *testing.T) {
+		t.Parallel()
+		ios, out, errOut := testIOStreams()
+		err := ReportMigrationResult(ios, "target1", &backup.RestoreResult{
+			Success: false,
+			Errors:  []string{"mqtt rejected"},
+		})
+		if err == nil {
+			t.Fatal("a rejected migration must return a non-nil error so the source factory-reset is skipped")
+		}
+		got := out.String() + errOut.String()
+		if strings.Contains(got, "Migration completed") {
+			t.Errorf("must not claim completion on failure; got:\n%s", got)
+		}
+		if !strings.Contains(got, "intact") {
+			t.Errorf("must tell the user the source was left intact; got:\n%s", got)
+		}
+		if !strings.Contains(got, "mqtt rejected") {
+			t.Errorf("the rejected section must be surfaced; got:\n%s", got)
+		}
+	})
+
+	t.Run("clean migration completes and returns nil", func(t *testing.T) {
+		t.Parallel()
+		ios, out, _ := testIOStreams()
+		err := ReportMigrationResult(ios, "target1", &backup.RestoreResult{Success: true, ConfigRestored: true})
+		if err != nil {
+			t.Fatalf("clean migration should return nil; got %v", err)
+		}
+		if !strings.Contains(out.String(), "Migration completed") {
+			t.Errorf("clean migration should print completion; got:\n%s", out.String())
+		}
+	})
+}
+
 func TestDisplayMigrationPreview_NoDifferences(t *testing.T) {
 	t.Parallel()
 

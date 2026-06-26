@@ -41,6 +41,92 @@ func TestDisplayRestoreResult_SurfacesErrorsAndDestabilizedStep(t *testing.T) {
 	})
 }
 
+func TestRestoreResultError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		result  *backup.RestoreResult
+		wantErr bool
+		wantSub string
+	}{
+		{name: "nil result is success", result: nil, wantErr: false},
+		{name: "clean success", result: &backup.RestoreResult{Success: true}, wantErr: false},
+		{
+			name:    "rejected sections",
+			result:  &backup.RestoreResult{Success: false, Errors: []string{"wifi rejected", "mqtt rejected"}},
+			wantErr: true,
+			wantSub: "2 section(s) rejected",
+		},
+		{
+			name:    "destabilized step wins over section count",
+			result:  &backup.RestoreResult{Success: false, Errors: []string{"x"}, DestabilizedStep: "coiot"},
+			wantErr: true,
+			wantSub: "reboot loop",
+		},
+		{
+			name:    "failure with no detail still errors",
+			result:  &backup.RestoreResult{Success: false},
+			wantErr: true,
+			wantSub: "failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := RestoreResultError("dev1", tt.result)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("RestoreResultError() err = %v, wantErr = %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				if !strings.Contains(err.Error(), "dev1") {
+					t.Errorf("error should name the target; got %q", err)
+				}
+				if !strings.Contains(err.Error(), tt.wantSub) {
+					t.Errorf("error %q missing %q", err, tt.wantSub)
+				}
+			}
+		})
+	}
+}
+
+func TestReportRestoreResult(t *testing.T) {
+	t.Parallel()
+
+	t.Run("partial failure prints no success line and returns an error", func(t *testing.T) {
+		t.Parallel()
+		ios, out, errOut := testIOStreams()
+		err := ReportRestoreResult(ios, "dev1", &backup.RestoreResult{
+			Success: false,
+			Errors:  []string{"wifi rejected"},
+		})
+		if err == nil {
+			t.Fatal("a rejected restore must return a non-nil error so the command exits non-zero")
+		}
+		got := out.String() + errOut.String()
+		if strings.Contains(got, "Backup restored to") {
+			t.Errorf("must not print a success line on failure; got:\n%s", got)
+		}
+		if !strings.Contains(got, "wifi rejected") {
+			t.Errorf("the rejected section must be surfaced; got:\n%s", got)
+		}
+	})
+
+	t.Run("clean restore prints success and returns nil", func(t *testing.T) {
+		t.Parallel()
+		ios, out, errOut := testIOStreams()
+		err := ReportRestoreResult(ios, "dev1", &backup.RestoreResult{Success: true, ConfigRestored: true})
+		if err != nil {
+			t.Fatalf("clean restore should return nil; got %v", err)
+		}
+		got := out.String() + errOut.String()
+		if !strings.Contains(got, "Backup restored to dev1") {
+			t.Errorf("clean restore should print the success line; got:\n%s", got)
+		}
+	})
+}
+
 func TestDisplayBackupsTable(t *testing.T) {
 	t.Parallel()
 

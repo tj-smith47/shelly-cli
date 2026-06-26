@@ -3,7 +3,10 @@ package backup
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"strings"
 
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 )
@@ -197,6 +200,29 @@ type RestoreResult struct {
 	SchedulesRestored int
 	WebhooksRestored  int
 	RestartRequired   bool
+}
+
+// Failed reports whether the device rejected any part of the restore. A restore
+// can fail per-section (WiFi/Cloud/MQTT/auth/…) while the call returns a nil
+// top-level error, so callers must consult this rather than err alone.
+func (r *RestoreResult) Failed() bool {
+	return r != nil && !r.Success
+}
+
+// Err summarizes why the restore did not fully succeed, or nil when it did.
+// Callers that surface a restore as a plain error (provisioning, the TUI import
+// flow) use this directly; the command layer wraps it with the target name.
+func (r *RestoreResult) Err() error {
+	if !r.Failed() {
+		return nil
+	}
+	if r.DestabilizedStep != "" {
+		return fmt.Errorf("the device entered a reboot loop after the %q step", r.DestabilizedStep)
+	}
+	if n := len(r.Errors); n > 0 {
+		return fmt.Errorf("%d section(s) rejected: %s", n, strings.Join(r.Errors, "; "))
+	}
+	return errors.New("restore did not complete")
 }
 
 // Script is a compatibility type for backup scripts.

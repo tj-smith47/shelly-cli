@@ -1111,20 +1111,71 @@ func TestRestoreGen1Backup_Destabilized(t *testing.T) {
 	if res.Success {
 		t.Error("Success must be false on a halted restore")
 	}
-	// The library's per-step error must surface through gen1ErrorStrings.
+	// The library's per-step error must surface through errorStrings.
 	if len(res.Errors) == 0 {
 		t.Error("expected the destabilization error to surface in Errors")
 	}
 }
 
-func TestGen1ErrorStrings(t *testing.T) {
+func TestErrorStrings(t *testing.T) {
 	t.Parallel()
-	if got := gen1ErrorStrings(nil); got != nil {
+	if got := errorStrings(nil); got != nil {
 		t.Errorf("nil slice should map to nil, got %v", got)
 	}
 	errs := []error{context.Canceled, http.ErrServerClosed}
-	got := gen1ErrorStrings(errs)
+	got := errorStrings(errs)
 	if len(got) != 2 || got[0] != context.Canceled.Error() || got[1] != http.ErrServerClosed.Error() {
-		t.Errorf("gen1ErrorStrings rendered errors wrong: %v", got)
+		t.Errorf("errorStrings rendered errors wrong: %v", got)
+	}
+}
+
+func TestRestoreResult_Err(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		result     *RestoreResult
+		wantFailed bool
+		wantErrSub string // "" means Err() must be nil
+	}{
+		{name: "nil result", result: nil, wantFailed: false},
+		{name: "clean success", result: &RestoreResult{Success: true}, wantFailed: false},
+		{
+			name:       "rejected sections list every section",
+			result:     &RestoreResult{Success: false, Errors: []string{"wifi rejected", "mqtt rejected"}},
+			wantFailed: true,
+			wantErrSub: "2 section(s) rejected: wifi rejected; mqtt rejected",
+		},
+		{
+			name:       "destabilized step takes precedence",
+			result:     &RestoreResult{Success: false, Errors: []string{"x"}, DestabilizedStep: "coiot"},
+			wantFailed: true,
+			wantErrSub: "reboot loop after the \"coiot\" step",
+		},
+		{
+			name:       "failure with no detail",
+			result:     &RestoreResult{Success: false},
+			wantFailed: true,
+			wantErrSub: "did not complete",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.result.Failed(); got != tt.wantFailed {
+				t.Errorf("Failed() = %v, want %v", got, tt.wantFailed)
+			}
+			err := tt.result.Err()
+			if tt.wantErrSub == "" {
+				if err != nil {
+					t.Errorf("Err() = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErrSub) {
+				t.Errorf("Err() = %v, want substring %q", err, tt.wantErrSub)
+			}
+		})
 	}
 }

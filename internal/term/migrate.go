@@ -67,4 +67,35 @@ func DisplayMigrationResult(ios *iostreams.IOStreams, result *backup.RestoreResu
 			ios.Printf("  - %s\n", w)
 		}
 	}
+
+	if len(result.Errors) > 0 {
+		ios.Println()
+		ios.Error("Errors:")
+		for _, e := range result.Errors {
+			ios.Printf("  - %s\n", e)
+		}
+	}
+
+	if result.DestabilizedStep != "" {
+		ios.Println()
+		ios.Error("Migration halted: the device entered a reboot loop after the %q step.", result.DestabilizedStep)
+	}
+}
+
+// ReportMigrationResult prints a migration outcome and returns a non-nil error
+// when the target rejected any part of the restore, so the command aborts
+// BEFORE the destructive source factory-reset — a partial restore must never
+// leave the target misconfigured AND wipe the source. On success it prints
+// "Migration completed!".
+func ReportMigrationResult(ios *iostreams.IOStreams, target string, result *backup.RestoreResult) error {
+	if err := RestoreResultError(target, result); err != nil {
+		ios.Error("Migration did not complete cleanly; leaving the source device intact:")
+		DisplayMigrationResult(ios, result)
+		return err
+	}
+	ios.Success("Migration completed!")
+	if result != nil {
+		DisplayMigrationResult(ios, result)
+	}
+	return nil
 }

@@ -98,6 +98,32 @@ func TestRun_FullMigration_ResetsSource(t *testing.T) {
 	}
 }
 
+// TestRun_FailedRestore_NoReset proves the destructive guard: when the target
+// rejects the restore (Success=false with a nil top-level error, the shape
+// shelly-go returns on a partial failure), run must abort BEFORE the source
+// factory-reset and return an error — never wipe the source after a bad restore.
+func TestRun_FailedRestore_NoReset(t *testing.T) {
+	t.Parallel()
+	tf := factory.NewTestFactory(t)
+	stub := &stubMigrateService{
+		restore: func(context.Context, string, *clibackup.DeviceBackup, clibackup.RestoreOptions) (*clibackup.RestoreResult, error) {
+			return &clibackup.RestoreResult{Success: false, Errors: []string{"mqtt rejected"}}, nil
+		},
+	}
+	opts := &Options{Factory: tf.Factory, Source: "src", Target: "dst", Yes: true, svc: stub}
+
+	err := run(migrateTestCtx(t), opts)
+	if err == nil {
+		t.Fatal("a rejected restore must make run return an error so the exit code is non-zero")
+	}
+	if stub.factoryResetCalls != 0 {
+		t.Errorf("source must NOT be factory reset after a failed restore, got %d calls", stub.factoryResetCalls)
+	}
+	if out := tf.OutString() + tf.ErrString(); strings.Contains(out, "Migration completed") {
+		t.Errorf("must not report completion on a failed restore, got %q", out)
+	}
+}
+
 // TestRun_SkipNetwork_NoReset confirms --skip-network leaves the source online.
 func TestRun_SkipNetwork_NoReset(t *testing.T) {
 	t.Parallel()
@@ -274,5 +300,35 @@ func TestMigrateViaAP_RestoreToAPFails(t *testing.T) {
 	err := opts.migrateViaAP(migrateTestCtx(t), stub, noWiFiBackup(), nil)
 	if err == nil || !strings.Contains(err.Error(), "migration via AP failed") {
 		t.Fatalf("expected AP migration failure, got %v", err)
+	}
+}
+
+// TestMigrateViaAP_PartialRestore proves the --to-ap path does not report a
+// false success: a Success=false result with a nil top-level error (a section
+// rejection at the AP) must surface an error and never print "Migration
+// completed!". The device's new LAN address is still reported for recovery.
+func TestMigrateViaAP_PartialRestore(t *testing.T) {
+	t.Parallel()
+	tf := factory.NewTestFactory(t)
+	stub := &stubMigrateService{
+		restoreToAP: func(context.Context, string, string, string, *clibackup.DeviceBackup, clibackup.RestoreOptions) (*clibackup.RestoreResult, string, error) {
+			return &clibackup.RestoreResult{Success: false, Errors: []string{"cloud section rejected"}}, "10.23.47.227", nil
+		},
+	}
+	opts := &Options{Factory: tf.Factory, Source: "src", Target: "fr", Yes: true, ToAP: "ShellyBulbDuo-AABBCC", svc: stub}
+
+	err := opts.migrateViaAP(migrateTestCtx(t), stub, noWiFiBackup(), nil)
+	if err == nil {
+		t.Fatal("a rejected at-AP restore must return a non-nil error")
+	}
+	out := tf.OutString() + tf.ErrString()
+	if strings.Contains(out, "Migration completed") {
+		t.Errorf("must not claim completion on partial failure, got %q", out)
+	}
+	if !strings.Contains(out, "10.23.47.227") {
+		t.Errorf("the device's new LAN address should still be surfaced, got %q", out)
+	}
+	if !strings.Contains(out, "cloud section rejected") {
+		t.Errorf("the rejected section must be surfaced, got %q", out)
 	}
 }
