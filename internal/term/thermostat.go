@@ -110,7 +110,11 @@ func DisplayThermostats(ios *iostreams.IOStreams, thermostats []model.Thermostat
 
 	for _, t := range thermostats {
 		ios.Printf("  %s %d\n", theme.Highlight().Render("Thermostat"), t.ID)
-		ios.Printf("    Status: %s\n", output.RenderActive(t.Enabled, output.CaseTitle, theme.FalseDim))
+		ios.Printf("    Enabled: %s\n", output.RenderActive(t.Enabled, output.CaseTitle, theme.FalseDim))
+		ios.Printf("    Heating: %s\n", output.RenderActive(t.Heating, output.CaseTitle, theme.FalseDim))
+		if t.Mode != "" {
+			ios.Printf("    Mode: %s\n", t.Mode)
+		}
 		if t.TargetC > 0 {
 			ios.Printf("    Target: %.1f°C\n", t.TargetC)
 		}

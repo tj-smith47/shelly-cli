@@ -158,7 +158,10 @@ func TestBuildThermostatScheduleCall(t *testing.T) {
 
 		result := BuildThermostatScheduleCall(params)
 
-		calls := result["calls"].([]any) //nolint:errcheck,forcetypeassert // type assertion checked by test logic
+		calls, ok := result["calls"].([]any)
+		if !ok {
+			t.Fatalf("expected calls to be []any, got %T", result["calls"])
+		}
 		if len(calls) != 1 {
 			t.Errorf("expected 1 call, got %d", len(calls))
 		}
@@ -215,10 +218,63 @@ func TestCollectThermostats(t *testing.T) {
 			"switch:0":     json.RawMessage(`{"id":0,"output":true}`),
 		}
 
-		thermostats := CollectThermostats(status)
+		thermostats := CollectThermostats(status, nil)
 
 		if len(thermostats) != 2 {
 			t.Errorf("expected 2 thermostats, got %d", len(thermostats))
+		}
+	})
+
+	t.Run("enabled comes from config, heating from status output", func(t *testing.T) {
+		t.Parallel()
+
+		// A thermostat that is enabled in config but whose valve is closed
+		// (output=false) must report Enabled=true, Heating=false — the bug
+		// previously reported it Disabled whenever the room was at temperature.
+		status := map[string]json.RawMessage{
+			"thermostat:0": json.RawMessage(`{"id":0,"output":false,"target_C":22.0}`),
+		}
+		config := map[string]json.RawMessage{
+			"thermostat:0": json.RawMessage(`{"id":0,"enable":true,"thermostat_mode":"heating"}`),
+		}
+
+		thermostats := CollectThermostats(status, config)
+
+		if len(thermostats) != 1 {
+			t.Fatalf("expected 1 thermostat, got %d", len(thermostats))
+		}
+		got := thermostats[0]
+		if !got.Enabled {
+			t.Error("Enabled = false, want true (from config enable)")
+		}
+		if got.Heating {
+			t.Error("Heating = true, want false (valve output is false)")
+		}
+		if got.Mode != "heating" {
+			t.Errorf("Mode = %q, want heating", got.Mode)
+		}
+	})
+
+	t.Run("disabled in config with valve open", func(t *testing.T) {
+		t.Parallel()
+
+		status := map[string]json.RawMessage{
+			"thermostat:0": json.RawMessage(`{"id":0,"output":true}`),
+		}
+		config := map[string]json.RawMessage{
+			"thermostat:0": json.RawMessage(`{"id":0,"enable":false}`),
+		}
+
+		thermostats := CollectThermostats(status, config)
+
+		if len(thermostats) != 1 {
+			t.Fatalf("expected 1 thermostat, got %d", len(thermostats))
+		}
+		if thermostats[0].Enabled {
+			t.Error("Enabled = true, want false (config enable is false)")
+		}
+		if !thermostats[0].Heating {
+			t.Error("Heating = false, want true (valve output is true)")
 		}
 	})
 
@@ -227,7 +283,7 @@ func TestCollectThermostats(t *testing.T) {
 
 		status := map[string]json.RawMessage{}
 
-		thermostats := CollectThermostats(status)
+		thermostats := CollectThermostats(status, nil)
 
 		if len(thermostats) != 0 {
 			t.Errorf("expected 0 thermostats, got %d", len(thermostats))
@@ -242,7 +298,7 @@ func TestCollectThermostats(t *testing.T) {
 			"thermostat:1": json.RawMessage(`{invalid json}`),
 		}
 
-		thermostats := CollectThermostats(status)
+		thermostats := CollectThermostats(status, nil)
 
 		if len(thermostats) != 1 {
 			t.Errorf("expected 1 thermostat (skip invalid), got %d", len(thermostats))

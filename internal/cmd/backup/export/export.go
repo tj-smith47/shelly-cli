@@ -109,6 +109,10 @@ func run(ctx context.Context, opts *Options) error {
 		for _, r := range shelly.FailedBackupResults(results) {
 			ios.Printf("  - %s: %v\n", r.DeviceName, r.Error)
 		}
+		// A non-zero exit is essential: an unattended `backup export` in cron
+		// that silently exits 0 with zero files written is an invisible backup
+		// gap. Any failed device fails the command.
+		return fmt.Errorf("%d of %d device backups failed", failed, success+failed)
 	}
 
 	return nil

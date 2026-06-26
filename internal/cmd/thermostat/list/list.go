@@ -107,7 +107,22 @@ func run(ctx context.Context, opts *Options) error {
 			return fmt.Errorf("failed to parse status: %w", unmarshalErr)
 		}
 
-		thermostats = shelly.CollectThermostats(fullStatus)
+		// The enable flag lives in config, not status — fetch it so "Enabled"
+		// reflects the configured state rather than the live valve output.
+		cfgResult, cfgErr := conn.Call(ctx, "Shelly.GetConfig", nil)
+		if cfgErr != nil {
+			return fmt.Errorf("failed to get device config: %w", cfgErr)
+		}
+		cfgBytes, cfgMarshalErr := json.Marshal(cfgResult)
+		if cfgMarshalErr != nil {
+			return fmt.Errorf("failed to marshal config: %w", cfgMarshalErr)
+		}
+		var fullConfig map[string]json.RawMessage
+		if cfgUnmarshalErr := json.Unmarshal(cfgBytes, &fullConfig); cfgUnmarshalErr != nil {
+			return fmt.Errorf("failed to parse config: %w", cfgUnmarshalErr)
+		}
+
+		thermostats = shelly.CollectThermostats(fullStatus, fullConfig)
 		return nil
 	})
 	if err != nil {

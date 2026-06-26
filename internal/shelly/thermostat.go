@@ -213,31 +213,66 @@ func ParseScheduleCreateResponse(result any) (ScheduleCreateResult, error) {
 	return resp, nil
 }
 
-// CollectThermostats extracts thermostat information from a device status map.
-// The status map should be the result of a Shelly.GetStatus call.
-func CollectThermostats(status map[string]json.RawMessage) []model.ThermostatInfo {
+// CollectThermostats extracts thermostat information from a device's status and
+// config maps (the results of Shelly.GetStatus and Shelly.GetConfig). The
+// enable flag is a configuration property; the status "output" field reports
+// only whether the valve is currently calling for heat, so the configured
+// Enabled flag and the live Heating state are surfaced as distinct fields.
+func CollectThermostats(status, config map[string]json.RawMessage) []model.ThermostatInfo {
 	var thermostats []model.ThermostatInfo
 
 	for key, raw := range status {
-		if strings.HasPrefix(key, "thermostat:") {
-			var t struct {
-				ID       int      `json:"id"`
-				Output   *bool    `json:"output"`
-				TargetC  *float64 `json:"target_C"`
-				CurrentC *float64 `json:"current_C"`
-			}
-			if err := json.Unmarshal(raw, &t); err == nil {
-				info := model.ThermostatInfo{
-					ID:      t.ID,
-					Enabled: t.Output != nil && *t.Output,
-				}
-				if t.TargetC != nil {
-					info.TargetC = *t.TargetC
-				}
-				thermostats = append(thermostats, info)
-			}
+		if !strings.HasPrefix(key, "thermostat:") {
+			continue
 		}
+
+		var st struct {
+			ID       int      `json:"id"`
+			Output   *bool    `json:"output"`
+			TargetC  *float64 `json:"target_C"`
+			CurrentC *float64 `json:"current_C"`
+		}
+		if err := json.Unmarshal(raw, &st); err != nil {
+			continue
+		}
+
+		info := model.ThermostatInfo{
+			ID:      st.ID,
+			Heating: st.Output != nil && *st.Output,
+		}
+		if st.TargetC != nil {
+			info.TargetC = *st.TargetC
+		}
+
+		// Enabled and mode live in config, not status.
+		applyThermostatConfig(&info, config[key])
+
+		thermostats = append(thermostats, info)
 	}
 
 	return thermostats
+}
+
+// applyThermostatConfig overlays the configuration-derived fields (enable flag,
+// mode, and a target_C fallback) onto a ThermostatInfo built from status. A nil
+// or unparsable config leaves the info unchanged.
+func applyThermostatConfig(info *model.ThermostatInfo, cfgRaw json.RawMessage) {
+	if len(cfgRaw) == 0 {
+		return
+	}
+	var cfg struct {
+		Enable  *bool    `json:"enable"`
+		Mode    *string  `json:"thermostat_mode"`
+		TargetC *float64 `json:"target_C"`
+	}
+	if err := json.Unmarshal(cfgRaw, &cfg); err != nil {
+		return
+	}
+	info.Enabled = cfg.Enable != nil && *cfg.Enable
+	if cfg.Mode != nil {
+		info.Mode = *cfg.Mode
+	}
+	if info.TargetC == 0 && cfg.TargetC != nil {
+		info.TargetC = *cfg.TargetC
+	}
 }
