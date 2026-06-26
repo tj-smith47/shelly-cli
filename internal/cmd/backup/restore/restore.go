@@ -306,27 +306,8 @@ func (o *Options) restoreViaAP(
 ) error {
 	ios := o.Factory.IOStreams()
 
-	var (
-		result  *backup.RestoreResult
-		newAddr string
-	)
-	err := cmdutil.RunWithSpinner(ctx, ios,
-		fmt.Sprintf("Restoring onto %s at AP %s (hopping host WiFi)...", o.Device, o.ToAP),
-		func(ctx context.Context) error {
-			var restoreErr error
-			result, newAddr, restoreErr = svc.RestoreToAP(ctx, o.ToAP, o.APIP, o.Device, bkp, restoreOpts)
-			return restoreErr
-		})
-	if err != nil {
-		return fmt.Errorf("failed to restore via AP: %w", err)
-	}
-
-	reportErr := term.ReportRestoreResult(ios, o.Device, result)
-	if newAddr != "" {
-		// The device rejoined the LAN at newAddr regardless of whether every
-		// section applied; surface the address either way so a partial failure
-		// can be finished by hand.
-		ios.Info("%s is live at %s", o.Device, newAddr)
-	}
-	return reportErr
+	// The AP-hop restore-and-report sequence (including partial-failure handling)
+	// is shared with the migrate command.
+	return cmdutil.RestoreAtAP(ctx, ios, svc, o.ToAP, o.APIP, o.Device, bkp, restoreOpts,
+		"failed to restore via AP", term.ReportRestoreResult)
 }

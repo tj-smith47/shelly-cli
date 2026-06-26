@@ -287,36 +287,11 @@ func (o *Options) migrateViaAP(
 		FirmwareURL:            o.FirmwareURL,
 	}
 
-	var (
-		result  *backup.RestoreResult
-		newAddr string
-	)
-	err := cmdutil.RunWithSpinner(ctx, ios,
-		fmt.Sprintf("Restoring onto %s at AP %s (hopping host WiFi)...", o.Target, o.ToAP),
-		func(ctx context.Context) error {
-			var restoreErr error
-			result, newAddr, restoreErr = svc.RestoreToAP(ctx, o.ToAP, o.APIP, o.Target, bkp, restoreOpts)
-			return restoreErr
-		})
-	if err != nil {
-		return fmt.Errorf("migration via AP failed: %w", err)
-	}
-
-	// A restore can reject sections while reporting no top-level error; gate the
-	// completion message and the exit code on the target accepting it. (No source
-	// reset on this path — the target is a different physical device.)
-	if reportErr := term.ReportMigrationResult(ios, o.Target, result); reportErr != nil {
-		if newAddr != "" {
-			// The device still rejoined the LAN even though some sections were
-			// rejected; surface the address so the user can finish by hand.
-			ios.Info("%s is live at %s", o.Target, newAddr)
-		}
-		return reportErr
-	}
-	if newAddr != "" {
-		ios.Info("%s is live at %s", o.Target, newAddr)
-	}
-	return nil
+	// The AP-hop restore-and-report sequence (including partial-failure handling)
+	// is shared with the restore command. No source reset on this path — the
+	// target is a different physical device.
+	return cmdutil.RestoreAtAP(ctx, ios, svc, o.ToAP, o.APIP, o.Target, bkp, restoreOpts,
+		"migration via AP failed", term.ReportMigrationResult)
 }
 
 func run(ctx context.Context, opts *Options) error {
