@@ -541,10 +541,13 @@ func (s *Service) OnboardViaAP(
 
 // confirmRejoinedLAN confirms a device rejoined the LAN after an AP hop and
 // returns its address plus a non-fatal note describing any failure to locate it.
-// It delegates to the shared locateRejoinedDevice confirm — a static address is
-// polled directly, a DHCP one is located by MAC over mDNS — so onboard and the
-// restore/migrate --to-ap flows confirm identically; only the policy differs, with
-// onboard reporting a failure as a note rather than treating it as fatal.
+// It delegates to the shared confirmRejoin racer — route-independent presence
+// signals (mDNS, plus CoIoT on Gen1) raced against unicast probes across every host
+// interface — so onboard and the restore/migrate --to-ap flows confirm identically;
+// only the policy differs. Onboarding only needs the device's address to register
+// it, so a route-independent presence sighting with no unicast route from this host
+// (writeable=false) is still a usable success here, unlike restore whose LAN pass
+// needs the unicast route; a total miss becomes a non-fatal note.
 func (s *Service) confirmRejoinedLAN(
 	ctx context.Context,
 	device *OnboardDevice,
@@ -554,14 +557,18 @@ func (s *Service) confirmRejoinedLAN(
 	if wifi.IsStatic() {
 		staticIP = wifi.StaticIP
 	}
-	ip, _, err := s.locateRejoinedDevice(ctx, device.Generation, device.Name, staticIP, device.MACAddress)
+	conf, err := s.confirmRejoin(ctx, device.Generation, staticIP, device.MACAddress)
 	if err != nil {
 		// Provisioning succeeded but the device could not be located; carry the
 		// cause so the UI warns instead of reporting a success it cannot prove.
 		debug.TraceEvent("onboard AP post-provision confirm failed for %s: %v", device.Name, err)
 		return "", fmt.Sprintf("provisioned but %v", err)
 	}
-	return ip, ""
+	if !conf.writeable {
+		debug.TraceEvent("onboard %s seen via %s at %s with no unicast route from this host",
+			device.Name, conf.via, conf.addr)
+	}
+	return conf.addr, ""
 }
 
 // configureWiFiAtAP sends WiFi credentials to a device at 192.168.33.1.

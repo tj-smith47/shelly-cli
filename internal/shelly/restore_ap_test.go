@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/afero"
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
@@ -49,181 +48,282 @@ func anyCircuitOpen(rl *ratelimit.DeviceRateLimiter) bool {
 // ErrCircuitOpen and the device's eventual recovery — plus the clockless-config
 // second pass it gates — would never be observed. The control loop confirms the
 // breaker genuinely trips for the same failures when NOT marked as polling.
-func TestPollReachable_DoesNotTripCircuit(t *testing.T) {
+// TestRejoinProbe_PollingDoesNotTripCircuit is the regression guard for the --to-ap
+// LAN-reconfirm failure on the live path: confirmRejoin marks its context as polling
+// before racing probes (probeReachableVia), so the expected early failures — host
+// still reacquiring its DHCP lease, device still booting — must NOT open the device's
+// circuit breaker. If they did, every later probe would short-circuit with
+// ErrCircuitOpen and the device's eventual recovery would never be observed. The
+// control loop confirms the breaker genuinely trips for the same failures when NOT
+// marked as polling. Both generations route through the same probe seam.
+func TestRejoinProbe_PollingDoesNotTripCircuit(t *testing.T) {
 	t.Parallel()
-	addr := refusingAddr(t)
 
-	// Polling path: many failing probes must leave the circuit closed.
-	rl := ratelimit.New()
-	svc := New(NewConfigResolver(), WithRateLimiter(rl))
-	err := svc.pollReachable(context.Background(), addr, 1,
-		400*time.Millisecond, 1*time.Millisecond, 30*time.Millisecond)
-	if err == nil {
-		t.Fatal("pollReachable to a closed port returned nil error")
-	}
-	if anyCircuitOpen(rl) {
-		t.Error("circuit opened during polling poll — breaker not suppressed for polling")
-	}
+	for _, gen := range []int{1, 2} {
+		t.Run(fmt.Sprintf("gen%d", gen), func(t *testing.T) {
+			t.Parallel()
+			addr := refusingAddr(t)
 
-	// Control: the same failures via a non-polling connection DO open the breaker,
-	// proving the suppression above is meaningful (default threshold is 3).
-	rl2 := ratelimit.New()
-	svc2 := New(NewConfigResolver(), WithRateLimiter(rl2))
-	for range 5 {
-		pctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
-		if err := svc2.WithGen1Connection(pctx, addr, func(conn *client.Gen1Client) error {
-			_, e := conn.GetSettings(pctx)
-			return e
-		}); err == nil {
-			t.Fatal("control probe unexpectedly reached a closed port")
-		}
-		cancel()
-	}
-	if !anyCircuitOpen(rl2) {
-		t.Error("control: circuit never opened for non-polling failures — test cannot distinguish the fix")
+			// Polling path: many failing probes must leave the circuit closed.
+			rl := ratelimit.New()
+			svc := New(NewConfigResolver(), WithRateLimiter(rl))
+			pollCtx := ratelimit.MarkAsPolling(context.Background())
+			for range 5 {
+				pctx, cancel := context.WithTimeout(pollCtx, 30*time.Millisecond)
+				if err := svc.probeReachableVia(pctx, addr, "", gen); err == nil {
+					t.Fatal("probe unexpectedly reached a closed port")
+				}
+				cancel()
+			}
+			if anyCircuitOpen(rl) {
+				t.Error("circuit opened while polling — breaker not suppressed on the rejoin probe path")
+			}
+
+			// Control: the same failures without the polling mark DO open the breaker,
+			// proving the suppression above is meaningful (default threshold is 3).
+			rl2 := ratelimit.New()
+			svc2 := New(NewConfigResolver(), WithRateLimiter(rl2))
+			for range 5 {
+				pctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+				if err := svc2.probeReachableVia(pctx, addr, "", gen); err == nil {
+					t.Fatal("control probe unexpectedly reached a closed port")
+				}
+				cancel()
+			}
+			if !anyCircuitOpen(rl2) {
+				t.Error("control: circuit never opened for non-polling failures — test cannot distinguish the fix")
+			}
+		})
 	}
 }
 
-// TestPollReachable_Gen2Branch exercises the Gen2+ probe path (a Gen2 device does
-// not serve the Gen1 /settings endpoint, so the probe must route by generation).
-// It still must not trip the circuit while polling.
-func TestPollReachable_Gen2Branch(t *testing.T) {
-	t.Parallel()
-	addr := refusingAddr(t)
-
-	rl := ratelimit.New()
-	svc := New(NewConfigResolver(), WithRateLimiter(rl))
-	err := svc.pollReachable(context.Background(), addr, 2,
-		200*time.Millisecond, 1*time.Millisecond, 30*time.Millisecond)
-	if err == nil {
-		t.Fatal("gen2 pollReachable to a closed port returned nil error")
-	}
-	if anyCircuitOpen(rl) {
-		t.Error("circuit opened during gen2 polling poll")
-	}
-}
-
-// TestPollReachableVia_NoCandidatesHitsDeadline covers the fallback return: with no
-// candidate interfaces, no probe ever runs, so the poll exhausts its (tiny) timeout
-// and returns the "not reachable within" error rather than a nil interface.
-func TestPollReachableVia_NoCandidatesHitsDeadline(t *testing.T) {
-	t.Parallel()
-	svc := New(NewConfigResolver(), WithRateLimiter(ratelimit.New()))
-
-	_, err := svc.pollReachableVia(context.Background(), "192.0.2.10", 1, nil,
-		20*time.Millisecond, 1*time.Millisecond, 5*time.Millisecond)
-	if err == nil {
-		t.Fatal("expected a not-reachable error when no candidate interface is tried")
-	}
-	if !strings.Contains(err.Error(), "not reachable within") {
-		t.Errorf("err = %q, want the 'not reachable within' deadline fallback", err)
-	}
-}
-
-// TestPollReachableVia_CancelledMidPoll covers the in-loop cancellation guard: a
-// context cancelled while probing a closed port makes the poll return ctx.Err()
-// promptly instead of grinding through the remaining budget.
-func TestPollReachableVia_CancelledMidPoll(t *testing.T) {
-	t.Parallel()
-	addr := refusingAddr(t)
-	svc := New(NewConfigResolver(), WithRateLimiter(ratelimit.New()))
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	_, err := svc.pollReachableVia(ctx, addr, 1, []string{""},
-		2*time.Second, 1*time.Millisecond, 30*time.Millisecond)
-	if err == nil {
-		t.Fatal("expected an error from a poll on a cancelled context")
-	}
-}
-
-// TestConfirmRejoinedLAN_Notes covers the static (direct address poll) and DHCP
-// (mDNS-by-MAC) branches, asserting each surfaces a non-fatal note rather than a
-// fabricated success when the device cannot be located.
+// TestConfirmRejoinedLAN_Notes covers the static and DHCP confirm branches, asserting
+// each surfaces a non-fatal note rather than a fabricated success when the device
+// cannot be located. A cancelled context returns the racer at once with no sighting,
+// so onboard reports the not-seen cause as a warning.
 func TestConfirmRejoinedLAN_Notes(t *testing.T) {
 	t.Parallel()
 
-	t.Run("static address not confirmed", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel() // poll returns immediately
-		svc := New(NewConfigResolver(), WithRateLimiter(ratelimit.New()))
-		dev := &OnboardDevice{Name: "bulb", Generation: 1}
-		wifi := &OnboardWiFiConfig{SSID: "Home", StaticIP: "192.0.2.10"}
+	for _, tc := range []struct {
+		name string
+		wifi *OnboardWiFiConfig
+	}{
+		{"static address not confirmed", &OnboardWiFiConfig{SSID: "Home", StaticIP: "192.0.2.10"}},
+		{"dhcp device not found", &OnboardWiFiConfig{SSID: "Home"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel() // racer returns immediately with no sighting
+			svc := New(NewConfigResolver(), WithRateLimiter(ratelimit.New()))
+			dev := &OnboardDevice{Name: "bulb", Generation: 1}
 
-		addr, note := svc.confirmRejoinedLAN(ctx, dev, wifi)
-		if addr != "" {
-			t.Errorf("addr = %q, want empty on failed confirm", addr)
+			addr, note := svc.confirmRejoinedLAN(ctx, dev, tc.wifi)
+			if addr != "" {
+				t.Errorf("addr = %q, want empty on failed confirm", addr)
+			}
+			if note == "" || !strings.Contains(note, "provisioned but") || !strings.Contains(note, "not seen on the network") {
+				t.Errorf("note = %q, want a 'provisioned but ... not seen on the network' warning", note)
+			}
+		})
+	}
+}
+
+// TestRaceRejoin covers the route-independent rejoin confirmation race over its
+// injected presence-scan and unicast-probe seams (no real multicast or sockets):
+//   - a unicast probe success is the strong, writeable outcome and names the
+//     interface that reached the device (the AP-isolation fallback);
+//   - a multicast-only sighting with no unicast route is the weak, NOT-writeable
+//     outcome (the Bug C dual-homed case — provably back, unreachable from here);
+//   - no sighting at all is the Bug A guard: an error, never a blind success;
+//   - on DHCP an address learned by one interface's presence scan is probed by all.
+func TestRaceRejoin(t *testing.T) {
+	t.Parallel()
+
+	fastCfg := func() rejoinConfig {
+		return rejoinConfig{
+			mac:             "AA:BB:CC:DD:EE:FF",
+			generation:      1,
+			timeout:         500 * time.Millisecond,
+			interval:        5 * time.Millisecond,
+			presenceTimeout: 10 * time.Millisecond,
+			probeTimeout:    10 * time.Millisecond,
 		}
-		if note == "" || !strings.Contains(note, "not confirmed at 192.0.2.10") {
-			t.Errorf("note = %q, want a 'not confirmed at' warning", note)
+	}
+	neverSeen := func(context.Context, string, string, bool, time.Duration) (string, error) {
+		return "", nil
+	}
+	noRoute := func(context.Context, string, string, int) error {
+		return fmt.Errorf("no route to host")
+	}
+
+	t.Run("unicast probe wins names the reaching interface", func(t *testing.T) {
+		t.Parallel()
+		cfg := fastCfg()
+		cfg.staticIP = "192.0.2.10"
+		cfg.candidates = []string{"", "eth0"}
+		cfg.scanPresence = neverSeen
+		// Only the wired interface reaches the device (AP-isolated wireless).
+		cfg.probe = func(_ context.Context, addr, iface string, _ int) error {
+			if iface == "eth0" && addr == "192.0.2.10" {
+				return nil
+			}
+			return fmt.Errorf("no route")
+		}
+
+		conf, err := raceRejoin(context.Background(), cfg)
+		if err != nil {
+			t.Fatalf("raceRejoin: %v", err)
+		}
+		if !conf.writeable {
+			t.Error("writeable = false, want true for a unicast probe success")
+		}
+		if conf.addr != "192.0.2.10" || conf.bindIface != "eth0" || conf.via != "probe" {
+			t.Errorf("conf = %+v, want addr=192.0.2.10 bindIface=eth0 via=probe", conf)
 		}
 	})
 
-	t.Run("dhcp device not found", func(t *testing.T) {
+	t.Run("presence only is not writeable (Bug C dual-homed)", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		svc := New(NewConfigResolver(), WithRateLimiter(ratelimit.New()))
-		// Empty MAC skips the 2s mDNS scan, so the cancelled context returns at once.
-		dev := &OnboardDevice{Name: "bulb", Generation: 1}
-		wifi := &OnboardWiFiConfig{SSID: "Home"} // DHCP (no static IP)
-
-		addr, note := svc.confirmRejoinedLAN(ctx, dev, wifi)
-		if addr != "" {
-			t.Errorf("addr = %q, want empty on failed detection", addr)
+		cfg := fastCfg()
+		cfg.staticIP = "192.0.2.10"
+		cfg.candidates = []string{""}
+		cfg.scanPresence = func(context.Context, string, string, bool, time.Duration) (string, error) {
+			return "192.0.2.10", nil // announced over multicast...
 		}
-		if note == "" || !strings.Contains(note, "not found on network") {
-			t.Errorf("note = %q, want a 'not found on network' warning", note)
+		cfg.probe = noRoute // ...but no unicast route from this host
+
+		conf, err := raceRejoin(context.Background(), cfg)
+		if err != nil {
+			t.Fatalf("raceRejoin: %v", err)
+		}
+		if conf.writeable {
+			t.Error("writeable = true, want false when only multicast saw the device")
+		}
+		if conf.addr != "192.0.2.10" || conf.via != "coiot" {
+			t.Errorf("conf = %+v, want addr=192.0.2.10 via=coiot (Gen1 presence)", conf)
+		}
+	})
+
+	t.Run("never seen returns an error not a blind success (Bug A)", func(t *testing.T) {
+		t.Parallel()
+		cfg := fastCfg()
+		cfg.staticIP = "192.0.2.10"
+		cfg.candidates = []string{""}
+		cfg.scanPresence = neverSeen
+		cfg.probe = noRoute
+
+		conf, err := raceRejoin(context.Background(), cfg)
+		if err == nil {
+			t.Fatalf("expected error when the device is never seen, got conf %+v", conf)
+		}
+		if conf.addr != "" {
+			t.Errorf("addr = %q, want empty when not seen", conf.addr)
+		}
+	})
+
+	t.Run("dhcp address learned by presence is probed by every interface", func(t *testing.T) {
+		t.Parallel()
+		cfg := fastCfg()
+		cfg.staticIP = "" // DHCP: address unknown up front
+		cfg.candidates = []string{"", "wlan0"}
+		// Only wlan0 hears the announcement; the address it learns must still be
+		// probeable by any interface via the shared-address path.
+		cfg.scanPresence = func(_ context.Context, _, iface string, _ bool, _ time.Duration) (string, error) {
+			if iface == "wlan0" {
+				return "192.0.2.55", nil
+			}
+			return "", nil
+		}
+		cfg.probe = func(_ context.Context, addr, _ string, _ int) error {
+			if addr == "192.0.2.55" {
+				return nil
+			}
+			return fmt.Errorf("unknown target %q", addr)
+		}
+
+		conf, err := raceRejoin(context.Background(), cfg)
+		if err != nil {
+			t.Fatalf("raceRejoin: %v", err)
+		}
+		if !conf.writeable || conf.addr != "192.0.2.55" || conf.via != "probe" {
+			t.Errorf("conf = %+v, want addr=192.0.2.55 writeable=true via=probe", conf)
 		}
 	})
 }
 
-// TestLocateRejoinedDevice_ReturnsErrorWhenUnconfirmed is the Bug A regression
-// guard: the shared --to-ap confirm core must return an ERROR (not a blind
-// success) when the device cannot be located, so RestoreToAP fails loudly instead
-// of reporting a stranded device as live. Both the static-address and DHCP-by-MAC
-// branches are covered.
-func TestLocateRejoinedDevice_ReturnsErrorWhenUnconfirmed(t *testing.T) {
+// TestRejoinCandidateInterfaces covers the candidate-set policy: a known static IP
+// narrows to its same-subnet interfaces (default route first), while a DHCP confirm
+// — address and subnet unknown — fans out across every host interface so a
+// multi-homed host can bind a presence listener to whichever segment hears the
+// device, again with the default route first.
+func TestRejoinCandidateInterfaces(t *testing.T) {
 	t.Parallel()
 
-	t.Run("static address unreachable", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel() // poll returns immediately
-		svc := New(NewConfigResolver(), WithRateLimiter(ratelimit.New()))
+	_, subnet, err := net.ParseCIDR("192.0.2.0/24")
+	if err != nil {
+		t.Fatalf("ParseCIDR: %v", err)
+	}
+	ifaces := []probeIface{
+		{Name: "eth0", Nets: []*net.IPNet{subnet}},
+		{Name: "wlan0", IsWireless: true, Nets: []*net.IPNet{subnet}},
+	}
 
-		addr, _, err := svc.locateRejoinedDevice(ctx, 1, "bulb", "192.0.2.10", "AA:BB:CC:DD:EE:FF")
-		if err == nil {
-			t.Fatal("expected error when static address is unreachable, got nil (blind success)")
-		}
-		if addr != "" {
-			t.Errorf("addr = %q, want empty on failed confirm", addr)
-		}
-		if !strings.Contains(err.Error(), "not confirmed at 192.0.2.10") {
-			t.Errorf("err = %q, want a 'not confirmed at 192.0.2.10' cause", err)
+	t.Run("static IP narrows to same-subnet interfaces", func(t *testing.T) {
+		t.Parallel()
+		got := rejoinCandidateInterfaces("192.0.2.10", ifaces)
+		want := []string{"", "eth0", "wlan0"} // default route, then wired before wireless
+		if !equalStrings(got, want) {
+			t.Errorf("got %v, want %v", got, want)
 		}
 	})
 
-	t.Run("dhcp device not found", func(t *testing.T) {
+	t.Run("dhcp fans out across every interface", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		svc := New(NewConfigResolver(), WithRateLimiter(ratelimit.New()))
-
-		// No static IP and empty MAC: the MAC scan is skipped and the cancelled
-		// context returns at once with the not-found error.
-		addr, _, err := svc.locateRejoinedDevice(ctx, 1, "bulb", "", "")
-		if err == nil {
-			t.Fatal("expected error when DHCP device is not found, got nil (blind success)")
-		}
-		if addr != "" {
-			t.Errorf("addr = %q, want empty on failed detection", addr)
-		}
-		if !strings.Contains(err.Error(), "not found on network") {
-			t.Errorf("err = %q, want a 'not found on network' cause", err)
+		got := rejoinCandidateInterfaces("", ifaces)
+		want := []string{"", "eth0", "wlan0"}
+		if !equalStrings(got, want) {
+			t.Errorf("got %v, want %v", got, want)
 		}
 	})
+
+	t.Run("dhcp default route only when no interfaces enumerated", func(t *testing.T) {
+		t.Parallel()
+		got := rejoinCandidateInterfaces("", nil)
+		if !equalStrings(got, []string{""}) {
+			t.Errorf("got %v, want [\"\"]", got)
+		}
+	})
+}
+
+// TestScanPresenceOnce_InputValidation covers the input-guard paths that never
+// reach the network: an unparseable MAC and an unknown interface name both error
+// before any multicast listener is created.
+func TestScanPresenceOnce_InputValidation(t *testing.T) {
+	t.Parallel()
+	svc := NewService()
+
+	if _, err := svc.scanPresenceOnce(context.Background(), "not-a-mac", "", true, time.Second); err == nil {
+		t.Error("expected an error for an unparseable MAC, got nil")
+	}
+
+	_, err := svc.scanPresenceOnce(context.Background(), "AA:BB:CC:DD:EE:FF",
+		"definitely-not-a-real-iface", true, time.Second)
+	if err == nil || !strings.Contains(err.Error(), "resolve interface") {
+		t.Errorf("err = %v, want a 'resolve interface' failure for an unknown interface", err)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // TestResolveJoinNetwork_Precedence covers the deterministic resolution paths
@@ -374,26 +474,31 @@ func TestProbeReachableOnce_Success(t *testing.T) {
 	})
 }
 
-// TestLocateRejoinedDevice_StaticSuccess covers the static-address confirm success:
-// when the device answers at its known static address, locateRejoinedDevice returns
-// that address. The fake device stands in for the static IP via the resolver seam.
-func TestLocateRejoinedDevice_StaticSuccess(t *testing.T) {
+// TestConfirmRejoin_StaticSuccess covers the Service wiring of confirmRejoin: when
+// the device answers a unicast probe at its known static address, the race returns
+// a writeable confirmation over the default route on the first tick — before any
+// presence scan runs, so no real multicast is issued. The fake device stands in for
+// the static IP via the resolver seam, and its host:port (which net.ParseIP cannot
+// parse) collapses the candidate set to the default route, exactly as a loopback
+// target would.
+func TestConfirmRejoin_StaticSuccess(t *testing.T) {
 	t.Parallel()
 	d := newAPDevServer(t, 1)
 	svc := apdevService(d, 1)
 
-	addr, _, err := svc.locateRejoinedDevice(context.Background(), 1, "bulb", d.addr(), "AA:BB:CC:DD:EE:FF")
+	conf, err := svc.confirmRejoin(context.Background(), 1, d.addr(), "AA:BB:CC:DD:EE:FF")
 	if err != nil {
-		t.Fatalf("locateRejoinedDevice (reachable static): %v", err)
+		t.Fatalf("confirmRejoin (reachable static): %v", err)
 	}
-	if addr != d.addr() {
-		t.Errorf("addr = %q, want the static address %q", addr, d.addr())
+	if !conf.writeable {
+		t.Error("writeable = false, want true when the device answers a unicast probe")
 	}
-	// locateRejoinedDevice's DHCP (no-static-IP) SUCCESS branch is not covered here: it
-	// returns once WaitForDeviceOnNetwork finds the device by MAC over real mDNS, which
-	// would issue a live network scan. Its failure branch is covered by
-	// TestLocateRejoinedDevice_ReturnsErrorWhenUnconfirmed/dhcp; the success branch is
-	// left uncovered rather than run real discovery (cardinal safety rule).
+	if conf.addr != d.addr() {
+		t.Errorf("addr = %q, want the static address %q", conf.addr, d.addr())
+	}
+	if conf.bindIface != "" {
+		t.Errorf("bindIface = %q, want the default route for a loopback-style target", conf.bindIface)
+	}
 }
 
 // TestRestoreOnLAN_CancelledContext covers the settle-wait guard: a cancelled context
