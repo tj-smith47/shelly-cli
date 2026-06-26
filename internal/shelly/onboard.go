@@ -886,6 +886,32 @@ func (s *Service) GetWiFiCredentials(ctx context.Context) *OnboardWiFiConfig {
 	return creds
 }
 
+// HostWiFiCredentials recovers the SSID and passphrase of the network the host
+// running the CLI is currently joined to. AP-hop provisioning (--ap-only) runs
+// from a machine already on the target WiFi, so the host already holds both the
+// SSID and the passphrase — no Shelly device surrenders its station key, and no
+// previously-registered device is required. This mirrors the host-credential
+// recovery that restore --to-ap performs in resolveJoinNetwork, so the two
+// AP-hop flows resolve credentials identically. Returns nil when the host is not
+// on WiFi or the platform cannot recover the passphrase.
+func (s *Service) HostWiFiCredentials(ctx context.Context) *OnboardWiFiConfig {
+	scanner := discovery.NewWiFiDiscoverer().Scanner
+	if scanner == nil {
+		return nil
+	}
+	current, err := scanner.CurrentNetwork(ctx)
+	if err != nil || current == nil || current.SSID == "" {
+		debug.TraceEvent("onboard: host not on a recoverable WiFi network: %v", err)
+		return nil
+	}
+	pass, passErr := s.hostWiFiPassword(ctx, current.SSID)
+	if passErr != nil || pass == "" {
+		debug.TraceEvent("onboard: host passphrase for %q not recovered: %v", current.SSID, passErr)
+		return nil
+	}
+	return &OnboardWiFiConfig{SSID: current.SSID, Password: pass}
+}
+
 // wifiReading is one device's reported station SSID and (Gen1, unmasked) key.
 type wifiReading struct {
 	ssid string

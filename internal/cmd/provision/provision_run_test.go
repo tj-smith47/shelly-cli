@@ -16,12 +16,13 @@ import (
 // host's WiFi to a Gen1 AP. Each hook, when nil, returns a benign default so a
 // test sets only the behavior it asserts on.
 type stubProvisionService struct {
-	loadSource   func(context.Context, string, string) (*shelly.ProvisionSource, error)
-	getWiFiCreds func(context.Context) *shelly.OnboardWiFiConfig
-	discover     func(context.Context, *shelly.OnboardOptions, func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error)
-	onboardBLE   func(context.Context, []*shelly.OnboardDevice, *shelly.OnboardWiFiConfig, *shelly.OnboardOptions) []*shelly.OnboardResult
-	onboardAP    func(context.Context, *shelly.OnboardDevice, *shelly.OnboardWiFiConfig, *shelly.OnboardOptions) *shelly.OnboardResult
-	applySource  func(context.Context, string, *shelly.ProvisionSource) error
+	loadSource    func(context.Context, string, string) (*shelly.ProvisionSource, error)
+	getWiFiCreds  func(context.Context) *shelly.OnboardWiFiConfig
+	hostWiFiCreds func(context.Context) *shelly.OnboardWiFiConfig
+	discover      func(context.Context, *shelly.OnboardOptions, func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error)
+	onboardBLE    func(context.Context, []*shelly.OnboardDevice, *shelly.OnboardWiFiConfig, *shelly.OnboardOptions) []*shelly.OnboardResult
+	onboardAP     func(context.Context, *shelly.OnboardDevice, *shelly.OnboardWiFiConfig, *shelly.OnboardOptions) *shelly.OnboardResult
+	applySource   func(context.Context, string, *shelly.ProvisionSource) error
 
 	applySourceCalls []string
 }
@@ -36,6 +37,13 @@ func (s *stubProvisionService) LoadProvisionSource(ctx context.Context, fromDevi
 func (s *stubProvisionService) GetWiFiCredentials(ctx context.Context) *shelly.OnboardWiFiConfig {
 	if s.getWiFiCreds != nil {
 		return s.getWiFiCreds(ctx)
+	}
+	return nil
+}
+
+func (s *stubProvisionService) HostWiFiCredentials(ctx context.Context) *shelly.OnboardWiFiConfig {
+	if s.hostWiFiCreds != nil {
+		return s.hostWiFiCreds(ctx)
 	}
 	return nil
 }
@@ -375,6 +383,28 @@ func TestPromptWiFiCredentials_AutoDetect(t *testing.T) {
 	}
 	if opts.SSID != "DetectedNet" || opts.Password != "detectedpass" {
 		t.Errorf("expected detected creds adopted, got SSID=%q Password=%q", opts.SSID, opts.Password)
+	}
+}
+
+// TestPromptWiFiCredentials_HostFallback proves that when no registered device can
+// supply credentials, the host's own current-network credentials are recovered and
+// adopted — the parity that lets --ap-only run unattended like restore --to-ap.
+func TestPromptWiFiCredentials_HostFallback(t *testing.T) {
+	t.Parallel()
+	tf := factory.NewTestFactory(t)
+	stub := &stubProvisionService{
+		getWiFiCreds: func(context.Context) *shelly.OnboardWiFiConfig { return nil },
+		hostWiFiCreds: func(context.Context) *shelly.OnboardWiFiConfig {
+			return &shelly.OnboardWiFiConfig{SSID: "HostNet", Password: "hostpass"}
+		},
+	}
+	opts := &Options{Factory: tf.Factory, svc: stub}
+
+	if err := opts.promptWiFiCredentials(provisionTestCtx(t)); err != nil {
+		t.Fatalf("promptWiFiCredentials: %v", err)
+	}
+	if opts.SSID != "HostNet" || opts.Password != "hostpass" {
+		t.Errorf("expected host creds adopted, got SSID=%q Password=%q", opts.SSID, opts.Password)
 	}
 }
 

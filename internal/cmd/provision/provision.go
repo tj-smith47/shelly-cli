@@ -33,6 +33,7 @@ const (
 type provisionService interface {
 	LoadProvisionSource(ctx context.Context, fromDevice, fromTemplate string) (*shelly.ProvisionSource, error)
 	GetWiFiCredentials(ctx context.Context) *shelly.OnboardWiFiConfig
+	HostWiFiCredentials(ctx context.Context) *shelly.OnboardWiFiConfig
 	DiscoverForOnboard(ctx context.Context, opts *shelly.OnboardOptions, progress func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error)
 	OnboardBLEParallel(ctx context.Context, devices []*shelly.OnboardDevice, wifiCfg *shelly.OnboardWiFiConfig, opts *shelly.OnboardOptions) []*shelly.OnboardResult
 	OnboardViaAP(ctx context.Context, device *shelly.OnboardDevice, wifi *shelly.OnboardWiFiConfig, opts *shelly.OnboardOptions) *shelly.OnboardResult
@@ -340,6 +341,21 @@ func (o *Options) promptWiFiCredentials(ctx context.Context) error {
 		ios.Success("WiFi credentials detected from network: %s", creds.SSID)
 		o.SSID = creds.SSID
 		o.Password = creds.Password
+		return nil
+	}
+
+	// Recover the credentials of the network this host is already joined to. AP-hop
+	// provisioning runs from a machine on the target WiFi, so the host holds both the
+	// SSID and passphrase even when no Shelly device is registered yet — the same
+	// recovery restore --to-ap performs.
+	ios.StartProgress("Recovering WiFi credentials from this host...")
+	hostCreds := svc.HostWiFiCredentials(ctx)
+	ios.StopProgress()
+
+	if hostCreds != nil {
+		ios.Success("WiFi credentials recovered from host network: %s", hostCreds.SSID)
+		o.SSID = hostCreds.SSID
+		o.Password = hostCreds.Password
 		return nil
 	}
 
