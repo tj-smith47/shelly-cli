@@ -78,7 +78,11 @@ func (m *Manager) tryIPRemap(ctx context.Context, dev model.Device, originalErr 
 	// Verify MAC matches (security check)
 	info := conn.Info()
 	if info == nil || model.NormalizeMAC(info.MAC) != dev.NormalizedMAC() {
-		iostreams.DebugCat(iostreams.CategoryDevice, "MAC mismatch: expected %s, got %s", dev.NormalizedMAC(), model.NormalizeMAC(info.MAC))
+		got := "<no device info>"
+		if info != nil {
+			got = model.NormalizeMAC(info.MAC)
+		}
+		iostreams.DebugCat(iostreams.CategoryDevice, "MAC mismatch: expected %s, got %s", dev.NormalizedMAC(), got)
 		iostreams.CloseWithDebug("closing mismatched connection", conn)
 		return nil, originalErr
 	}

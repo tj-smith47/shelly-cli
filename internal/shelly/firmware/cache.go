@@ -60,17 +60,32 @@ func (c *Cache) Get(deviceName string) (*CacheEntry, bool) {
 
 	// Check in-memory cache first.
 	if entry, ok := c.entries[deviceName]; ok {
-		return entry, true
+		return entry.clone(), true
 	}
 
 	// Try loading from file cache.
 	entry := c.loadFromFileCache(deviceName)
 	if entry != nil {
 		c.entries[deviceName] = entry
-		return entry, true
+		return entry.clone(), true
 	}
 
 	return nil, false
+}
+
+// clone returns a deep copy of the entry so a caller cannot mutate the cached
+// value (and its Info) outside the lock, racing Set/prefetchDevice. Info is a
+// flat struct, so a value copy fully isolates it.
+func (e *CacheEntry) clone() *CacheEntry {
+	if e == nil {
+		return nil
+	}
+	cp := *e
+	if e.Info != nil {
+		info := *e.Info
+		cp.Info = &info
+	}
+	return &cp
 }
 
 // loadFromFileCache loads a cache entry from the file cache.

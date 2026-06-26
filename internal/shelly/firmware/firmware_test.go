@@ -473,13 +473,24 @@ func TestCache_GetSet(t *testing.T) {
 	}
 	cache.Set("device1", newEntry)
 
-	// Get existing entry
+	// Get existing entry — returns an isolated copy, not the stored pointer.
 	entry, ok = cache.Get("device1")
 	if !ok {
 		t.Error("expected entry to exist")
 	}
-	if entry != newEntry {
-		t.Error("expected entry to match")
+	if entry == newEntry {
+		t.Error("expected Get to return a copy, not the stored pointer")
+	}
+	if entry.DeviceName != newEntry.DeviceName || entry.Address != newEntry.Address ||
+		entry.Info.Current != newEntry.Info.Current {
+		t.Errorf("returned entry %+v does not match stored %+v", entry, newEntry)
+	}
+
+	// Mutating the returned copy must not affect the cached entry.
+	entry.Info.Current = "9.9.9"
+	again, _ := cache.Get("device1")
+	if again.Info.Current != "1.0.0" {
+		t.Errorf("mutating the returned entry leaked into the cache: %q", again.Info.Current)
 	}
 }
 
