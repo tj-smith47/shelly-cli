@@ -51,7 +51,7 @@ func DisplayEMDataHistory(ios *iostreams.IOStreams, data *components.EMDataGetDa
 		for i, values := range block.Values {
 			if limit > 0 && count >= limit {
 				ios.Printf("\n(showing first %d of %d records, use --limit to see more)\n", limit, totalRecords)
-				displayEMMetricsSummary(ios, data, count)
+				displayEMMetricsSummary(ios, data, count, totalRecords)
 				return
 			}
 
@@ -70,14 +70,24 @@ func DisplayEMDataHistory(ios *iostreams.IOStreams, data *components.EMDataGetDa
 		}
 	}
 
-	displayEMMetricsSummary(ios, data, count)
+	displayEMMetricsSummary(ios, data, count, totalRecords)
 }
 
-func displayEMMetricsSummary(ios *iostreams.IOStreams, data *components.EMDataGetDataResult, count int) {
+func displayEMMetricsSummary(ios *iostreams.IOStreams, data *components.EMDataGetDataResult, count, totalRecords int) {
 	if count > 0 {
 		totalEnergy, _, _, _ := monitoring.CalculateEMMetrics(data)
-		ios.Printf("\nEstimated total energy consumption: %.2f kWh\n", totalEnergy)
+		ios.Printf("\n%s: %.2f kWh\n", energySummaryLabel(count, totalRecords), totalEnergy)
 	}
+}
+
+// energySummaryLabel qualifies the energy total when --limit truncated the
+// printed rows: the total is computed over the whole queried range, not just the
+// shown subset, so it must not read as the sum of the visible rows.
+func energySummaryLabel(shown, totalRecords int) string {
+	if shown < totalRecords {
+		return "Estimated total energy consumption (full range)"
+	}
+	return "Estimated total energy consumption"
 }
 
 // DisplayEM1DataHistory shows single-phase energy meter history data.
@@ -118,7 +128,7 @@ func DisplayEM1DataHistory(ios *iostreams.IOStreams, data *components.EM1DataGet
 		for i, values := range block.Values {
 			if limit > 0 && count >= limit {
 				ios.Printf("\n(showing first %d of %d records, use --limit to see more)\n", limit, totalRecords)
-				displayEM1MetricsSummary(ios, data, count)
+				displayEM1MetricsSummary(ios, data, count, totalRecords)
 				return
 			}
 
@@ -138,13 +148,13 @@ func DisplayEM1DataHistory(ios *iostreams.IOStreams, data *components.EM1DataGet
 		}
 	}
 
-	displayEM1MetricsSummary(ios, data, count)
+	displayEM1MetricsSummary(ios, data, count, totalRecords)
 }
 
-func displayEM1MetricsSummary(ios *iostreams.IOStreams, data *components.EM1DataGetDataResult, count int) {
+func displayEM1MetricsSummary(ios *iostreams.IOStreams, data *components.EM1DataGetDataResult, count, totalRecords int) {
 	if count > 0 {
 		totalEnergy, _, _, _ := monitoring.CalculateEM1Metrics(data)
-		ios.Printf("\nEstimated total energy consumption: %.2f kWh\n", totalEnergy)
+		ios.Printf("\n%s: %.2f kWh\n", energySummaryLabel(count, totalRecords), totalEnergy)
 	}
 }
 
