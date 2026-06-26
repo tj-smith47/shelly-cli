@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/spf13/afero"
 
@@ -31,7 +32,23 @@ func FromURL(ctx context.Context, downloadURL string) (*Result, error) {
 	}
 	tmpPath := tmpFile.Name()
 
+	// closeFile closes the open handle exactly once and caches the result.
+	// afero.TempFile hands back an open *os.File; the early-error paths below only
+	// removed the path and leaked the descriptor. sync.Once lets cleanup and the
+	// happy-path write share one close without a double-close error.
+	var (
+		closeOnce sync.Once
+		closeErr  error
+	)
+	closeFile := func() error {
+		closeOnce.Do(func() { closeErr = tmpFile.Close() })
+		return closeErr
+	}
+
 	cleanup := func() {
+		if err := closeFile(); err != nil {
+			iostreams.DebugErr("close temp file", err)
+		}
 		// Cleanup temp file - log errors for debugging but don't block caller
 		if err := fs.Remove(tmpPath); err != nil {
 			iostreams.DebugErr("cleanup temp file", err)
@@ -64,7 +81,7 @@ func FromURL(ctx context.Context, downloadURL string) (*Result, error) {
 	}
 
 	_, err = io.Copy(tmpFile, resp.Body)
-	if cerr := tmpFile.Close(); cerr != nil && err == nil {
+	if cerr := closeFile(); cerr != nil && err == nil {
 		err = cerr
 	}
 

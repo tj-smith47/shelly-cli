@@ -552,9 +552,16 @@ func (c *Client) extractToFile(destPath string, r io.Reader) error {
 		}
 	}()
 
-	_, err = io.CopyN(outFile, r, maxExtractSize)
+	// Copy one byte past the cap so an oversized member is detected rather than
+	// silently truncated: io.CopyN returns nil (not EOF) when it copies exactly
+	// maxExtractSize bytes with data still remaining, which would chmod+install a
+	// truncated binary.
+	n, err := io.CopyN(outFile, r, maxExtractSize+1)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Errorf("failed to extract file: %w", err)
+	}
+	if n > maxExtractSize {
+		return fmt.Errorf("extracted file exceeds maximum size of %d bytes", maxExtractSize)
 	}
 
 	return nil
