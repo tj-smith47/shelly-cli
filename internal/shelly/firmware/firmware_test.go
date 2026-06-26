@@ -3,6 +3,7 @@ package firmware
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -16,9 +17,13 @@ const (
 	testStageStable       = "stable"
 )
 
-// mockConnectionHandler is a test double for ConnectionHandler.
+// mockConnectionHandler is a test double for ConnectionHandler. By default it
+// reports Gen2 (isGen1Fn nil) so existing Gen2 tests are unaffected; a test
+// exercising the Gen1 path sets isGen1Fn and gen1ConnectionFn.
 type mockConnectionHandler struct {
 	withConnectionFn func(ctx context.Context, identifier string, fn func(*client.Client) error) error
+	gen1ConnectionFn func(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error
+	isGen1Fn         func(ctx context.Context, identifier string) (bool, model.Device, error)
 }
 
 func (m *mockConnectionHandler) WithConnection(ctx context.Context, identifier string, fn func(*client.Client) error) error {
@@ -26,6 +31,20 @@ func (m *mockConnectionHandler) WithConnection(ctx context.Context, identifier s
 		return m.withConnectionFn(ctx, identifier, fn)
 	}
 	return nil
+}
+
+func (m *mockConnectionHandler) WithGen1Connection(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error {
+	if m.gen1ConnectionFn != nil {
+		return m.gen1ConnectionFn(ctx, identifier, fn)
+	}
+	return nil
+}
+
+func (m *mockConnectionHandler) IsGen1Device(ctx context.Context, identifier string) (bool, model.Device, error) {
+	if m.isGen1Fn != nil {
+		return m.isGen1Fn(ctx, identifier)
+	}
+	return false, model.Device{}, nil
 }
 
 func TestNewService(t *testing.T) {
@@ -42,6 +61,181 @@ func TestNewService(t *testing.T) {
 	}
 	if svc.cache == nil {
 		t.Error("expected cache to be initialized")
+	}
+}
+
+// gen1Handler builds a mock that reports the device as Gen1 and records which
+// connection path the service took.
+func gen1Handler(gen2Called, gen1Called *bool) *mockConnectionHandler {
+	return &mockConnectionHandler{
+		isGen1Fn: func(context.Context, string) (bool, model.Device, error) {
+			return true, model.Device{Name: "gen1dev", Generation: 1}, nil
+		},
+		withConnectionFn: func(context.Context, string, func(*client.Client) error) error {
+			*gen2Called = true
+			return nil
+		},
+		gen1ConnectionFn: func(context.Context, string, func(*client.Gen1Client) error) error {
+			*gen1Called = true
+			return nil
+		},
+	}
+}
+
+// TestService_Gen1_RoutesToGen1Path proves the B6 fix: firmware reads on a Gen1
+// device take the Gen1 HTTP path, never the Gen2 RPC path (which cannot connect
+// to a Gen1 device and previously failed every firmware command).
+func TestService_Gen1_RoutesToGen1Path(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("Check", func(t *testing.T) {
+		t.Parallel()
+		var gen2, gen1 bool
+		svc := NewService(gen1Handler(&gen2, &gen1))
+		if _, err := svc.Check(ctx, "gen1dev"); err != nil {
+			t.Fatalf("Check: %v", err)
+		}
+		if gen2 || !gen1 {
+			t.Errorf("Gen1 Check must use the Gen1 path (gen1=%v gen2=%v)", gen1, gen2)
+		}
+	})
+
+	t.Run("GetStatus", func(t *testing.T) {
+		t.Parallel()
+		var gen2, gen1 bool
+		svc := NewService(gen1Handler(&gen2, &gen1))
+		if _, err := svc.GetStatus(ctx, "gen1dev"); err != nil {
+			t.Fatalf("GetStatus: %v", err)
+		}
+		if gen2 || !gen1 {
+			t.Errorf("Gen1 GetStatus must use the Gen1 path (gen1=%v gen2=%v)", gen1, gen2)
+		}
+	})
+
+	t.Run("UpdateStable", func(t *testing.T) {
+		t.Parallel()
+		var gen2, gen1 bool
+		svc := NewService(gen1Handler(&gen2, &gen1))
+		if err := svc.UpdateStable(ctx, "gen1dev"); err != nil {
+			t.Fatalf("UpdateStable: %v", err)
+		}
+		if gen2 || !gen1 {
+			t.Errorf("Gen1 stable update must use the Gen1 path (gen1=%v gen2=%v)", gen1, gen2)
+		}
+	})
+
+	t.Run("UpdateFromURL", func(t *testing.T) {
+		t.Parallel()
+		var gen2, gen1 bool
+		svc := NewService(gen1Handler(&gen2, &gen1))
+		if err := svc.UpdateFromURL(ctx, "gen1dev", "http://example/fw.zip"); err != nil {
+			t.Fatalf("UpdateFromURL: %v", err)
+		}
+		if gen2 || !gen1 {
+			t.Errorf("Gen1 custom-URL update must use the Gen1 path (gen1=%v gen2=%v)", gen1, gen2)
+		}
+	})
+}
+
+// TestService_Gen1_UnsupportedOps proves Gen1-incapable operations fail with an
+// honest ErrGen1Unsupported instead of a misleading connection error or a
+// silent wrong-channel flash.
+func TestService_Gen1_UnsupportedOps(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("Rollback", func(t *testing.T) {
+		t.Parallel()
+		var gen2, gen1 bool
+		svc := NewService(gen1Handler(&gen2, &gen1))
+		err := svc.Rollback(ctx, "gen1dev")
+		if !errors.Is(err, ErrGen1Unsupported) {
+			t.Fatalf("Gen1 rollback should report ErrGen1Unsupported, got %v", err)
+		}
+		if gen1 || gen2 {
+			t.Error("unsupported op must not open any connection")
+		}
+	})
+
+	t.Run("GetURL", func(t *testing.T) {
+		t.Parallel()
+		var gen2, gen1 bool
+		svc := NewService(gen1Handler(&gen2, &gen1))
+		_, err := svc.GetURL(ctx, "gen1dev", testStageStable)
+		if !errors.Is(err, ErrGen1Unsupported) {
+			t.Fatalf("Gen1 GetURL should report ErrGen1Unsupported, got %v", err)
+		}
+	})
+
+	t.Run("UpdateBeta", func(t *testing.T) {
+		t.Parallel()
+		var gen2, gen1 bool
+		svc := NewService(gen1Handler(&gen2, &gen1))
+		err := svc.UpdateBeta(ctx, "gen1dev")
+		if !errors.Is(err, ErrGen1Unsupported) {
+			t.Fatalf("Gen1 beta update should report ErrGen1Unsupported, got %v", err)
+		}
+		if gen1 {
+			t.Error("a rejected beta update must not flash anything on the Gen1 device")
+		}
+	})
+}
+
+// TestService_Gen2_StillUsesRPCPath guards against a regression: a Gen2 device
+// must continue to take the RPC path.
+func TestService_Gen2_StillUsesRPCPath(t *testing.T) {
+	t.Parallel()
+	var gen2, gen1 bool
+	handler := &mockConnectionHandler{
+		isGen1Fn: func(context.Context, string) (bool, model.Device, error) {
+			return false, model.Device{Name: "gen2dev", Generation: 2}, nil
+		},
+		withConnectionFn: func(context.Context, string, func(*client.Client) error) error {
+			gen2 = true
+			return nil
+		},
+		gen1ConnectionFn: func(context.Context, string, func(*client.Gen1Client) error) error {
+			gen1 = true
+			return nil
+		},
+	}
+	svc := NewService(handler)
+	if _, err := svc.Check(context.Background(), "gen2dev"); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if gen1 || !gen2 {
+		t.Errorf("Gen2 Check must use the RPC path (gen1=%v gen2=%v)", gen1, gen2)
+	}
+}
+
+// TestService_Gen1Detection_ErrorPropagates ensures a generation-detection
+// failure aborts the firmware op rather than silently falling through to a path.
+func TestService_Gen1Detection_ErrorPropagates(t *testing.T) {
+	t.Parallel()
+	detectErr := errors.New("cannot reach device")
+	handler := &mockConnectionHandler{
+		isGen1Fn: func(context.Context, string) (bool, model.Device, error) {
+			return false, model.Device{}, detectErr
+		},
+	}
+	svc := NewService(handler)
+	ctx := context.Background()
+
+	if _, err := svc.Check(ctx, "dev"); !errors.Is(err, detectErr) {
+		t.Errorf("Check should propagate the detection error, got %v", err)
+	}
+	if _, err := svc.GetStatus(ctx, "dev"); !errors.Is(err, detectErr) {
+		t.Errorf("GetStatus should propagate the detection error, got %v", err)
+	}
+	if err := svc.UpdateStable(ctx, "dev"); !errors.Is(err, detectErr) {
+		t.Errorf("Update should propagate the detection error, got %v", err)
+	}
+	if err := svc.Rollback(ctx, "dev"); !errors.Is(err, detectErr) {
+		t.Errorf("Rollback should propagate the detection error, got %v", err)
+	}
+	if _, err := svc.GetURL(ctx, "dev", testStageStable); !errors.Is(err, detectErr) {
+		t.Errorf("GetURL should propagate the detection error, got %v", err)
 	}
 }
 

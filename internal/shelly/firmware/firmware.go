@@ -3,6 +3,7 @@ package firmware
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -85,9 +86,18 @@ type UpdateEntry struct {
 }
 
 // ConnectionHandler provides connection management for firmware operations.
+// Both generations are exposed because firmware ops must reach Gen1 devices
+// over their HTTP API (Gen2 RPC connect fails outright on a Gen1 device).
 type ConnectionHandler interface {
 	WithConnection(ctx context.Context, identifier string, fn func(*client.Client) error) error
+	WithGen1Connection(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error
+	IsGen1Device(ctx context.Context, identifier string) (bool, model.Device, error)
 }
+
+// ErrGen1Unsupported marks a firmware operation a Gen1 device's HTTP API cannot
+// perform: it has a single firmware slot (no rollback) and its OTA endpoint
+// pulls only the stable release from the cloud (no beta channel selection).
+var ErrGen1Unsupported = errors.New("not supported on Gen1 devices")
 
 // DeviceChecker provides device firmware checking capability.
 type DeviceChecker interface {
@@ -119,8 +129,51 @@ func (s *Service) Cache() *Cache {
 	return s.cache
 }
 
+// isGen1 reports whether identifier is a Gen1 device so firmware ops route to
+// the Gen1 HTTP path instead of attempting a Gen2-only RPC connect.
+func (s *Service) isGen1(ctx context.Context, identifier string) (bool, error) {
+	gen1, _, err := s.connHandler.IsGen1Device(ctx, identifier)
+	return gen1, err
+}
+
 // Check checks for firmware updates on a device.
 func (s *Service) Check(ctx context.Context, identifier string) (*Info, error) {
+	gen1, err := s.isGen1(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+	if gen1 {
+		return s.checkGen1(ctx, identifier)
+	}
+	return s.checkGen2(ctx, identifier)
+}
+
+// checkGen1 checks for updates on a Gen1 device via its HTTP OTA endpoint.
+func (s *Service) checkGen1(ctx context.Context, identifier string) (*Info, error) {
+	var result *Info
+	err := s.connHandler.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		info, err := conn.CheckForUpdate(ctx)
+		if err != nil {
+			return err
+		}
+		result = &Info{
+			Available:  info.NewVersion,
+			HasUpdate:  info.HasUpdate,
+			Generation: 1,
+			Platform:   platformShelly,
+		}
+		if di := conn.Info(); di != nil {
+			result.Current = di.Firmware
+			result.DeviceModel = di.Model
+			result.DeviceID = di.ID
+		}
+		return nil
+	})
+	return result, err
+}
+
+// checkGen2 checks for updates on a Gen2+ device via RPC.
+func (s *Service) checkGen2(ctx context.Context, identifier string) (*Info, error) {
 	var result *Info
 	err := s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := firmware.New(conn.RPCClient())
@@ -147,6 +200,38 @@ func (s *Service) Check(ctx context.Context, identifier string) (*Info, error) {
 
 // GetStatus gets the current firmware status.
 func (s *Service) GetStatus(ctx context.Context, identifier string) (*Status, error) {
+	gen1, err := s.isGen1(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+	if gen1 {
+		return s.getStatusGen1(ctx, identifier)
+	}
+	return s.getStatusGen2(ctx, identifier)
+}
+
+// getStatusGen1 reports firmware status for a Gen1 device. Gen1 has a single
+// firmware slot, so rollback is never available.
+func (s *Service) getStatusGen1(ctx context.Context, identifier string) (*Status, error) {
+	var result *Status
+	err := s.connHandler.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		info, err := conn.CheckForUpdate(ctx)
+		if err != nil {
+			return err
+		}
+		result = &Status{
+			Status:      info.Status,
+			HasUpdate:   info.HasUpdate,
+			NewVersion:  info.NewVersion,
+			CanRollback: false,
+		}
+		return nil
+	})
+	return result, err
+}
+
+// getStatusGen2 reports firmware status for a Gen2+ device via RPC.
+func (s *Service) getStatusGen2(ctx context.Context, identifier string) (*Status, error) {
 	var result *Status
 	err := s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := firmware.New(conn.RPCClient())
@@ -176,9 +261,33 @@ func (s *Service) GetStatus(ctx context.Context, identifier string) (*Status, er
 
 // Update starts a firmware update on a device.
 func (s *Service) Update(ctx context.Context, identifier string, opts *firmware.UpdateOptions) error {
+	gen1, err := s.isGen1(ctx, identifier)
+	if err != nil {
+		return err
+	}
+	if gen1 {
+		return s.updateGen1(ctx, identifier, opts)
+	}
 	return s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := firmware.New(conn.RPCClient())
 		return mgr.Update(ctx, opts)
+	})
+}
+
+// updateGen1 starts a firmware update on a Gen1 device via its HTTP OTA
+// endpoint. A custom URL flashes that image; otherwise the device pulls the
+// stable release from the cloud. Gen1 has no beta channel, so a beta request
+// without an explicit URL is rejected rather than silently flashing stable.
+func (s *Service) updateGen1(ctx context.Context, identifier string, opts *firmware.UpdateOptions) error {
+	url := ""
+	if opts != nil {
+		url = opts.URL
+		if url == "" && opts.Stage == stageBeta {
+			return fmt.Errorf("beta firmware channel is %w", ErrGen1Unsupported)
+		}
+	}
+	return s.connHandler.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		return conn.Update(ctx, url)
 	})
 }
 
@@ -197,18 +306,34 @@ func (s *Service) UpdateFromURL(ctx context.Context, identifier, url string) err
 	return s.Update(ctx, identifier, &firmware.UpdateOptions{URL: url})
 }
 
-// Rollback rolls back to the previous firmware version.
+// Rollback rolls back to the previous firmware version. Gen1 devices have a
+// single firmware slot and cannot roll back.
 func (s *Service) Rollback(ctx context.Context, identifier string) error {
+	gen1, err := s.isGen1(ctx, identifier)
+	if err != nil {
+		return err
+	}
+	if gen1 {
+		return fmt.Errorf("firmware rollback is %w", ErrGen1Unsupported)
+	}
 	return s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := firmware.New(conn.RPCClient())
 		return mgr.Rollback(ctx)
 	})
 }
 
-// GetURL gets the firmware download URL for a device.
+// GetURL gets the firmware download URL for a device. Gen1 devices do not
+// expose a firmware-URL lookup over their HTTP API.
 func (s *Service) GetURL(ctx context.Context, identifier, stage string) (string, error) {
+	gen1, err := s.isGen1(ctx, identifier)
+	if err != nil {
+		return "", err
+	}
+	if gen1 {
+		return "", fmt.Errorf("firmware URL lookup is %w", ErrGen1Unsupported)
+	}
 	var result string
-	err := s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err = s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := firmware.New(conn.RPCClient())
 		url, err := mgr.GetFirmwareURL(ctx, stage)
 		if err != nil {
