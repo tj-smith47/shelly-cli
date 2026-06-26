@@ -792,6 +792,14 @@ func selectTheme(ios *iostreams.IOStreams, opts *Options) (string, error) {
 	return strings.Split(selected, " ")[0], nil
 }
 
+// Telemetry hints must be copy-pasteable: `config set` requires key=value
+// syntax (it splits each arg on "="), so a space-separated form like
+// `config set telemetry true` errors with `invalid format`.
+const (
+	telemetryEnableHint  = "You can enable it later with: shelly config set telemetry=true"
+	telemetryDisableHint = "You can disable it anytime with: shelly config set telemetry=false"
+)
+
 func stepTelemetry(ios *iostreams.IOStreams) error {
 	ios.Println("Help improve Shelly CLI by sharing anonymous usage statistics.")
 	ios.Println("")
@@ -816,10 +824,10 @@ func stepTelemetry(ios *iostreams.IOStreams) error {
 			return err
 		}
 		ios.Success("Telemetry enabled")
-		ios.Info("You can disable it anytime with: shelly config set telemetry false")
+		ios.Info(telemetryDisableHint)
 	} else {
 		ios.Info("Telemetry disabled")
-		ios.Info("You can enable it later with: shelly config set telemetry true")
+		ios.Info(telemetryEnableHint)
 	}
 	ios.Println("")
 	return nil

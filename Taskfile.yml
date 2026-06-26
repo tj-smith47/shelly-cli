@@ -222,8 +222,14 @@ tasks:
         sh: git diff --name-only
     cmds:
       - task: fmt
+      # CLI_ARGS carries the commit message (e.g. -m 'msg'); blank it for lint
+      # and test, the only gates that interpolate CLI_ARGS (for their standalone
+      # single-file mode), so the message does not leak into them. Only the
+      # final `git commit` below reads the message.
       - task: lint
+        vars: { CLI_ARGS: "" }
       - task: test
+        vars: { CLI_ARGS: "" }
       - task: build
       - task: docs
       - task: audit

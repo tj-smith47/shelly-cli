@@ -147,6 +147,42 @@ func TestPrintWelcome(t *testing.T) {
 	}
 }
 
+// TestStepTelemetry_HintsAreRunnable is a regression guard for issue #3: the
+// "enable/disable later" hints must be copy-pasteable. `config set` parses each
+// arg as key=value (strings.SplitN on "="), so a space-separated hint such as
+// `config set telemetry true` fails at runtime with `invalid format`.
+func TestStepTelemetry_HintsAreRunnable(t *testing.T) {
+	t.Parallel()
+
+	const marker = "shelly config set "
+	for _, hint := range []string{telemetryEnableHint, telemetryDisableHint} {
+		_, after, found := strings.Cut(hint, marker)
+		if !found {
+			t.Fatalf("hint %q missing %q", hint, marker)
+		}
+		arg := strings.TrimSpace(after)
+		// Mirror internal/cmd/config/set parsing exactly.
+		parts := strings.SplitN(arg, "=", 2)
+		if len(parts) != 2 || parts[0] == "" {
+			t.Errorf("hint arg %q is not a valid key=value for `config set`", arg)
+		}
+		if parts[0] != "telemetry" {
+			t.Errorf("hint arg %q: key = %q, want telemetry", arg, parts[0])
+		}
+	}
+
+	// The declined branch must print the enable hint. In non-TTY tests Confirm
+	// returns its default (false), so stepTelemetry takes the disabled path.
+	out := &bytes.Buffer{}
+	ios := iostreams.Test(strings.NewReader(""), out, &bytes.Buffer{})
+	if err := stepTelemetry(ios); err != nil {
+		t.Fatalf("stepTelemetry: %v", err)
+	}
+	if got := out.String(); !strings.Contains(got, telemetryEnableHint) {
+		t.Errorf("declined telemetry should print enable hint %q; got:\n%s", telemetryEnableHint, got)
+	}
+}
+
 func TestPrintSummary(t *testing.T) {
 	t.Parallel()
 
