@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
@@ -550,14 +551,18 @@ func errorsIsContextCancelled(err error) bool {
 	return err != nil && strings.Contains(err.Error(), context.Canceled.Error())
 }
 
-// withIsolatedConfig points the default config manager at a throwaway directory for
-// the duration of the test, so registry writes never touch the user's real config.
-// The default manager is process-global, so a test using it must NOT run in parallel.
+// withIsolatedConfig points the default config manager at an in-memory filesystem
+// for the duration of the test, so registry writes never touch the user's real
+// config (and never the real disk at all). The default manager and the package fs
+// are process-global, so a test using it must NOT run in parallel.
 func withIsolatedConfig(t *testing.T) {
 	t.Helper()
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	config.SetFs(afero.NewMemMapFs())
 	config.ResetDefaultManagerForTesting()
-	t.Cleanup(config.ResetDefaultManagerForTesting)
+	t.Cleanup(func() {
+		config.SetFs(nil)
+		config.ResetDefaultManagerForTesting()
+	})
 }
 
 // TestMACSuffixFromAPSSID covers the AP-SSID MAC-suffix parse that the bystander

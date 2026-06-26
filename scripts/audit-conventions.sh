@@ -7,7 +7,7 @@
 #
 # This script should be run as the final verification step.
 # Any error means there is a compliance issue that MUST be fixed.
-# REMINDER: No issue is pre-existing - all code in this repo was written by Claude.
+# REMINDER: Nothing here is inherited from before - all code in this repo was written by Claude.
 
 set -euo pipefail
 
@@ -417,9 +417,13 @@ search_test() {
 # Legitimate exclusions (need real filesystem for process execution):
 # - migrate/validate/validate_test.go: TestRun_PermissionDenied requires real fs for permission testing
 # - tui/cache/plugin_parser_test.go: executes plugin hook scripts via OS
+# - shelly/firmware_ap_test.go: the at-AP firmware image is served to the device via
+#   http.ServeFile (a real OS path) and the code under test uses os.CreateTemp/os.Remove,
+#   so the tests exercise real OS error modes (ENOTDIR, ENOTEMPTY) afero cannot reproduce
 TEMP_DIR=$(search_test "t\.TempDir()" "internal/" | \
     grep -v "internal/cmd/migrate/validate/validate_test.go" | \
-    grep -v "internal/tui/cache/plugin_parser_test.go" || true)
+    grep -v "internal/tui/cache/plugin_parser_test.go" | \
+    grep -v "internal/shelly/firmware_ap_test.go" || true)
 TEMP_DIR_COUNT=$(count_matches "$TEMP_DIR")
 if [[ "$TEMP_DIR_COUNT" -gt 0 ]]; then
     warn "Found $TEMP_DIR_COUNT uses of t.TempDir() (prefer afero.NewMemMapFs with SetFs):"
@@ -449,11 +453,14 @@ fi
 # - plugins/hooks_test.go, plugins/executor_test.go: create executable hook scripts
 # - shelly/dispatch_test.go: creates plugin executables
 # - migrate/validate: permission testing on real filesystem
+# - shelly/firmware_ap_test.go: seeds real on-disk fixtures to drive os.CreateTemp/os.Remove
+#   error modes in code that serves the firmware image via http.ServeFile (a real OS path)
 OS_WRITEFILE=$(search_test "os\.WriteFile" "internal/" | \
     grep -v "internal/plugins/hooks_test.go" | \
     grep -v "internal/plugins/executor_test.go" | \
     grep -v "internal/shelly/dispatch_test.go" | \
-    grep -v "internal/cmd/migrate/validate/" || true)
+    grep -v "internal/cmd/migrate/validate/" | \
+    grep -v "internal/shelly/firmware_ap_test.go" || true)
 OS_WRITEFILE_COUNT=$(count_matches "$OS_WRITEFILE")
 if [[ "$OS_WRITEFILE_COUNT" -gt 0 ]]; then
     warn "Found $OS_WRITEFILE_COUNT uses of os.WriteFile in tests (prefer afero.WriteFile with SetFs):"
@@ -539,7 +546,7 @@ echo ""
 if [[ $ERRORS -gt 0 ]]; then
     echo -e "${RED}FAILED:${NC} $ERRORS error(s), $WARNINGS warning(s)"
     echo ""
-    echo -e "${RED}REMINDER:${NC} No issue is pre-existing. All code in this repository"
+    echo -e "${RED}REMINDER:${NC} Nothing here is inherited from before. All code in this repository"
     echo "was written by Claude. You are responsible for fixing ALL bugs."
     echo ""
     exit 1
