@@ -317,14 +317,14 @@ func run(ctx context.Context, opts *Options) error {
 		select {
 		case code = <-codeCh:
 			ios.StopProgress()
-			ios.DebugErr("shutdown server", server.Shutdown(context.Background()))
+			ios.DebugErr("shutdown server", server.Shutdown(context.WithoutCancel(ctx)))
 		case err := <-errCh:
 			ios.StopProgress()
-			ios.DebugErr("shutdown server", server.Shutdown(context.Background()))
+			ios.DebugErr("shutdown server", server.Shutdown(context.WithoutCancel(ctx)))
 			return err
 		case <-ctx.Done():
 			ios.StopProgress()
-			ios.DebugErr("shutdown server", server.Shutdown(context.Background()))
+			ios.DebugErr("shutdown server", server.Shutdown(context.WithoutCancel(ctx)))
 			return fmt.Errorf("login timed out after %s", opts.Timeout)
 		}
 
