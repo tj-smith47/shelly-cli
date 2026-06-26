@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/discovery"
@@ -98,6 +99,14 @@ func (s *Service) RestoreToAP(
 		restoreErr error
 	)
 	hopErr := s.withAPHop(ctx, apSSID, apHostIP, homeWiFi, func(ctx context.Context) error {
+		// Before ANY write, prove the device answering at the AP is the one whose AP
+		// the host joined. A --to-ap pass that wrote to a device it was not aimed at
+		// would strand a bystander (the documented sl-bulb corruption), so abort
+		// before the firmware/station writes if the identity does not match.
+		if idErr := s.confirmAPDeviceIdentity(ctx, generation, apSSID); idErr != nil {
+			restoreErr = idErr
+			return idErr
+		}
 		// Flash the device (if its build is older than the backup's) while it is stable
 		// at its AP, before the station config that would otherwise reboot-loop it onto
 		// a dead LAN. A no-op when the firmware already matches.
@@ -257,6 +266,100 @@ func (s *Service) rebootAtAP(ctx context.Context, generation int) {
 	if err != nil {
 		debug.TraceEvent("restore-to-ap: reboot at AP (expected as device drops connection): %v", err)
 	}
+}
+
+// confirmAPDeviceIdentity verifies the device answering at the factory AP is the
+// one whose AP the host was asked to join, BEFORE any write. A Shelly factory AP
+// SSID embeds the device's MAC suffix (e.g. "ShellyBulbDuo-6645B6"); the device
+// reports its full MAC. If the host associated with a different device's AP — a
+// duplicate/rogue SSID, or a stale association left over from a fleet hop — the
+// reported MAC will not end with the SSID's suffix, and the write is aborted so it
+// cannot overwrite a device the operation was never aimed at. When the SSID carries
+// no recognizable MAC suffix (a user-renamed AP), identity cannot be derived from
+// the name and the guard is skipped rather than blocking a legitimate restore.
+func (s *Service) confirmAPDeviceIdentity(ctx context.Context, generation int, apSSID string) error {
+	// Skip the device read entirely when the SSID yields no MAC to check against —
+	// a write to a user-renamed AP cannot be verified by name, so do not pay for an
+	// extra round-trip that could not change the outcome.
+	if macSuffixFromAPSSID(apSSID) == "" {
+		debug.TraceEvent("restore-to-ap: AP %q carries no MAC suffix; skipping device-identity guard", apSSID)
+		return nil
+	}
+	actual, err := s.readDeviceMACAtAP(ctx, generation)
+	if err != nil {
+		return fmt.Errorf("could not read device identity at AP %q to confirm the target before writing: %w", apSSID, err)
+	}
+	matched, skip, want, got := evaluateAPIdentity(actual, apSSID)
+	if skip {
+		debug.TraceEvent("restore-to-ap: device at AP %q returned unparseable MAC %q; skipping identity guard", apSSID, actual)
+		return nil
+	}
+	if !matched {
+		return fmt.Errorf(
+			"AP %q is serving device %s, whose MAC does not match the AP name's suffix %q: refusing to write to "+
+				"avoid corrupting a device this operation was not aimed at — confirm the AP name, and that the "+
+				"intended device is the one currently in AP mode, then retry",
+			apSSID, got, want)
+	}
+	return nil
+}
+
+// evaluateAPIdentity decides whether a device reporting actualMAC is the one a
+// Shelly factory AP named apSSID belongs to. matched is the verdict; skip is true
+// when identity cannot be derived (the SSID carries no MAC suffix, or the reported
+// MAC is unparseable), in which case the caller bypasses the guard rather than
+// failing a legitimate operation. want and got are the normalized SSID suffix and
+// full device MAC, for the caller's diagnostics. It performs no IO so the whole
+// decision table is unit-testable without a device.
+func evaluateAPIdentity(actualMAC, apSSID string) (matched, skip bool, want, got string) {
+	want = macSuffixFromAPSSID(apSSID)
+	if want == "" {
+		return false, true, "", ""
+	}
+	got = normalizeMAC(actualMAC)
+	if got == "" {
+		return false, true, want, ""
+	}
+	return strings.HasSuffix(got, want), false, want, got
+}
+
+// macSuffixFromAPSSID extracts the trailing MAC hex from a Shelly factory AP SSID
+// (the token after the final '-', e.g. "ShellyBulbDuo-6645B6" -> "6645B6"),
+// upper-cased. It returns "" when the trailing token is absent or not pure hex, so
+// a user-renamed AP (no derivable MAC) disables the identity guard rather than
+// failing it.
+func macSuffixFromAPSSID(ssid string) string {
+	idx := strings.LastIndex(ssid, "-")
+	if idx < 0 || idx == len(ssid)-1 {
+		return ""
+	}
+	suffix := strings.ToUpper(ssid[idx+1:])
+	for _, c := range suffix {
+		if (c < '0' || c > '9') && (c < 'A' || c > 'F') {
+			return ""
+		}
+	}
+	return suffix
+}
+
+// readDeviceMACAtAP reads the MAC of the device answering at the factory AP
+// address. Both generations report it through the device-identity read the client
+// performs when the connection is established (Gen1 /shelly, Gen2+ Shelly.GetDeviceInfo),
+// so the MAC is already cached on the connection and needs no extra round-trip.
+func (s *Service) readDeviceMACAtAP(ctx context.Context, generation int) (string, error) {
+	var mac string
+	if generation == 1 {
+		err := s.WithGen1Connection(ctx, discovery.DefaultAPIP, func(conn *client.Gen1Client) error {
+			mac = conn.Info().MAC
+			return nil
+		})
+		return mac, err
+	}
+	err := s.WithConnection(ctx, discovery.DefaultAPIP, func(conn *client.Client) error {
+		mac = conn.Info().MAC
+		return nil
+	})
+	return mac, err
 }
 
 // resolveJoinNetwork determines the SSID and passphrase the target device will

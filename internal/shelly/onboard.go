@@ -500,6 +500,12 @@ func (s *Service) OnboardViaAP(
 	// returns to the home network (wifi) once configuration completes.
 	var configErr error
 	if hopErr := s.withAPHop(ctx, device.SSID, "", wifi, func(ctx context.Context) error {
+		// Never write to a device the host only reached because it joined the wrong
+		// AP — confirm the device at the AP matches the SSID's MAC suffix first.
+		if idErr := s.confirmAPDeviceIdentity(ctx, device.Generation, device.SSID); idErr != nil {
+			configErr = idErr
+			return idErr
+		}
 		configErr = s.configureWiFiAtAP(ctx, wifi, device.Generation)
 		return configErr
 	}); hopErr != nil && configErr == nil {

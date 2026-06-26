@@ -2,6 +2,7 @@ package shelly
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -557,4 +558,103 @@ func withIsolatedConfig(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	config.ResetDefaultManagerForTesting()
 	t.Cleanup(config.ResetDefaultManagerForTesting)
+}
+
+// TestMACSuffixFromAPSSID covers the AP-SSID MAC-suffix parse that the bystander
+// guard keys on: a Shelly factory SSID's trailing hex token is the device MAC
+// suffix, and anything without a pure-hex trailing token yields "" (guard skipped).
+func TestMACSuffixFromAPSSID(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, ssid, want string
+	}{
+		{"gen1 six-hex", "ShellyBulbDuo-6645B6", "6645B6"},
+		{"gen2 full mac", "shellyplus2pm-aabbccddeeff", "AABBCCDDEEFF"},
+		{"lowercase normalized", "ShellyBulbDuo-6645b6", "6645B6"},
+		{"multiple dashes keeps last token", "Shelly-Bulb-DDEEFF", "DDEEFF"},
+		{"no dash", "MyCustomAP", ""},
+		{"trailing dash", "ShellyBulbDuo-", ""},
+		{"non-hex suffix", "ShellyBulbDuo-LIVING", ""},
+		{"empty", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := macSuffixFromAPSSID(tc.ssid); got != tc.want {
+				t.Errorf("macSuffixFromAPSSID(%q) = %q, want %q", tc.ssid, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestEvaluateAPIdentity covers the IO-free identity decision: a device MAC that
+// ends with the SSID's MAC suffix matches, a different MAC is a genuine mismatch
+// (matched=false, skip=false → fatal), and an underivable suffix or unparseable
+// MAC is skipped (skip=true → guard bypassed, never a false mismatch).
+func TestEvaluateAPIdentity(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, mac, ssid     string
+		wantMatch, wantSkip bool
+	}{
+		{"suffix match", "AABBCCDDEEFF", "ShellyBulbDuo-DDEEFF", true, false},
+		{"full-mac ssid match", "AA:BB:CC:DD:EE:FF", "shellyplus2pm-AABBCCDDEEFF", true, false},
+		{"genuine mismatch", "AABBCCDDEEFF", "ShellyBulbDuo-6645B6", false, false},
+		{"no ssid suffix is skipped", "AABBCCDDEEFF", "CustomAP", false, true},
+		{"unparseable mac is skipped", "not-a-mac", "ShellyBulbDuo-DDEEFF", false, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			matched, skip, _, _ := evaluateAPIdentity(tc.mac, tc.ssid)
+			if matched != tc.wantMatch || skip != tc.wantSkip {
+				t.Errorf("evaluateAPIdentity(%q, %q) = (matched=%v, skip=%v), want (matched=%v, skip=%v)",
+					tc.mac, tc.ssid, matched, skip, tc.wantMatch, tc.wantSkip)
+			}
+		})
+	}
+}
+
+// TestConfirmAPDeviceIdentity drives the guard end-to-end over the AP-device fake
+// (which reports MAC AABBCCDDEEFF on both generations): an SSID naming that device
+// passes, an SSID naming a different device is refused BEFORE any write, and a
+// custom SSID with no MAC suffix is allowed through (the guard cannot verify by
+// name). Both generations are exercised because the MAC is read over each client's
+// own identity endpoint.
+func TestConfirmAPDeviceIdentity(t *testing.T) {
+	t.Parallel()
+
+	for _, gen := range []int{1, 2} {
+		t.Run(fmt.Sprintf("gen%d match passes", gen), func(t *testing.T) {
+			t.Parallel()
+			d := newAPDevServer(t, gen)
+			svc := apdevService(d, gen)
+			if err := svc.confirmAPDeviceIdentity(context.Background(), gen, "ShellyBulbDuo-DDEEFF"); err != nil {
+				t.Errorf("matching AP identity should pass, got: %v", err)
+			}
+		})
+
+		t.Run(fmt.Sprintf("gen%d mismatch refused", gen), func(t *testing.T) {
+			t.Parallel()
+			d := newAPDevServer(t, gen)
+			svc := apdevService(d, gen)
+			err := svc.confirmAPDeviceIdentity(context.Background(), gen, "ShellyBulbDuo-6645B6")
+			if err == nil {
+				t.Fatal("a device whose MAC does not match the AP name must be refused")
+			}
+			if !strings.Contains(err.Error(), "refusing to write") {
+				t.Errorf("err = %q, want it to refuse the write to a bystander", err)
+			}
+		})
+	}
+
+	t.Run("no-suffix SSID is allowed without a device read", func(t *testing.T) {
+		t.Parallel()
+		// A Service with a resolver that points nowhere: a custom SSID must short-circuit
+		// before any connection, so the absent device never matters.
+		svc := New(NewConfigResolver(), WithRateLimiter(ratelimit.New()))
+		if err := svc.confirmAPDeviceIdentity(context.Background(), 1, "MyHouseAP"); err != nil {
+			t.Errorf("a custom (no-MAC-suffix) SSID must skip the guard, got: %v", err)
+		}
+	})
 }
