@@ -101,7 +101,6 @@ func TestNewCommand_Flags(t *testing.T) {
 		defValue  string
 	}{
 		{"all", "a", "true"},
-		{"format", "f", defaultFormat},
 		{"parallel", "", "3"},
 	}
 
@@ -146,7 +145,6 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	wantPatterns := []string{
 		"shelly backup export",
 		"./backups",
-		"--format yaml",
 		"--parallel",
 	}
 
@@ -256,48 +254,18 @@ func TestExecute_WithDevices(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies global state via config.SetFs
-func TestExecute_YAMLFormat(t *testing.T) {
-	config.SetFs(afero.NewMemMapFs())
-	t.Cleanup(func() { config.SetFs(nil) })
+// TestExecute_RejectsRemovedFormatFlag verifies the dropped --format flag is no
+// longer accepted (backups are JSON-only).
+func TestExecute_RejectsRemovedFormatFlag(t *testing.T) {
+	t.Parallel()
 
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "test-device",
-					Address:    "192.168.1.100",
-					MAC:        "AA:BB:CC:DD:EE:FF",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-	}
+	cmd := NewCommand(cmdutil.NewFactory())
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"/test/backups", "--format", "yaml"})
 
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	dir := "/test/backups-yaml"
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{dir, "--format", "yaml"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err != nil {
-		t.Logf("Execute() error = %v (may be expected)", err)
+	if err := cmd.Execute(); err == nil {
+		t.Error("Execute() should reject the removed --format flag")
 	}
 }
 
@@ -321,9 +289,7 @@ func TestRun_NoDevices(t *testing.T) {
 	opts := &Options{
 		Factory:   tf.Factory,
 		Directory: dir,
-		All:       true,
-		Format:    defaultFormat,
-		Parallel:  3,
+		All:       true, Parallel: 3,
 	}
 	err = run(context.Background(), opts)
 	if err != nil {
@@ -365,9 +331,7 @@ func TestRun_WithDevices(t *testing.T) {
 	opts := &Options{
 		Factory:   tf.Factory,
 		Directory: dir,
-		All:       true,
-		Format:    defaultFormat,
-		Parallel:  3,
+		All:       true, Parallel: 3,
 	}
 	err = run(context.Background(), opts)
 	if err != nil {
@@ -406,9 +370,7 @@ func TestRun_InvalidDirectory(t *testing.T) {
 	opts := &Options{
 		Factory:   tf.Factory,
 		Directory: "/dev/null/invalid",
-		All:       true,
-		Format:    defaultFormat,
-		Parallel:  3,
+		All:       true, Parallel: 3,
 	}
 	err = run(context.Background(), opts)
 	if err == nil {
@@ -458,9 +420,7 @@ func TestRun_MultipleDevices(t *testing.T) {
 	opts := &Options{
 		Factory:   tf.Factory,
 		Directory: dir,
-		All:       true,
-		Format:    defaultFormat,
-		Parallel:  3,
+		All:       true, Parallel: 3,
 	}
 	err = run(context.Background(), opts)
 	if err != nil {

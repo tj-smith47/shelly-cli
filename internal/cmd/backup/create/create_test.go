@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -109,16 +110,9 @@ func TestNewCommand_Flags(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Check format flag
-	formatFlag := cmd.Flags().Lookup("format")
-	if formatFlag == nil {
-		t.Fatal("format flag not found")
-	}
-	if formatFlag.Shorthand != "f" {
-		t.Errorf("format flag shorthand = %q, want 'f'", formatFlag.Shorthand)
-	}
-	if formatFlag.DefValue != defaultFormat {
-		t.Errorf("format flag default = %q, want %q", formatFlag.DefValue, defaultFormat)
+	// Backups are JSON-only; there is no --format flag.
+	if cmd.Flags().Lookup("format") != nil {
+		t.Error("format flag should not exist (backups are JSON-only)")
 	}
 
 	// Check encrypt flag
@@ -173,16 +167,13 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 		name string
 		args []string
 	}{
-		{"format json", []string{"--format", defaultFormat, "device"}},
-		{"format yaml", []string{"--format", "yaml", "device"}},
-		{"format short", []string{"-f", "yaml", "device"}},
 		{"encrypt", []string{"--encrypt", "mypassword", "device"}},
 		{"encrypt short", []string{"-e", "mypassword", "device"}},
 		{"skip-scripts", []string{"--skip-scripts", "device"}},
 		{"skip-schedules", []string{"--skip-schedules", "device"}},
 		{"skip-webhooks", []string{"--skip-webhooks", "device"}},
 		{"all skip flags", []string{"--skip-scripts", "--skip-schedules", "--skip-webhooks", "device"}},
-		{"combined flags", []string{"-f", "yaml", "-e", "pass", "--skip-scripts", "device"}},
+		{"combined flags", []string{"-e", "pass", "--skip-scripts", "device"}},
 	}
 
 	for _, tc := range testCases {
@@ -213,7 +204,6 @@ func TestNewCommand_Example_Content(t *testing.T) {
 	examples := []string{
 		"backup create",
 		"backup.json",
-		"--format yaml",
 		"--encrypt",
 		"--skip-scripts",
 	}
@@ -634,7 +624,6 @@ func TestRun_Success(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Device:  "test-device",
-		Format:  defaultFormat,
 	}
 	err = run(context.Background(), opts)
 	if err != nil {
@@ -681,7 +670,6 @@ func TestRun_WriteToFile(t *testing.T) {
 		Factory:  tf.Factory,
 		Device:   "test-device",
 		FilePath: filePath,
-		Format:   defaultFormat,
 	}
 	err = run(context.Background(), opts)
 	if err != nil {
@@ -727,56 +715,11 @@ func TestRun_InvalidFilePath(t *testing.T) {
 		Factory:  tf.Factory,
 		Device:   "test-device",
 		FilePath: "/nonexistent/directory/backup.json",
-		Format:   defaultFormat,
 	}
 	err = run(context.Background(), opts)
 	// This should fail either at backup creation (mock limitation) or file write (invalid path)
 	if err != nil {
 		t.Logf("run() error = %v (expected)", err)
-	}
-}
-
-//nolint:paralleltest // Test modifies global state via config.SetFs
-func TestRun_YAMLFormat(t *testing.T) {
-	config.SetFs(afero.NewMemMapFs())
-	t.Cleanup(func() { config.SetFs(nil) })
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "test-device",
-					Address:    "192.168.1.100",
-					MAC:        "AA:BB:CC:DD:EE:FF",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"test-device": {"switch:0": map[string]any{"output": false}},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-		Format:  "yaml",
-	}
-	err = run(context.Background(), opts)
-	if err != nil {
-		t.Logf("run() error = %v (may be expected for mock)", err)
 	}
 }
 
@@ -816,7 +759,6 @@ func TestRun_WithAllSkipFlags(t *testing.T) {
 	opts := &Options{
 		Factory:       tf.Factory,
 		Device:        "test-device",
-		Format:        defaultFormat,
 		SkipScripts:   true,
 		SkipSchedules: true,
 		SkipWebhooks:  true,
@@ -860,16 +802,27 @@ func TestRun_WithPassword(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
+	const encPath = "/test/enc-backup.json"
 	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-		Format:  defaultFormat,
-		Encrypt: "mysecretpassword",
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		FilePath: encPath,
+		Encrypt:  "mysecretpassword",
 	}
 	err = run(context.Background(), opts)
-	// Expected to fail because encrypted backups are not supported via service layer
-	if err == nil {
-		t.Log("Expected error for encrypted backup via service layer")
+	if err != nil {
+		// The mock may not support a full Gen2 backup export; the deterministic
+		// encryption round-trip is proven in the backup package's encrypt_test.go.
+		t.Logf("run() error = %v (may be expected for mock)", err)
+		return
+	}
+
+	data, readErr := afero.ReadFile(config.Fs(), encPath)
+	if readErr != nil {
+		t.Fatalf("reading encrypted backup: %v", readErr)
+	}
+	if !backup.IsEncrypted(data) {
+		t.Error("--encrypt should write an encrypted backup envelope")
 	}
 }
 

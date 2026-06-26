@@ -101,10 +101,6 @@ func TestBackupOptions_ToExportOptions(t *testing.T) {
 				SkipWebhooks:  true,
 			},
 		},
-		{
-			name: "with password",
-			opts: backuppkg.Options{Password: "secret123"},
-		},
 	}
 
 	for _, tt := range tests {

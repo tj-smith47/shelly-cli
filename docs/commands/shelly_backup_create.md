@@ -7,12 +7,12 @@ Create a device backup
 Create a complete backup of a Shelly device.
 
 The backup includes configuration, scripts, schedules, and webhooks.
-If no file is specified, backup is saved to ~/.config/shelly/backups/
-with a name based on the device and date. Use "-" as the file to write
-to stdout.
+Backups are written as JSON. If no file is specified, the backup is saved
+to ~/.config/shelly/backups/ with a name based on the device and date. Use
+"-" as the file to write to stdout.
 
-Use --encrypt to password-protect the backup (password verification only,
-sensitive data is not encrypted in the file).
+Use --encrypt to AES-encrypt the backup with a password; restore the file
+with 'shelly backup restore --decrypt <password>'.
 
 ```
 shelly backup create <device> [file] [flags]
@@ -27,9 +27,6 @@ shelly backup create <device> [file] [flags]
   # Create backup to specific file
   shelly backup create living-room backup.json
 
-  # Create YAML backup
-  shelly backup create living-room backup.yaml --format yaml
-
   # Create backup to stdout
   shelly backup create living-room -
 
@@ -43,8 +40,7 @@ shelly backup create <device> [file] [flags]
 ### Options
 
 ```
-  -e, --encrypt string   Password to protect backup
-  -f, --format string    Output format (json, yaml) (default "json")
+  -e, --encrypt string   Password to AES-encrypt the backup
   -h, --help             help for create
       --skip-schedules   Exclude schedules from backup
       --skip-scripts     Exclude scripts from backup

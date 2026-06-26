@@ -17,8 +17,6 @@ import (
 type BackupExportOptions struct {
 	// Directory is the output directory for backup files.
 	Directory string
-	// Format is the output format (json or yaml).
-	Format string
 	// Parallel is the number of concurrent backup operations.
 	Parallel int
 	// BackupOpts are passed to the underlying CreateBackup call.
@@ -47,12 +45,10 @@ func NewBackupExporter(svc *Service) *BackupExporter {
 // ExportAll exports backups for all provided devices concurrently.
 // It returns results for each device, including failures.
 func (e *BackupExporter) ExportAll(ctx context.Context, devices map[string]model.Device, opts BackupExportOptions) []BackupResult {
-	// Cap parallelism to global rate limit (silently, no ios available)
-	parallelism := opts.Parallel
+	// Cap parallelism to global rate limit (silently, no ios available) and
+	// floor to 1 — SetLimit(0) deadlocks errgroup permanently.
 	globalMax := config.GetGlobalMaxConcurrent()
-	if parallelism > globalMax {
-		parallelism = globalMax
-	}
+	parallelism := min(max(opts.Parallel, 1), globalMax)
 
 	var (
 		mu      sync.Mutex
@@ -97,11 +93,11 @@ func (e *BackupExporter) exportDevice(ctx context.Context, name, addr string, op
 		return result
 	}
 
-	// Write backup file
-	filename := export.SanitizeFilename(name) + "." + opts.Format
+	// Write backup file (backups are JSON-only)
+	filename := export.SanitizeFilename(name) + ".json"
 	filePath := opts.Directory + "/" + filename
 
-	if err := export.WriteBackupFile(bkp, filePath, opts.Format); err != nil {
+	if err := export.WriteBackupFile(bkp, filePath); err != nil {
 		result.Error = err
 		return result
 	}

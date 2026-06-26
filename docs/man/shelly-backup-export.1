@@ -13,17 +13,12 @@ shelly-backup-export - Export backups for all registered devices
 Export backup files for all registered devices to a directory.
 
 .PP
-Creates one backup file per device, named by device ID.
-Use --format to choose JSON or YAML output.
+Creates one JSON backup file per device, named by device ID.
 
 
 .SH OPTIONS
 \fB-a\fP, \fB--all\fP[=true]
 	Export all registered devices
-
-.PP
-\fB-f\fP, \fB--format\fP="json"
-	Output format (json, yaml)
 
 .PP
 \fB-h\fP, \fB--help\fP[=false]
@@ -95,9 +90,6 @@ Use --format to choose JSON or YAML output.
 .EX
   # Export all device backups to directory
   shelly backup export ./backups
-
-  # Export in YAML format
-  shelly backup export ./backups --format yaml
 
   # Export with parallel processing
   shelly backup export ./backups --parallel 5

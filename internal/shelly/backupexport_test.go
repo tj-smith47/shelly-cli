@@ -59,16 +59,12 @@ func TestBackupExportOptions_Fields(t *testing.T) {
 
 	opts := BackupExportOptions{
 		Directory:  "/tmp/backups",
-		Format:     "json",
 		Parallel:   4,
 		BackupOpts: backup.Options{SkipScripts: true},
 	}
 
 	if opts.Directory != "/tmp/backups" {
 		t.Errorf("got Directory=%q, want %q", opts.Directory, "/tmp/backups")
-	}
-	if opts.Format != "json" {
-		t.Errorf("got Format=%q, want %q", opts.Format, "json")
 	}
 	if opts.Parallel != 4 {
 		t.Errorf("got Parallel=%d, want 4", opts.Parallel)

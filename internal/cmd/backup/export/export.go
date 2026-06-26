@@ -14,15 +14,11 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-// defaultFormat is the default backup export output format.
-const defaultFormat = "json"
-
 // Options holds the command options.
 type Options struct {
 	Factory   *cmdutil.Factory
 	All       bool
 	Directory string
-	Format    string
 	Parallel  int
 }
 
@@ -31,7 +27,6 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
 		Factory:  f,
 		All:      true,
-		Format:   defaultFormat,
 		Parallel: 3,
 	}
 
@@ -41,13 +36,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Export backups for all registered devices",
 		Long: `Export backup files for all registered devices to a directory.
 
-Creates one backup file per device, named by device ID.
-Use --format to choose JSON or YAML output.`,
+Creates one JSON backup file per device, named by device ID.`,
 		Example: `  # Export all device backups to directory
   shelly backup export ./backups
-
-  # Export in YAML format
-  shelly backup export ./backups --format yaml
 
   # Export with parallel processing
   shelly backup export ./backups --parallel 5`,
@@ -59,7 +50,6 @@ Use --format to choose JSON or YAML output.`,
 	}
 
 	cmd.Flags().BoolVarP(&opts.All, "all", "a", true, "Export all registered devices")
-	cmd.Flags().StringVarP(&opts.Format, "format", "f", defaultFormat, "Output format (json, yaml)")
 	cmd.Flags().IntVar(&opts.Parallel, "parallel", 3, "Number of parallel backups")
 
 	return cmd
@@ -90,7 +80,6 @@ func run(ctx context.Context, opts *Options) error {
 	exporter := shelly.NewBackupExporter(opts.Factory.ShellyService())
 	exportOpts := shelly.BackupExportOptions{
 		Directory:  opts.Directory,
-		Format:     opts.Format,
 		Parallel:   opts.Parallel,
 		BackupOpts: backup.Options{},
 	}

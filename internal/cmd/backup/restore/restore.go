@@ -3,6 +3,7 @@ package restore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/spf13/afero"
@@ -212,15 +213,14 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("failed to read backup file: %w", err)
 	}
 
-	// Validate backup
-	bkp, err := backup.Validate(data)
+	// Load the backup, transparently decrypting an encrypted envelope when
+	// --decrypt supplies the password.
+	bkp, err := backup.Load(data, opts.Decrypt)
 	if err != nil {
+		if errors.Is(err, backup.ErrEncryptedNeedsPassword) {
+			return fmt.Errorf("backup is encrypted, use --decrypt to provide the password")
+		}
 		return fmt.Errorf("invalid backup file: %w", err)
-	}
-
-	// Check encryption
-	if bkp.Encrypted() && opts.Decrypt == "" {
-		return fmt.Errorf("backup is encrypted, use --decrypt to provide password")
 	}
 
 	if err := opts.validateFlags(); err != nil {
@@ -248,7 +248,6 @@ func run(ctx context.Context, opts *Options) error {
 		SkipWebhooks:           opts.SkipWebhooks,
 		SkipState:              opts.SkipState,
 		SkipMeters:             opts.SkipMeters,
-		Password:               opts.Decrypt,
 		NetworkOverride:        override,
 		Name:                   cmdutil.DeviceDisplayName(opts.Name, opts.Device),
 		AllowFirmwareDowngrade: opts.AllowFirmwareDowngrade,

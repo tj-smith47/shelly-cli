@@ -51,6 +51,23 @@ func run(opts *Options) error {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
+	// An encrypted backup is opaque without the password: confirm the envelope is
+	// well-formed and report its cleartext metadata rather than failing to parse it
+	// as a plaintext backup.
+	if backup.IsEncrypted(data) {
+		env, encErr := backup.ReadEncryptedInfo(data)
+		if encErr != nil {
+			ios.Error("Validation failed: %v", encErr)
+			return encErr
+		}
+		ios.Success("Backup file is valid (encrypted)")
+		ios.Println()
+		ios.Printf("  Device:    %s (%s)\n", env.DeviceID, env.DeviceModel)
+		ios.Printf("  Created:   %s\n", env.CreatedAt.Format("2006-01-02 15:04:05"))
+		ios.Printf("  Encrypted: yes (use 'backup restore --decrypt' to inspect contents)\n")
+		return nil
+	}
+
 	// Validate backup
 	bkp, err := backup.Validate(data)
 	if err != nil {
@@ -68,10 +85,6 @@ func run(opts *Options) error {
 	ios.Printf("  Scripts:   %d\n", len(bkp.Scripts))
 	ios.Printf("  Schedules: %d\n", len(bkp.Schedules))
 	ios.Printf("  Webhooks:  %d\n", len(bkp.Webhooks))
-
-	if bkp.Encrypted() {
-		ios.Printf("  Encrypted: yes\n")
-	}
 
 	return nil
 }

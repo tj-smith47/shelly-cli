@@ -16,16 +16,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-// defaultFormat is the default backup output format.
-const defaultFormat = "json"
-
 // Options holds the command options.
 type Options struct {
 	Factory       *cmdutil.Factory
 	Device        string
 	Encrypt       string
 	FilePath      string
-	Format        string
 	SkipScripts   bool
 	SkipSchedules bool
 	SkipWebhooks  bool
@@ -33,10 +29,7 @@ type Options struct {
 
 // NewCommand creates the backup create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{
-		Factory: f,
-		Format:  defaultFormat,
-	}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "create <device> [file]",
@@ -45,20 +38,17 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Create a complete backup of a Shelly device.
 
 The backup includes configuration, scripts, schedules, and webhooks.
-If no file is specified, backup is saved to ~/.config/shelly/backups/
-with a name based on the device and date. Use "-" as the file to write
-to stdout.
+Backups are written as JSON. If no file is specified, the backup is saved
+to ~/.config/shelly/backups/ with a name based on the device and date. Use
+"-" as the file to write to stdout.
 
-Use --encrypt to password-protect the backup (password verification only,
-sensitive data is not encrypted in the file).`,
+Use --encrypt to AES-encrypt the backup with a password; restore the file
+with 'shelly backup restore --decrypt <password>'.`,
 		Example: `  # Create backup (auto-saved to ~/.config/shelly/backups/)
   shelly backup create living-room
 
   # Create backup to specific file
   shelly backup create living-room backup.json
-
-  # Create YAML backup
-  shelly backup create living-room backup.yaml --format yaml
 
   # Create backup to stdout
   shelly backup create living-room -
@@ -78,8 +68,7 @@ sensitive data is not encrypted in the file).`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Format, "format", "f", defaultFormat, "Output format (json, yaml)")
-	cmd.Flags().StringVarP(&opts.Encrypt, "encrypt", "e", "", "Password to protect backup")
+	cmd.Flags().StringVarP(&opts.Encrypt, "encrypt", "e", "", "Password to AES-encrypt the backup")
 	cmd.Flags().BoolVar(&opts.SkipScripts, "skip-scripts", false, "Exclude scripts from backup")
 	cmd.Flags().BoolVar(&opts.SkipSchedules, "skip-schedules", false, "Exclude schedules from backup")
 	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Exclude webhooks from backup")
@@ -98,7 +87,6 @@ func run(ctx context.Context, opts *Options) error {
 		SkipScripts:   opts.SkipScripts,
 		SkipSchedules: opts.SkipSchedules,
 		SkipWebhooks:  opts.SkipWebhooks,
-		Password:      opts.Encrypt,
 	}
 
 	var bkp *backup.DeviceBackup
@@ -111,8 +99,14 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
-	// Format the output
-	data, err := export.MarshalBackup(bkp, opts.Format)
+	// --encrypt wraps the plaintext backup in an AES-256-GCM envelope; otherwise
+	// the backup is written as plaintext JSON.
+	var data []byte
+	if opts.Encrypt != "" {
+		data, err = backup.Encrypt(bkp, opts.Encrypt)
+	} else {
+		data, err = export.MarshalBackup(bkp)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to marshal backup: %w", err)
 	}
@@ -125,7 +119,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Auto-generate file path if not specified
 	if opts.FilePath == "" {
-		autoPath, pathErr := backup.AutoSavePath(opts.Device, bkp, opts.Format)
+		autoPath, pathErr := backup.AutoSavePath(opts.Device, bkp, "json")
 		if pathErr != nil {
 			return pathErr
 		}

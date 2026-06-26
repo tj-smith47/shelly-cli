@@ -350,6 +350,97 @@ func TestRun_BackupMissingConfig(t *testing.T) {
 	}
 }
 
+func encryptedBackupFile(t *testing.T, password, path string) {
+	t.Helper()
+	bkp := &clibackup.DeviceBackup{Backup: &shellybackup.Backup{
+		Version: shellybackup.BackupVersion,
+		DeviceInfo: &shellybackup.DeviceInfo{
+			ID:         "shellyplus1-enc",
+			Model:      "SNSW-001X16EU",
+			Generation: 2,
+		},
+		Config:    json.RawMessage(`{"sys":{}}`),
+		CreatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+	}}
+	data, err := clibackup.Encrypt(bkp, password)
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	if err := afero.WriteFile(config.Fs(), path, data, 0o600); err != nil {
+		t.Fatalf("write encrypted backup: %v", err)
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_EncryptedRequiresDecrypt(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	f := cmdutil.NewFactory().SetIOStreams(iostreams.Test(nil, out, errOut))
+
+	encFile := "/test/enc.json"
+	encryptedBackupFile(t, "s3cret", encFile)
+
+	cmd := NewCommand(f)
+	cmd.SetArgs([]string{"device1", encFile})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error restoring an encrypted backup without --decrypt")
+	}
+	if !strings.Contains(err.Error(), "--decrypt") {
+		t.Errorf("expected '--decrypt' hint, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_EncryptedDryRunWithDecrypt(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	f := cmdutil.NewFactory().SetIOStreams(iostreams.Test(nil, out, errOut))
+
+	encFile := "/test/enc.json"
+	encryptedBackupFile(t, "s3cret", encFile)
+
+	cmd := NewCommand(f)
+	cmd.SetArgs([]string{"--dry-run", "--decrypt", "s3cret", "device1", encFile})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error decrypting+previewing: %v", err)
+	}
+	if !strings.Contains(out.String(), "shellyplus1-enc") {
+		t.Errorf("expected decrypted device ID in preview, got: %s", out.String())
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_EncryptedWrongPassword(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	f := cmdutil.NewFactory().SetIOStreams(iostreams.Test(nil, out, errOut))
+
+	encFile := "/test/enc.json"
+	encryptedBackupFile(t, "s3cret", encFile)
+
+	cmd := NewCommand(f)
+	cmd.SetArgs([]string{"--dry-run", "--decrypt", "wrong", "device1", encFile})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error restoring with the wrong decryption password")
+	}
+}
+
 //nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_DryRun_ValidBackup(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())

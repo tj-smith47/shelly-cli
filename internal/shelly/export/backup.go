@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/spf13/afero"
-	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -32,17 +31,12 @@ func SanitizeFilename(name string) string {
 	return replacer.Replace(name)
 }
 
-// WriteBackupFile writes a backup to a file in the specified format.
-func WriteBackupFile(bkp *backup.DeviceBackup, filePath, format string) error {
-	var data []byte
-	var err error
-
-	switch format {
-	case FormatYAML, FormatYML:
-		data, err = yaml.Marshal(bkp)
-	default:
-		data, err = json.MarshalIndent(bkp, "", "  ")
-	}
+// WriteBackupFile writes a backup to a file as JSON. Backups are JSON-only: the
+// embedded shelly-go Backup carries json-only tags and json.RawMessage config
+// sections, so a YAML rendering is an unreadable byte-array blob that the
+// JSON-only restore path cannot read back.
+func WriteBackupFile(bkp *backup.DeviceBackup, filePath string) error {
+	data, err := json.MarshalIndent(bkp, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal backup: %w", err)
 	}
@@ -97,12 +91,25 @@ func ParseBackupFile(filePath string) (model.BackupFileInfo, error) {
 		return info, err
 	}
 
-	bkp, err := backup.Validate(data)
+	stat, err := fs.Stat(filePath)
 	if err != nil {
 		return info, err
 	}
+	info.Size = stat.Size()
 
-	stat, err := fs.Stat(filePath)
+	// An encrypted backup cannot be parsed as a plaintext Backup; surface the
+	// cleartext envelope metadata so encrypted files still appear in listings.
+	if backup.IsEncrypted(data) {
+		info.Encrypted = true
+		if env, encErr := backup.ReadEncryptedInfo(data); encErr == nil {
+			info.DeviceID = env.DeviceID
+			info.DeviceModel = env.DeviceModel
+			info.CreatedAt = env.CreatedAt
+		}
+		return info, nil
+	}
+
+	bkp, err := backup.Validate(data)
 	if err != nil {
 		return info, err
 	}
@@ -111,18 +118,12 @@ func ParseBackupFile(filePath string) (model.BackupFileInfo, error) {
 	info.DeviceModel = bkp.Device().Model
 	info.FWVersion = bkp.Device().FWVersion
 	info.CreatedAt = bkp.CreatedAt
-	info.Encrypted = bkp.Encrypted()
-	info.Size = stat.Size()
 
 	return info, nil
 }
 
-// MarshalBackup serializes a backup to the specified format.
-func MarshalBackup(bkp *backup.DeviceBackup, format string) ([]byte, error) {
-	switch format {
-	case FormatYAML, FormatYML:
-		return yaml.Marshal(bkp)
-	default:
-		return json.MarshalIndent(bkp, "", "  ")
-	}
+// MarshalBackup serializes a backup to JSON. Backups are JSON-only (see
+// WriteBackupFile for why YAML is not a valid backup encoding).
+func MarshalBackup(bkp *backup.DeviceBackup) ([]byte, error) {
+	return json.MarshalIndent(bkp, "", "  ")
 }

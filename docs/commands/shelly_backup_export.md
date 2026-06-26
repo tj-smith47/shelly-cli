@@ -6,8 +6,7 @@ Export backups for all registered devices
 
 Export backup files for all registered devices to a directory.
 
-Creates one backup file per device, named by device ID.
-Use --format to choose JSON or YAML output.
+Creates one JSON backup file per device, named by device ID.
 
 ```
 shelly backup export <directory> [flags]
@@ -19,9 +18,6 @@ shelly backup export <directory> [flags]
   # Export all device backups to directory
   shelly backup export ./backups
 
-  # Export in YAML format
-  shelly backup export ./backups --format yaml
-
   # Export with parallel processing
   shelly backup export ./backups --parallel 5
 ```
@@ -29,10 +25,9 @@ shelly backup export <directory> [flags]
 ### Options
 
 ```
-  -a, --all             Export all registered devices (default true)
-  -f, --format string   Output format (json, yaml) (default "json")
-  -h, --help            help for export
-      --parallel int    Number of parallel backups (default 3)
+  -a, --all            Export all registered devices (default true)
+  -h, --help           help for export
+      --parallel int   Number of parallel backups (default 3)
 ```
 
 ### Options inherited from parent commands

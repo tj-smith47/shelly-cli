@@ -2,10 +2,12 @@
 package export
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
+	shellybackup "github.com/tj-smith47/shelly-go/backup"
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -339,36 +341,46 @@ func TestWriteBackupFile(t *testing.T) {
 
 	bkp := &backup.DeviceBackup{}
 
-	tests := []struct {
-		name    string
-		format  string
-		wantErr bool
-	}{
-		{"json format", "json", false},
-		{"yaml format", "yaml", false},
-		{"yml format", "yml", false},
+	filePath := "/test/backup.json"
+	if err := WriteBackupFile(bkp, filePath); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			filePath := "/test/backup-" + tt.format + "." + tt.format
-			err := WriteBackupFile(bkp, filePath, tt.format)
+	// Verify file was created
+	if _, statErr := config.Fs().Stat(filePath); statErr != nil {
+		t.Error("expected file to be created")
+	}
+}
 
-			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestParseBackupFile_Encrypted(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-			// Verify file was created
-			if _, statErr := config.Fs().Stat(filePath); statErr != nil {
-				t.Error("expected file to be created")
-			}
-		})
+	bkp := &backup.DeviceBackup{Backup: &shellybackup.Backup{
+		Version:    shellybackup.BackupVersion,
+		DeviceInfo: &shellybackup.DeviceInfo{ID: "dev-enc", Model: "SNSW-001P16EU"},
+		Config:     json.RawMessage(`{}`),
+	}}
+	data, err := backup.Encrypt(bkp, "pw")
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+
+	filePath := "/test/enc.json"
+	if writeErr := afero.WriteFile(config.Fs(), filePath, data, 0o600); writeErr != nil {
+		t.Fatalf("write: %v", writeErr)
+	}
+
+	info, err := ParseBackupFile(filePath)
+	if err != nil {
+		t.Fatalf("ParseBackupFile: %v", err)
+	}
+	if !info.Encrypted {
+		t.Error("expected encrypted backup to be reported as encrypted")
+	}
+	if info.DeviceID != "dev-enc" {
+		t.Errorf("DeviceID = %q, want %q", info.DeviceID, "dev-enc")
 	}
 }
 
@@ -405,31 +417,12 @@ func TestMarshalBackup(t *testing.T) {
 
 	bkp := &backup.DeviceBackup{}
 
-	// Test JSON format
-	jsonData, err := MarshalBackup(bkp, "json")
+	jsonData, err := MarshalBackup(bkp)
 	if err != nil {
 		t.Errorf("unexpected error for JSON: %v", err)
 	}
 	if jsonData == nil {
 		t.Error("expected non-nil JSON data")
-	}
-
-	// Test YAML format
-	yamlData, err := MarshalBackup(bkp, "yaml")
-	if err != nil {
-		t.Errorf("unexpected error for YAML: %v", err)
-	}
-	if yamlData == nil {
-		t.Error("expected non-nil YAML data")
-	}
-
-	// Test YML format
-	ymlData, err := MarshalBackup(bkp, "yml")
-	if err != nil {
-		t.Errorf("unexpected error for YML: %v", err)
-	}
-	if ymlData == nil {
-		t.Error("expected non-nil YML data")
 	}
 }
 

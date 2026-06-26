@@ -132,12 +132,8 @@ func (s *Service) createGen2Backup(ctx context.Context, identifier string, opts 
 	err := s.connector.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := shellybackup.New(conn.RPCClient())
 
-		// Handle encrypted vs. regular backup
-		if opts.Password != "" {
-			return fmt.Errorf("encrypted backups not supported via service layer; use backup create command with --encrypt flag")
-		}
-
-		// Create regular backup
+		// The service always builds a plaintext backup; AES encryption is a
+		// serialization concern applied by the command layer (see backup.Encrypt).
 		data, err := mgr.Export(ctx, opts.ToExportOptions())
 		if err != nil {
 			return fmt.Errorf("failed to export backup: %w", err)

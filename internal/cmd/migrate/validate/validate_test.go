@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
 
 const (
@@ -237,6 +238,46 @@ func TestRun_ValidBackup(t *testing.T) {
 	// Should show model
 	if !bytes.Contains([]byte(output), []byte("SNSW-001X16EU")) {
 		t.Errorf("output should contain model, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via SetFs
+func TestRun_EncryptedBackup(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	var stdout, stderr bytes.Buffer
+	ios := iostreams.Test(nil, &stdout, &stderr)
+	f := cmdutil.NewWithIOStreams(ios)
+
+	bkp := &backup.DeviceBackup{Backup: &shellybackup.Backup{
+		Version: shellybackup.BackupVersion,
+		DeviceInfo: &shellybackup.DeviceInfo{
+			ID:    "test-device-id",
+			Model: "SNSW-001X16EU",
+		},
+		Config: json.RawMessage(`{"sys":{}}`),
+	}}
+	data, err := backup.Encrypt(bkp, "secret")
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	encFile := testBackupDir + "/encrypted.json"
+	if writeErr := afero.WriteFile(config.Fs(), encFile, data, 0o600); writeErr != nil {
+		t.Fatalf("write: %v", writeErr)
+	}
+
+	opts := &Options{Factory: f, FilePath: encFile}
+	if err := run(opts); err != nil {
+		t.Errorf("unexpected error validating encrypted backup: %v", err)
+	}
+
+	output := stdout.String() + stderr.String()
+	if !bytes.Contains([]byte(output), []byte("encrypted")) {
+		t.Errorf("output should report the backup as encrypted, got: %s", output)
+	}
+	if !bytes.Contains([]byte(output), []byte("test-device-id")) {
+		t.Errorf("output should surface the envelope device ID, got: %s", output)
 	}
 }
 

@@ -18,6 +18,10 @@ const ipv4ModeStatic = "static"
 // DeviceBackup wraps the shelly-go backup.Backup with CLI-specific methods.
 type DeviceBackup struct {
 	*shellybackup.Backup
+	// encrypted records whether this backup was loaded from, or written as, an
+	// AES-encrypted envelope. The in-memory Backup is always plaintext; this flag
+	// tracks the on-disk protection state for summaries and listings.
+	encrypted bool
 }
 
 // Device returns device info from the backup.
@@ -35,9 +39,10 @@ func (b *DeviceBackup) Device() DeviceInfo {
 	}
 }
 
-// Encrypted returns true if backup is encrypted (always false for regular backups).
+// Encrypted reports whether the backup was loaded from, or written as, an
+// AES-encrypted envelope. See Load and Encrypt for how the flag is set.
 func (b *DeviceBackup) Encrypted() bool {
-	return false
+	return b.encrypted
 }
 
 // DeviceInfo contains device identification from a backup.
@@ -62,8 +67,6 @@ type Options struct {
 	SkipKVS bool
 	// SkipWiFi excludes WiFi configuration from backup (security).
 	SkipWiFi bool
-	// Password for encryption (empty = no encryption).
-	Password string
 }
 
 // ToExportOptions converts Options to shelly-go ExportOptions.
@@ -136,8 +139,6 @@ type RestoreOptions struct {
 	// SkipMeters skips restoring meter / energy-meter configuration (e.g. Gen1
 	// overpower limits), leaving the target's protection settings untouched.
 	SkipMeters bool
-	// Password for decryption (required if backup is encrypted).
-	Password string
 	// ClockDependentOnly restores only the clock-gated configuration (Gen1 light
 	// component config and captured light state). Set for the LAN second pass of a
 	// --to-ap restore, where everything else already applied at the factory AP and
