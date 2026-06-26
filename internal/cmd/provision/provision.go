@@ -25,6 +25,20 @@ const (
 	methodWiFiAP = "WiFi AP"
 )
 
+// provisionService is the subset of *shelly.Service the provision command drives.
+// Depending on this narrow interface instead of the concrete service keeps the
+// orchestration testable with a stub: the concrete service reaches real devices
+// over BLE and hops the host's WiFi to onboard Gen1 APs, which a unit test cannot
+// exercise.
+type provisionService interface {
+	LoadProvisionSource(ctx context.Context, fromDevice, fromTemplate string) (*shelly.ProvisionSource, error)
+	GetWiFiCredentials(ctx context.Context) *shelly.OnboardWiFiConfig
+	DiscoverForOnboard(ctx context.Context, opts *shelly.OnboardOptions, progress func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error)
+	OnboardBLEParallel(ctx context.Context, devices []*shelly.OnboardDevice, wifiCfg *shelly.OnboardWiFiConfig, opts *shelly.OnboardOptions) []*shelly.OnboardResult
+	OnboardViaAP(ctx context.Context, device *shelly.OnboardDevice, wifi *shelly.OnboardWiFiConfig, opts *shelly.OnboardOptions) *shelly.OnboardResult
+	ApplyProvisionSource(ctx context.Context, deviceAddr string, source *shelly.ProvisionSource) error
+}
+
 // Options holds command options.
 type Options struct {
 	Factory      *cmdutil.Factory
@@ -45,6 +59,19 @@ type Options struct {
 	NoCloud      bool
 	Yes          bool
 	DiscoverOnly bool
+
+	// svc, when non-nil, overrides the service resolved from the Factory. It is the
+	// test injection seam; production leaves it nil and uses Factory.ShellyService().
+	svc provisionService
+}
+
+// service returns the injected provisionService when set, otherwise the concrete
+// service from the Factory.
+func (o *Options) service() provisionService {
+	if o.svc != nil {
+		return o.svc
+	}
+	return o.Factory.ShellyService()
 }
 
 // NewCommand creates the provision command.
@@ -144,7 +171,7 @@ To register already-networked devices, use: shelly discover --register`,
 
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
+	svc := opts.service()
 
 	// Load provision source + resolve WiFi credentials. Skipped for
 	// --discover-only, which just lists devices and needs no credentials.
@@ -197,7 +224,7 @@ func run(ctx context.Context, opts *Options) error {
 
 // resolveSourceAndCreds loads the optional --from-device/--from-template config
 // source and resolves WiFi credentials (flags/source → auto-detect → prompt).
-func (o *Options) resolveSourceAndCreds(ctx context.Context, svc *shelly.Service) (*shelly.ProvisionSource, error) {
+func (o *Options) resolveSourceAndCreds(ctx context.Context, svc provisionService) (*shelly.ProvisionSource, error) {
 	ios := o.Factory.IOStreams()
 	var source *shelly.ProvisionSource
 	if o.FromDevice != "" || o.FromTemplate != "" {
@@ -302,7 +329,7 @@ func (o *Options) promptWiFiCredentials(ctx context.Context) error {
 	}
 
 	ios := o.Factory.IOStreams()
-	svc := o.Factory.ShellyService()
+	svc := o.service()
 
 	// Try to auto-detect from an existing device
 	ios.StartProgress("Detecting WiFi credentials from existing devices...")
@@ -354,7 +381,7 @@ func (o *Options) buildOnboardOptions() *shelly.OnboardOptions {
 }
 
 // runDiscovery runs multi-protocol device discovery with progress output.
-func (o *Options) runDiscovery(ctx context.Context, svc *shelly.Service, opts *shelly.OnboardOptions) ([]shelly.OnboardDevice, error) {
+func (o *Options) runDiscovery(ctx context.Context, svc provisionService, opts *shelly.OnboardOptions) ([]shelly.OnboardDevice, error) {
 	ios := o.Factory.IOStreams()
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
 	if !opts.APOnly {
@@ -395,7 +422,7 @@ func (o *Options) runDiscovery(ctx context.Context, svc *shelly.Service, opts *s
 // If source is non-nil, applies the source config to each device after provisioning.
 func (o *Options) provisionAll(
 	ctx context.Context,
-	svc *shelly.Service,
+	svc provisionService,
 	selected []shelly.OnboardDevice,
 	wifiCfg *shelly.OnboardWiFiConfig,
 	onboardOpts *shelly.OnboardOptions,
@@ -437,7 +464,7 @@ func (o *Options) provisionAll(
 // applySourceConfig applies a provision source config to all successfully provisioned devices.
 func (o *Options) applySourceConfig(
 	ctx context.Context,
-	svc *shelly.Service,
+	svc provisionService,
 	results []*shelly.OnboardResult,
 	source *shelly.ProvisionSource,
 ) {
