@@ -246,7 +246,7 @@ func TestRun_InvalidKeyValueFormat(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Test invalid key=value format (no equals sign)
+	// A bare key with no separator and no following value is an error.
 	opts := &Options{
 		Factory:   tf.Factory,
 		Device:    "test-device",
@@ -255,9 +255,40 @@ func TestRun_InvalidKeyValueFormat(t *testing.T) {
 	}
 	err := run(ctx, opts)
 
-	// Expect an error due to invalid format
+	// Expect an error due to the missing value
 	if err == nil {
-		t.Error("Expected error with invalid key=value format")
+		t.Error("Expected error for a bare key with no value")
+	}
+}
+
+func TestRun_SeparatorEquivalence(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	// "=", ":", and a space must all be accepted and produce the same config.
+	// The cancelled context stops execution before the device call, so any
+	// returned error must come from there, never from key/value parsing.
+	cases := map[string][]string{
+		"equals": {"name=Light"},
+		"colon":  {"name:Light"},
+		"space":  {"name", "Light"},
+	}
+	for label, kv := range cases {
+		t.Run(label, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			opts := &Options{
+				Factory:   tf.Factory,
+				Device:    "test-device",
+				Component: "switch:0",
+				KeyValues: kv,
+			}
+			if err := run(ctx, opts); err != nil && strings.Contains(err.Error(), "missing value") {
+				t.Errorf("args %q should parse, got parse error: %v", kv, err)
+			}
+		})
 	}
 }
 

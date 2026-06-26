@@ -4,7 +4,6 @@ package set
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -30,9 +29,13 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Set device configuration",
 		Long: `Set configuration values for a device component.
 
-Specify key=value pairs to update. Only the specified keys will be modified.`,
-		Example: `  # Set switch name
+Specify key=value pairs to update. Only the specified keys will be modified.
+
+A key and its value may be separated with "=", ":", or a space — these are
+equivalent ("name=Light", "name:Light", and "name Light" all set name to Light).`,
+		Example: `  # Set switch name (these are equivalent)
   shelly config set living-room switch:0 name="Main Light"
+  shelly config set living-room switch:0 name "Main Light"
 
   # Set multiple values
   shelly config set living-room switch:0 name="Light" initial_state=on
@@ -58,19 +61,17 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 	ios := opts.Factory.IOStreams()
 
-	// Parse key=value pairs
-	cfg := make(map[string]any)
-	for _, kv := range opts.KeyValues {
-		parts := strings.SplitN(kv, "=", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid key=value format: %s", kv)
-		}
-		key := parts[0]
-		value := config.ParseValue(parts[1])
-		cfg[key] = value
+	// Parse key=value pairs (accepts "=", ":", or space separators).
+	pairs, err := cmdutil.ParseKeyValues(opts.KeyValues)
+	if err != nil {
+		return err
+	}
+	cfg := make(map[string]any, len(pairs))
+	for _, kv := range pairs {
+		cfg[kv.Key] = config.ParseValue(kv.Value)
 	}
 
-	err := cmdutil.RunWithSpinner(ctx, ios, "Setting configuration...", func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, "Setting configuration...", func(ctx context.Context) error {
 		return svc.SetComponentConfig(ctx, opts.Device, opts.Component, cfg)
 	})
 	if err != nil {

@@ -102,7 +102,7 @@ func TestNewCommand_Args(t *testing.T) {
 		},
 		{
 			name:    "one arg valid",
-			args:    []string{"defaults.timeout"},
+			args:    []string{"discovery.timeout"},
 			wantErr: false,
 		},
 		{
@@ -312,7 +312,7 @@ func TestNewCommand_AcceptsKeyWithDotNotation(t *testing.T) {
 		},
 		{
 			name:    "nested key with one dot",
-			args:    []string{"defaults.timeout"},
+			args:    []string{"discovery.timeout"},
 			wantErr: false,
 		},
 		{

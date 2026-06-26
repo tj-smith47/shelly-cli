@@ -34,10 +34,10 @@ With a key argument, shows only that specific setting (supports dot notation).`,
   shelly config show
 
   # Show specific setting
-  shelly config show defaults.timeout
+  shelly config show discovery.timeout
 
   # Show a section
-  shelly config show defaults
+  shelly config show discovery
 
   # Output as JSON
   shelly config show -o json`,

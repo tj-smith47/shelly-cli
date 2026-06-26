@@ -1,7 +1,9 @@
 package config
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
@@ -17,8 +19,8 @@ func TestKnownSettingKeys(t *testing.T) {
 
 	// Check for expected keys
 	expectedKeys := []string{
-		"defaults.timeout",
-		"defaults.output",
+		"discovery.timeout",
+		"output",
 		"editor",
 		"theme.name",
 	}
@@ -46,7 +48,7 @@ func TestFilterSettingKeys(t *testing.T) {
 		wantMin  int // minimum expected matches
 		contains string
 	}{
-		{"defaults prefix", "defaults.", 2, "defaults.timeout"},
+		{"discovery prefix", "discovery.", 2, "discovery.timeout"},
 		{"theme prefix", "theme.", 2, "theme.name"},
 		{"log prefix", "log.", 1, "log.json"},
 		{"no match", "nonexistent.", 0, ""},
@@ -151,46 +153,45 @@ func TestGetAllSettings(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Tests modify global viper state
-func TestSetSetting(t *testing.T) {
-	setupViperTest(t)
+func TestSetSetting_FreshInstallCreatesFile(t *testing.T) {
+	setupPackageTestSettings(t)
+	t.Setenv("XDG_CONFIG_HOME", "/testconfig")
 
-	// SetSetting will fail WriteConfig without a config file set
-	// But we can still test that the value is set in viper
-	err := SetSetting("test.setting", "new-value")
-	// Error is expected since no config file is set
-	if err == nil {
-		// If no error, check value was set
-		if v := viper.Get("test.setting"); v != "new-value" {
-			t.Errorf("SetSetting() did not set value, got %v", v)
-		}
+	// On a fresh install no config file exists yet. SetSetting must create one
+	// rather than failing with "Config File Not Found" (the issue #3 bug).
+	if err := SetSetting(settingKeyTelemetry, true); err != nil {
+		t.Fatalf("SetSetting on fresh install should succeed, got: %v", err)
 	}
-	// Either way, verify the value was set in memory
-	if v := viper.Get("test.setting"); v != "new-value" {
-		t.Errorf("SetSetting() did not set value in memory, got %v", v)
+
+	if v := viper.Get(settingKeyTelemetry); v != true {
+		t.Errorf("telemetry not set in memory, got %v", v)
+	}
+
+	// The value must persist to disk as a real bool, not a quoted string.
+	data, err := afero.ReadFile(Fs(), "/testconfig/shelly/config.yaml")
+	if err != nil {
+		t.Fatalf("config file was not created: %v", err)
+	}
+	if got := string(data); !strings.Contains(got, "telemetry: true") {
+		t.Errorf("config file should contain bare bool, got:\n%s", got)
 	}
 }
 
-//nolint:paralleltest // Tests modify global viper state
 func TestResetSettings(t *testing.T) {
-	setupViperTest(t)
+	setupPackageTestSettings(t)
+	t.Setenv("XDG_CONFIG_HOME", "/testconfig")
 
-	// Set some values
 	viper.Set("reset.test1", "value1")
 	viper.Set("reset.test2", "value2")
 
-	// Reset will fail WriteConfig without a config file set
-	// But we can still test that values are cleared
-	err := ResetSettings()
-	// Error is expected since no config file is set
-	if err == nil {
-		// If no error, check values were cleared
-		if v := viper.Get("reset.test1"); v != nil {
-			t.Errorf("ResetSettings() did not clear reset.test1, got %v", v)
-		}
+	// ResetSettings must succeed even when no config file exists yet.
+	if err := ResetSettings(); err != nil {
+		t.Fatalf("ResetSettings should succeed on fresh install, got: %v", err)
 	}
-	// Either way, verify values were cleared in memory
-	// (ResetSettings sets them to nil, which should make IsSet return false)
+
+	if viper.IsSet("reset.test1") {
+		t.Error("ResetSettings() did not clear reset.test1")
+	}
 }
 
 //nolint:paralleltest // Tests modify global viper state
@@ -209,7 +210,7 @@ func TestGetEditor(t *testing.T) {
 	_ = GetEditor()
 
 	// Set via viper and test fallback
-	viper.Set("editor", "nano")
+	viper.Set(settingKeyEditor, "nano")
 	editor := GetEditor()
 	// Should return the editor from config or viper
 	if editor == "" {
@@ -251,7 +252,7 @@ func TestGetEditor_FromViperSetting(t *testing.T) {
 	SetDefaultManager(testMgr)
 
 	// Set via viper
-	viper.Set("editor", "nano")
+	viper.Set(settingKeyEditor, "nano")
 
 	editor := GetEditor()
 	if editor != "nano" {
@@ -274,12 +275,59 @@ func TestGetEditor_NonStringViperValue(t *testing.T) {
 	SetDefaultManager(testMgr)
 
 	// Set a non-string value via viper
-	viper.Set("editor", 123)
+	viper.Set(settingKeyEditor, 123)
 
 	// Should return empty since value is not a string
 	editor := GetEditor()
 	if editor != "" {
 		t.Errorf("GetEditor() = %q, want empty for non-string viper value", editor)
+	}
+}
+
+func TestCoerceSettingValue(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		key     string
+		raw     string
+		want    any
+		wantErr bool
+	}{
+		// Typed struct fields must coerce to their real Go type so they
+		// round-trip through the YAML config instead of being stored as the
+		// strings that broke config loading (the issue #3 telemetry bug).
+		{"bool true", settingKeyTelemetry, "true", true, false},
+		{"bool lenient on", settingKeyTelemetry, "on", true, false},
+		{"bool lenient no", settingKeyTelemetry, "no", false, false},
+		{"bool invalid", settingKeyTelemetry, "maybe", nil, true},
+		{"top-level string", settingKeyOutput, "json", "json", false},
+		{"nested duration", settingKeyDiscoveryTimeout, "30s", 30 * time.Second, false},
+		{"nested duration invalid", settingKeyDiscoveryTimeout, "xyz", nil, true},
+		{"nested int", settingKeyRateLimitConcurrent, "12", int64(12), false},
+		{"nested int invalid", settingKeyRateLimitConcurrent, "lots", nil, true},
+		{"nested bool", "discovery.mdns", "yes", true, false},
+		// Unknown keys are not struct-backed: keep them as free-form strings.
+		{"unknown key stays string", settingKeyEditor, "nano", "nano", false},
+		{"unknown dotted key stays string", "some.unknown.key", "0", "0", false},
+		// Surrounding quotes are stripped before coercion.
+		{"quoted bool", settingKeyTelemetry, `"true"`, true, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := CoerceSettingValue(tt.key, tt.raw)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("CoerceSettingValue(%q, %q) err = %v, wantErr %v", tt.key, tt.raw, err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+			if got != tt.want {
+				t.Errorf("CoerceSettingValue(%q, %q) = %#v (%T), want %#v (%T)", tt.key, tt.raw, got, got, tt.want, tt.want)
+			}
+		})
 	}
 }
 

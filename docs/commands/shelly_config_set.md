@@ -6,7 +6,18 @@ Set CLI configuration values
 
 Set configuration values in the Shelly CLI config file.
 
-Use dot notation for nested values (e.g., "defaults.timeout=30s").
+Use dot notation for nested values (e.g. "discovery.timeout=30s").
+
+A key and its value may be separated with "=", ":", or a space — these are
+equivalent:
+
+  shelly config set telemetry=true
+  shelly config set telemetry:true
+  shelly config set telemetry true
+
+Values are stored using each setting's real type (e.g. telemetry as a boolean,
+ratelimit.global.max_concurrent as an integer), so booleans and numbers behave
+correctly.
 
 ```
 shelly config set <key>=<value>... [flags]
@@ -15,14 +26,18 @@ shelly config set <key>=<value>... [flags]
 ### Examples
 
 ```
-  # Set default timeout
-  shelly config set defaults.timeout=30s
+  # Enable anonymous usage telemetry (these are equivalent)
+  shelly config set telemetry=true
+  shelly config set telemetry true
+
+  # Set discovery timeout (duration)
+  shelly config set discovery.timeout=30s
 
   # Set output format
-  shelly config set defaults.output=json
+  shelly config set output=json
 
   # Set multiple values
-  shelly config set defaults.timeout=30s defaults.output=json
+  shelly config set discovery.timeout=30s output=json
 ```
 
 ### Options

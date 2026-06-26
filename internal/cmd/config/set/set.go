@@ -3,7 +3,6 @@ package set
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -29,15 +28,30 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Set CLI configuration values",
 		Long: `Set configuration values in the Shelly CLI config file.
 
-Use dot notation for nested values (e.g., "defaults.timeout=30s").`,
-		Example: `  # Set default timeout
-  shelly config set defaults.timeout=30s
+Use dot notation for nested values (e.g. "discovery.timeout=30s").
+
+A key and its value may be separated with "=", ":", or a space — these are
+equivalent:
+
+  shelly config set telemetry=true
+  shelly config set telemetry:true
+  shelly config set telemetry true
+
+Values are stored using each setting's real type (e.g. telemetry as a boolean,
+ratelimit.global.max_concurrent as an integer), so booleans and numbers behave
+correctly.`,
+		Example: `  # Enable anonymous usage telemetry (these are equivalent)
+  shelly config set telemetry=true
+  shelly config set telemetry true
+
+  # Set discovery timeout (duration)
+  shelly config set discovery.timeout=30s
 
   # Set output format
-  shelly config set defaults.output=json
+  shelly config set output=json
 
   # Set multiple values
-  shelly config set defaults.timeout=30s defaults.output=json`,
+  shelly config set discovery.timeout=30s output=json`,
 		Args:              cobra.MinimumNArgs(1),
 		ValidArgsFunction: completion.SettingKeysWithEquals(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,18 +66,21 @@ Use dot notation for nested values (e.g., "defaults.timeout=30s").`,
 func run(opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
-	for _, arg := range opts.Args {
-		parts := strings.SplitN(arg, "=", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid format %q, expected key=value", arg)
+	pairs, err := cmdutil.ParseKeyValues(opts.Args)
+	if err != nil {
+		return err
+	}
+
+	for _, kv := range pairs {
+		value, err := config.CoerceSettingValue(kv.Key, kv.Value)
+		if err != nil {
+			return err
+		}
+		if err := config.SetSetting(kv.Key, value); err != nil {
+			return fmt.Errorf("failed to set %s: %w", kv.Key, err)
 		}
 
-		key, value := parts[0], parts[1]
-		if err := config.SetSetting(key, value); err != nil {
-			return fmt.Errorf("failed to set %s: %w", key, err)
-		}
-
-		ios.Success("Set %s = %s", key, value)
+		ios.Success("Set %s = %s", kv.Key, config.FormatSettingValue(value))
 	}
 
 	return nil

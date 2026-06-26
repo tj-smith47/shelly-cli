@@ -13,6 +13,9 @@ Set configuration values for a device component.
 
 Specify key=value pairs to update. Only the specified keys will be modified.
 
+A key and its value may be separated with "=", ":", or a space — these are
+equivalent ("name=Light", "name:Light", and "name Light" all set name to Light).
+
 ```
 shelly device config set <device> <component> <key>=<value>... [flags]
 ```
@@ -20,8 +23,9 @@ shelly device config set <device> <component> <key>=<value>... [flags]
 ### Examples
 
 ```
-  # Set switch name
+  # Set switch name (these are equivalent)
   shelly config set living-room switch:0 name="Main Light"
+  shelly config set living-room switch:0 name "Main Light"
 
   # Set multiple values
   shelly config set living-room switch:0 name="Light" initial_state=on

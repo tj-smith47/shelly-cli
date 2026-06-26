@@ -62,7 +62,7 @@ func TestNewCommand_Structure(t *testing.T) {
 	if err := cmd.Args(cmd, []string{}); err != nil {
 		t.Errorf("Args should accept no arguments: %v", err)
 	}
-	if err := cmd.Args(cmd, []string{"defaults.timeout"}); err != nil {
+	if err := cmd.Args(cmd, []string{"discovery.timeout"}); err != nil {
 		t.Errorf("Args should accept one argument: %v", err)
 	}
 	if err := cmd.Args(cmd, []string{"arg1", "arg2"}); err == nil {

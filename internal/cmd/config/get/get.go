@@ -33,13 +33,13 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Get a CLI configuration value",
 		Long: `Get a configuration value from the Shelly CLI config file.
 
-Use dot notation to access nested values (e.g., "defaults.timeout").
+Use dot notation to access nested values (e.g., "discovery.timeout").
 Without a key, shows all configuration values.`,
 		Example: `  # Get all settings
   shelly config get
 
-  # Get default timeout
-  shelly config get defaults.timeout
+  # Get the discovery timeout
+  shelly config get discovery.timeout
 
   # Output as JSON
   shelly config get -o json`,

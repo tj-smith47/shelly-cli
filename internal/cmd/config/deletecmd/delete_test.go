@@ -131,7 +131,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 
 	wantPatterns := []string{
 		"shelly config delete",
-		"defaults.timeout",
+		"discovery.timeout",
 		"--yes",
 	}
 

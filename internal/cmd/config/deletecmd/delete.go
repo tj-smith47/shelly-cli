@@ -31,21 +31,21 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Delete CLI configuration values",
 		Long: `Delete configuration values from the Shelly CLI config file.
 
-Use dot notation for nested values (e.g., "defaults.timeout").
+Use dot notation for nested values (e.g., "discovery.timeout").
 Multiple keys can be deleted at once.
 
 If a key has nested child values, confirmation is required unless --yes is provided.`,
 		Example: `  # Delete a single setting
-  shelly config delete defaults.timeout
+  shelly config delete discovery.timeout
 
   # Delete multiple settings
-  shelly config delete defaults.timeout defaults.output
+  shelly config delete discovery.timeout discovery.network
 
   # Delete a parent key with all children (with confirmation)
-  shelly config delete defaults
+  shelly config delete discovery
 
   # Skip confirmation prompt
-  shelly config delete defaults --yes
+  shelly config delete discovery --yes
 
   # Using alias
   shelly config rm editor`,

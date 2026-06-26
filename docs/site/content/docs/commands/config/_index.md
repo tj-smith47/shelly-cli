@@ -26,13 +26,13 @@ For device configuration, use: shelly device config <subcommand>
   shelly config get
 
   # Get specific setting
-  shelly config get defaults.timeout
+  shelly config get discovery.timeout
 
   # Set a value
-  shelly config set defaults.output=json
+  shelly config set output=json
 
   # Delete a setting
-  shelly config delete defaults.timeout
+  shelly config delete discovery.timeout
 
   # Open config in editor
   shelly config edit

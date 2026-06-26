@@ -98,8 +98,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 
 	wantPatterns := []string{
 		"shelly config set",
-		"defaults.timeout",
-		"defaults.output",
+		"discovery.timeout",
+		"output=json",
 	}
 
 	for _, pattern := range wantPatterns {
@@ -119,31 +119,48 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 	}
 }
 
-func TestRun_InvalidFormat(t *testing.T) {
-	t.Parallel()
+//nolint:paralleltest // run() touches global viper state; keep serial like siblings
+func TestRun_BareKeyMissingValue(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	opts := &Options{Factory: tf.Factory, Args: []string{"invalid-no-equals"}}
+	opts := &Options{Factory: tf.Factory, Args: []string{"telemetry-no-separator"}}
 	err := run(opts)
 	if err == nil {
-		t.Error("Expected error for invalid format")
+		t.Fatal("Expected error for a bare key with no value")
 	}
-	if !strings.Contains(err.Error(), "invalid format") {
-		t.Errorf("Error should mention invalid format: %v", err)
+	if !strings.Contains(err.Error(), "missing value") {
+		t.Errorf("Error should mention the missing value: %v", err)
 	}
 }
 
+// parseErr reports whether err is a key/value parse error (as opposed to a
+// downstream config-write error, which is acceptable in these tests because
+// SetSetting needs a real config file).
+func parseErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "missing value") ||
+		strings.Contains(msg, "empty key") ||
+		strings.Contains(msg, "no key/value pairs")
+}
+
 //nolint:paralleltest // modifies global viper state
-func TestRun_ValidSetting(t *testing.T) {
+func TestRun_SeparatorEquivalence(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	// This will fail because config.SetSetting needs a real config setup
-	// but we're testing the run function's parsing logic
-	opts := &Options{Factory: tf.Factory, Args: []string{"defaults.timeout=30s"}}
-	err := run(opts)
-	// We expect either success or a config-related error, not a parsing error
-	if err != nil && strings.Contains(err.Error(), "invalid format") {
-		t.Errorf("Should not get invalid format error for valid format: %v", err)
+	// "=", ":", and a space must all be accepted for the same assignment.
+	cases := [][]string{
+		{"discovery.timeout=30s"},
+		{"discovery.timeout:30s"},
+		{"discovery.timeout", "30s"},
+	}
+	for _, args := range cases {
+		opts := &Options{Factory: tf.Factory, Args: args}
+		if err := run(opts); parseErr(err) {
+			t.Errorf("args %q should parse, got parse error: %v", args, err)
+		}
 	}
 }
 
@@ -151,23 +168,9 @@ func TestRun_ValidSetting(t *testing.T) {
 func TestRun_MultipleSettings(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	opts := &Options{Factory: tf.Factory, Args: []string{"key1=value1", "key2=value2"}}
-	err := run(opts)
-	// Check that parsing is correct
-	if err != nil && strings.Contains(err.Error(), "invalid format") {
-		t.Errorf("Should not get invalid format error for valid formats: %v", err)
-	}
-}
-
-//nolint:paralleltest // modifies global viper state
-func TestRun_EmptyValue(t *testing.T) {
-	tf := factory.NewTestFactory(t)
-
-	// key= should be valid (empty value)
-	opts := &Options{Factory: tf.Factory, Args: []string{"key="}}
-	err := run(opts)
-	if err != nil && strings.Contains(err.Error(), "invalid format") {
-		t.Errorf("Should not get invalid format error for key=: %v", err)
+	opts := &Options{Factory: tf.Factory, Args: []string{"editor=vim", "theme.name=dark"}}
+	if err := run(opts); parseErr(err) {
+		t.Errorf("multiple inline pairs should parse: %v", err)
 	}
 }
 
@@ -175,10 +178,9 @@ func TestRun_EmptyValue(t *testing.T) {
 func TestRun_ValueWithEquals(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	// key=value=with=equals should be valid
-	opts := &Options{Factory: tf.Factory, Args: []string{"key=value=with=equals"}}
-	err := run(opts)
-	if err != nil && strings.Contains(err.Error(), "invalid format") {
-		t.Errorf("Should not get invalid format error for value with equals: %v", err)
+	// editor=value=with=equals should keep everything after the first separator.
+	opts := &Options{Factory: tf.Factory, Args: []string{"editor=code --wait=true"}}
+	if err := run(opts); parseErr(err) {
+		t.Errorf("value containing '=' should parse: %v", err)
 	}
 }
