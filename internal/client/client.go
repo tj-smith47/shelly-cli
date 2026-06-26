@@ -37,12 +37,19 @@ type DeviceInfo struct {
 	AuthEn     bool
 }
 
+// ensureHTTPScheme prepends "http://" to a bare host/IP address. A hostname
+// beginning with 'h' (hub.local, host123) is left schemeless by a naive
+// first-byte check, so the decision keys off the "http" prefix instead.
+func ensureHTTPScheme(address string) string {
+	if address != "" && !strings.HasPrefix(address, "http") {
+		return "http://" + address
+	}
+	return address
+}
+
 // Connect establishes a connection to a Shelly device.
 func Connect(ctx context.Context, device model.Device) (*Client, error) {
-	url := device.Address
-	if url != "" && url[0] != 'h' {
-		url = "http://" + url
-	}
+	url := ensureHTTPScheme(device.Address)
 
 	var opts []transport.Option
 	if device.HasAuth() {

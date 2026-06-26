@@ -849,7 +849,7 @@ func TestFilterEntriesByStage(t *testing.T) {
 		{
 			name:      "beta filter",
 			beta:      true,
-			wantCount: 3, // beta-only, both, AND stable-only (HasUpdate fallback)
+			wantCount: 2, // beta-only and both; stable-only has no beta image
 		},
 	}
 
@@ -932,7 +932,7 @@ func TestSelectEntriesByStage(t *testing.T) {
 			name:       "beta",
 			beta:       true,
 			wantStage:  "beta",
-			wantIndLen: 3, // dev1, dev2, and dev3 (beta includes HasUpdate fallback)
+			wantIndLen: 2, // dev2 and dev3; dev1 is stable-only (no beta image)
 		},
 	}
 

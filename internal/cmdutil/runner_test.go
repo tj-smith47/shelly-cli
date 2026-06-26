@@ -930,6 +930,25 @@ func TestCapConcurrency(t *testing.T) {
 			t.Error("should warn when exceeding limit")
 		}
 	})
+
+	t.Run("zero floors to one", func(t *testing.T) {
+		t.Parallel()
+		ios, _, _ := testIOStreams()
+
+		// errgroup.SetLimit(0) deadlocks; a requested 0 must floor to 1.
+		if result := cmdutil.CapConcurrency(ios, 0); result != 1 {
+			t.Errorf("CapConcurrency(0) = %d, want 1", result)
+		}
+	})
+
+	t.Run("negative floors to one", func(t *testing.T) {
+		t.Parallel()
+		ios, _, _ := testIOStreams()
+
+		if result := cmdutil.CapConcurrency(ios, -5); result != 1 {
+			t.Errorf("CapConcurrency(-5) = %d, want 1", result)
+		}
+	})
 }
 
 func TestRunBatchWithResults_ConcurrencyCapped(t *testing.T) {
@@ -951,5 +970,22 @@ func TestRunBatchWithResults_ConcurrencyCapped(t *testing.T) {
 		if !r.Success {
 			t.Errorf("results[%d].Success = false, want true", i)
 		}
+	}
+}
+
+func TestRunBatchWithResults_ZeroConcurrencyNoDeadlock(t *testing.T) {
+	t.Parallel()
+
+	svc := shelly.NewService()
+	targets := []string{"device1", "device2"}
+
+	// concurrent=0 must floor to 1 — SetLimit(0) would otherwise hang forever.
+	// A failing test here manifests as a timeout, not an assertion.
+	results := cmdutil.RunBatchWithResults(context.Background(), svc, targets, 0, func(_ context.Context, _ *shelly.Service, _ string) error {
+		return nil
+	})
+
+	if len(results) != 2 {
+		t.Fatalf("RunBatchWithResults() returned %d results, want 2", len(results))
 	}
 }

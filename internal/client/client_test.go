@@ -142,6 +142,33 @@ func TestDeviceInfo_Fields(t *testing.T) {
 	}
 }
 
+func TestEnsureHTTPScheme(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"bare ip", "192.168.1.10", "http://192.168.1.10"},
+		{"hostname starting with h", "hub.local", "http://hub.local"},
+		{"hallway hostname", "hallway.local", "http://hallway.local"},
+		{"host123", "host123", "http://host123"},
+		{"already http", "http://1.2.3.4", "http://1.2.3.4"},
+		{"already https", "https://1.2.3.4", "https://1.2.3.4"},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := ensureHTTPScheme(tt.in); got != tt.want {
+				t.Errorf("ensureHTTPScheme(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseComponentKey_ValidKeys(t *testing.T) {
 	t.Parallel()
 

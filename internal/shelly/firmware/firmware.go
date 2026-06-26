@@ -695,8 +695,13 @@ func FilterDevicesByNameAndPlatform(devices map[string]model.Device, devicesList
 func FilterEntriesByStage(entries []UpdateEntry, beta bool) []UpdateEntry {
 	var result []UpdateEntry
 	for _, e := range entries {
-		if beta && e.HasBeta {
-			result = append(result, e)
+		// With --beta, only a device that actually has a beta image is a
+		// candidate; a device that merely has a stable update must NOT be
+		// flashed with the beta channel.
+		if beta {
+			if e.HasBeta {
+				result = append(result, e)
+			}
 		} else if e.HasUpdate {
 			result = append(result, e)
 		}

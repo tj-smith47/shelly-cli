@@ -50,10 +50,7 @@ type DetectionResult struct {
 // detection would stall on /rpc, and an inconclusive result left the generation
 // unknown, which downstream routing silently treats as Gen2 (RPC).
 func DetectGeneration(ctx context.Context, address string, auth *model.Auth) (*DetectionResult, error) {
-	url := address
-	if url != "" && !strings.HasPrefix(url, "http") {
-		url = "http://" + url
-	}
+	url := ensureHTTPScheme(address)
 
 	transport := cloneDefaultTransport()
 	if strings.HasPrefix(url, "https") {

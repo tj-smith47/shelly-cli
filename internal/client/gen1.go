@@ -23,10 +23,7 @@ type Gen1Client struct {
 
 // ConnectGen1 establishes a connection to a Gen1 Shelly device.
 func ConnectGen1(ctx context.Context, device model.Device) (*Gen1Client, error) {
-	url := device.Address
-	if url != "" && url[0] != 'h' {
-		url = "http://" + url
-	}
+	url := ensureHTTPScheme(device.Address)
 
 	var opts []transport.Option
 	if device.HasAuth() {

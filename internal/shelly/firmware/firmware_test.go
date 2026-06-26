@@ -728,10 +728,17 @@ func TestFilterEntriesByStage(t *testing.T) {
 		t.Errorf("expected 2 stable entries, got %d", len(stableEntries))
 	}
 
-	// Filter for beta - gets entries with HasBeta=true OR HasUpdate=true
+	// Filter for beta - ONLY entries that actually have a beta image. A
+	// stable-only device (device1: HasUpdate, no beta) must NOT be selected,
+	// or the beta channel gets flashed onto a device with no beta available.
 	betaEntries := FilterEntriesByStage(entries, true)
-	if len(betaEntries) != 3 { // device1 (HasUpdate), device2 (HasBeta), device3 (HasBeta)
-		t.Errorf("expected 3 beta entries, got %d", len(betaEntries))
+	if len(betaEntries) != 2 { // device2 (HasBeta), device3 (HasBeta)
+		t.Errorf("expected 2 beta entries, got %d", len(betaEntries))
+	}
+	for _, e := range betaEntries {
+		if !e.HasBeta {
+			t.Errorf("beta filter selected %q which has no beta image", e.Name)
+		}
 	}
 }
 
@@ -796,13 +803,19 @@ func TestSelectEntriesByStage(t *testing.T) {
 		t.Errorf("expected 2 indices for stable, got %d", len(indices))
 	}
 
-	// Select beta - gets entries with HasBeta=true OR HasUpdate=true
+	// Select beta - only entries that actually have a beta image (device2,
+	// device3). device1 is stable-only and must be excluded.
 	indices, stage = SelectEntriesByStage(entries, true)
 	if stage != testDeviceNameBeta {
 		t.Errorf("got stage=%q, want %q", stage, testDeviceNameBeta)
 	}
-	if len(indices) != 3 {
-		t.Errorf("expected 3 indices for beta, got %d", len(indices))
+	if len(indices) != 2 {
+		t.Errorf("expected 2 indices for beta, got %d", len(indices))
+	}
+	for _, idx := range indices {
+		if !entries[idx].HasBeta {
+			t.Errorf("beta selection included %q which has no beta image", entries[idx].Name)
+		}
 	}
 }
 

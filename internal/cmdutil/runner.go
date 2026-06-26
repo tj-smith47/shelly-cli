@@ -38,6 +38,10 @@ func logVerbose(format string, args ...any) {
 func CapConcurrency(ios *iostreams.IOStreams, requested int) int {
 	globalMax := config.GetGlobalMaxConcurrent()
 
+	// errgroup.SetLimit(0) deadlocks on the first Go (no permit ever frees), so
+	// a requested value below 1 must floor to a single worker, never zero.
+	requested = max(requested, 1)
+
 	if requested > globalMax {
 		ios.Warning("Requested concurrency %d exceeds global rate limit %d; capping to %d.\n"+
 			"  Adjust ratelimit.global.max_concurrent in config to increase.",
@@ -149,12 +153,10 @@ func RunBatchWithResults(ctx context.Context, svc *shelly.Service, targets []str
 		return nil
 	}
 
-	// Cap concurrency to global rate limit (silently)
+	// Cap concurrency to global rate limit (silently). Floor to 1: SetLimit(0)
+	// deadlocks errgroup permanently (see CapConcurrency).
 	globalMax := config.GetGlobalMaxConcurrent()
-	capped := concurrent
-	if concurrent > globalMax {
-		capped = globalMax
-	}
+	capped := min(max(concurrent, 1), globalMax)
 
 	results := make([]BatchResult, len(targets))
 	resultChan := make(chan struct {

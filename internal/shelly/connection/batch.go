@@ -45,6 +45,9 @@ func (m *Manager) WithDevices(ctx context.Context, devices []string, concurrency
 		return nil
 	}
 
+	// A zero-capacity semaphore blocks the first send forever; floor to one.
+	concurrency = max(concurrency, 1)
+
 	type result struct {
 		device string
 		err    error
