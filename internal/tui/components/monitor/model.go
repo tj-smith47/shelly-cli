@@ -689,8 +689,16 @@ func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
 
 // exportData exports the current monitoring data to a file.
 func (m Model) exportData(format ExportFormat) tea.Cmd {
+	// Snapshot the device statuses on the Update goroutine: the returned Cmd runs
+	// on its own goroutine while the event loop keeps mutating m.statuses in place
+	// (handleDeviceEvent rewrites fields through statusMap pointers into the shared
+	// backing array). A shallow copy is sufficient because the WS path only ever
+	// replaces pointer fields with new pointers, never writes through the pointees.
+	statuses := make([]DeviceStatus, len(m.statuses))
+	copy(statuses, m.statuses)
+
 	return func() tea.Msg {
-		if len(m.statuses) == 0 {
+		if len(statuses) == 0 {
 			return ExportResultMsg{Err: fmt.Errorf("no data to export")}
 		}
 
@@ -717,9 +725,9 @@ func (m Model) exportData(format ExportFormat) tea.Cmd {
 		// Export based on format
 		switch format {
 		case ExportCSV:
-			err = m.exportCSV(fs, path)
+			err = m.exportCSV(fs, path, statuses)
 		case ExportJSON:
-			err = m.exportJSON(fs, path)
+			err = m.exportJSON(fs, path, statuses)
 		}
 
 		if err != nil {
@@ -746,7 +754,7 @@ func optionalInt(v *int) string {
 	return fmt.Sprintf("%d", *v)
 }
 
-func (m Model) exportCSV(fs afero.Fs, path string) (retErr error) {
+func (m Model) exportCSV(fs afero.Fs, path string, statuses []DeviceStatus) (retErr error) {
 	f, err := fs.Create(path)
 	if err != nil {
 		return fmt.Errorf("create file: %w", err)
@@ -767,7 +775,7 @@ func (m Model) exportCSV(fs afero.Fs, path string) (retErr error) {
 	}
 
 	// Write device data
-	for _, s := range m.statuses {
+	for _, s := range statuses {
 		// Health indicators
 		chipTemp := optionalFloat(s.ChipTemp, "%.1f")
 		wifiRSSI := optionalFloat(s.WiFiRSSI, "%.0f")
@@ -818,7 +826,7 @@ func buildExportHealth(s DeviceStatus) *exportHealth {
 	return h
 }
 
-func (m Model) exportJSON(fs afero.Fs, path string) (retErr error) {
+func (m Model) exportJSON(fs afero.Fs, path string, statuses []DeviceStatus) (retErr error) {
 	// Build export structure
 	type exportDevice struct {
 		Name        string        `json:"name"`
@@ -852,7 +860,7 @@ func (m Model) exportJSON(fs afero.Fs, path string) (retErr error) {
 
 	// Calculate totals
 	var totalPower, totalEnergy float64
-	for _, s := range m.statuses {
+	for _, s := range statuses {
 		if s.Online {
 			totalPower += s.Power
 			totalEnergy += s.TotalEnergy
@@ -865,7 +873,7 @@ func (m Model) exportJSON(fs afero.Fs, path string) (retErr error) {
 		TotalEnergy: totalEnergy,
 		CostRate:    m.costRate,
 		Currency:    m.currency,
-		Devices:     make([]exportDevice, 0, len(m.statuses)),
+		Devices:     make([]exportDevice, 0, len(statuses)),
 	}
 
 	if m.costRate > 0 && totalEnergy > 0 {
@@ -873,7 +881,7 @@ func (m Model) exportJSON(fs afero.Fs, path string) (retErr error) {
 		export.TotalCost = &cost
 	}
 
-	for _, s := range m.statuses {
+	for _, s := range statuses {
 		d := exportDevice{
 			Name:        s.Name,
 			Address:     s.Address,

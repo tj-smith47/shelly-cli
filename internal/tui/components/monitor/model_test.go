@@ -3,11 +3,14 @@ package monitor
 import (
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/afero"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
@@ -568,6 +571,51 @@ func TestOptionalInt(t *testing.T) {
 	})
 }
 
+// TestExportData_SnapshotIsolatesConcurrentMutation guards the monitor export
+// against a data race: the export tea.Cmd runs on its own goroutine while the
+// event loop keeps rewriting device statuses through statusMap pointers. Run
+// under -race, the unfixed code (export reading the live m.statuses) trips the
+// detector; the snapshot taken in exportData isolates it.
+//
+//nolint:paralleltest // Test mutates the global config filesystem via SetFs.
+func TestExportData_SnapshotIsolatesConcurrentMutation(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	m := Model{
+		statuses: []DeviceStatus{{Name: "dev", Online: true, Power: 1.0}},
+	}
+	m.statusMap = map[string]*DeviceStatus{"dev": &m.statuses[0]}
+
+	// exportData snapshots m.statuses synchronously; the returned Cmd reads only
+	// that snapshot.
+	cmd := m.exportData(ExportJSON)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var result tea.Msg
+	go func() {
+		defer wg.Done()
+		result = cmd()
+	}()
+	go func() {
+		defer wg.Done()
+		for i := range 2000 {
+			m.statusMap["dev"].Power = float64(i)
+			m.statusMap["dev"].Voltage = float64(i)
+		}
+	}()
+	wg.Wait()
+
+	if msg, ok := result.(ExportResultMsg); ok {
+		if msg.Err != nil {
+			t.Fatalf("export failed: %v", msg.Err)
+		}
+	} else {
+		t.Fatalf("expected ExportResultMsg, got %T", result)
+	}
+}
+
 func TestExportCSV_IncludesHealthData(t *testing.T) {
 	t.Parallel()
 
@@ -596,7 +644,7 @@ func TestExportCSV_IncludesHealthData(t *testing.T) {
 		},
 	}
 
-	err := m.exportCSV(memFs, path)
+	err := m.exportCSV(memFs, path, m.statuses)
 	if err != nil {
 		t.Fatalf("exportCSV failed: %v", err)
 	}
@@ -661,7 +709,7 @@ func TestExportJSON_IncludesHealthData(t *testing.T) {
 		},
 	}
 
-	err := m.exportJSON(memFs, path)
+	err := m.exportJSON(memFs, path, m.statuses)
 	if err != nil {
 		t.Fatalf("exportJSON failed: %v", err)
 	}
@@ -728,7 +776,7 @@ func TestExportJSON_NoHealthWhenEmpty(t *testing.T) {
 		},
 	}
 
-	err := m.exportJSON(memFs, path)
+	err := m.exportJSON(memFs, path, m.statuses)
 	if err != nil {
 		t.Fatalf("exportJSON failed: %v", err)
 	}
