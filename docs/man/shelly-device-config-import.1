@@ -13,8 +13,9 @@ shelly-device-config-import - Import configuration from a file
 Import device configuration from a JSON or YAML file.
 
 .PP
-By default, only specified keys are updated (merge mode). Use --overwrite
-to replace the entire configuration.
+Keys present in the file are applied to the device; keys absent from the file
+are left unchanged (the device merges the update — there is no whole-config
+replace primitive). Capture a file in this format with 'shelly config export'.
 
 
 .SH OPTIONS
@@ -24,14 +25,6 @@ to replace the entire configuration.
 .PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for import
-
-.PP
-\fB--merge\fP[=true]
-	Merge with existing configuration (default)
-
-.PP
-\fB--overwrite\fP[=false]
-	Overwrite entire configuration
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -93,14 +86,11 @@ to replace the entire configuration.
 
 .SH EXAMPLE
 .EX
-  # Import configuration (merge mode)
+  # Import configuration
   shelly config import living-room config-backup.json
 
   # Dry run - show what would change without applying
   shelly config import living-room config.json --dry-run
-
-  # Overwrite entire configuration
-  shelly config import living-room config.json --overwrite
 .EE
 
 

@@ -20,10 +20,7 @@ import (
 const testFilePerms = 0o600
 
 // Flag default value constants for tests.
-const (
-	flagDefFalse = "false"
-	flagDefTrue  = "true"
-)
+const flagDefFalse = "false"
 
 // Test path constants.
 const (
@@ -106,22 +103,6 @@ func TestNewCommand_Flags(t *testing.T) {
 	}
 	if dryRunFlag.DefValue != flagDefFalse {
 		t.Errorf("dry-run default = %q, want false", dryRunFlag.DefValue)
-	}
-
-	mergeFlag := cmd.Flags().Lookup("merge")
-	if mergeFlag == nil {
-		t.Fatal("merge flag not found")
-	}
-	if mergeFlag.DefValue != flagDefTrue {
-		t.Errorf("merge default = %q, want true", mergeFlag.DefValue)
-	}
-
-	overwriteFlag := cmd.Flags().Lookup("overwrite")
-	if overwriteFlag == nil {
-		t.Fatal("overwrite flag not found")
-	}
-	if overwriteFlag.DefValue != flagDefFalse {
-		t.Errorf("overwrite default = %q, want false", overwriteFlag.DefValue)
 	}
 }
 
@@ -240,19 +221,14 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "merge flag false",
-			args:    []string{"--merge=false"},
-			wantErr: false,
-		},
-		{
-			name:    "overwrite flag",
+			name:    "removed overwrite flag is rejected",
 			args:    []string{"--overwrite"},
-			wantErr: false,
+			wantErr: true,
 		},
 		{
-			name:    "all flags",
-			args:    []string{"--dry-run", "--overwrite"},
-			wantErr: false,
+			name:    "removed merge flag is rejected",
+			args:    []string{"--merge=false"},
+			wantErr: true,
 		},
 		{
 			name:    "no flags",
@@ -793,7 +769,7 @@ func TestRun_DeviceNotFound(t *testing.T) {
 }
 
 //nolint:paralleltest // Uses shared mock server
-func TestRun_WithOverwriteFlag(t *testing.T) {
+func TestRun_AppliesConfig(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { config.SetFs(nil) })
 
@@ -838,11 +814,10 @@ func TestRun_WithOverwriteFlag(t *testing.T) {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
-	// Create and execute command with --overwrite
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"overwrite-device", configFile, "--overwrite"})
+	cmd.SetArgs([]string{"overwrite-device", configFile})
 
 	err = cmd.Execute()
 	if err != nil {
@@ -861,12 +836,10 @@ func TestOptions_Fields(t *testing.T) {
 
 	f := cmdutil.NewFactory()
 	opts := &Options{
-		Factory:   f,
-		Device:    "test-device",
-		FilePath:  "/path/to/config.json",
-		DryRun:    true,
-		Merge:     true,
-		Overwrite: false,
+		Factory:  f,
+		Device:   "test-device",
+		FilePath: "/path/to/config.json",
+		DryRun:   true,
 	}
 
 	if opts.Device != "test-device" {
@@ -879,14 +852,6 @@ func TestOptions_Fields(t *testing.T) {
 
 	if !opts.DryRun {
 		t.Error("DryRun should be true")
-	}
-
-	if !opts.Merge {
-		t.Error("Merge should be true")
-	}
-
-	if opts.Overwrite {
-		t.Error("Overwrite should be false")
 	}
 
 	if opts.Factory == nil {
@@ -1080,48 +1045,6 @@ wifi:
 	out := tf.OutString()
 	if !strings.Contains(out, "Configuration imported") {
 		t.Errorf("Output should contain 'Configuration imported', got: %s", out)
-	}
-}
-
-func TestNewCommand_MergeFlagDefault(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Parse empty args to get default values
-	if err := cmd.ParseFlags([]string{}); err != nil {
-		t.Fatalf("ParseFlags error: %v", err)
-	}
-
-	mergeFlag := cmd.Flags().Lookup("merge")
-	if mergeFlag == nil {
-		t.Fatal("merge flag not found")
-	}
-
-	// Merge should default to true
-	if mergeFlag.DefValue != flagDefTrue {
-		t.Errorf("merge default should be true, got %q", mergeFlag.DefValue)
-	}
-}
-
-func TestNewCommand_OverwriteFlagDefault(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Parse empty args to get default values
-	if err := cmd.ParseFlags([]string{}); err != nil {
-		t.Fatalf("ParseFlags error: %v", err)
-	}
-
-	overwriteFlag := cmd.Flags().Lookup("overwrite")
-	if overwriteFlag == nil {
-		t.Fatal("overwrite flag not found")
-	}
-
-	// Overwrite should default to false
-	if overwriteFlag.DefValue != flagDefFalse {
-		t.Errorf("overwrite default should be false, got %q", overwriteFlag.DefValue)
 	}
 }
 

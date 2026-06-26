@@ -18,12 +18,10 @@ import (
 
 // Options holds command options.
 type Options struct {
-	Factory   *cmdutil.Factory
-	Device    string
-	FilePath  string
-	DryRun    bool
-	Merge     bool
-	Overwrite bool
+	Factory  *cmdutil.Factory
+	Device   string
+	FilePath string
+	DryRun   bool
 }
 
 // NewCommand creates the config import command.
@@ -36,16 +34,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Import configuration from a file",
 		Long: `Import device configuration from a JSON or YAML file.
 
-By default, only specified keys are updated (merge mode). Use --overwrite
-to replace the entire configuration.`,
-		Example: `  # Import configuration (merge mode)
+Keys present in the file are applied to the device; keys absent from the file
+are left unchanged (the device merges the update — there is no whole-config
+replace primitive). Capture a file in this format with 'shelly config export'.`,
+		Example: `  # Import configuration
   shelly config import living-room config-backup.json
 
   # Dry run - show what would change without applying
-  shelly config import living-room config.json --dry-run
-
-  # Overwrite entire configuration
-  shelly config import living-room config.json --overwrite`,
+  shelly config import living-room config.json --dry-run`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
@@ -55,8 +51,6 @@ to replace the entire configuration.`,
 	}
 
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would be changed without applying")
-	cmd.Flags().BoolVar(&opts.Merge, "merge", true, "Merge with existing configuration (default)")
-	cmd.Flags().BoolVar(&opts.Overwrite, "overwrite", false, "Overwrite entire configuration")
 
 	return cmd
 }
