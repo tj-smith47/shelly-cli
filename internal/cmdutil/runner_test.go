@@ -185,22 +185,44 @@ func TestRunBatch(t *testing.T) {
 		}
 	})
 
-	t.Run("individual errors don't stop batch", func(t *testing.T) {
+	t.Run("individual errors don't abort batch but are reported", func(t *testing.T) {
 		t.Parallel()
 		ios, _, _ := testIOStreams()
 		svc := shelly.NewService()
 		targets := []string{"device1", "device2", "device3"}
+		var callCount atomic.Int32
 
 		err := cmdutil.RunBatch(context.Background(), ios, svc, targets, 5, func(_ context.Context, _ *shelly.Service, device string) error {
+			callCount.Add(1)
 			if device == "device2" {
 				return errors.New("device2 failed")
 			}
 			return nil
 		})
 
-		// Batch should not return error even if individual operations fail
-		if err != nil {
-			t.Errorf("RunBatch() error = %v, want nil (errors logged but don't stop batch)", err)
+		// A failure must not abort the batch: every device is still attempted...
+		if callCount.Load() != 3 {
+			t.Errorf("action called %d times, want 3 (one failure must not abort the rest)", callCount.Load())
+		}
+		// ...but the overall result must be a non-nil error so callers / scripts
+		// gating on exit status don't believe a failed batch succeeded.
+		if err == nil {
+			t.Error("RunBatch() error = nil, want non-nil when a device fails")
+		}
+	})
+
+	t.Run("all devices fail returns error", func(t *testing.T) {
+		t.Parallel()
+		ios, _, _ := testIOStreams()
+		svc := shelly.NewService()
+		targets := []string{"device1", "device2"}
+
+		err := cmdutil.RunBatch(context.Background(), ios, svc, targets, 5, func(_ context.Context, _ *shelly.Service, _ string) error {
+			return errors.New("offline")
+		})
+
+		if err == nil {
+			t.Error("RunBatch() error = nil, want non-nil when all devices fail")
 		}
 	})
 }

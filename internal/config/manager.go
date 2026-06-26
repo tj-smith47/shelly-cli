@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	iofs "io/fs"
 	"log"
 	"path/filepath"
 	"sort"
@@ -148,12 +149,19 @@ func (m *Manager) Load() error {
 
 	c := &Config{}
 
-	// Read config file directly (not via viper) to enable parallel tests
-	if data, err := afero.ReadFile(m.Fs(), m.path); err == nil {
+	// Read config file directly (not via viper) to enable parallel tests.
+	// A missing file is fine (first run); any OTHER read error (EACCES, EIO,
+	// transient FS) must abort — treating it as "empty config" would let the
+	// next Save() overwrite the real registry with nothing.
+	data, err := afero.ReadFile(m.Fs(), m.path)
+	switch {
+	case err == nil:
 		data = m.migrateSchemaURL(data)
 		if err := yaml.Unmarshal(data, c); err != nil {
 			return fmt.Errorf("unmarshal config: %w", err)
 		}
+	case !errors.Is(err, iofs.ErrNotExist):
+		return fmt.Errorf("read config %s: %w", m.path, err)
 	}
 
 	initConfigMaps(c)
@@ -175,10 +183,27 @@ func (m *Manager) migrateSchemaURL(data []byte) []byte {
 		[]byte(oldSchemaURLFragment),
 		[]byte("shelly-cli/master/cfg/config.schema.json"))
 	// Persist the fix so editors pick it up immediately
-	if err := afero.WriteFile(m.Fs(), m.path, data, 0o600); err != nil && viper.GetInt("verbosity") >= 1 {
+	if err := m.atomicWrite(m.Fs(), data); err != nil && viper.GetInt("verbosity") >= 1 {
 		log.Printf("[debug] migrate schema URL: %v", err)
 	}
 	return data
+}
+
+// atomicWrite writes the config to a sibling temp file then renames it over
+// m.path, so a crash or ENOSPC partway through can never leave a truncated or
+// zero-length config (the live registry stays intact until rename succeeds).
+func (m *Manager) atomicWrite(afs afero.Fs, data []byte) error {
+	tmpPath := m.path + ".tmp"
+	if err := afero.WriteFile(afs, tmpPath, data, 0o600); err != nil {
+		return fmt.Errorf("write temp config: %w", err)
+	}
+	if err := afs.Rename(tmpPath, m.path); err != nil {
+		if rmErr := afs.Remove(tmpPath); rmErr != nil && viper.GetInt("verbosity") >= 1 {
+			log.Printf("[debug] remove temp config: %v", rmErr)
+		}
+		return fmt.Errorf("rename temp config: %w", err)
+	}
+	return nil
 }
 
 // initConfigMaps initializes nil maps in a freshly-loaded config.
@@ -293,8 +318,8 @@ func (m *Manager) saveWithoutLock() error {
 		return nil
 	}
 
-	fs := m.Fs()
-	if err := fs.MkdirAll(filepath.Dir(m.path), 0o750); err != nil {
+	afs := m.Fs()
+	if err := afs.MkdirAll(filepath.Dir(m.path), 0o750); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
@@ -309,7 +334,7 @@ func (m *Manager) saveWithoutLock() error {
 	// Prepend YAML schema header for editor support (autocomplete, validation)
 	fullData := append([]byte(yamlSchemaHeader), data...)
 
-	if err := afero.WriteFile(fs, m.path, fullData, 0o600); err != nil {
+	if err := m.atomicWrite(afs, fullData); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 

@@ -327,10 +327,13 @@ func TestNewBatchComponentCommand_ServiceError(t *testing.T) {
 	cmd := factories.NewBatchComponentCommand(tf.Factory, opts)
 	cmd.SetArgs([]string{"dev1"})
 
-	// Batch operations don't fail the whole command for individual device errors
+	// A batch keeps going past a per-device failure (the summary still prints
+	// every device's result), but it must surface a non-zero exit when any
+	// device failed — otherwise a fully-failed batch reports success and
+	// callers/scripts cannot detect the failure.
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Execute() error = %v, want nil (batch errors are logged)", err)
+	if err == nil {
+		t.Error("Execute() should return an error when a device fails, so the exit code is non-zero")
 	}
 }
 

@@ -112,8 +112,17 @@ func RunBatch(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service
 	err := g.Wait()
 	mw.Finalize()
 	mw.PrintSummary()
+	if err != nil {
+		return err
+	}
 
-	return err
+	// Per-device failures return nil from the closure (so one bad device doesn't
+	// abort the batch), so g.Wait() can't surface them. Derive the exit status
+	// from the summary instead, matching batch/command's contract.
+	if _, failed, _ := mw.Summary(); failed > 0 {
+		return fmt.Errorf("%d/%d devices failed", failed, len(targets))
+	}
+	return nil
 }
 
 // RunBatchComponent executes a component action on multiple devices concurrently.
