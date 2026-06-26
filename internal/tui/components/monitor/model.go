@@ -94,6 +94,12 @@ type DeviceStatus struct {
 
 	// Link info (for devices linked to a parent switch)
 	LinkState string // Derived state from parent switch (e.g., "Off", "On", "Unknown")
+
+	// componentPower tracks per-component active power (keyed by the WebSocket
+	// component, e.g. "switch:0") so a single-component status change re-derives the
+	// device's aggregate Power by summing all known components instead of clobbering
+	// it with one channel's value. Reset whenever a full status recomputes Power.
+	componentPower map[string]float64
 }
 
 // StatusUpdateMsg is sent when device status is updated.
@@ -634,9 +640,22 @@ func (m Model) parseStatusChange(status *DeviceStatus, component string, data js
 		return
 	}
 
-	// Extract power data from switch/pm components
+	// Extract power data from switch/pm components. A status change carries a single
+	// component, so track per-component power and re-derive the device aggregate by
+	// summing all known components — assigning status.Power directly would drop the
+	// other channels' contribution on a multi-channel device (2PM/4PM) until the
+	// next full poll.
 	if power, ok := statusData["apower"].(float64); ok {
-		status.Power = power
+		if status.componentPower == nil {
+			status.componentPower = make(map[string]float64)
+		}
+		status.componentPower[component] = power
+
+		var total float64
+		for _, p := range status.componentPower {
+			total += p
+		}
+		status.Power = total
 	}
 	if voltage, ok := statusData["voltage"].(float64); ok {
 		status.Voltage = voltage
@@ -658,6 +677,9 @@ func (m Model) parseFullStatus(status *DeviceStatus, data json.RawMessage) {
 	status.Voltage = 0
 	status.Current = 0
 	status.TotalEnergy = 0
+	// A full status is the authoritative aggregate; drop per-component tracking so
+	// subsequent single-component changes rebuild it from a clean baseline.
+	status.componentPower = nil
 
 	aggregateMetrics(status, fullStatus.PM, false)
 	aggregateMetrics(status, fullStatus.EM, true)

@@ -218,8 +218,9 @@ func gen1RollerStatusToCover(id int, status *gen1comp.RollerStatus) *model.Cover
 	if status.CurrentPos >= 0 && status.IsValid {
 		result.CurrentPosition = &status.CurrentPos
 	}
-	if status.Power > 0 {
-		result.Power = &status.Power
-	}
+	// Always surface the reading: an idle roller legitimately reports 0 W, and the
+	// prior `> 0` guard hid it so `cover status` printed "-" instead of "0.0 W".
+	power := status.Power
+	result.Power = &power
 	return result
 }

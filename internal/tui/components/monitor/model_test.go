@@ -264,6 +264,54 @@ func TestAggregateMetrics_PM(t *testing.T) {
 	}
 }
 
+func TestParseStatusChange_AggregatesMultiComponentPower(t *testing.T) {
+	t.Parallel()
+
+	var m Model
+	status := &DeviceStatus{}
+
+	// A multi-channel device (e.g. 2PM) emits one status change per channel. Each
+	// must accumulate, not clobber the device aggregate.
+	m.parseStatusChange(status, "switch:0", json.RawMessage(`{"apower": 10.0}`))
+	if status.Power != 10 {
+		t.Fatalf("after switch:0, expected power 10, got %f", status.Power)
+	}
+
+	m.parseStatusChange(status, "switch:1", json.RawMessage(`{"apower": 20.0}`))
+	if status.Power != 30 {
+		t.Fatalf("after switch:1, expected aggregate power 30, got %f", status.Power)
+	}
+
+	// A new reading for an existing channel replaces only that channel's share.
+	m.parseStatusChange(status, "switch:0", json.RawMessage(`{"apower": 5.0}`))
+	if status.Power != 25 {
+		t.Errorf("after switch:0 update, expected aggregate power 25, got %f", status.Power)
+	}
+}
+
+func TestParseFullStatus_ResetsComponentPowerBaseline(t *testing.T) {
+	t.Parallel()
+
+	var m Model
+	status := &DeviceStatus{}
+
+	// Seed per-component tracking, then a full status arrives as the authoritative
+	// aggregate: subsequent single-component changes must rebuild from a clean slate
+	// rather than re-adding the stale pre-poll channel readings.
+	m.parseStatusChange(status, "switch:0", json.RawMessage(`{"apower": 10.0}`))
+	m.parseStatusChange(status, "switch:1", json.RawMessage(`{"apower": 20.0}`))
+
+	m.parseFullStatus(status, json.RawMessage(`{"online": true}`))
+	if status.Power != 0 {
+		t.Fatalf("full status should reset power to its aggregate (0 here), got %f", status.Power)
+	}
+
+	m.parseStatusChange(status, "switch:0", json.RawMessage(`{"apower": 7.0}`))
+	if status.Power != 7 {
+		t.Errorf("after reset, switch:0 should rebuild from clean baseline to 7, got %f", status.Power)
+	}
+}
+
 func TestAggregateMetrics_EM(t *testing.T) {
 	t.Parallel()
 
