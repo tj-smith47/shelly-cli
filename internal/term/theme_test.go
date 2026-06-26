@@ -54,3 +54,28 @@ func TestDisplayValidationResult_Minimal(t *testing.T) {
 		t.Error("should not show base theme when empty")
 	}
 }
+
+func TestRenderThemePreview(t *testing.T) {
+	t.Parallel()
+
+	out := RenderThemePreview("nord")
+
+	// The header carries the requested theme ID, and every preview section is
+	// present so a regression that drops one is caught.
+	for _, want := range []string{
+		"Theme: nord",
+		"Color Palette:",
+		"Foreground",
+		"Status Indicators:",
+		"Success message",
+		"Device Status:",
+		"Switch State:",
+		"Power/Energy:",
+		"Table Header:",
+		"DEVICE",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("preview missing %q", want)
+		}
+	}
+}
