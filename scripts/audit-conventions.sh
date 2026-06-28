@@ -420,10 +420,14 @@ search_test() {
 # - shelly/firmware_ap_test.go: the at-AP firmware image is served to the device via
 #   http.ServeFile (a real OS path) and the code under test uses os.CreateTemp/os.Remove,
 #   so the tests exercise real OS error modes (ENOTDIR, ENOTEMPTY) afero cannot reproduce
+# - config/manager_fs_guard_test.go: exercises guardLiveConfigWrite, which only fires on
+#   *afero.OsFs writes to the live config path — a real OS temp dir is required to prove it
+#   (memfs is not *afero.OsFs, so the guard would never trigger and the test would be moot)
 TEMP_DIR=$(search_test "t\.TempDir()" "internal/" | \
     grep -v "internal/cmd/migrate/validate/validate_test.go" | \
     grep -v "internal/tui/cache/plugin_parser_test.go" | \
-    grep -v "internal/shelly/firmware_ap_test.go" || true)
+    grep -v "internal/shelly/firmware_ap_test.go" | \
+    grep -v "internal/config/manager_fs_guard_test.go" || true)
 TEMP_DIR_COUNT=$(count_matches "$TEMP_DIR")
 if [[ "$TEMP_DIR_COUNT" -gt 0 ]]; then
     warn "Found $TEMP_DIR_COUNT uses of t.TempDir() (prefer afero.NewMemMapFs with SetFs):"

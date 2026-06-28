@@ -68,6 +68,7 @@ Registered devices can be referenced by name in other commands.
 * [shelly device reboot](shelly_device_reboot.md)	 - Reboot device
 * [shelly device remove](shelly_device_remove.md)	 - Remove a device from the registry
 * [shelly device rename](shelly_device_rename.md)	 - Rename a device in the registry
+* [shelly device set-address](shelly_device_set-address.md)	 - Update a registered device's IP address
 * [shelly device status](shelly_device_status.md)	 - Show device status
 * [shelly device ui](shelly_device_ui.md)	 - Open device web interface in browser
 

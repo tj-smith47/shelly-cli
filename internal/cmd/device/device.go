@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/reboot"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/remove"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/rename"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/device/setaddress"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/status"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/ui"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -49,6 +50,7 @@ Registered devices can be referenced by name in other commands.`,
 	cmd.AddCommand(reboot.NewCommand(f))
 	cmd.AddCommand(remove.NewCommand(f))
 	cmd.AddCommand(rename.NewCommand(f))
+	cmd.AddCommand(setaddress.NewCommand(f))
 	cmd.AddCommand(status.NewCommand(f))
 	cmd.AddCommand(ui.NewCommand(f))
 
