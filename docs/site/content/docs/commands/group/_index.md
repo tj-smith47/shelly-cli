@@ -37,6 +37,14 @@ Devices can belong to multiple groups.
 
   # Delete a group
   shelly group delete living-room
+
+  # Set all members to 100% and turn on
+  shelly group set guest-bath-bulbs -b 100 --on
+
+  # Turn a group on, off, or toggle it
+  shelly group on living-room
+  shelly group off living-room
+  shelly group toggle living-room
 ```
 
 ### Options
@@ -72,5 +80,9 @@ Devices can belong to multiple groups.
 * [shelly group delete](shelly_group_delete.md)	 - Delete a group
 * [shelly group list](shelly_group_list.md)	 - List groups
 * [shelly group members](shelly_group_members.md)	 - List group members
+* [shelly group off](shelly_group_off.md)	 - Turn off all group members
+* [shelly group on](shelly_group_on.md)	 - Turn on all group members
 * [shelly group remove](shelly_group_remove.md)	 - Remove devices from a group
+* [shelly group set](shelly_group_set.md)	 - Set light parameters on all group members
+* [shelly group toggle](shelly_group_toggle.md)	 - Toggle all group members
 

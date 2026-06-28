@@ -2,24 +2,46 @@
 .TH "SHELLY" "1" "Jun 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-group - Manage device groups
+shelly-group-set - Set light parameters on all group members
 
 
 .SH SYNOPSIS
-\fBshelly group [flags]\fP
+\fBshelly group set  [flags]\fP
 
 
 .SH DESCRIPTION
-Manage device groups for batch operations.
+Set light parameters on every device in a group.
 
 .PP
-Groups allow you to organize devices and perform bulk operations on them.
-Devices can belong to multiple groups.
+You can set brightness, white color temperature (Gen1 white-temp bulbs such as
+the Duo), and on/off state. Values not specified are left unchanged. The change
+is fanned out to all members concurrently and a per-member result summary is
+printed.
 
 
 .SH OPTIONS
+\fB-b\fP, \fB--brightness\fP=-1
+	Brightness (0-100)
+
+.PP
+\fB-c\fP, \fB--concurrent\fP=5
+	Max concurrent operations
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
-	help for group
+	help for set
+
+.PP
+\fB-i\fP, \fB--id\fP=0
+	Light component ID (default 0)
+
+.PP
+\fB--on\fP[=false]
+	Turn on
+
+.PP
+\fB-t\fP, \fB--temp\fP=-1
+	White color temperature in Kelvin (Gen1 Duo: 2700-6500)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -81,33 +103,16 @@ Devices can belong to multiple groups.
 
 .SH EXAMPLE
 .EX
-  # List all groups
-  shelly group list
-
-  # Create a new group
-  shelly group create living-room
-
-  # Add devices to a group
-  shelly group add living-room light-1 switch-2
-
-  # Show group members
-  shelly group members living-room
-
-  # Remove a device from a group
-  shelly group remove living-room switch-2
-
-  # Delete a group
-  shelly group delete living-room
-
-  # Set all members to 100% and turn on
+  # Set every member to 100% and turn on
   shelly group set guest-bath-bulbs -b 100 --on
 
-  # Turn a group on, off, or toggle it
-  shelly group on living-room
-  shelly group off living-room
-  shelly group toggle living-room
+  # Set white color temperature to 4200K on all members (Gen1 Duo)
+  shelly group set master-bath -t 4200
+
+  # Target component 1 on every member
+  shelly group set living-room -b 50 --id 1
 .EE
 
 
 .SH SEE ALSO
-\fBshelly(1)\fP, \fBshelly-group-add(1)\fP, \fBshelly-group-create(1)\fP, \fBshelly-group-delete(1)\fP, \fBshelly-group-list(1)\fP, \fBshelly-group-members(1)\fP, \fBshelly-group-off(1)\fP, \fBshelly-group-on(1)\fP, \fBshelly-group-remove(1)\fP, \fBshelly-group-set(1)\fP, \fBshelly-group-toggle(1)\fP
+\fBshelly-group(1)\fP

@@ -9,7 +9,11 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/deletecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/members"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/group/off"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/group/on"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/remove"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/group/set"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/group/toggle"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
@@ -39,7 +43,15 @@ Devices can belong to multiple groups.`,
   shelly group remove living-room switch-2
 
   # Delete a group
-  shelly group delete living-room`,
+  shelly group delete living-room
+
+  # Set all members to 100% and turn on
+  shelly group set guest-bath-bulbs -b 100 --on
+
+  # Turn a group on, off, or toggle it
+  shelly group on living-room
+  shelly group off living-room
+  shelly group toggle living-room`,
 	}
 
 	cmd.AddCommand(list.NewCommand(f))
@@ -48,6 +60,10 @@ Devices can belong to multiple groups.`,
 	cmd.AddCommand(add.NewCommand(f))
 	cmd.AddCommand(remove.NewCommand(f))
 	cmd.AddCommand(members.NewCommand(f))
+	cmd.AddCommand(set.NewCommand(f))
+	cmd.AddCommand(on.NewCommand(f))
+	cmd.AddCommand(off.NewCommand(f))
+	cmd.AddCommand(toggle.NewCommand(f))
 
 	return cmd
 }
