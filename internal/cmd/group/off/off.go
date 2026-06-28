@@ -25,7 +25,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "off <group>",
-		Aliases: []string{"disable", "power-off"},
+		Aliases: []string{"turn-off", "disable"},
 		Short:   "Turn off all group members",
 		Long: `Turn off every device in a group.
 

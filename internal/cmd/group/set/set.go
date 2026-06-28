@@ -39,7 +39,10 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 You can set brightness, white color temperature (Gen1 white-temp bulbs such as
 the Duo), and on/off state. Values not specified are left unchanged. The change
 is fanned out to all members concurrently and a per-member result summary is
-printed.`,
+printed.
+
+Unlike on/off/toggle, --id targets a single light component (default 0) on each
+member rather than all components.`,
 		Example: `  # Set every member to 100% and turn on
   shelly group set guest-bath-bulbs -b 100 --on
 

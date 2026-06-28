@@ -16,6 +16,9 @@ the Duo), and on/off state. Values not specified are left unchanged. The change
 is fanned out to all members concurrently and a per-member result summary is
 printed.
 
+Unlike on/off/toggle, --id targets a single light component (default 0) on each
+member rather than all components.
+
 ```
 shelly group set <group> [flags]
 ```

@@ -25,7 +25,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "toggle <group>",
-		Aliases: []string{"tog", "switch"},
+		Aliases: []string{"flip", "switch"},
 		Short:   "Toggle all group members",
 		Long: `Toggle every device in a group.
 
