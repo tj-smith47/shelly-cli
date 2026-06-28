@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"testing"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
@@ -27,8 +28,39 @@ var (
 	defaultFsMu sync.RWMutex
 )
 
+// guardLiveConfigWrite refuses, under `go test`, any write to the user's live
+// config path through a real OS filesystem. Memory filesystems and writes to
+// other (temp) paths are unaffected, so legitimate OS-FS temp-dir tests still
+// work; only the one sacred file is protected.
+func guardLiveConfigWrite(afs afero.Fs, path string) error {
+	if !testing.Testing() {
+		return nil
+	}
+	if _, isOsFs := afs.(*afero.OsFs); !isOsFs {
+		return nil
+	}
+	dir, err := Dir()
+	if err != nil {
+		return nil //nolint:nilerr // can't resolve the live path → nothing to guard; fail open (production is never under test)
+	}
+	live := filepath.Clean(filepath.Join(dir, "config.yaml"))
+	if filepath.Clean(path) == live {
+		// Loud on purpose: a test reaching this means it lacks filesystem
+		// isolation. The write is refused (the real config is never touched),
+		// but the offending test must be fixed to use SetFs / NewTestManager.
+		log.Printf("config: BLOCKED a test write to the live config %q — isolate the test with SetFs(afero.NewMemMapFs()) or NewTestManager", live)
+		return fmt.Errorf("refusing to write live config %q from a test (use SetFs with an in-memory filesystem)", live)
+	}
+	return nil
+}
+
 // SetFs sets the package-level filesystem for testing.
 // Pass nil to reset to the real OS filesystem.
+//
+// A test cannot clobber the user's live config even on this OS default: every
+// config save runs through guardLiveConfigWrite, which refuses an OS-filesystem
+// write to the live config path under `go test`. This preserves real-OS
+// semantics for tests that need them while making a config clobber impossible.
 func SetFs(fs afero.Fs) {
 	defaultFsMu.Lock()
 	defer defaultFsMu.Unlock()
@@ -319,6 +351,14 @@ func (m *Manager) saveWithoutLock() error {
 	}
 
 	afs := m.Fs()
+
+	// Hard guard: a test that forces a real OS filesystem (e.g. SetFs(afero.NewOsFs()))
+	// must never overwrite the user's live config file. This is the last line of
+	// defense behind the memory-by-default filesystem; together they make a real
+	// config clobber from the test binary unrepresentable.
+	if err := guardLiveConfigWrite(afs, m.path); err != nil {
+		return err
+	}
 	if err := afs.MkdirAll(filepath.Dir(m.path), 0o750); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}

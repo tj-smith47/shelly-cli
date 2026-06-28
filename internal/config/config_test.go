@@ -1358,9 +1358,9 @@ func TestPackageLevel_Reload(t *testing.T) {
 		t.Fatal("Reload() returned nil config")
 	}
 
-	// Both should have initialized maps
-	if cfg1 == nil || cfg2 == nil {
-		t.Fatal("configs should not be nil")
+	// The initial Load() result must be valid too
+	if cfg1 == nil {
+		t.Fatal("Load() returned nil config")
 	}
 }
 

@@ -50,6 +50,9 @@ func TestSceneStruct(t *testing.T) {
 	if scene.Name != "movie-night" {
 		t.Errorf("Name = %q, want movie-night", scene.Name)
 	}
+	if scene.Description != "Dim lights for movie watching" {
+		t.Errorf("Description = %q, want Dim lights for movie watching", scene.Description)
+	}
 	if len(scene.Actions) != 2 {
 		t.Errorf("Actions length = %d, want 2", len(scene.Actions))
 	}

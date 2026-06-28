@@ -2,7 +2,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -157,43 +156,38 @@ func SetSetting(key string, value any) error {
 	return writeViperConfig()
 }
 
-// writeViperConfig persists viper's in-memory settings to disk. On a fresh
-// install no config file exists yet, which makes viper.WriteConfig fail with
-// "Config File Not Found"; this resolves the default path, creates the
-// directory, and writes a new file so the very first `shelly config set` (and
-// `config reset`) succeeds instead of erroring.
+// writeViperConfig persists viper's in-memory settings to disk through the
+// package filesystem.
+//
+// It deliberately does NOT call viper.WriteConfig()/WriteConfigAs(): those write
+// the real OS filesystem directly, which (a) bypasses the in-memory test
+// filesystem — the original cause of a live-config clobber from an un-isolated
+// `config set` test — and (b) bypasses guardLiveConfigWrite. Routing every write
+// through Fs() keeps tests in memory and lets the guard refuse any test write to
+// the user's live config. In production Fs() is the real OS filesystem, so this
+// resolves the default path and writes a new file on a fresh install just as
+// before.
 func writeViperConfig() error {
-	err := viper.WriteConfig()
-	if err == nil {
-		return nil
-	}
-	var notFound viper.ConfigFileNotFoundError
-	if !errors.As(err, &notFound) {
-		return err
-	}
-
 	path := viper.ConfigFileUsed()
 	if path == "" {
 		dir, dirErr := Dir()
 		if dirErr != nil {
 			return dirErr
 		}
-		if mkErr := Fs().MkdirAll(dir, 0o700); mkErr != nil {
-			return fmt.Errorf("create config dir: %w", mkErr)
-		}
 		path = filepath.Join(dir, "config.yaml")
 	}
 
-	// In test mode viper still uses the OS filesystem, so write through the
-	// package filesystem (an in-memory FS under test) to keep isolation.
-	if IsTestFs() {
-		data, marshalErr := yaml.Marshal(viper.AllSettings())
-		if marshalErr != nil {
-			return fmt.Errorf("marshal config: %w", marshalErr)
-		}
-		return afero.WriteFile(Fs(), path, data, 0o600)
+	if err := guardLiveConfigWrite(Fs(), path); err != nil {
+		return err
 	}
-	return viper.WriteConfigAs(path)
+	if mkErr := Fs().MkdirAll(filepath.Dir(path), 0o700); mkErr != nil {
+		return fmt.Errorf("create config dir: %w", mkErr)
+	}
+	data, marshalErr := yaml.Marshal(viper.AllSettings())
+	if marshalErr != nil {
+		return fmt.Errorf("marshal config: %w", marshalErr)
+	}
+	return afero.WriteFile(Fs(), path, data, 0o600)
 }
 
 // DeleteSetting removes a CLI configuration value by key.
@@ -389,5 +383,8 @@ func SaveTheme(themeName string) error {
 		return afero.WriteFile(Fs(), configFile, data, 0o600)
 	}
 
+	if err := guardLiveConfigWrite(Fs(), configFile); err != nil {
+		return err
+	}
 	return viper.WriteConfigAs(configFile)
 }
