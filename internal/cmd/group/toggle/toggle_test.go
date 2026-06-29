@@ -33,6 +33,20 @@ func TestNewCommand(t *testing.T) {
 	}
 }
 
+func TestNewCommand_DoesNotAliasSwitch(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// "switch" is the device-component command name; aliasing toggle to it
+	// shadows that command (the root toggle dropped it for the same reason), so
+	// the group toggle must stay aligned and never reintroduce it.
+	for _, a := range cmd.Aliases {
+		if a == "switch" {
+			t.Errorf("group toggle must not alias %q — it shadows the switch command", a)
+		}
+	}
+}
+
 func TestNewCommand_Flags(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
