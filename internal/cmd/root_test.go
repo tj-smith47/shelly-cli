@@ -2,10 +2,13 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"testing"
 
 	"github.com/spf13/viper"
+	"github.com/tj-smith47/shelly-go/transport"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
@@ -61,6 +64,67 @@ func TestRootCommand_GlobalFlags(t *testing.T) {
 		if flag.DefValue != tt.defValue {
 			t.Errorf("%s default = %q, want %q", tt.flagName, flag.DefValue, tt.defValue)
 		}
+	}
+}
+
+func TestRootCommand_RawFlag(t *testing.T) {
+	t.Parallel()
+
+	flag := rootCmd.PersistentFlags().Lookup("raw")
+	if flag == nil {
+		t.Fatal("raw flag not registered")
+	}
+	if flag.DefValue != "false" {
+		t.Errorf("raw default = %q, want %q", flag.DefValue, "false")
+	}
+}
+
+func TestEmitRawResponses(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		responses []json.RawMessage
+		want      string
+	}{
+		{
+			name:      "no device calls yields empty array",
+			responses: nil,
+			want:      "[]\n",
+		},
+		{
+			name:      "single Gen1 REST body",
+			responses: []json.RawMessage{json.RawMessage(`{"ison":true}`)},
+			want:      `[{"ison":true}]` + "\n",
+		},
+		{
+			name: "multiple responses preserve order",
+			responses: []json.RawMessage{
+				json.RawMessage(`{"id":0}`),
+				json.RawMessage(`{"was_on":false}`),
+			},
+			want: `[{"id":0},{"was_on":false}]` + "\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var sink transport.RawCapture
+			for _, r := range tt.responses {
+				sink.Record(r)
+			}
+
+			var out bytes.Buffer
+			if err := emitRawResponses(&out, &sink); err != nil {
+				t.Fatalf("emitRawResponses() error = %v", err)
+			}
+
+			if got := out.String(); got != tt.want {
+				t.Errorf("stdout = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

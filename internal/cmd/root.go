@@ -3,8 +3,10 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
@@ -16,6 +18,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/tj-smith47/shelly-go/transport"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/action"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alert"
@@ -142,6 +145,15 @@ and controlling Shelly devices on your local network.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+
+	// rawSink, when --raw is set, captures the verbatim device responses produced
+	// during the command so execute() can print them as a JSON array afterward.
+	rawSink *transport.RawCapture
+
+	// rawOut is the writer the captured --raw JSON array is printed to. It holds
+	// the command's original stdout (saved before output is suppressed) so the raw
+	// payload still reaches the real stdout, and so tests can capture it.
+	rawOut io.Writer
 )
 
 // GetRootCmd returns the root command for documentation generation.
@@ -195,6 +207,19 @@ func execute() int {
 	success := err == nil && ctx.Err() == nil
 	telemetry.Track(cmdPath, success, duration)
 
+	// --raw: emit the captured device responses as a JSON array before any error
+	// handling, so the exact device JSON is always on stdout even when the command
+	// also errored. An invocation that made no device calls prints an empty array.
+	if rawSink != nil {
+		w := rawOut
+		if w == nil {
+			w = os.Stdout
+		}
+		if rawErr := emitRawResponses(w, rawSink); rawErr != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", theme.StatusError().Render("[ERROR]"), rawErr)
+		}
+	}
+
 	if err != nil {
 		// Check if we were cancelled by signal
 		if ctx.Err() != nil {
@@ -211,6 +236,20 @@ func execute() int {
 	version.ShowUpdateNotification()
 
 	return 0
+}
+
+// emitRawResponses marshals the captured device responses to a JSON array and
+// writes it to out. An invocation that made no device calls yields an empty
+// array. Any marshal or write failure is returned for the caller to report.
+func emitRawResponses(out io.Writer, sink *transport.RawCapture) error {
+	data, err := json.Marshal(sink.Responses())
+	if err != nil {
+		return fmt.Errorf("encode raw responses: %w", err)
+	}
+	if _, err := fmt.Fprintln(out, string(data)); err != nil {
+		return fmt.Errorf("write raw responses: %w", err)
+	}
+	return nil
 }
 
 // Command group IDs for organized help output.
@@ -244,6 +283,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolP("fields", "F", false, "Print available field names for use with --jq and --template")
 	rootCmd.PersistentFlags().Bool("refresh", false, "Bypass cache and fetch fresh data from device")
 	rootCmd.PersistentFlags().Bool("offline", false, "Only read from cache, error on cache miss")
+	rootCmd.PersistentFlags().Bool("raw", false, "Print the exact device response(s) as a JSON array and suppress normal output")
 
 	// Bind to viper - errors indicate programming bugs, panic is appropriate
 	utils.Must(viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output")))
@@ -266,6 +306,11 @@ func init() {
 	// --jq produces its own output, mutually exclusive with format flags
 	rootCmd.MarkFlagsMutuallyExclusive("jq", "output")
 	rootCmd.MarkFlagsMutuallyExclusive("jq", "template")
+	// --raw emits its own JSON output, mutually exclusive with the other output/format flags
+	rootCmd.MarkFlagsMutuallyExclusive("raw", "jq")
+	rootCmd.MarkFlagsMutuallyExclusive("raw", "output")
+	rootCmd.MarkFlagsMutuallyExclusive("raw", "template")
+	rootCmd.MarkFlagsMutuallyExclusive("raw", "fields")
 
 	// Define command groups for organized help output (alphabetical by title)
 	rootCmd.AddGroup(
@@ -403,7 +448,7 @@ func init() {
 	)
 }
 
-func initializeConfig(_ *cobra.Command, _ []string) error {
+func initializeConfig(cmd *cobra.Command, _ []string) error {
 	// Load config: flag > env var > default
 	configFile, err := rootCmd.Flags().GetString("config")
 	if err != nil {
@@ -473,5 +518,27 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 		telemetry.SetEnabled(true)
 	}
 
+	applyRawCapture(cmd)
+
 	return nil
+}
+
+// applyRawCapture wires --raw when set: it installs a capture sink on the
+// command context so every device call records its exact response at shelly-go's
+// transport choke point, and suppresses decorative output. execute() prints the
+// captured responses as a JSON array once the command finishes. The sink rides
+// the context, so it reaches every Gen1/Gen2 call without per-command wiring.
+func applyRawCapture(cmd *cobra.Command) {
+	raw, err := cmd.Flags().GetBool("raw")
+	if err != nil || !raw {
+		return
+	}
+
+	rawSink = &transport.RawCapture{}
+	cmd.SetContext(transport.WithRawCapture(cmd.Context(), rawSink))
+
+	ios := factory.IOStreams()
+	rawOut = ios.Out
+	ios.Out = io.Discard
+	ios.SetQuiet(true)
 }

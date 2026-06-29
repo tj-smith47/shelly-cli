@@ -86,6 +86,7 @@ shelly batch command <method> [params-json] [device...] [flags]
       --offline                 Only read from cache, error on cache miss
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
+      --raw                     Print the exact device response(s) as a JSON array and suppress normal output
       --refresh                 Bypass cache and fetch fresh data from device
       --template string         Go template string for output (use with -o template)
   -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)

@@ -294,6 +294,23 @@ func TestRejoinCandidateInterfaces(t *testing.T) {
 			t.Errorf("got %v, want [\"\"]", got)
 		}
 	})
+
+	t.Run("dhcp de-duplicates repeated interface names", func(t *testing.T) {
+		t.Parallel()
+		// A multi-homed host can enumerate the same interface name across several
+		// addresses; each candidate must appear once so a presence listener is not
+		// bound to the same NIC twice.
+		dup := []probeIface{
+			{Name: "eth0", Nets: []*net.IPNet{subnet}},
+			{Name: "eth0", Nets: []*net.IPNet{subnet}},
+			{Name: "wlan0", IsWireless: true, Nets: []*net.IPNet{subnet}},
+		}
+		got := rejoinCandidateInterfaces("", dup)
+		want := []string{"", "eth0", "wlan0"}
+		if !equalStrings(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
 }
 
 // TestScanPresenceOnce_InputValidation covers the input-guard paths that never
@@ -311,6 +328,57 @@ func TestScanPresenceOnce_InputValidation(t *testing.T) {
 		"definitely-not-a-real-iface", true, time.Second)
 	if err == nil || !strings.Contains(err.Error(), "resolve interface") {
 		t.Errorf("err = %v, want a 'resolve interface' failure for an unknown interface", err)
+	}
+}
+
+// TestRejoinRaceSharedAddr covers the shared-address handoff state: before any
+// interface records a weak sighting there is no address to share (the DHCP
+// "not seen yet" case), and once one does, every interface reads it back.
+func TestRejoinRaceSharedAddr(t *testing.T) {
+	t.Parallel()
+
+	r := &rejoinRace{}
+	if got := r.sharedAddr(); got != "" {
+		t.Errorf("sharedAddr() before any sighting = %q, want empty", got)
+	}
+
+	r.recordWeak("192.0.2.55", viaMDNS)
+	if got := r.sharedAddr(); got != "192.0.2.55" {
+		t.Errorf("sharedAddr() after a sighting = %q, want %q", got, "192.0.2.55")
+	}
+
+	// The first sighting wins; a later one does not overwrite the shared address.
+	r.recordWeak("192.0.2.99", viaCoIoT)
+	if got := r.sharedAddr(); got != "192.0.2.55" {
+		t.Errorf("sharedAddr() = %q, want the first sighting %q to stand", got, "192.0.2.55")
+	}
+}
+
+// TestPresenceProto covers the diagnostic attribution of a route-independent
+// sighting to its source protocol: a Gen1 device's weak sighting is credited to
+// the Gen1-specific CoIoT listener, every other generation to mDNS.
+func TestPresenceProto(t *testing.T) {
+	t.Parallel()
+
+	if got := presenceProto(true); got != viaCoIoT {
+		t.Errorf("presenceProto(gen1=true) = %q, want %q", got, viaCoIoT)
+	}
+	if got := presenceProto(false); got != viaMDNS {
+		t.Errorf("presenceProto(gen1=false) = %q, want %q", got, viaMDNS)
+	}
+}
+
+// TestIfaceLabel covers the log-rendering of a bind interface: the empty
+// interface (the host's default route) is named explicitly, any other is
+// rendered verbatim.
+func TestIfaceLabel(t *testing.T) {
+	t.Parallel()
+
+	if got := ifaceLabel(""); got != "default route" {
+		t.Errorf("ifaceLabel(\"\") = %q, want %q", got, "default route")
+	}
+	if got := ifaceLabel("wlan0"); got != "wlan0" {
+		t.Errorf("ifaceLabel(\"wlan0\") = %q, want %q", got, "wlan0")
 	}
 }
 
