@@ -155,6 +155,28 @@ func TestRootCommand_Subcommands(t *testing.T) {
 	}
 }
 
+func TestSwitchSubcommandsNotShadowedByToggleAlias(t *testing.T) {
+	t.Parallel()
+
+	// Regression: the root `toggle` quick command once aliased "switch", which
+	// shadowed the `switch` command group (registered later). Cobra matched the
+	// alias first, so `shelly switch status <dev>` mis-routed to toggle and died
+	// with "accepts 1 arg(s), received 2". Every switch subcommand must resolve
+	// to the switch group.
+	for _, sub := range []string{"status", "on", "off", "toggle", "list"} {
+		cmd, _, err := rootCmd.Find([]string{"switch", sub})
+		if err != nil {
+			t.Fatalf("Find(switch %s): %v", sub, err)
+		}
+		if cmd.Name() != sub {
+			t.Errorf("switch %s resolved to %q, want the switch-group subcommand", sub, cmd.Name())
+		}
+		if cmd.Parent() == nil || cmd.Parent().Name() != "switch" {
+			t.Errorf("switch %s parent = %v, want the switch group", sub, cmd.Parent())
+		}
+	}
+}
+
 func TestMust_NilError(t *testing.T) {
 	t.Parallel()
 

@@ -11,8 +11,12 @@ import (
 // NewCommand creates the toggle command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return factories.NewQuickCommand(f, factories.QuickOpts{
-		Action:  factories.QuickToggle,
-		Aliases: []string{"flip", "switch"},
+		Action: factories.QuickToggle,
+		// "switch" is intentionally NOT an alias here: it collides with the
+		// `switch` command group (switchcmd), and because this quick command is
+		// registered first, the alias shadowed the group — every `shelly switch
+		// <sub>` (status/on/off/list) mis-routed to toggle and failed arg parsing.
+		Aliases: []string{"flip"},
 		Short:   "Toggle a device (auto-detects type)",
 		Long: `Toggle a device by automatically detecting its type.
 
