@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -13,6 +14,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
+
+// rootCmdMu guards concurrent access to the shared rootCmd singleton from
+// parallel tests. cobra.Command.Commands() and .Find() both sort the
+// command tree in place, which races when called from more than one
+// goroutine at once.
+var rootCmdMu sync.Mutex
 
 func TestRootCommandStructure(t *testing.T) {
 	t.Parallel()
@@ -131,7 +138,9 @@ func TestEmitRawResponses(t *testing.T) {
 func TestRootCommand_Subcommands(t *testing.T) {
 	t.Parallel()
 
+	rootCmdMu.Lock()
 	subcommands := rootCmd.Commands()
+	rootCmdMu.Unlock()
 	expectedSubcommands := map[string]bool{
 		"discover": false,
 		"switch":   false,
@@ -164,7 +173,9 @@ func TestSwitchSubcommandsNotShadowedByToggleAlias(t *testing.T) {
 	// with "accepts 1 arg(s), received 2". Every switch subcommand must resolve
 	// to the switch group.
 	for _, sub := range []string{"status", "on", "off", "toggle", "list"} {
+		rootCmdMu.Lock()
 		cmd, _, err := rootCmd.Find([]string{"switch", sub})
+		rootCmdMu.Unlock()
 		if err != nil {
 			t.Fatalf("Find(switch %s): %v", sub, err)
 		}
