@@ -4,11 +4,21 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "saturday"
+    # Skip day-zero releases: a dep bumped this week is not re-bumped next
+    # week when its follow-up patch ships.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "chore"
       include: "scope"
     groups:
       github-actions:
+        patterns: ["*"]
+      # Security updates ignore the schedule and arrive on advisory day; this
+      # group folds them into one PR per ecosystem instead of one per dep.
+      github-actions-security:
+        applies-to: security-updates
         patterns: ["*"]
   - package-ecosystem: "gomod"
     directories:
@@ -17,19 +27,61 @@ updates:
       - "/examples/plugins/shelly-tasmota"
     schedule:
       interval: "weekly"
+      day: "saturday"
+    # Skip day-zero releases: a dep bumped this week is not re-bumped next
+    # week when its follow-up patch ships.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "chore"
       include: "scope"
     groups:
       go-modules:
         patterns: ["*"]
+      # Security updates ignore the schedule and arrive on advisory day; this
+      # group folds them into one PR per ecosystem instead of one per dep.
+      go-modules-security:
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "saturday"
+    # Skip day-zero releases: a dep bumped this week is not re-bumped next
+    # week when its follow-up patch ships.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "chore"
       include: "scope"
     groups:
       docker:
+        patterns: ["*"]
+      # Security updates ignore the schedule and arrive on advisory day; this
+      # group folds them into one PR per ecosystem instead of one per dep.
+      docker-security:
+        applies-to: security-updates
+        patterns: ["*"]
+  - package-ecosystem: "npm"
+    # The Docusaurus site lockfile; uncovered, its bumps only ever arrived as
+    # one security PR per dependency.
+    directory: "/docs/site"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    # Skip day-zero releases: a dep bumped this week is not re-bumped next
+    # week when its follow-up patch ships.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      npm:
+        patterns: ["*"]
+      # Security updates ignore the schedule and arrive on advisory day; this
+      # group folds them into one PR per ecosystem instead of one per dep.
+      npm-security:
+        applies-to: security-updates
         patterns: ["*"]
