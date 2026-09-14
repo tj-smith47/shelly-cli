@@ -109,7 +109,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_modbus.md"&gt;shelly modbus&lt;/a&gt;	 - Manage Modbus-TCP configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_modbus.md"&gt;shelly modbus&lt;/a&gt;	 - Manage Modbus-TCP configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly modbus enable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/enable/</guid><description>&lt;h2 id="shelly-modbus-enable"&gt;shelly modbus enable&lt;/h2&gt;
 &lt;p&gt;Enable Modbus-TCP&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -222,7 +224,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_modbus.md"&gt;shelly modbus&lt;/a&gt;	 - Manage Modbus-TCP configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_modbus.md"&gt;shelly modbus&lt;/a&gt;	 - Manage Modbus-TCP configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly modbus status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/status/</guid><description>&lt;h2 id="shelly-modbus-status"&gt;shelly modbus status&lt;/h2&gt;
 &lt;p&gt;Show Modbus-TCP status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -340,5 +344,7 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_modbus.md"&gt;shelly modbus&lt;/a&gt;	 - Manage Modbus-TCP configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_modbus.md"&gt;shelly modbus&lt;/a&gt;	 - Manage Modbus-TCP configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

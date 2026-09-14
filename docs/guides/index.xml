@@ -51,7 +51,9 @@
 &lt;h2 id="tabs"&gt;Tabs&lt;/h2&gt;
 &lt;p&gt;The TUI has 5 main tabs, accessible via number keys 1-5:&lt;/p&gt;</description></item><item><title>Tasmota Devices</title><link>https://tj-smith47.github.io/shelly-cli/docs/guides/tasmota/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/guides/tasmota/</guid><description>&lt;p&gt;The Tasmota plugin enables shelly-cli to discover, control, and update Tasmota-based smart home devices.&lt;/p&gt;
 &lt;p&gt;For full documentation, see the plugin README:&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;&lt;a href="../examples/plugins/shelly-tasmota/README.md"&gt;examples/plugins/shelly-tasmota/README.md&lt;/a&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;
+
+&lt;a class="link link--text" href="../examples/plugins/shelly-tasmota/README.md"&gt;examples/plugins/shelly-tasmota/README.md&lt;/a&gt;&lt;/strong&gt;&lt;/p&gt;
 &lt;h2 id="quick-reference"&gt;Quick Reference&lt;/h2&gt;
 &lt;h3 id="installation"&gt;Installation&lt;/h3&gt;
 
@@ -149,6 +151,10 @@
 &lt;/div&gt;
 &lt;h2 id="see-also"&gt;See Also&lt;/h2&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="plugins.md"&gt;Plugin Development Guide&lt;/a&gt; - How to create plugins&lt;/li&gt;
-&lt;li&gt;&lt;a href="../examples/plugins/shelly-tasmota/README.md"&gt;Plugin README&lt;/a&gt; - Full Tasmota documentation&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="plugins.md"&gt;Plugin Development Guide&lt;/a&gt; - How to create plugins&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="../examples/plugins/shelly-tasmota/README.md"&gt;Plugin README&lt;/a&gt; - Full Tasmota documentation&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

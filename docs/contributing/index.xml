@@ -2,26 +2,60 @@
 &lt;h2 id="table-of-contents"&gt;Table of Contents&lt;/h2&gt;
 &lt;h3 id="development-standards"&gt;Development Standards&lt;/h3&gt;
 &lt;ol&gt;
-&lt;li&gt;&lt;a href="#command-development-standards"&gt;Command Development Standards&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#factory-usage"&gt;Factory Usage&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#iostreams-usage"&gt;IOStreams Usage&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#error-handling"&gt;Error Handling&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#context-propagation"&gt;Context Propagation&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#import-organization"&gt;Import Organization&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#anti-patterns-to-avoid"&gt;Anti-Patterns to Avoid&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#migration-checklist"&gt;Migration Checklist&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#reference-implementations"&gt;Reference Implementations&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#command-development-standards"&gt;Command Development Standards&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#factory-usage"&gt;Factory Usage&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#iostreams-usage"&gt;IOStreams Usage&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#error-handling"&gt;Error Handling&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#context-propagation"&gt;Context Propagation&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#import-organization"&gt;Import Organization&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#anti-patterns-to-avoid"&gt;Anti-Patterns to Avoid&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#migration-checklist"&gt;Migration Checklist&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#reference-implementations"&gt;Reference Implementations&lt;/a&gt;&lt;/li&gt;
 &lt;/ol&gt;
 &lt;h3 id="reference-patterns"&gt;Reference Patterns&lt;/h3&gt;
 &lt;ol start="10"&gt;
-&lt;li&gt;&lt;a href="#factory-pattern"&gt;Factory Pattern (gh/kubectl)&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#iostreams-pattern"&gt;IOStreams Pattern (gh)&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#command-utilities"&gt;Command Utilities (gh/kubectl/jira-cli)&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#directory-structure"&gt;Directory Structure&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#tui-architecture"&gt;TUI Architecture (gh-dash/BubbleTea)&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#multi-writer-output-pattern"&gt;Multi-Writer Output Pattern&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#concurrency-patterns"&gt;Concurrency Patterns&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="#testing-patterns"&gt;Testing Patterns&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#factory-pattern"&gt;Factory Pattern (gh/kubectl)&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#iostreams-pattern"&gt;IOStreams Pattern (gh)&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#command-utilities"&gt;Command Utilities (gh/kubectl/jira-cli)&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#directory-structure"&gt;Directory Structure&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#tui-architecture"&gt;TUI Architecture (gh-dash/BubbleTea)&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#multi-writer-output-pattern"&gt;Multi-Writer Output Pattern&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#concurrency-patterns"&gt;Concurrency Patterns&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="https://tj-smith47.github.io/shelly-cli/docs/contributing/development/#testing-patterns"&gt;Testing Patterns&lt;/a&gt;&lt;/li&gt;
 &lt;/ol&gt;
 &lt;hr&gt;
 &lt;h1 id="development-standards-1"&gt;Development Standards&lt;/h1&gt;

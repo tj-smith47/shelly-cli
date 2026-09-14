@@ -121,7 +121,9 @@ devices paired to Zigbee coordinators.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_zigbee.md"&gt;shelly zigbee&lt;/a&gt;	 - Manage Zigbee connectivity&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_zigbee.md"&gt;shelly zigbee&lt;/a&gt;	 - Manage Zigbee connectivity&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly zigbee pair</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/zigbee/pair/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/zigbee/pair/</guid><description>&lt;h2 id="shelly-zigbee-pair"&gt;shelly zigbee pair&lt;/h2&gt;
 &lt;p&gt;Start Zigbee network pairing&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -254,7 +256,9 @@ through Zigbee coordinators.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_zigbee.md"&gt;shelly zigbee&lt;/a&gt;	 - Manage Zigbee connectivity&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_zigbee.md"&gt;shelly zigbee&lt;/a&gt;	 - Manage Zigbee connectivity&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly zigbee status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/zigbee/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/zigbee/status/</guid><description>&lt;h2 id="shelly-zigbee-status"&gt;shelly zigbee status&lt;/h2&gt;
 &lt;p&gt;Show Zigbee network status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -382,5 +386,7 @@ through Zigbee coordinators.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_zigbee.md"&gt;shelly zigbee&lt;/a&gt;	 - Manage Zigbee connectivity&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_zigbee.md"&gt;shelly zigbee&lt;/a&gt;	 - Manage Zigbee connectivity&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

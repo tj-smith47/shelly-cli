@@ -133,7 +133,9 @@ can connect to. Use &amp;ndash;clients to list connected clients.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_wifi.md"&gt;shelly wifi&lt;/a&gt;	 - Manage device WiFi configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_wifi.md"&gt;shelly wifi&lt;/a&gt;	 - Manage device WiFi configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly wifi scan</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/wifi/scan/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/wifi/scan/</guid><description>&lt;h2 id="shelly-wifi-scan"&gt;shelly wifi scan&lt;/h2&gt;
 &lt;p&gt;Scan for available WiFi networks&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -254,7 +256,9 @@ signal strength (RSSI), channel, and authentication type.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_wifi.md"&gt;shelly wifi&lt;/a&gt;	 - Manage device WiFi configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_wifi.md"&gt;shelly wifi&lt;/a&gt;	 - Manage device WiFi configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly wifi set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/wifi/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/wifi/set/</guid><description>&lt;h2 id="shelly-wifi-set"&gt;shelly wifi set&lt;/h2&gt;
 &lt;p&gt;Configure WiFi connection&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -398,7 +402,9 @@ static IP settings instead of using DHCP.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_wifi.md"&gt;shelly wifi&lt;/a&gt;	 - Manage device WiFi configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_wifi.md"&gt;shelly wifi&lt;/a&gt;	 - Manage device WiFi configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly wifi status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/wifi/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/wifi/status/</guid><description>&lt;h2 id="shelly-wifi-status"&gt;shelly wifi status&lt;/h2&gt;
 &lt;p&gt;Show WiFi status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -518,5 +524,7 @@ and number of clients connected to the access point (if enabled).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_wifi.md"&gt;shelly wifi&lt;/a&gt;	 - Manage device WiFi configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_wifi.md"&gt;shelly wifi&lt;/a&gt;	 - Manage device WiFi configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

@@ -129,7 +129,9 @@ Devices can belong to multiple groups.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly group create</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/group/create/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/group/create/</guid><description>&lt;h2 id="shelly-group-create"&gt;shelly group create&lt;/h2&gt;
 &lt;p&gt;Create a new device group&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -254,7 +256,9 @@ Devices can belong to multiple groups.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly group delete</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/group/delete/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/group/delete/</guid><description>&lt;h2 id="shelly-group-delete"&gt;shelly group delete&lt;/h2&gt;
 &lt;p&gt;Delete a group&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -380,7 +384,9 @@ Devices can belong to multiple groups.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly group list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/group/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/group/list/</guid><description>&lt;h2 id="shelly-group-list"&gt;shelly group list&lt;/h2&gt;
 &lt;p&gt;List groups&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -506,7 +512,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly group members</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/group/members/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/group/members/</guid><description>&lt;h2 id="shelly-group-members"&gt;shelly group members&lt;/h2&gt;
 &lt;p&gt;List group members&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -624,7 +632,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly group off</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/group/off/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/group/off/</guid><description>&lt;h2 id="shelly-group-off"&gt;shelly group off&lt;/h2&gt;
 &lt;p&gt;Turn off all group members&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -749,7 +759,9 @@ control every controllable component on each member.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly group on</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/group/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/group/on/</guid><description>&lt;h2 id="shelly-group-on"&gt;shelly group on&lt;/h2&gt;
 &lt;p&gt;Turn on all group members&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -874,7 +886,9 @@ control every controllable component on each member.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly group remove</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/group/remove/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/group/remove/</guid><description>&lt;h2 id="shelly-group-remove"&gt;shelly group remove&lt;/h2&gt;
 &lt;p&gt;Remove devices from a group&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1006,7 +1020,9 @@ Removing a device from a group does not delete the device.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly group set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/group/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/group/set/</guid><description>&lt;h2 id="shelly-group-set"&gt;shelly group set&lt;/h2&gt;
 &lt;p&gt;Set light parameters on all group members&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1140,5 +1156,7 @@ control every controllable component on each member.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_group.md"&gt;shelly group&lt;/a&gt;	 - Manage device groups&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

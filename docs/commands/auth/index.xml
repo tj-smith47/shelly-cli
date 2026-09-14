@@ -119,7 +119,9 @@ Use with caution in production environments.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly auth export</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/export/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/export/</guid><description>&lt;h2 id="shelly-auth-export"&gt;shelly auth export&lt;/h2&gt;
 &lt;p&gt;Export device credentials&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -241,7 +243,9 @@ Use with auth import to restore credentials on another system.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly auth import</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/import/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/import/</guid><description>&lt;h2 id="shelly-auth-import"&gt;shelly auth import&lt;/h2&gt;
 &lt;p&gt;Import device credentials&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -362,7 +366,9 @@ Use with auth import to restore credentials on another system.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly auth rotate</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/rotate/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/rotate/</guid><description>&lt;h2 id="shelly-auth-rotate"&gt;shelly auth rotate&lt;/h2&gt;
 &lt;p&gt;Rotate device credentials&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -510,7 +516,9 @@ optionally generating a secure random password.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly auth set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/set/</guid><description>&lt;h2 id="shelly-auth-set"&gt;shelly auth set&lt;/h2&gt;
 &lt;p&gt;Set authentication credentials&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -636,7 +644,9 @@ to &amp;ldquo;admin&amp;rdquo; if not specified.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly auth status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/status/</guid><description>&lt;h2 id="shelly-auth-status"&gt;shelly auth status&lt;/h2&gt;
 &lt;p&gt;Show authentication status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -755,7 +765,9 @@ to &amp;ldquo;admin&amp;rdquo; if not specified.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly auth test</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/test/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/auth/test/</guid><description>&lt;h2 id="shelly-auth-test"&gt;shelly auth test&lt;/h2&gt;
 &lt;p&gt;Test authentication credentials&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -890,5 +902,7 @@ by attempting to connect to the device.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

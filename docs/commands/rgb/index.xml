@@ -134,7 +134,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_rgb.md"&gt;shelly rgb&lt;/a&gt;	 - Control RGB light components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_rgb.md"&gt;shelly rgb&lt;/a&gt;	 - Control RGB light components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly rgb on</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/on/</guid><description>&lt;h2 id="shelly-rgb-on"&gt;shelly rgb on&lt;/h2&gt;
 &lt;p&gt;Turn rgb on&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -262,7 +264,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_rgb.md"&gt;shelly rgb&lt;/a&gt;	 - Control RGB light components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_rgb.md"&gt;shelly rgb&lt;/a&gt;	 - Control RGB light components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly rgb set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/set/</guid><description>&lt;h2 id="shelly-rgb-set"&gt;shelly rgb set&lt;/h2&gt;
 &lt;p&gt;Set RGB parameters&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -394,7 +398,9 @@ Values not specified will be left unchanged.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_rgb.md"&gt;shelly rgb&lt;/a&gt;	 - Control RGB light components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_rgb.md"&gt;shelly rgb&lt;/a&gt;	 - Control RGB light components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly rgb status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/status/</guid><description>&lt;h2 id="shelly-rgb-status"&gt;shelly rgb status&lt;/h2&gt;
 &lt;p&gt;Show rgb status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -514,7 +520,9 @@ Values not specified will be left unchanged.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_rgb.md"&gt;shelly rgb&lt;/a&gt;	 - Control RGB light components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_rgb.md"&gt;shelly rgb&lt;/a&gt;	 - Control RGB light components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly rgb toggle</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/toggle/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/toggle/</guid><description>&lt;h2 id="shelly-rgb-toggle"&gt;shelly rgb toggle&lt;/h2&gt;
 &lt;p&gt;Toggle rgb on/off&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -642,5 +650,7 @@ Values not specified will be left unchanged.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_rgb.md"&gt;shelly rgb&lt;/a&gt;	 - Control RGB light components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_rgb.md"&gt;shelly rgb&lt;/a&gt;	 - Control RGB light components&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

@@ -123,7 +123,9 @@ If it is not installed already, you can install it via your OS&amp;rsquo;s packa
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_completion.md"&gt;shelly completion&lt;/a&gt;	 - Generate shell completion scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_completion.md"&gt;shelly completion&lt;/a&gt;	 - Generate shell completion scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly completion install</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/completion/install/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/completion/install/</guid><description>&lt;h2 id="shelly-completion-install"&gt;shelly completion install&lt;/h2&gt;
 &lt;p&gt;Install shell completions&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -249,7 +251,9 @@ to source the completions on startup.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_completion.md"&gt;shelly completion&lt;/a&gt;	 - Generate shell completion scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_completion.md"&gt;shelly completion&lt;/a&gt;	 - Generate shell completion scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly completion powershell</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/completion/powershell/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/completion/powershell/</guid><description>&lt;h2 id="shelly-completion-powershell"&gt;shelly completion powershell&lt;/h2&gt;
 &lt;p&gt;Generate powershell completion script&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -365,7 +369,9 @@ to your PowerShell profile.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_completion.md"&gt;shelly completion&lt;/a&gt;	 - Generate shell completion scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_completion.md"&gt;shelly completion&lt;/a&gt;	 - Generate shell completion scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly completion zsh</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/completion/zsh/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/completion/zsh/</guid><description>&lt;h2 id="shelly-completion-zsh"&gt;shelly completion zsh&lt;/h2&gt;
 &lt;p&gt;Generate zsh completion script&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -482,5 +488,7 @@ to enable it. You can execute the following once:&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_completion.md"&gt;shelly completion&lt;/a&gt;	 - Generate shell completion scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_completion.md"&gt;shelly completion&lt;/a&gt;	 - Generate shell completion scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

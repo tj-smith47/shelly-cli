@@ -137,7 +137,9 @@ Use &amp;ndash;cancel to cancel an active boost.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly thermostat calibrate</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/calibrate/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/calibrate/</guid><description>&lt;h2 id="shelly-thermostat-calibrate"&gt;shelly thermostat calibrate&lt;/h2&gt;
 &lt;p&gt;Calibrate thermostat valve&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -266,7 +268,9 @@ move through its full range to determine open/close positions.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly thermostat disable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/disable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/disable/</guid><description>&lt;h2 id="shelly-thermostat-disable"&gt;shelly thermostat disable&lt;/h2&gt;
 &lt;p&gt;Disable thermostat&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -389,7 +393,9 @@ in its current position or close.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly thermostat enable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/enable/</guid><description>&lt;h2 id="shelly-thermostat-enable"&gt;shelly thermostat enable&lt;/h2&gt;
 &lt;p&gt;Enable thermostat&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -523,7 +529,9 @@ in its current position or close.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly thermostat list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/list/</guid><description>&lt;h2 id="shelly-thermostat-list"&gt;shelly thermostat list&lt;/h2&gt;
 &lt;p&gt;List thermostats&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -676,7 +684,9 @@ modifying the permanent schedule.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly thermostat schedule</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/schedule/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/schedule/</guid><description>&lt;h2 id="shelly-thermostat-schedule"&gt;shelly thermostat schedule&lt;/h2&gt;
 &lt;p&gt;Manage thermostat schedules&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -820,7 +830,9 @@ Use &amp;ndash;all to delete all schedules (use with caution).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat_schedule.md"&gt;shelly thermostat schedule&lt;/a&gt;	 - Manage thermostat schedules&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat_schedule.md"&gt;shelly thermostat schedule&lt;/a&gt;	 - Manage thermostat schedules&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly thermostat schedule disable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/schedule-disable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/schedule-disable/</guid><description>&lt;h2 id="shelly-thermostat-schedule-disable"&gt;shelly thermostat schedule disable&lt;/h2&gt;
 &lt;p&gt;Disable schedule&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -934,7 +946,9 @@ Use &amp;ndash;all to delete all schedules (use with caution).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat_schedule.md"&gt;shelly thermostat schedule&lt;/a&gt;	 - Manage thermostat schedules&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat_schedule.md"&gt;shelly thermostat schedule&lt;/a&gt;	 - Manage thermostat schedules&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly thermostat schedule enable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/schedule-enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/schedule-enable/</guid><description>&lt;h2 id="shelly-thermostat-schedule-enable"&gt;shelly thermostat schedule enable&lt;/h2&gt;
 &lt;p&gt;Enable schedule&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1048,7 +1062,9 @@ Use &amp;ndash;all to delete all schedules (use with caution).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat_schedule.md"&gt;shelly thermostat schedule&lt;/a&gt;	 - Manage thermostat schedules&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat_schedule.md"&gt;shelly thermostat schedule&lt;/a&gt;	 - Manage thermostat schedules&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly thermostat schedule list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/schedule-list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/schedule-list/</guid><description>&lt;h2 id="shelly-thermostat-schedule-list"&gt;shelly thermostat schedule list&lt;/h2&gt;
 &lt;p&gt;List thermostat schedules&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1186,7 +1202,9 @@ Use &amp;ndash;all to show all device schedules.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat_schedule.md"&gt;shelly thermostat schedule&lt;/a&gt;	 - Manage thermostat schedules&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat_schedule.md"&gt;shelly thermostat schedule&lt;/a&gt;	 - Manage thermostat schedules&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly thermostat set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/set/</guid><description>&lt;h2 id="shelly-thermostat-set"&gt;shelly thermostat set&lt;/h2&gt;
 &lt;p&gt;Set thermostat configuration&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1332,7 +1350,9 @@ Use &amp;ndash;all to show all device schedules.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly thermostat status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/thermostat/status/</guid><description>&lt;h2 id="shelly-thermostat-status"&gt;shelly thermostat status&lt;/h2&gt;
 &lt;p&gt;Show thermostat status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1469,5 +1489,7 @@ Use &amp;ndash;all to show all device schedules.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_thermostat.md"&gt;shelly thermostat&lt;/a&gt;	 - Manage thermostats&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

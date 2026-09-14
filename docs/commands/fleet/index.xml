@@ -130,7 +130,9 @@ to a specific cloud host.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly fleet disconnect</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/disconnect/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/disconnect/</guid><description>&lt;h2 id="shelly-fleet-disconnect"&gt;shelly fleet disconnect&lt;/h2&gt;
 &lt;p&gt;Disconnect from Shelly Cloud hosts&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -248,7 +250,9 @@ SHELLY_INTEGRATOR_TOKEN - Your integrator token&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly fleet health</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/health/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/health/</guid><description>&lt;h2 id="shelly-fleet-health"&gt;shelly fleet health&lt;/h2&gt;
 &lt;p&gt;Check device health&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -377,7 +381,9 @@ online/offline transitions indicating connectivity issues.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly fleet off</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/off/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/off/</guid><description>&lt;h2 id="shelly-fleet-off"&gt;shelly fleet off&lt;/h2&gt;
 &lt;p&gt;Turn off devices via cloud&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -516,7 +522,9 @@ SHELLY_INTEGRATOR_TOKEN - Your integrator token&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly fleet on</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/on/</guid><description>&lt;h2 id="shelly-fleet-on"&gt;shelly fleet on&lt;/h2&gt;
 &lt;p&gt;Turn on devices via cloud&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -655,7 +663,9 @@ SHELLY_INTEGRATOR_TOKEN - Your integrator token&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly fleet stats</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/stats/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/stats/</guid><description>&lt;h2 id="shelly-fleet-stats"&gt;shelly fleet stats&lt;/h2&gt;
 &lt;p&gt;View fleet statistics&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -774,7 +784,9 @@ SHELLY_INTEGRATOR_TOKEN - Your integrator token&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly fleet status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/status/</guid><description>&lt;h2 id="shelly-fleet-status"&gt;shelly fleet status&lt;/h2&gt;
 &lt;p&gt;View fleet device status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -909,7 +921,9 @@ connected through Shelly Cloud.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly fleet toggle</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/toggle/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/fleet/toggle/</guid><description>&lt;h2 id="shelly-fleet-toggle"&gt;shelly fleet toggle&lt;/h2&gt;
 &lt;p&gt;Toggle devices via cloud&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1048,5 +1062,7 @@ SHELLY_INTEGRATOR_TOKEN - Your integrator token&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_fleet.md"&gt;shelly fleet&lt;/a&gt;	 - Cloud-based fleet management&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

@@ -158,7 +158,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_switch.md"&gt;shelly switch&lt;/a&gt;	 - Control switch components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_switch.md"&gt;shelly switch&lt;/a&gt;	 - Control switch components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly switch off</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/switch/off/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/switch/off/</guid><description>&lt;h2 id="shelly-switch-off"&gt;shelly switch off&lt;/h2&gt;
 &lt;p&gt;Turn switch off&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -286,7 +288,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_switch.md"&gt;shelly switch&lt;/a&gt;	 - Control switch components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_switch.md"&gt;shelly switch&lt;/a&gt;	 - Control switch components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly switch on</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/switch/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/switch/on/</guid><description>&lt;h2 id="shelly-switch-on"&gt;shelly switch on&lt;/h2&gt;
 &lt;p&gt;Turn switch on&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -414,7 +418,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_switch.md"&gt;shelly switch&lt;/a&gt;	 - Control switch components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_switch.md"&gt;shelly switch&lt;/a&gt;	 - Control switch components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly switch status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/switch/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/switch/status/</guid><description>&lt;h2 id="shelly-switch-status"&gt;shelly switch status&lt;/h2&gt;
 &lt;p&gt;Show switch status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -534,7 +540,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_switch.md"&gt;shelly switch&lt;/a&gt;	 - Control switch components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_switch.md"&gt;shelly switch&lt;/a&gt;	 - Control switch components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly switch toggle</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/switch/toggle/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/switch/toggle/</guid><description>&lt;h2 id="shelly-switch-toggle"&gt;shelly switch toggle&lt;/h2&gt;
 &lt;p&gt;Toggle switch on/off&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -662,5 +670,7 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_switch.md"&gt;shelly switch&lt;/a&gt;	 - Control switch components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_switch.md"&gt;shelly switch&lt;/a&gt;	 - Control switch components&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

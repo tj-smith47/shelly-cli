@@ -133,7 +133,9 @@ Common events include &amp;ldquo;switch.on&amp;rdquo;, &amp;ldquo;switch.off&amp
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_webhook.md"&gt;shelly webhook&lt;/a&gt;	 - Manage device webhooks&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_webhook.md"&gt;shelly webhook&lt;/a&gt;	 - Manage device webhooks&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly webhook delete</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/webhook/delete/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/webhook/delete/</guid><description>&lt;h2 id="shelly-webhook-delete"&gt;shelly webhook delete&lt;/h2&gt;
 &lt;p&gt;Delete a webhook&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -254,7 +256,9 @@ Common events include &amp;ldquo;switch.on&amp;rdquo;, &amp;ldquo;switch.off&amp
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_webhook.md"&gt;shelly webhook&lt;/a&gt;	 - Manage device webhooks&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_webhook.md"&gt;shelly webhook&lt;/a&gt;	 - Manage device webhooks&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly webhook list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/webhook/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/webhook/list/</guid><description>&lt;h2 id="shelly-webhook-list"&gt;shelly webhook list&lt;/h2&gt;
 &lt;p&gt;List webhooks&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -404,7 +408,9 @@ logs all incoming requests with their headers, query parameters, and body.&lt;/p
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_webhook.md"&gt;shelly webhook&lt;/a&gt;	 - Manage device webhooks&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_webhook.md"&gt;shelly webhook&lt;/a&gt;	 - Manage device webhooks&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly webhook update</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/webhook/update/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/webhook/update/</guid><description>&lt;h2 id="shelly-webhook-update"&gt;shelly webhook update&lt;/h2&gt;
 &lt;p&gt;Update a webhook&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -540,5 +546,7 @@ change the webhook&amp;rsquo;s active state.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_webhook.md"&gt;shelly webhook&lt;/a&gt;	 - Manage device webhooks&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_webhook.md"&gt;shelly webhook&lt;/a&gt;	 - Manage device webhooks&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

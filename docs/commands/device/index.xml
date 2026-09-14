@@ -138,7 +138,9 @@ becomes &amp;ldquo;master-bathroom&amp;rdquo; as the key).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device alias</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/alias/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/alias/</guid><description>&lt;h2 id="shelly-device-alias"&gt;shelly device alias&lt;/h2&gt;
 &lt;p&gt;Manage device aliases&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -281,7 +283,9 @@ and contain only letters, numbers, hyphens, and underscores.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device config</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config/</guid><description>&lt;h2 id="shelly-device-config"&gt;shelly device config&lt;/h2&gt;
 &lt;p&gt;Manage device configuration&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -439,13 +443,27 @@ component settings, system parameters, and feature configurations.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_device_config_diff.md"&gt;shelly device config diff&lt;/a&gt;	 - Compare device configurations&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_device_config_export.md"&gt;shelly device config export&lt;/a&gt;	 - Export device configuration to a file&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_device_config_get.md"&gt;shelly device config get&lt;/a&gt;	 - Get device configuration&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_device_config_import.md"&gt;shelly device config import&lt;/a&gt;	 - Import configuration from a file&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_device_config_reset.md"&gt;shelly device config reset&lt;/a&gt;	 - Reset configuration to defaults&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_device_config_set.md"&gt;shelly device config set&lt;/a&gt;	 - Set device configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config_diff.md"&gt;shelly device config diff&lt;/a&gt;	 - Compare device configurations&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config_export.md"&gt;shelly device config export&lt;/a&gt;	 - Export device configuration to a file&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config_get.md"&gt;shelly device config get&lt;/a&gt;	 - Get device configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config_import.md"&gt;shelly device config import&lt;/a&gt;	 - Import configuration from a file&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config_reset.md"&gt;shelly device config reset&lt;/a&gt;	 - Reset configuration to defaults&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config_set.md"&gt;shelly device config set&lt;/a&gt;	 - Set device configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device config diff</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-diff/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-diff/</guid><description>&lt;h2 id="shelly-device-config-diff"&gt;shelly device config diff&lt;/h2&gt;
 &lt;p&gt;Compare device configurations&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -589,7 +607,9 @@ component settings, system parameters, and feature configurations.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device config export</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-export/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-export/</guid><description>&lt;h2 id="shelly-device-config-export"&gt;shelly device config export&lt;/h2&gt;
 &lt;p&gt;Export device configuration to a file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -717,7 +737,9 @@ for YAML output.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device config get</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-get/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-get/</guid><description>&lt;h2 id="shelly-device-config-get"&gt;shelly device config get&lt;/h2&gt;
 &lt;p&gt;Get device configuration&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -862,7 +884,9 @@ only that component&amp;rsquo;s configuration.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device config import</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-import/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-import/</guid><description>&lt;h2 id="shelly-device-config-import"&gt;shelly device config import&lt;/h2&gt;
 &lt;p&gt;Import configuration from a file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -985,7 +1009,9 @@ replace primitive). Capture a file in this format with &amp;lsquo;shelly config 
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device config reset</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-reset/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-reset/</guid><description>&lt;h2 id="shelly-device-config-reset"&gt;shelly device config reset&lt;/h2&gt;
 &lt;p&gt;Reset configuration to defaults&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1109,7 +1135,9 @@ shelly device factory-reset &lt;device&gt;&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device config set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/config-set/</guid><description>&lt;h2 id="shelly-device-config-set"&gt;shelly device config set&lt;/h2&gt;
 &lt;p&gt;Set device configuration&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1238,7 +1266,9 @@ equivalent (&amp;ldquo;name=Light&amp;rdquo;, &amp;ldquo;name:Light&amp;rdquo;, 
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device_config.md"&gt;shelly device config&lt;/a&gt;	 - Manage device configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device factory-reset</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/factory-reset/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/factory-reset/</guid><description>&lt;h2 id="shelly-device-factory-reset"&gt;shelly device factory-reset&lt;/h2&gt;
 &lt;p&gt;Factory reset a device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1381,7 +1411,9 @@ equivalent (&amp;ldquo;name=Light&amp;rdquo;, &amp;ldquo;name:Light&amp;rdquo;, 
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device info</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/info/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/info/</guid><description>&lt;h2 id="shelly-device-info"&gt;shelly device info&lt;/h2&gt;
 &lt;p&gt;Show device information&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1518,7 +1550,9 @@ equivalent (&amp;ldquo;name=Light&amp;rdquo;, &amp;ldquo;name:Light&amp;rdquo;, 
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/list/</guid><description>&lt;h2 id="shelly-device-list"&gt;shelly device list&lt;/h2&gt;
 &lt;p&gt;List registered devices&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1664,7 +1698,9 @@ This is useful for verifying network connectivity and device availability.&lt;/p
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device reboot</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/reboot/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/reboot/</guid><description>&lt;h2 id="shelly-device-reboot"&gt;shelly device reboot&lt;/h2&gt;
 &lt;p&gt;Reboot device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1792,7 +1828,9 @@ This is useful for verifying network connectivity and device availability.&lt;/p
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device remove</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/remove/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/remove/</guid><description>&lt;h2 id="shelly-device-remove"&gt;shelly device remove&lt;/h2&gt;
 &lt;p&gt;Remove a device from the registry&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1920,7 +1958,9 @@ This does not affect the physical device itself.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device rename</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/rename/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/rename/</guid><description>&lt;h2 id="shelly-device-rename"&gt;shelly device rename&lt;/h2&gt;
 &lt;p&gt;Rename a device in the registry&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -2040,7 +2080,9 @@ to use the new name. The device&amp;rsquo;s address and configuration are preser
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device set-address</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/set-address/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/set-address/</guid><description>&lt;h2 id="shelly-device-set-address"&gt;shelly device set-address&lt;/h2&gt;
 &lt;p&gt;Update a registered device&amp;rsquo;s IP address&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -2165,7 +2207,9 @@ auth, and every group membership are preserved. This is the safe alternative to
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly device ui</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/device/ui/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/device/ui/</guid><description>&lt;h2 id="shelly-device-ui"&gt;shelly device ui&lt;/h2&gt;
 &lt;p&gt;Open device web interface in browser&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -2298,5 +2342,7 @@ auth, and every group membership are preserved. This is the safe alternative to
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_device.md"&gt;shelly device&lt;/a&gt;	 - Manage Shelly devices&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

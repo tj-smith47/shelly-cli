@@ -128,7 +128,9 @@ settings. Use &amp;ndash;dry-run to preview changes without applying them.&lt;/p
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly template create</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/template/create/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/template/create/</guid><description>&lt;h2 id="shelly-template-create"&gt;shelly template create&lt;/h2&gt;
 &lt;p&gt;Create a template from a device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -273,7 +275,9 @@ Use &amp;ndash;include-wifi to include them.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly template delete</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/template/delete/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/template/delete/</guid><description>&lt;h2 id="shelly-template-delete"&gt;shelly template delete&lt;/h2&gt;
 &lt;p&gt;Delete a template&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -399,7 +403,9 @@ Use &amp;ndash;include-wifi to include them.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly template diff</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/template/diff/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/template/diff/</guid><description>&lt;h2 id="shelly-template-diff"&gt;shelly template diff&lt;/h2&gt;
 &lt;p&gt;Compare a template with a device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -519,7 +525,9 @@ what would change if the template were applied.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly template export</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/template/export/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/template/export/</guid><description>&lt;h2 id="shelly-template-export"&gt;shelly template export&lt;/h2&gt;
 &lt;p&gt;Export a template to a file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -653,7 +661,9 @@ Format is auto-detected from file extension, or can be specified with &amp;ndash
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly template import</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/template/import/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/template/import/</guid><description>&lt;h2 id="shelly-template-import"&gt;shelly template import&lt;/h2&gt;
 &lt;p&gt;Import a template from a file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -781,7 +791,9 @@ Use &amp;ndash;force to overwrite an existing template with the same name.&lt;/p
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly template list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/template/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/template/list/</guid><description>&lt;h2 id="shelly-template-list"&gt;shelly template list&lt;/h2&gt;
 &lt;p&gt;List templates&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -907,5 +919,7 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_template.md"&gt;shelly template&lt;/a&gt;	 - Manage device configuration templates&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

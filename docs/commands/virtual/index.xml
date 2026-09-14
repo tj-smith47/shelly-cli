@@ -133,7 +133,9 @@ group - Component group&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly virtual delete</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/virtual/delete/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/virtual/delete/</guid><description>&lt;h2 id="shelly-virtual-delete"&gt;shelly virtual delete&lt;/h2&gt;
 &lt;p&gt;Delete a virtual component&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -257,7 +259,9 @@ group - Component group&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly virtual get</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/virtual/get/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/virtual/get/</guid><description>&lt;h2 id="shelly-virtual-get"&gt;shelly virtual get&lt;/h2&gt;
 &lt;p&gt;Get a virtual component value&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -376,7 +380,9 @@ group - Component group&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly virtual list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/virtual/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/virtual/list/</guid><description>&lt;h2 id="shelly-virtual-list"&gt;shelly virtual list&lt;/h2&gt;
 &lt;p&gt;List virtual components on a device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -496,7 +502,9 @@ Component IDs in the range 200-299 are reserved for virtual components.&lt;/p&gt
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly virtual set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/virtual/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/virtual/set/</guid><description>&lt;h2 id="shelly-virtual-set"&gt;shelly virtual set&lt;/h2&gt;
 &lt;p&gt;Set a virtual component value&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -643,5 +651,7 @@ For button components, use &amp;ldquo;trigger&amp;rdquo; as the value to press t
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

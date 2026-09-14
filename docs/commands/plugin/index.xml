@@ -131,7 +131,9 @@ specified with &amp;ndash;output.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly plugin exec</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/plugin/exec/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/plugin/exec/</guid><description>&lt;h2 id="shelly-plugin-exec"&gt;shelly plugin exec&lt;/h2&gt;
 &lt;p&gt;Execute an extension&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -251,7 +253,9 @@ or when you want to explicitly invoke an extension.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly plugin install</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/plugin/install/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/plugin/install/</guid><description>&lt;h2 id="shelly-plugin-install"&gt;shelly plugin install&lt;/h2&gt;
 &lt;p&gt;Install an extension&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -260,7 +264,9 @@ or when you want to explicitly invoke an extension.&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Local file: ./path/to/shelly-myext&lt;/li&gt;
 &lt;li&gt;GitHub repo: gh:user/shelly-myext&lt;/li&gt;
-&lt;li&gt;HTTP URL: &lt;a href="https://example.com/shelly-myext"&gt;https://example.com/shelly-myext&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;HTTP URL: 
+
+&lt;a class="link link--text" href="https://example.com/shelly-myext" rel="external"&gt;https://example.com/shelly-myext&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;The extension must be named with the shelly- prefix.&lt;/p&gt;
 
@@ -390,7 +396,9 @@ or when you want to explicitly invoke an extension.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly plugin list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/plugin/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/plugin/list/</guid><description>&lt;h2 id="shelly-plugin-list"&gt;shelly plugin list&lt;/h2&gt;
 &lt;p&gt;List installed extensions&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -514,7 +522,9 @@ Extensions found in PATH cannot be removed with this command.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly plugin upgrade</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/plugin/upgrade/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/plugin/upgrade/</guid><description>&lt;h2 id="shelly-plugin-upgrade"&gt;shelly plugin upgrade&lt;/h2&gt;
 &lt;p&gt;Upgrade extension(s)&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -639,5 +649,7 @@ For extensions installed from local files or URLs, you need to reinstall manuall
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_plugin.md"&gt;shelly plugin&lt;/a&gt;	 - Manage CLI plugins&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

@@ -144,7 +144,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_lora.md"&gt;shelly lora&lt;/a&gt;	 - Manage LoRa add-on&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_lora.md"&gt;shelly lora&lt;/a&gt;	 - Manage LoRa add-on&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly lora send</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/lora/send/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/lora/send/</guid><description>&lt;h2 id="shelly-lora-send"&gt;shelly lora send&lt;/h2&gt;
 &lt;p&gt;Send data over LoRa&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -279,7 +281,9 @@ the LoRa.SendBytes API.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_lora.md"&gt;shelly lora&lt;/a&gt;	 - Manage LoRa add-on&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_lora.md"&gt;shelly lora&lt;/a&gt;	 - Manage LoRa add-on&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly lora status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/lora/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/lora/status/</guid><description>&lt;h2 id="shelly-lora-status"&gt;shelly lora status&lt;/h2&gt;
 &lt;p&gt;Show LoRa add-on status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -409,5 +413,7 @@ information from the last received packet.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_lora.md"&gt;shelly lora&lt;/a&gt;	 - Manage LoRa add-on&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_lora.md"&gt;shelly lora&lt;/a&gt;	 - Manage LoRa add-on&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

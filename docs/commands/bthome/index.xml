@@ -141,7 +141,9 @@ can be monitored with &amp;lsquo;shelly monitor events&amp;rsquo;.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_bthome.md"&gt;shelly bthome&lt;/a&gt;	 - Manage BTHome Bluetooth devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_bthome.md"&gt;shelly bthome&lt;/a&gt;	 - Manage BTHome Bluetooth devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly bthome list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/list/</guid><description>&lt;h2 id="shelly-bthome-list"&gt;shelly bthome list&lt;/h2&gt;
 &lt;p&gt;List BTHome devices&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -274,7 +276,9 @@ components. The physical device will no longer be tracked by the gateway.&lt;/p&
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_bthome.md"&gt;shelly bthome&lt;/a&gt;	 - Manage BTHome Bluetooth devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_bthome.md"&gt;shelly bthome&lt;/a&gt;	 - Manage BTHome Bluetooth devices&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly bthome status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/status/</guid><description>&lt;h2 id="shelly-bthome-status"&gt;shelly bthome status&lt;/h2&gt;
 &lt;p&gt;Show BTHome device status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -403,5 +407,7 @@ BTHomeDevice including signal strength, battery, and known objects.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_bthome.md"&gt;shelly bthome&lt;/a&gt;	 - Manage BTHome Bluetooth devices&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_bthome.md"&gt;shelly bthome&lt;/a&gt;	 - Manage BTHome Bluetooth devices&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

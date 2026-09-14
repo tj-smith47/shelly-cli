@@ -131,7 +131,9 @@ model type. Use @all to export all registered devices.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_export.md"&gt;shelly export&lt;/a&gt;	 - Export fleet data for infrastructure tools&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_export.md"&gt;shelly export&lt;/a&gt;	 - Export fleet data for infrastructure tools&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly export csv</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/export/csv/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/export/csv/</guid><description>&lt;h2 id="shelly-export-csv"&gt;shelly export csv&lt;/h2&gt;
 &lt;p&gt;Export device list as CSV&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -267,7 +269,9 @@ Otherwise outputs to stdout.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_export.md"&gt;shelly export&lt;/a&gt;	 - Export fleet data for infrastructure tools&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_export.md"&gt;shelly export&lt;/a&gt;	 - Export fleet data for infrastructure tools&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly export terraform</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/export/terraform/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/export/terraform/</guid><description>&lt;h2 id="shelly-export-terraform"&gt;shelly export terraform&lt;/h2&gt;
 &lt;p&gt;Export devices as Terraform configuration&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -395,5 +399,7 @@ used as data source for infrastructure as code workflows.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_export.md"&gt;shelly export&lt;/a&gt;	 - Export fleet data for infrastructure tools&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_export.md"&gt;shelly export&lt;/a&gt;	 - Export fleet data for infrastructure tools&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

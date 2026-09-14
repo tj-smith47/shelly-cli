@@ -123,7 +123,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_link.md"&gt;shelly link&lt;/a&gt;	 - Manage device power links&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_link.md"&gt;shelly link&lt;/a&gt;	 - Manage device power links&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly link list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/link/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/link/list/</guid><description>&lt;h2 id="shelly-link-list"&gt;shelly link list&lt;/h2&gt;
 &lt;p&gt;List links&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -249,7 +251,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_link.md"&gt;shelly link&lt;/a&gt;	 - Manage device power links&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_link.md"&gt;shelly link&lt;/a&gt;	 - Manage device power links&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly link set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/link/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/link/set/</guid><description>&lt;h2 id="shelly-link-set"&gt;shelly link set&lt;/h2&gt;
 &lt;p&gt;Set a device power link&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -377,7 +381,9 @@ child is offline, its state can be derived from the parent switch state.&lt;/p&g
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_link.md"&gt;shelly link&lt;/a&gt;	 - Manage device power links&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_link.md"&gt;shelly link&lt;/a&gt;	 - Manage device power links&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly link status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/link/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/link/status/</guid><description>&lt;h2 id="shelly-link-status"&gt;shelly link status&lt;/h2&gt;
 &lt;p&gt;Show link status with derived device state&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -503,5 +509,7 @@ parent switch state. If no device is specified, shows all links.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_link.md"&gt;shelly link&lt;/a&gt;	 - Manage device power links&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_link.md"&gt;shelly link&lt;/a&gt;	 - Manage device power links&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

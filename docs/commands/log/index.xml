@@ -109,7 +109,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly log export</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/log/export/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/log/export/</guid><description>&lt;h2 id="shelly-log-export"&gt;shelly log export&lt;/h2&gt;
 &lt;p&gt;Export log file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -227,7 +229,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly log path</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/log/path/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/log/path/</guid><description>&lt;h2 id="shelly-log-path"&gt;shelly log path&lt;/h2&gt;
 &lt;p&gt;Show log file path&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -339,7 +343,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly log show</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/log/show/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/log/show/</guid><description>&lt;h2 id="shelly-log-show"&gt;shelly log show&lt;/h2&gt;
 &lt;p&gt;Show recent log entries&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -459,7 +465,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly log tail</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/log/tail/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/log/tail/</guid><description>&lt;h2 id="shelly-log-tail"&gt;shelly log tail&lt;/h2&gt;
 &lt;p&gt;Tail log file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -579,5 +587,7 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_log.md"&gt;shelly log&lt;/a&gt;	 - Manage CLI logs&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

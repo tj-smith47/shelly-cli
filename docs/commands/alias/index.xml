@@ -121,7 +121,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly alias export</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/alias/export/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/alias/export/</guid><description>&lt;h2 id="shelly-alias-export"&gt;shelly alias export&lt;/h2&gt;
 &lt;p&gt;Export aliases to a YAML file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -251,7 +253,9 @@ shellalias: &amp;ldquo;!shell command&amp;rdquo;&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly alias import</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/alias/import/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/alias/import/</guid><description>&lt;h2 id="shelly-alias-import"&gt;shelly alias import&lt;/h2&gt;
 &lt;p&gt;Import aliases from a YAML file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -378,7 +382,9 @@ shellalias: &amp;ldquo;!shell command&amp;rdquo;&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly alias list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/alias/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/alias/list/</guid><description>&lt;h2 id="shelly-alias-list"&gt;shelly alias list&lt;/h2&gt;
 &lt;p&gt;List aliass&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -504,7 +510,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly alias set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/alias/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/alias/set/</guid><description>&lt;h2 id="shelly-alias-set"&gt;shelly alias set&lt;/h2&gt;
 &lt;p&gt;Create or update a command alias&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -646,5 +654,7 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

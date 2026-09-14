@@ -137,7 +137,9 @@ Use &amp;ndash;dry-run to preview actions without executing them.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly scene create</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/create/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/create/</guid><description>&lt;h2 id="shelly-scene-create"&gt;shelly scene create&lt;/h2&gt;
 &lt;p&gt;Create a new scene&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -271,7 +273,9 @@ or import an existing scene definition from a file.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly scene delete</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/delete/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/delete/</guid><description>&lt;h2 id="shelly-scene-delete"&gt;shelly scene delete&lt;/h2&gt;
 &lt;p&gt;Delete a scene&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -397,7 +401,9 @@ or import an existing scene definition from a file.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly scene export</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/export/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/export/</guid><description>&lt;h2 id="shelly-scene-export"&gt;shelly scene export&lt;/h2&gt;
 &lt;p&gt;Export a scene to file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -531,7 +537,9 @@ Format is auto-detected from file extension (.json, .yaml, .yml).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly scene import</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/import/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/import/</guid><description>&lt;h2 id="shelly-scene-import"&gt;shelly scene import&lt;/h2&gt;
 &lt;p&gt;Import a scene from file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -667,7 +675,9 @@ Use &amp;ndash;name to override the scene name from the file.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly scene list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/list/</guid><description>&lt;h2 id="shelly-scene-list"&gt;shelly scene list&lt;/h2&gt;
 &lt;p&gt;List scenes&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -793,7 +803,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly scene show</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/show/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/show/</guid><description>&lt;h2 id="shelly-scene-show"&gt;shelly scene show&lt;/h2&gt;
 &lt;p&gt;Show scene details&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -923,5 +935,7 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

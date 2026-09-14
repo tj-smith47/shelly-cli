@@ -133,7 +133,9 @@ structured output suitable for scripting.&lt;/p&gt;</description></item><item><t
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly light on</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/light/on/</guid><description>&lt;h2 id="shelly-light-on"&gt;shelly light on&lt;/h2&gt;
 &lt;p&gt;Turn light on&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -261,7 +263,9 @@ structured output suitable for scripting.&lt;/p&gt;</description></item><item><t
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly light set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/light/set/</guid><description>&lt;h2 id="shelly-light-set"&gt;shelly light set&lt;/h2&gt;
 &lt;p&gt;Set light parameters&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -395,7 +399,9 @@ the Duo), and on/off state. Values not specified are left unchanged.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly light status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/light/status/</guid><description>&lt;h2 id="shelly-light-status"&gt;shelly light status&lt;/h2&gt;
 &lt;p&gt;Show light status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -515,7 +521,9 @@ the Duo), and on/off state. Values not specified are left unchanged.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly light toggle</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/toggle/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/light/toggle/</guid><description>&lt;h2 id="shelly-light-toggle"&gt;shelly light toggle&lt;/h2&gt;
 &lt;p&gt;Toggle light on/off&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -643,5 +651,7 @@ the Duo), and on/off state. Values not specified are left unchanged.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

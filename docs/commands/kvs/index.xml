@@ -118,7 +118,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly kvs export</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/kvs/export/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/kvs/export/</guid><description>&lt;h2 id="shelly-kvs-export"&gt;shelly kvs export&lt;/h2&gt;
 &lt;p&gt;Export KVS data to file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -252,7 +254,9 @@ The export format can be JSON (default) or YAML.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly kvs get</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/kvs/get/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/kvs/get/</guid><description>&lt;h2 id="shelly-kvs-get"&gt;shelly kvs get&lt;/h2&gt;
 &lt;p&gt;Get a KVS value&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -378,7 +382,9 @@ Use &amp;ndash;raw to output only the value without formatting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly kvs import</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/kvs/import/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/kvs/import/</guid><description>&lt;h2 id="shelly-kvs-import"&gt;shelly kvs import&lt;/h2&gt;
 &lt;p&gt;Import KVS data from file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -516,7 +522,9 @@ Use &amp;ndash;dry-run to see what would be imported without making changes.&lt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly kvs list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/kvs/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/kvs/list/</guid><description>&lt;h2 id="shelly-kvs-list"&gt;shelly kvs list&lt;/h2&gt;
 &lt;p&gt;List KVS keys&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -677,5 +685,7 @@ structured output suitable for scripting.&lt;/p&gt;</description></item><item><t
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_kvs.md"&gt;shelly kvs&lt;/a&gt;	 - Manage device key-value storage&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

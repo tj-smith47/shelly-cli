@@ -138,7 +138,9 @@ of the total consumption. Useful for identifying high-energy consumers.&lt;/p&gt
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly energy dashboard</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/energy/dashboard/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/energy/dashboard/</guid><description>&lt;h2 id="shelly-energy-dashboard"&gt;shelly energy dashboard&lt;/h2&gt;
 &lt;p&gt;Show energy dashboard for all devices&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -292,7 +294,9 @@ measurements for the specified time range.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly energy history</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/energy/history/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/energy/history/</guid><description>&lt;h2 id="shelly-energy-history"&gt;shelly energy history&lt;/h2&gt;
 &lt;p&gt;Show energy consumption history&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -441,7 +445,9 @@ measurements. Not all Shelly devices support historical data storage.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly energy list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/energy/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/energy/list/</guid><description>&lt;h2 id="shelly-energy-list"&gt;shelly energy list&lt;/h2&gt;
 &lt;p&gt;List energy monitoring components&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -578,7 +584,9 @@ do not have a reset capability.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly energy status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/energy/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/energy/status/</guid><description>&lt;h2 id="shelly-energy-status"&gt;shelly energy status&lt;/h2&gt;
 &lt;p&gt;Show energy monitor status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -713,5 +721,7 @@ per-phase data and totals.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_energy.md"&gt;shelly energy&lt;/a&gt;	 - Energy monitoring operations (EM/EM1 components)&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

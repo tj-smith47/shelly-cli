@@ -119,7 +119,9 @@ The cover will move to both extremes during calibration.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly cover close</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/cover/close/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/cover/close/</guid><description>&lt;h2 id="shelly-cover-close"&gt;shelly cover close&lt;/h2&gt;
 &lt;p&gt;Close cover&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -249,7 +251,9 @@ The cover will move to both extremes during calibration.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly cover list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/cover/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/cover/list/</guid><description>&lt;h2 id="shelly-cover-list"&gt;shelly cover list&lt;/h2&gt;
 &lt;p&gt;List cover components&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -388,7 +392,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly cover position</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/cover/position/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/cover/position/</guid><description>&lt;h2 id="shelly-cover-position"&gt;shelly cover position&lt;/h2&gt;
 &lt;p&gt;Set cover position&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -509,7 +515,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly cover status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/cover/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/cover/status/</guid><description>&lt;h2 id="shelly-cover-status"&gt;shelly cover status&lt;/h2&gt;
 &lt;p&gt;Show cover status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -629,7 +637,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly cover stop</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/cover/stop/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/cover/stop/</guid><description>&lt;h2 id="shelly-cover-stop"&gt;shelly cover stop&lt;/h2&gt;
 &lt;p&gt;Stop cover&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -757,5 +767,7 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_cover.md"&gt;shelly cover&lt;/a&gt;	 - Control cover/roller components&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

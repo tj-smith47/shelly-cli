@@ -138,7 +138,9 @@ Multiple keys can be deleted at once.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly config edit</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/config/edit/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/config/edit/</guid><description>&lt;h2 id="shelly-config-edit"&gt;shelly config edit&lt;/h2&gt;
 &lt;p&gt;Open CLI config in editor&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -265,7 +267,9 @@ devices, aliases, groups, scenes, and other settings.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly config get</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/config/get/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/config/get/</guid><description>&lt;h2 id="shelly-config-get"&gt;shelly config get&lt;/h2&gt;
 &lt;p&gt;Get a CLI configuration value&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -391,7 +395,9 @@ Without a key, shows all configuration values.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly config path</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/config/path/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/config/path/</guid><description>&lt;h2 id="shelly-config-path"&gt;shelly config path&lt;/h2&gt;
 &lt;p&gt;Show configuration file path&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -509,7 +515,9 @@ Without a key, shows all configuration values.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly config reset</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/config/reset/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/config/reset/</guid><description>&lt;h2 id="shelly-config-reset"&gt;shelly config reset&lt;/h2&gt;
 &lt;p&gt;Reset CLI configuration to defaults&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -631,7 +639,9 @@ aliases, and other data are preserved.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly config set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/config/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/config/set/</guid><description>&lt;h2 id="shelly-config-set"&gt;shelly config set&lt;/h2&gt;
 &lt;p&gt;Set CLI configuration values&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -775,5 +785,7 @@ With a key argument, shows only that specific setting (supports dot notation).&l
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_config.md"&gt;shelly config&lt;/a&gt;	 - Manage CLI configuration&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

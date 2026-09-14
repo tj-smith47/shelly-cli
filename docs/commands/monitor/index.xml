@@ -119,7 +119,9 @@ Press Ctrl+C to stop monitoring.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_monitor.md"&gt;shelly monitor&lt;/a&gt;	 - Real-time device monitoring&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_monitor.md"&gt;shelly monitor&lt;/a&gt;	 - Real-time device monitoring&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly monitor events</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/monitor/events/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/monitor/events/</guid><description>&lt;h2 id="shelly-monitor-events"&gt;shelly monitor events&lt;/h2&gt;
 &lt;p&gt;Monitor device events in real-time&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -247,7 +249,9 @@ Press Ctrl+C to stop monitoring.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_monitor.md"&gt;shelly monitor&lt;/a&gt;	 - Real-time device monitoring&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_monitor.md"&gt;shelly monitor&lt;/a&gt;	 - Real-time device monitoring&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly monitor power</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/monitor/power/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/monitor/power/</guid><description>&lt;h2 id="shelly-monitor-power"&gt;shelly monitor power&lt;/h2&gt;
 &lt;p&gt;Monitor power consumption in real-time&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -378,7 +382,9 @@ Press Ctrl+C to stop monitoring.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_monitor.md"&gt;shelly monitor&lt;/a&gt;	 - Real-time device monitoring&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_monitor.md"&gt;shelly monitor&lt;/a&gt;	 - Real-time device monitoring&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly monitor status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/monitor/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/monitor/status/</guid><description>&lt;h2 id="shelly-monitor-status"&gt;shelly monitor status&lt;/h2&gt;
 &lt;p&gt;Monitor device status in real-time&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -508,5 +514,7 @@ Press Ctrl+C to stop monitoring.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_monitor.md"&gt;shelly monitor&lt;/a&gt;	 - Real-time device monitoring&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_monitor.md"&gt;shelly monitor&lt;/a&gt;	 - Real-time device monitoring&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

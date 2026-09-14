@@ -129,7 +129,9 @@ with &amp;lsquo;shelly backup restore &amp;ndash;decrypt &lt;password&gt;&amp;rs
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_backup.md"&gt;shelly backup&lt;/a&gt;	 - Backup and restore device configurations&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_backup.md"&gt;shelly backup&lt;/a&gt;	 - Backup and restore device configurations&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly backup list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/backup/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/backup/list/</guid><description>&lt;h2 id="shelly-backup-list"&gt;shelly backup list&lt;/h2&gt;
 &lt;p&gt;List saved backups&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -277,7 +279,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_backup.md"&gt;shelly backup&lt;/a&gt;	 - Backup and restore device configurations&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_backup.md"&gt;shelly backup&lt;/a&gt;	 - Backup and restore device configurations&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly backup restore</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/backup/restore/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/backup/restore/</guid><description>&lt;h2 id="shelly-backup-restore"&gt;shelly backup restore&lt;/h2&gt;
 &lt;p&gt;Restore a device from backup&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -496,5 +500,7 @@ sections.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_backup.md"&gt;shelly backup&lt;/a&gt;	 - Backup and restore device configurations&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_backup.md"&gt;shelly backup&lt;/a&gt;	 - Backup and restore device configurations&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

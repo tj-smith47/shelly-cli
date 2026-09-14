@@ -131,7 +131,9 @@ Use &amp;ndash;enable to automatically enable the script after creation.&lt;/p&g
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script delete</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/delete/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/delete/</guid><description>&lt;h2 id="shelly-script-delete"&gt;shelly script delete&lt;/h2&gt;
 &lt;p&gt;Delete a script&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -252,7 +254,9 @@ Use &amp;ndash;enable to automatically enable the script after creation.&lt;/p&g
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script download</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/download/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/download/</guid><description>&lt;h2 id="shelly-script-download"&gt;shelly script download&lt;/h2&gt;
 &lt;p&gt;Download script to file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -370,7 +374,9 @@ Use &amp;ndash;enable to automatically enable the script after creation.&lt;/p&g
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script eval</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/eval/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/eval/</guid><description>&lt;h2 id="shelly-script-eval"&gt;shelly script eval&lt;/h2&gt;
 &lt;p&gt;Evaluate JavaScript code&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -496,7 +502,9 @@ multiple words that will be joined together.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script get</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/get/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/get/</guid><description>&lt;h2 id="shelly-script-get"&gt;shelly script get&lt;/h2&gt;
 &lt;p&gt;Get script code or status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -618,7 +626,9 @@ detailed status including memory usage and errors.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/list/</guid><description>&lt;h2 id="shelly-script-list"&gt;shelly script list&lt;/h2&gt;
 &lt;p&gt;List scripts on a device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -760,7 +770,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script start</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/start/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/start/</guid><description>&lt;h2 id="shelly-script-start"&gt;shelly script start&lt;/h2&gt;
 &lt;p&gt;Start a script&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -873,7 +885,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script stop</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/stop/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/stop/</guid><description>&lt;h2 id="shelly-script-stop"&gt;shelly script stop&lt;/h2&gt;
 &lt;p&gt;Stop a running script&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -985,7 +999,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script template</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/template/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/template/</guid><description>&lt;h2 id="shelly-script-template"&gt;shelly script template&lt;/h2&gt;
 &lt;p&gt;Manage script templates&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1108,10 +1124,18 @@ substituted during installation.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_script_template_install.md"&gt;shelly script template install&lt;/a&gt;	 - Install a script template on a device&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_script_template_list.md"&gt;shelly script template list&lt;/a&gt;	 - List available script templates&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_script_template_show.md"&gt;shelly script template show&lt;/a&gt;	 - Show script template details&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script_template_install.md"&gt;shelly script template install&lt;/a&gt;	 - Install a script template on a device&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script_template_list.md"&gt;shelly script template list&lt;/a&gt;	 - List available script templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script_template_show.md"&gt;shelly script template show&lt;/a&gt;	 - Show script template details&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script template install</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/template-install/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/template-install/</guid><description>&lt;h2 id="shelly-script-template-install"&gt;shelly script template install&lt;/h2&gt;
 &lt;p&gt;Install a script template on a device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1250,7 +1274,9 @@ variables are substituted with their default values, or you can use
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script_template.md"&gt;shelly script template&lt;/a&gt;	 - Manage script templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script_template.md"&gt;shelly script template&lt;/a&gt;	 - Manage script templates&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script template list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/template-list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/template-list/</guid><description>&lt;h2 id="shelly-script-template-list"&gt;shelly script template list&lt;/h2&gt;
 &lt;p&gt;List available script templates&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1370,7 +1396,9 @@ templates from your configuration.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script_template.md"&gt;shelly script template&lt;/a&gt;	 - Manage script templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script_template.md"&gt;shelly script template&lt;/a&gt;	 - Manage script templates&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script template show</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/template-show/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/template-show/</guid><description>&lt;h2 id="shelly-script-template-show"&gt;shelly script template show&lt;/h2&gt;
 &lt;p&gt;Show script template details&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1498,7 +1526,9 @@ JavaScript source code.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script_template.md"&gt;shelly script template&lt;/a&gt;	 - Manage script templates&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script_template.md"&gt;shelly script template&lt;/a&gt;	 - Manage script templates&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script update</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/update/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/update/</guid><description>&lt;h2 id="shelly-script-update"&gt;shelly script update&lt;/h2&gt;
 &lt;p&gt;Update a script&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1640,7 +1670,9 @@ Use &amp;ndash;append to add code to the existing script instead of replacing it
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly script upload</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/script/upload/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/script/upload/</guid><description>&lt;h2 id="shelly-script-upload"&gt;shelly script upload&lt;/h2&gt;
 &lt;p&gt;Upload script from file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1761,5 +1793,7 @@ Use &amp;ndash;append to add code to the existing script instead of replacing it
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_script.md"&gt;shelly script&lt;/a&gt;	 - Manage device scripts&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

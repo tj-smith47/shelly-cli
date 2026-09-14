@@ -70,10 +70,18 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_claude_disable.md"&gt;shelly mcp claude disable&lt;/a&gt;	 - Remove server from Claude config&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_claude_enable.md"&gt;shelly mcp claude enable&lt;/a&gt;	 - Add server to Claude config&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_claude_list.md"&gt;shelly mcp claude list&lt;/a&gt;	 - Show Claude MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_claude_disable.md"&gt;shelly mcp claude disable&lt;/a&gt;	 - Remove server from Claude config&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_claude_enable.md"&gt;shelly mcp claude enable&lt;/a&gt;	 - Add server to Claude config&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_claude_list.md"&gt;shelly mcp claude list&lt;/a&gt;	 - Show Claude MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp claude disable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/claude-disable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/claude-disable/</guid><description>&lt;h2 id="shelly-mcp-claude-disable"&gt;shelly mcp claude disable&lt;/h2&gt;
 &lt;p&gt;Remove server from Claude config&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -168,7 +176,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_claude.md"&gt;shelly mcp claude&lt;/a&gt;	 - Manage Claude Desktop MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_claude.md"&gt;shelly mcp claude&lt;/a&gt;	 - Manage Claude Desktop MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp claude enable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/claude-enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/claude-enable/</guid><description>&lt;h2 id="shelly-mcp-claude-enable"&gt;shelly mcp claude enable&lt;/h2&gt;
 &lt;p&gt;Add server to Claude config&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -267,7 +277,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_claude.md"&gt;shelly mcp claude&lt;/a&gt;	 - Manage Claude Desktop MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_claude.md"&gt;shelly mcp claude&lt;/a&gt;	 - Manage Claude Desktop MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp claude list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/claude-list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/claude-list/</guid><description>&lt;h2 id="shelly-mcp-claude-list"&gt;shelly mcp claude list&lt;/h2&gt;
 &lt;p&gt;Show Claude MCP servers&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -360,7 +372,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_claude.md"&gt;shelly mcp claude&lt;/a&gt;	 - Manage Claude Desktop MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_claude.md"&gt;shelly mcp claude&lt;/a&gt;	 - Manage Claude Desktop MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp configure</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/configure/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/configure/</guid><description>&lt;h2 id="shelly-mcp-configure"&gt;shelly mcp configure&lt;/h2&gt;
 &lt;p&gt;Configure AI assistant MCP integration&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -513,7 +527,9 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp cursor</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/cursor/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/cursor/</guid><description>&lt;h2 id="shelly-mcp-cursor"&gt;shelly mcp cursor&lt;/h2&gt;
 &lt;p&gt;Manage Cursor MCP servers&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -586,10 +602,18 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_cursor_disable.md"&gt;shelly mcp cursor disable&lt;/a&gt;	 - Remove server from Cursor config&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_cursor_enable.md"&gt;shelly mcp cursor enable&lt;/a&gt;	 - Add server to Cursor config&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_cursor_list.md"&gt;shelly mcp cursor list&lt;/a&gt;	 - Show Cursor MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_cursor_disable.md"&gt;shelly mcp cursor disable&lt;/a&gt;	 - Remove server from Cursor config&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_cursor_enable.md"&gt;shelly mcp cursor enable&lt;/a&gt;	 - Add server to Cursor config&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_cursor_list.md"&gt;shelly mcp cursor list&lt;/a&gt;	 - Show Cursor MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp cursor disable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/cursor-disable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/cursor-disable/</guid><description>&lt;h2 id="shelly-mcp-cursor-disable"&gt;shelly mcp cursor disable&lt;/h2&gt;
 &lt;p&gt;Remove server from Cursor config&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -686,7 +710,9 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_cursor.md"&gt;shelly mcp cursor&lt;/a&gt;	 - Manage Cursor MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_cursor.md"&gt;shelly mcp cursor&lt;/a&gt;	 - Manage Cursor MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp cursor enable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/cursor-enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/cursor-enable/</guid><description>&lt;h2 id="shelly-mcp-cursor-enable"&gt;shelly mcp cursor enable&lt;/h2&gt;
 &lt;p&gt;Add server to Cursor config&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -787,7 +813,9 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_cursor.md"&gt;shelly mcp cursor&lt;/a&gt;	 - Manage Cursor MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_cursor.md"&gt;shelly mcp cursor&lt;/a&gt;	 - Manage Cursor MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp cursor list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/cursor-list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/cursor-list/</guid><description>&lt;h2 id="shelly-mcp-cursor-list"&gt;shelly mcp cursor list&lt;/h2&gt;
 &lt;p&gt;Show Cursor MCP servers&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -882,7 +910,9 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_cursor.md"&gt;shelly mcp cursor&lt;/a&gt;	 - Manage Cursor MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_cursor.md"&gt;shelly mcp cursor&lt;/a&gt;	 - Manage Cursor MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp start</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/start/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/start/</guid><description>&lt;h2 id="shelly-mcp-start"&gt;shelly mcp start&lt;/h2&gt;
 &lt;p&gt;Start the MCP server&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -975,7 +1005,9 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp stream</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/stream/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/stream/</guid><description>&lt;h2 id="shelly-mcp-stream"&gt;shelly mcp stream&lt;/h2&gt;
 &lt;p&gt;Stream the MCP server over HTTP&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1072,7 +1104,9 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp tools</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/tools/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/tools/</guid><description>&lt;h2 id="shelly-mcp-tools"&gt;shelly mcp tools&lt;/h2&gt;
 &lt;p&gt;Export tools as JSON&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1165,7 +1199,9 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp vscode</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/vscode/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/vscode/</guid><description>&lt;h2 id="shelly-mcp-vscode"&gt;shelly mcp vscode&lt;/h2&gt;
 &lt;p&gt;Manage VSCode MCP servers&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1238,10 +1274,18 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_vscode_disable.md"&gt;shelly mcp vscode disable&lt;/a&gt;	 - Remove server from VSCode config&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_vscode_enable.md"&gt;shelly mcp vscode enable&lt;/a&gt;	 - Add server to VSCode config&lt;/li&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_vscode_list.md"&gt;shelly mcp vscode list&lt;/a&gt;	 - Show VSCode MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp.md"&gt;shelly mcp&lt;/a&gt;	 - MCP server for AI assistant integration&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_vscode_disable.md"&gt;shelly mcp vscode disable&lt;/a&gt;	 - Remove server from VSCode config&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_vscode_enable.md"&gt;shelly mcp vscode enable&lt;/a&gt;	 - Add server to VSCode config&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_vscode_list.md"&gt;shelly mcp vscode list&lt;/a&gt;	 - Show VSCode MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp vscode disable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/vscode-disable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/vscode-disable/</guid><description>&lt;h2 id="shelly-mcp-vscode-disable"&gt;shelly mcp vscode disable&lt;/h2&gt;
 &lt;p&gt;Remove server from VSCode config&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1338,7 +1382,9 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_vscode.md"&gt;shelly mcp vscode&lt;/a&gt;	 - Manage VSCode MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_vscode.md"&gt;shelly mcp vscode&lt;/a&gt;	 - Manage VSCode MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp vscode enable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/vscode-enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/vscode-enable/</guid><description>&lt;h2 id="shelly-mcp-vscode-enable"&gt;shelly mcp vscode enable&lt;/h2&gt;
 &lt;p&gt;Add server to VSCode config&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1439,7 +1485,9 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_vscode.md"&gt;shelly mcp vscode&lt;/a&gt;	 - Manage VSCode MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_vscode.md"&gt;shelly mcp vscode&lt;/a&gt;	 - Manage VSCode MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mcp vscode list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/vscode-list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mcp/vscode-list/</guid><description>&lt;h2 id="shelly-mcp-vscode-list"&gt;shelly mcp vscode list&lt;/h2&gt;
 &lt;p&gt;Show VSCode MCP servers&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -1534,5 +1582,7 @@ use the Shelly CLI via MCP (Model Context Protocol).&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mcp_vscode.md"&gt;shelly mcp vscode&lt;/a&gt;	 - Manage VSCode MCP servers&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mcp_vscode.md"&gt;shelly mcp vscode&lt;/a&gt;	 - Manage VSCode MCP servers&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

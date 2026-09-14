@@ -126,7 +126,9 @@ accidental triggers.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_input.md"&gt;shelly input&lt;/a&gt;	 - Manage input components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_input.md"&gt;shelly input&lt;/a&gt;	 - Manage input components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly input enable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/input/enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/input/enable/</guid><description>&lt;h2 id="shelly-input-enable"&gt;shelly input enable&lt;/h2&gt;
 &lt;p&gt;Enable input component&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -254,7 +256,9 @@ state changes and trigger associated actions.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_input.md"&gt;shelly input&lt;/a&gt;	 - Manage input components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_input.md"&gt;shelly input&lt;/a&gt;	 - Manage input components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly input list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/input/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/input/list/</guid><description>&lt;h2 id="shelly-input-list"&gt;shelly input list&lt;/h2&gt;
 &lt;p&gt;List input components&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -383,7 +387,9 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_input.md"&gt;shelly input&lt;/a&gt;	 - Manage input components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_input.md"&gt;shelly input&lt;/a&gt;	 - Manage input components&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly input trigger</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/input/trigger/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/input/trigger/</guid><description>&lt;h2 id="shelly-input-trigger"&gt;shelly input trigger&lt;/h2&gt;
 &lt;p&gt;Trigger input event&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -515,5 +521,7 @@ long_push - Long button press&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_input.md"&gt;shelly input&lt;/a&gt;	 - Manage input components&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_input.md"&gt;shelly input&lt;/a&gt;	 - Manage input components&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>

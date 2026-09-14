@@ -119,7 +119,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mock.md"&gt;shelly mock&lt;/a&gt;	 - Mock device mode for testing&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mock.md"&gt;shelly mock&lt;/a&gt;	 - Mock device mode for testing&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mock delete</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mock/delete/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mock/delete/</guid><description>&lt;h2 id="shelly-mock-delete"&gt;shelly mock delete&lt;/h2&gt;
 &lt;p&gt;Delete a mock device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -231,7 +233,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mock.md"&gt;shelly mock&lt;/a&gt;	 - Mock device mode for testing&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mock.md"&gt;shelly mock&lt;/a&gt;	 - Mock device mode for testing&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mock list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mock/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mock/list/</guid><description>&lt;h2 id="shelly-mock-list"&gt;shelly mock list&lt;/h2&gt;
 &lt;p&gt;List mock devices&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -343,7 +347,9 @@
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mock.md"&gt;shelly mock&lt;/a&gt;	 - Mock device mode for testing&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mock.md"&gt;shelly mock&lt;/a&gt;	 - Mock device mode for testing&lt;/li&gt;
 &lt;/ul&gt;</description></item><item><title>shelly mock scenario</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/mock/scenario/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/mock/scenario/</guid><description>&lt;h2 id="shelly-mock-scenario"&gt;shelly mock scenario&lt;/h2&gt;
 &lt;p&gt;Load a test scenario&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
@@ -465,5 +471,7 @@ minimal - Single device for quick testing&lt;/p&gt;
 &lt;/div&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;a href="shelly_mock.md"&gt;shelly mock&lt;/a&gt;	 - Mock device mode for testing&lt;/li&gt;
+&lt;li&gt;
+
+&lt;a class="link link--text" href="shelly_mock.md"&gt;shelly mock&lt;/a&gt;	 - Mock device mode for testing&lt;/li&gt;
 &lt;/ul&gt;</description></item></channel></rss>
