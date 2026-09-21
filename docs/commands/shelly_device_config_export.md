@@ -17,13 +17,13 @@ shelly device config export <device> <file> [flags]
 
 ```
   # Export to JSON file
-  shelly config export living-room config-backup.json
+  shelly device config export living-room config-backup.json
 
   # Export to YAML file
-  shelly config export living-room config-backup.yaml --format=yaml
+  shelly device config export living-room config-backup.yaml --format=yaml
 
   # Export to stdout
-  shelly config export living-room -
+  shelly device config export living-room -
 ```
 
 ### Options

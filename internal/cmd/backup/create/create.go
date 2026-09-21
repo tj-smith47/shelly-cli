@@ -58,7 +58,8 @@ with 'shelly backup restore --decrypt <password>'.`,
 
   # Skip scripts in backup
   shelly backup create living-room backup.json --skip-scripts`,
-		Args: cobra.RangeArgs(1, 2),
+		Annotations: cmdutil.DashIsOutputAnnotation(),
+		Args:        cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			if len(args) > 1 {

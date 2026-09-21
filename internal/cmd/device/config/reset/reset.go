@@ -37,10 +37,10 @@ With a component argument, resets that component's configuration.
 Note: This does not perform a full factory reset. For that, use:
   shelly device factory-reset <device>`,
 		Example: `  # Reset switch:0 to defaults
-  shelly config reset living-room switch:0
+  shelly device config reset living-room switch:0
 
   # Reset with confirmation skipped
-  shelly config reset living-room switch:0 --yes`,
+  shelly device config reset living-room switch:0 --yes`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]

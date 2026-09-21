@@ -8,7 +8,7 @@ Import device configuration from a JSON or YAML file.
 
 Keys present in the file are applied to the device; keys absent from the file
 are left unchanged (the device merges the update — there is no whole-config
-replace primitive). Capture a file in this format with 'shelly config export'.
+replace primitive). Capture a file in this format with 'shelly device config export'.
 
 ```
 shelly device config import <device> <file> [flags]
@@ -18,10 +18,10 @@ shelly device config import <device> <file> [flags]
 
 ```
   # Import configuration
-  shelly config import living-room config-backup.json
+  shelly device config import living-room config-backup.json
 
   # Dry run - show what would change without applying
-  shelly config import living-room config.json --dry-run
+  shelly device config import living-room config.json --dry-run
 ```
 
 ### Options

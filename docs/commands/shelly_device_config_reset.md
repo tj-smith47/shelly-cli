@@ -20,10 +20,10 @@ shelly device config reset <device> [component] [flags]
 
 ```
   # Reset switch:0 to defaults
-  shelly config reset living-room switch:0
+  shelly device config reset living-room switch:0
 
   # Reset with confirmation skipped
-  shelly config reset living-room switch:0 --yes
+  shelly device config reset living-room switch:0 --yes
 ```
 
 ### Options

@@ -36,12 +36,12 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 Keys present in the file are applied to the device; keys absent from the file
 are left unchanged (the device merges the update — there is no whole-config
-replace primitive). Capture a file in this format with 'shelly config export'.`,
+replace primitive). Capture a file in this format with 'shelly device config export'.`,
 		Example: `  # Import configuration
-  shelly config import living-room config-backup.json
+  shelly device config import living-room config-backup.json
 
   # Dry run - show what would change without applying
-  shelly config import living-room config.json --dry-run`,
+  shelly device config import living-room config.json --dry-run`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]

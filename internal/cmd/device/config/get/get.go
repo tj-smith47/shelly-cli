@@ -33,22 +33,22 @@ Without a component argument, returns the full device configuration.
 With a component argument (e.g., "switch:0", "sys", "wifi"), returns
 only that component's configuration.`,
 		Example: `  # Get full device configuration
-  shelly config get living-room
+  shelly device config get living-room
 
   # Get switch:0 configuration
-  shelly config get living-room switch:0
+  shelly device config get living-room switch:0
 
   # Get system configuration
-  shelly config get living-room sys
+  shelly device config get living-room sys
 
   # Get WiFi configuration
-  shelly config get living-room wifi
+  shelly device config get living-room wifi
 
   # Output as JSON
-  shelly config get living-room -o json
+  shelly device config get living-room -o json
 
   # Output as YAML
-  shelly config get living-room -o yaml`,
+  shelly device config get living-room -o yaml`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]

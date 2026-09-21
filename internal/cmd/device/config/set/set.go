@@ -34,14 +34,14 @@ Specify key=value pairs to update. Only the specified keys will be modified.
 A key and its value may be separated with "=", ":", or a space — these are
 equivalent ("name=Light", "name:Light", and "name Light" all set name to Light).`,
 		Example: `  # Set switch name (these are equivalent)
-  shelly config set living-room switch:0 name="Main Light"
-  shelly config set living-room switch:0 name "Main Light"
+  shelly device config set living-room switch:0 name="Main Light"
+  shelly device config set living-room switch:0 name "Main Light"
 
   # Set multiple values
-  shelly config set living-room switch:0 name="Light" initial_state=on
+  shelly device config set living-room switch:0 name="Light" initial_state=on
 
   # Set light brightness default
-  shelly config set living-room light:0 default.brightness=50`,
+  shelly device config set living-room light:0 default.brightness=50`,
 		Args: cobra.MinimumNArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]

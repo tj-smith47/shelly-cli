@@ -187,11 +187,15 @@ func execute() int {
 		return config.ExecuteShellAlias(ctx, expandedArgs)
 	}
 
-	// Substitute "-" argument with piped stdin content (enables: echo "dev" | shelly status -)
-	expandedArgs, err := utils.ReplaceStdinArg(expandedArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s: %s\n", theme.StatusError().Render("[ERROR]"), err.Error())
-		return 1
+	// Substitute "-" argument with piped stdin content (enables: echo "dev" | shelly status -).
+	// Commands that take "-" as their stdout target keep the argument as typed.
+	var err error
+	if !dashIsOutput(rootCmd, expandedArgs) {
+		expandedArgs, err = utils.ReplaceStdinArg(expandedArgs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %s\n", theme.StatusError().Render("[ERROR]"), err.Error())
+			return 1
+		}
 	}
 
 	// Set the expanded args for cobra to process
@@ -236,6 +240,17 @@ func execute() int {
 	version.ShowUpdateNotification()
 
 	return 0
+}
+
+// dashIsOutput reports whether args resolve to a command that reads a bare "-"
+// argument as "write to stdout" (cmdutil.AnnotationDashIsOutput). An unknown
+// command resolves to false so cobra reports it in the usual way.
+func dashIsOutput(root *cobra.Command, args []string) bool {
+	target, _, err := root.Find(args)
+	if err != nil {
+		return false
+	}
+	return cmdutil.DashIsOutput(target)
 }
 
 // emitRawResponses marshals the captured device responses to a JSON array and
@@ -529,7 +544,10 @@ func initializeConfig(cmd *cobra.Command, _ []string) error {
 // captured responses as a JSON array once the command finishes. The sink rides
 // the context, so it reaches every Gen1/Gen2 call without per-command wiring.
 func applyRawCapture(cmd *cobra.Command) {
-	raw, err := cmd.Flags().GetBool("raw")
+	// Read the root flag itself: a command-local --raw with its own meaning (api,
+	// kvs get, cloud events, debug websocket) shadows the global one in
+	// cmd.Flags(), and must not switch the command into capture mode.
+	raw, err := cmd.Root().PersistentFlags().GetBool("raw")
 	if err != nil || !raw {
 		return
 	}

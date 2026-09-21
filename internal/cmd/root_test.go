@@ -5,12 +5,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"regexp"
 	"sync"
 	"testing"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/tj-smith47/shelly-go/transport"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
@@ -245,5 +249,171 @@ func TestIsColorDisabled(t *testing.T) {
 				t.Errorf("iostreams.IsColorDisabled() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// walkCommands visits c and every descendant. Callers hold rootCmdMu:
+// Commands() sorts the tree in place.
+func walkCommands(c *cobra.Command, visit func(*cobra.Command)) {
+	visit(c)
+	for _, sub := range c.Commands() {
+		walkCommands(sub, visit)
+	}
+}
+
+// bareDashExample matches a documented invocation whose last argument is a bare
+// "-", e.g. "shelly backup create living-room -".
+var bareDashExample = regexp.MustCompile(`(?m)^\s*shelly\s.*\s-\s*$`)
+
+// TestDashIsOutput_AnnotationMatchesDocs keeps the stdin substitution and the
+// docs in step: a command that documents a bare "-" argument must opt out of the
+// root's stdin replacement, and only such commands may opt out.
+func TestDashIsOutput_AnnotationMatchesDocs(t *testing.T) {
+	t.Parallel()
+
+	rootCmdMu.Lock()
+	defer rootCmdMu.Unlock()
+
+	var annotated int
+	walkCommands(rootCmd, func(c *cobra.Command) {
+		documented := bareDashExample.MatchString(c.Example)
+		marked := cmdutil.DashIsOutput(c)
+		if marked {
+			annotated++
+		}
+		switch {
+		case documented && !marked:
+			t.Errorf("%s documents a bare \"-\" argument but lacks cmdutil.DashIsOutputAnnotation(); "+
+				"the root would replace \"-\" with stdin before the command sees it", c.CommandPath())
+		case marked && !documented:
+			t.Errorf("%s carries cmdutil.DashIsOutputAnnotation() but no example shows the bare \"-\" form", c.CommandPath())
+		}
+	})
+	if annotated == 0 {
+		t.Error("no command carries the dash-is-output annotation; backup create and config export should")
+	}
+}
+
+func TestDashIsOutput_ResolvesCommand(t *testing.T) {
+	t.Parallel()
+
+	rootCmdMu.Lock()
+	defer rootCmdMu.Unlock()
+
+	tests := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"backup create to stdout", []string{"backup", "create", "living-room", "-"}, true},
+		{"config export to stdout", []string{"device", "config", "export", "living-room", "-"}, true},
+		{"device from stdin", []string{"status", "-"}, false},
+		{"unknown command", []string{"no-such-command", "-"}, false},
+	}
+	for _, tt := range tests {
+		if got := dashIsOutput(rootCmd, tt.args); got != tt.want {
+			t.Errorf("%s: dashIsOutput(%v) = %v, want %v", tt.name, tt.args, got, tt.want)
+		}
+	}
+}
+
+// localShadowsOfGlobalFlags lists every command-local flag that reuses a global
+// flag's name, with what the local flag means there. In cobra the local flag
+// wins, so the global one is unreachable on these commands. The root reads each
+// global through its own flag object (viper bindings, applyRawCapture), so a
+// local flag never switches on the global behavior.
+var localShadowsOfGlobalFlags = map[string]string{
+	"shelly api --raw":                     "compact JSON of the single response",
+	"shelly auth export --output":          "output file path",
+	"shelly batch command --output":        "output format, limited to the formats the command supports",
+	"shelly cloud events --raw":            "print each event message as received",
+	"shelly debug coiot --raw":             "print each event message as received",
+	"shelly debug websocket --raw":         "print each event message as received",
+	"shelly device list --refresh":         "re-read device metadata from hardware",
+	"shelly discover coiot --verbose":      "show Gen1-specific detail",
+	"shelly energy export --output":        "output file path",
+	"shelly firmware download --output":    "output file path",
+	"shelly fleet status --offline":        "list only offline devices",
+	"shelly group members --output":        "output format, limited to the formats the command supports",
+	"shelly init --no-color":               "same meaning as the global flag",
+	"shelly kvs get --raw":                 "print the stored value only",
+	"shelly log export --output":           "output file path",
+	"shelly metrics influxdb --output":     "output file path",
+	"shelly metrics json --output":         "output file path",
+	"shelly modbus status --output":        "output format, limited to the formats the command supports",
+	"shelly plugin create --output":        "output directory",
+	"shelly profile info --output":         "output format, limited to the formats the command supports",
+	"shelly profile list --output":         "output format, limited to the formats the command supports",
+	"shelly profile search --output":       "output format, limited to the formats the command supports",
+	"shelly scene show --output":           "output format, limited to the formats the command supports",
+	"shelly script template list --output": "output format, limited to the formats the command supports",
+	"shelly script template show --output": "output format, limited to the formats the command supports",
+	"shelly sensoraddon list --output":     "output format, limited to the formats the command supports",
+	"shelly sensoraddon scan --output":     "output format, limited to the formats the command supports",
+	"shelly virtual get --output":          "output format, limited to the formats the command supports",
+	"shelly virtual list --output":         "output format, limited to the formats the command supports",
+	"shelly webhook server --log-json":     "log received webhooks as JSON",
+	"shelly zwave config --output":         "output format, limited to the formats the command supports",
+	"shelly zwave info --output":           "output format, limited to the formats the command supports",
+}
+
+// TestLocalFlagsDoNotShadowGlobals stops new commands from redefining a global
+// flag name: the local flag wins in cobra, silently disabling the global one.
+func TestLocalFlagsDoNotShadowGlobals(t *testing.T) {
+	t.Parallel()
+
+	rootCmdMu.Lock()
+	defer rootCmdMu.Unlock()
+
+	seen := map[string]bool{}
+	walkCommands(rootCmd, func(c *cobra.Command) {
+		if c == rootCmd {
+			return
+		}
+		c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+			if rootCmd.PersistentFlags().Lookup(f.Name) == nil {
+				return
+			}
+			key := c.CommandPath() + " --" + f.Name
+			seen[key] = true
+			if _, ok := localShadowsOfGlobalFlags[key]; !ok {
+				t.Errorf("%s reuses the global --%s flag name; pick a different local flag name", key, f.Name)
+			}
+		})
+	})
+	for key := range localShadowsOfGlobalFlags {
+		if !seen[key] {
+			t.Errorf("%s is allowlisted but no longer shadows a global flag; drop it from the list", key)
+		}
+	}
+}
+
+// TestApplyRawCapture_IgnoresLocalRawFlag asserts a command-local --raw does not
+// switch the command into global capture mode (which discarded its output and
+// printed "[]").
+func TestApplyRawCapture_IgnoresLocalRawFlag(t *testing.T) {
+	t.Parallel()
+
+	rootCmdMu.Lock()
+	defer rootCmdMu.Unlock()
+
+	apiCmd, _, err := rootCmd.Find([]string{"api"})
+	if err != nil {
+		t.Fatalf("find api: %v", err)
+	}
+	if err := apiCmd.Flags().Set("raw", "true"); err != nil {
+		t.Fatalf("set local --raw: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := apiCmd.Flags().Set("raw", "false"); err != nil {
+			t.Errorf("reset local --raw: %v", err)
+		}
+	})
+
+	rawSink = nil
+	applyRawCapture(apiCmd)
+	if rawSink != nil {
+		rawSink = nil
+		t.Error("local --raw installed the global capture sink")
 	}
 }

@@ -42,13 +42,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 The configuration is saved in JSON format by default. Use --format=yaml
 for YAML output.`,
 		Example: `  # Export to JSON file
-  shelly config export living-room config-backup.json
+  shelly device config export living-room config-backup.json
 
   # Export to YAML file
-  shelly config export living-room config-backup.yaml --format=yaml
+  shelly device config export living-room config-backup.yaml --format=yaml
 
   # Export to stdout
-  shelly config export living-room -`,
+  shelly device config export living-room -`,
+		Annotations:       cmdutil.DashIsOutputAnnotation(),
 		Args:              cobra.ExactArgs(2),
 		ValidArgsFunction: completion.DeviceThenFile(),
 		RunE: func(cmd *cobra.Command, args []string) error {

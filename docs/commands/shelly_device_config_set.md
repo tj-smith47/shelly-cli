@@ -19,14 +19,14 @@ shelly device config set <device> <component> <key>=<value>... [flags]
 
 ```
   # Set switch name (these are equivalent)
-  shelly config set living-room switch:0 name="Main Light"
-  shelly config set living-room switch:0 name "Main Light"
+  shelly device config set living-room switch:0 name="Main Light"
+  shelly device config set living-room switch:0 name "Main Light"
 
   # Set multiple values
-  shelly config set living-room switch:0 name="Light" initial_state=on
+  shelly device config set living-room switch:0 name="Light" initial_state=on
 
   # Set light brightness default
-  shelly config set living-room light:0 default.brightness=50
+  shelly device config set living-room light:0 default.brightness=50
 ```
 
 ### Options
