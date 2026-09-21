@@ -250,9 +250,13 @@ func NewCloudClientWithAuthKey(authKey, serverURL string) *CloudClient {
 
 // BrowserLoginOptions configures the browser login flow.
 type BrowserLoginOptions struct {
-	ClientID     string        // OAuth client ID (default: shelly-diy)
-	CallbackPort int           // Port for local callback server (default: auto-select)
-	Timeout      time.Duration // Timeout waiting for callback (default: 5 minutes)
+	// OnAuthorizeURL, when set, is called once with the URL the user has to
+	// open, before StartBrowserLogin starts waiting for the callback. With an
+	// auto-selected CallbackPort this is the only way to learn the URL in time.
+	OnAuthorizeURL func(authorizeURL string)
+	ClientID       string        // OAuth client ID (default: shelly-diy)
+	CallbackPort   int           // Port for local callback server (default: auto-select)
+	Timeout        time.Duration // Timeout waiting for callback (default: 5 minutes)
 }
 
 // BrowserLoginResult contains the result of a browser-based OAuth login.
@@ -272,6 +276,7 @@ func StartBrowserLogin(ctx context.Context, opts *BrowserLoginOptions) (*Browser
 		cloudOpts.ClientID = opts.ClientID
 		cloudOpts.CallbackPort = opts.CallbackPort
 		cloudOpts.Timeout = opts.Timeout
+		cloudOpts.OnAuthorizeURL = opts.OnAuthorizeURL
 	}
 
 	result, err := cloud.BrowserLogin(ctx, cloudOpts)
