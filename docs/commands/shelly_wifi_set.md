@@ -9,6 +9,11 @@ Configure the WiFi station (client) connection for a device.
 Set the SSID and password to connect to a WiFi network. Optionally configure
 static IP settings instead of using DHCP.
 
+Without --password, a device that stays on the same network keeps the
+password it has. A different network takes the password this host has stored
+for it; with none, the command is refused. Use --open for a network that has
+no password.
+
 ```
 shelly wifi set <device> [flags]
 ```
@@ -19,9 +24,18 @@ shelly wifi set <device> [flags]
   # Connect to a WiFi network
   shelly wifi set living-room --ssid "MyNetwork" --password "secret"
 
+  # Join a network this host knows, using its stored password
+  shelly wifi set living-room --ssid "MyNetwork"
+
+  # Join a network that has no password
+  shelly wifi set living-room --ssid "GuestNet" --open
+
   # Configure static IP
   shelly wifi set living-room --ssid "MyNetwork" --password "secret" \
     --static-ip "192.168.1.50" --gateway "192.168.1.1" --netmask "255.255.255.0"
+
+  # Change only the address; the gateway and netmask stay the device's
+  shelly wifi set living-room --ssid "MyNetwork" --static-ip "192.168.1.51"
 
   # Disable WiFi station mode
   shelly wifi set living-room --disable
@@ -31,14 +45,15 @@ shelly wifi set <device> [flags]
 
 ```
       --disable            Disable WiFi station mode
-      --dns string         DNS server address (for static IP)
+      --dns string         Static IPv4 nameserver (with --static-ip; default: the device's current one)
       --enable             Enable WiFi station mode
-      --gateway string     Gateway address (for static IP)
+      --gateway string     Static IPv4 default gateway (with --static-ip; default: the device's current one)
   -h, --help               help for set
-      --netmask string     Network mask (for static IP)
-      --password string    WiFi password
+      --netmask string     Static IPv4 subnet mask (with --static-ip; default: the device's current one)
+      --open               Join a network that has no password
+      --password string    WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
       --ssid string        WiFi network name
-      --static-ip string   Static IP address (uses DHCP if not set)
+      --static-ip string   Static IPv4 address (DHCP when not set; --gateway, --netmask and --dns default to the device's current ones)
 ```
 
 ### Options inherited from parent commands

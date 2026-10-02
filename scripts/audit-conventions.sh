@@ -500,6 +500,57 @@ else
     success "All cache-using tests properly set up memory filesystem"
 fi
 
+section "Network Isolation Checks"
+
+# internal/netguard refuses non-loopback dials only in a test binary that
+# links it, so every package with tests must link it.
+NETGUARD_PKG="github.com/tj-smith47/shelly-cli/internal/netguard"
+NETGUARD_MISSING=$(go list -test -f '{{.ImportPath}}{{range .Deps}} {{.}}{{end}}' ./... |
+    awk -v ng="$NETGUARD_PKG" '$1 ~ /\.test$/ { f = 0; for (i = 2; i <= NF; i++) if ($i == ng) f = 1; if (!f) print $1 }')
+if [[ -n "$NETGUARD_MISSING" ]]; then
+    error "Test binaries that do not link internal/netguard (add a _test.go with a blank import of it):"
+    echo "$NETGUARD_MISSING" | head -20
+else
+    success "Every test binary links internal/netguard"
+fi
+
+# The real factory access point flows join WiFi networks through the SDK's own
+# sockets, which netguard cannot see; tests use the service's flow fakes.
+REPROVISION_IN_TESTS=$(grep -rnE "reprovision\.(Restore|Onboard|Inspect|ScanAPs)\(" internal/ cmd/ 2>/dev/null | grep "_test\.go:" || true)
+if [[ -n "$REPROVISION_IN_TESTS" ]]; then
+    error "Tests calling the real reprovision flows (use the service's flow fakes):"
+    echo "$REPROVISION_IN_TESTS" | head -10
+else
+    success "No test calls the real reprovision flows"
+fi
+
+# A multicast sweep bypasses every dialer; only the guarded constructors may
+# build one. Test files are searched too: a test building a raw sweeper would
+# send real multicast.
+RAW_MULTICAST=$(grep -rnE "(discovery\.NewMDNSDiscoverer|discovery\.NewCoIoTDiscoverer|gen1\.NewCoIoTListener)\(" \
+    --include='*.go' internal/ cmd/ 2>/dev/null |
+    grep -v "^internal/shelly/discovery.go:" | while IFS=: read -r file line _; do
+        prev=$(sed -n "$((line - 4)),$((line - 1))p" "$file")
+        grep -q "netguard.Refuse" <<<"$prev" || echo "$file:$line"
+    done)
+if [[ -n "$RAW_MULTICAST" ]]; then
+    error "mDNS/CoIoT constructed without netguard.Refuse (use shelly.NewMDNSDiscoverer / shelly.NewCoIoTDiscoverer):"
+    echo "$RAW_MULTICAST" | head -10
+else
+    success "Every mDNS/CoIoT constructor is guarded"
+fi
+
+# The SDK websocket takes no dialer, so netguard sees it only through
+# client.NewDeviceWebSocket, which refuses a non-loopback host under test.
+RAW_WEBSOCKET=$(grep -rn "transport\.NewWebSocket(" --include='*.go' internal/ cmd/ 2>/dev/null |
+    grep -v "^internal/client/detect.go:" || true)
+if [[ -n "$RAW_WEBSOCKET" ]]; then
+    error "transport.NewWebSocket called directly (use client.NewDeviceWebSocket):"
+    echo "$RAW_WEBSOCKET" | head -10
+else
+    success "Every device websocket is built by client.NewDeviceWebSocket"
+fi
+
 # ==============================================================================
 # SECTION 9: Build, Lint, Test, Docs
 # ==============================================================================

@@ -419,6 +419,50 @@ func TestFlagsSharingAVariableAgreeOnDefault(t *testing.T) {
 	})
 }
 
+// TestEnableDisablePairsAreExclusive asserts every command with both an
+// enable and a disable flag refuses the two together: whichever one the
+// command checks first would otherwise win silently.
+func TestEnableDisablePairsAreExclusive(t *testing.T) {
+	t.Parallel()
+
+	rootCmdMu.Lock()
+	defer rootCmdMu.Unlock()
+
+	pairs := [][2]string{{"enable", "disable"}, {"enabled", "disabled"}}
+	checked := 0
+	walkCommands(rootCmd, func(c *cobra.Command) {
+		for _, pair := range pairs {
+			on, off := c.LocalFlags().Lookup(pair[0]), c.LocalFlags().Lookup(pair[1])
+			if on == nil || off == nil {
+				continue
+			}
+			checked++
+			restore := func(f *pflag.Flag, value string, changed bool) {
+				if err := f.Value.Set(value); err != nil {
+					t.Errorf("%s: reset --%s: %v", c.CommandPath(), f.Name, err)
+				}
+				f.Changed = changed
+			}
+			onValue, offValue, onChanged, offChanged := on.Value.String(), off.Value.String(), on.Changed, off.Changed
+			if err := c.Flags().Set(pair[0], "true"); err != nil {
+				t.Fatalf("%s: set --%s: %v", c.CommandPath(), pair[0], err)
+			}
+			if err := c.Flags().Set(pair[1], "true"); err != nil {
+				t.Fatalf("%s: set --%s: %v", c.CommandPath(), pair[1], err)
+			}
+			if err := c.ValidateFlagGroups(); err == nil {
+				t.Errorf("%s accepts --%s and --%s together; mark them mutually exclusive",
+					c.CommandPath(), pair[0], pair[1])
+			}
+			restore(on, onValue, onChanged)
+			restore(off, offValue, offChanged)
+		}
+	})
+	if checked == 0 {
+		t.Fatal("no command with an enable/disable pair found")
+	}
+}
+
 // TestApplyRawCapture_IgnoresLocalRawFlag asserts a command-local --raw does not
 // switch the command into global capture mode (which discarded its output and
 // printed "[]").

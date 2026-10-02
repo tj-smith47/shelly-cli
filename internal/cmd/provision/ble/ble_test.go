@@ -2,7 +2,7 @@
 
 // Race detection is disabled for this file because the tinygo.org/x/bluetooth
 // library has internal race conditions in the Bluetooth adapter initialization
-// that we cannot fix (third-party library). The tests work correctly without
+// that cannot be fixed here (third-party library). The tests work correctly without
 // race detection.
 package ble
 
@@ -392,11 +392,11 @@ func TestNewCommand_Execute_WithDeviceArgument(t *testing.T) {
 	// Device argument provided with required flags
 	cmd.SetArgs([]string{"ShellyPlus1-ABCD", "--ssid", "TestNetwork", "--password", "testpass"})
 
-	// Execute will fail because we can't actually provision via BLE
-	// but we want to verify the command accepts arguments and tries to run
+	// Execute fails without a BLE adapter; the check is that the arguments
+	// pass validation and the command tries to run.
 	err := cmd.Execute()
 
-	// We expect an error (network/device not found), but not an arg validation error
+	// An error is expected (network/device not found), but not an arg validation error
 	// The error should be about failed initialization, not missing arguments
 	if err != nil {
 		// Error is expected due to device/BLE unavailability
@@ -417,7 +417,7 @@ func TestNewCommand_Execute_WithSSIDFlag(t *testing.T) {
 	// With explicit SSID flag
 	cmd.SetArgs([]string{"TestDevice", "--ssid", "MyWiFi"})
 
-	// Execute - will fail due to BLE unavailability, but we're testing flag parsing
+	// Execute fails without BLE; flag parsing is what is checked
 	err := cmd.Execute()
 	// Error expected, but should be related to device connection, not flags
 	if err != nil {
@@ -441,7 +441,7 @@ func TestNewCommand_Execute_AllFlags(t *testing.T) {
 		"--no-cloud",
 	})
 
-	// Execute - will fail due to BLE, but we're testing flag parsing
+	// Execute fails without BLE; flag parsing is what is checked
 	err := cmd.Execute()
 	// Error expected
 	if err != nil {
@@ -458,7 +458,7 @@ func TestNewCommand_Execute_PartialFlags(t *testing.T) {
 	// Only device and name
 	cmd.SetArgs([]string{"TestDevice", "--name", "My Device"})
 
-	// Execute - will fail due to BLE, but we're testing it accepts flags
+	// Execute fails without BLE; flag acceptance is what is checked
 	err := cmd.Execute()
 	// Error expected
 	if err != nil {
@@ -898,7 +898,7 @@ func TestNewCommand_Execute_IntegrationWithAllFlags(t *testing.T) {
 	})
 
 	// Execute - will fail due to BLE unavailability
-	// but we're testing the command accepts and parses all flags
+	// the check is that the command accepts and parses all flags
 	err := cmd.Execute()
 	// Error is expected (Bluetooth not available)
 	// Just verify the command structure is correct
@@ -1046,7 +1046,7 @@ func TestNewCommand_Execute_Variations(t *testing.T) {
 			cmd := NewCommand(tf.Factory)
 			cmd.SetArgs(tt.args)
 
-			// Execute - will fail but we're testing command structure
+			// Execute fails without BLE; command structure is what is checked
 			err := cmd.Execute()
 			// Error expected (BLE unavailable), but no panic
 			if err != nil {
@@ -1171,5 +1171,50 @@ func TestRun_InvalidContextPaths(t *testing.T) {
 				t.Error("Expected error with cancelled context")
 			}
 		})
+	}
+}
+
+func TestNewCommand_OpenFlag(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"device", "--ssid", "net", "--open", "--password", "pwd"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "none of the others can be") {
+		t.Fatalf("--open with --password: err = %v, want the mutual-exclusion error", err)
+	}
+}
+
+func TestRun_UnknownPasswordRefused(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, DeviceAddress: "TestDevice", SSID: "home"}
+	err := run(context.Background(), opts)
+	if err == nil || !strings.Contains(err.Error(), `no WiFi passphrase for "home"`) {
+		t.Fatalf("err = %v, want the passphrase error naming home", err)
+	}
+	if strings.Contains(tf.ErrString()+tf.OutString(), "Bluetooth") {
+		t.Error("Bluetooth was initialized before the password was known")
+	}
+}
+
+func TestRun_DeclinedOpenRefused(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	opts := &Options{
+		Factory: tf.Factory, DeviceAddress: "TestDevice", SSID: "home",
+		prompts: cmdutil.WiFiPasswordPrompts{
+			Password: func(string) (string, error) { return "", nil },
+			Confirm:  func(string, bool) (bool, error) { return false, nil },
+		},
+	}
+	if err := run(context.Background(), opts); err == nil || !strings.Contains(err.Error(), "--open") {
+		t.Fatalf("err = %v, want the passphrase error", err)
+	}
+	if opts.Open {
+		t.Error("declined prompt set Open")
 	}
 }

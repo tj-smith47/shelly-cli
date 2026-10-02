@@ -97,3 +97,34 @@ func TestSetSetting_RefusesLiveConfigOnOsFs(t *testing.T) {
 		t.Fatalf("guard returned an error but viper still created %q", live)
 	}
 }
+
+// TestLoad_IgnoresLiveConfigOnOsFs proves a test never reads the user's live
+// registry: a live config holding a device loads as empty under `go test`,
+// while the same file at another path loads normally.
+func TestLoad_IgnoresLiveConfigOnOsFs(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmp)
+
+	body := []byte("devices:\n  kitchen:\n    name: kitchen\n    address: 10.0.0.9\n")
+	live := filepath.Join(tmp, "shelly", "config.yaml")
+	other := filepath.Join(tmp, "elsewhere", "config.yaml")
+	osfs := afero.NewOsFs()
+	for _, p := range []string{live, other} {
+		if err := osfs.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := afero.WriteFile(osfs, p, body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for path, want := range map[string]int{live: 0, other: 1} {
+		m := &Manager{path: path, fs: osfs}
+		if err := m.Load(); err != nil {
+			t.Fatalf("Load(%s) error = %v", path, err)
+		}
+		if got := len(m.config.Devices); got != want {
+			t.Errorf("Load(%s) devices = %d, want %d", path, got, want)
+		}
+	}
+}

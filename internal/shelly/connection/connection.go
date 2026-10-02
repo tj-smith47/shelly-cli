@@ -84,7 +84,12 @@ func (m *Manager) WithConnection(ctx context.Context, identifier string, fn func
 	if err != nil {
 		return err
 	}
+	return m.WithDeviceConnection(ctx, dev, fn)
+}
 
+// WithDeviceConnection is WithConnection for a device already resolved, so a
+// caller trying more than one connection resolves (and probes) only once.
+func (m *Manager) WithDeviceConnection(ctx context.Context, dev model.Device, fn func(*client.Client) error) error {
 	// No rate limiter configured - execute directly
 	if m.rateLimiter == nil {
 		return m.ExecuteGen2(ctx, dev, fn)
@@ -114,7 +119,11 @@ func (m *Manager) WithGen1Connection(ctx context.Context, identifier string, fn 
 	if err != nil {
 		return err
 	}
+	return m.WithGen1DeviceConnection(ctx, dev, fn)
+}
 
+// WithGen1DeviceConnection is WithGen1Connection for a device already resolved.
+func (m *Manager) WithGen1DeviceConnection(ctx context.Context, dev model.Device, fn func(*client.Gen1Client) error) error {
 	// No rate limiter configured - execute directly
 	if m.rateLimiter == nil {
 		return m.ExecuteGen1(ctx, dev, fn)

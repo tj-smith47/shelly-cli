@@ -3,6 +3,7 @@ package provisioning
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -408,24 +409,69 @@ func TestModel_HandleKey_Credentials_EnterShortPassword(t *testing.T) {
 	}
 }
 
-func TestModel_HandleKey_Credentials_EnterOpenNetwork(t *testing.T) {
-	t.Parallel()
+// emptyPasswordModel is at the credentials step with a network and no
+// password; its host lookup returns hostPass.
+func emptyPasswordModel(hostPass string) Model {
 	m := newTestModel()
 	m.focused = true
 	m.step = StepCredentials
 	m.ssid = testSSID
-	m.password = "" // open network: empty password is valid
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-
-	if updated.step != StepConfiguring {
-		t.Errorf("step = %d, want %d", updated.step, StepConfiguring)
+	m.hostPassword = func(context.Context, string) (string, error) {
+		if hostPass == "" {
+			return "", errors.New("no stored passphrase")
+		}
+		return hostPass, nil
 	}
-	if cmd == nil {
-		t.Error("should return configure command for an open network")
+	return m
+}
+
+func TestModel_EmptyPassword_LooksUpHost(t *testing.T) {
+	t.Parallel()
+	m := emptyPasswordModel("stored-pass")
+
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.step != StepCredentials || !m.lookingUp || cmd == nil {
+		t.Fatalf("Enter with no password: step %d lookingUp %v cmd %v, want a host lookup", m.step, m.lookingUp, cmd)
 	}
-	if updated.credErr != "" {
-		t.Errorf("credErr = %q, want empty", updated.credErr)
+	msg, ok := cmd().(HostPasswordMsg)
+	if !ok || msg.Password != "stored-pass" {
+		t.Fatalf("lookup returned %#v, want the stored passphrase", msg)
+	}
+	m, _ = m.Update(msg)
+	if m.step != StepConfiguring || m.password != "stored-pass" || m.open {
+		t.Errorf("step %d password %q open %v, want configuring with the stored passphrase", m.step, m.password, m.open)
+	}
+}
+
+func TestModel_EmptyPassword_OpenMustBeConfirmed(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		key      tea.KeyPressMsg
+		wantOpen bool
+	}{
+		{key: tea.KeyPressMsg{Code: 'y', Text: "y"}, wantOpen: true},
+		{key: tea.KeyPressMsg{Code: 'n', Text: "n"}},
+		{key: tea.KeyPressMsg{Code: tea.KeyEnter}},
+	} {
+		m := emptyPasswordModel("")
+		m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		m, _ = m.Update(cmd())
+		if !m.askOpen || m.step != StepCredentials {
+			t.Fatalf("no stored passphrase: askOpen %v step %d, want the open question", m.askOpen, m.step)
+		}
+		if view := m.SetSize(160, 40).View(); !strings.Contains(view, "open network") {
+			t.Errorf("question not shown: %q", view)
+		}
+		m, _ = m.Update(tt.key)
+		if m.open != tt.wantOpen {
+			t.Errorf("answer %q: open = %v, want %v", tt.key.String(), m.open, tt.wantOpen)
+		}
+		if tt.wantOpen && m.step != StepConfiguring {
+			t.Errorf("confirmed open: step %d, want configuring", m.step)
+		}
+		if !tt.wantOpen && (m.step != StepCredentials || m.credErr == "") {
+			t.Errorf("declined: step %d credErr %q, want back at credentials with a message", m.step, m.credErr)
+		}
 	}
 }
 
@@ -664,4 +710,31 @@ func newTestModel() Model {
 	svc := &shelly.Service{}
 	deps := Deps{Ctx: ctx, Svc: svc}
 	return New(deps)
+}
+
+func TestModel_EscCancelsHostLookup(t *testing.T) {
+	t.Parallel()
+	m := emptyPasswordModel("")
+	m.hostPassword = func(ctx context.Context, _ string) (string, error) {
+		<-ctx.Done()
+		return "", ctx.Err()
+	}
+
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !m.lookingUp || cmd == nil {
+		t.Fatalf("Enter with no password: lookingUp %v, want a host lookup", m.lookingUp)
+	}
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.lookingUp || m.step != StepCredentials || m.inputField != 1 || m.ssid != testSSID {
+		t.Fatalf("after Esc: lookingUp %v step %d field %d ssid %q, want the password field", m.lookingUp, m.step,
+			m.inputField, m.ssid)
+	}
+
+	// The lookup only returns once its context is cancelled, so this proves
+	// Esc cancelled it; its late answer must not move the wizard.
+	msg := cmd()
+	m, next := m.Update(msg)
+	if next != nil || m.askOpen || m.step != StepCredentials {
+		t.Errorf("stale lookup answer acted on: askOpen %v step %d", m.askOpen, m.step)
+	}
 }

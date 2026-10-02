@@ -24,10 +24,14 @@ const (
 
 // Shared RPC config field names.
 const (
-	fieldConfig = "config"
-	fieldEnable = "enable"
-	fieldServer = "server"
-	fieldSTA    = "sta"
+	fieldConfig     = "config"
+	fieldEnable     = "enable"
+	fieldServer     = "server"
+	fieldSTA        = "sta"
+	fieldSTA1       = "sta1"
+	fieldIPv4Mode   = "ipv4mode"
+	fieldNetmask    = "netmask"
+	fieldNameserver = "nameserver"
 )
 
 // ValidThermostatModes contains the valid thermostat operating modes.

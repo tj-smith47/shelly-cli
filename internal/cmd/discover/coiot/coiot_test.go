@@ -45,8 +45,8 @@ func (m *mockDiscoverer) Stop() error {
 // setMockDiscoverer replaces the discoverer factory and returns a cleanup function.
 func setMockDiscoverer(mock *mockDiscoverer) func() {
 	original := newDiscoverer
-	newDiscoverer = func() Discoverer {
-		return mock
+	newDiscoverer = func() (Discoverer, error) {
+		return mock, nil
 	}
 	return func() {
 		newDiscoverer = original

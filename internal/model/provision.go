@@ -7,9 +7,14 @@ type BulkProvisionConfig struct {
 }
 
 // ProvisionWiFiConfig represents shared WiFi settings.
+// An empty Password with Open false means the key is not known: a device on
+// the same network keeps its own, and a different network takes the
+// passphrase stored on this host or is refused.
 type ProvisionWiFiConfig struct {
 	SSID     string `yaml:"ssid" json:"ssid"`
 	Password string `yaml:"password" json:"password"`
+	// Open joins a network that has no password.
+	Open bool `yaml:"open,omitempty" json:"open,omitempty"`
 }
 
 // DeviceProvisionConfig represents per-device settings.
@@ -23,5 +28,8 @@ type DeviceProvisionConfig struct {
 // ProvisionResult holds the result of provisioning a single device.
 type ProvisionResult struct {
 	Device string
-	Err    error
+	// Warnings are SetWiFiConfig's, such as a static address kept on a
+	// changed network.
+	Warnings []string
+	Err      error
 }

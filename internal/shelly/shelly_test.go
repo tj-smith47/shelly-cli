@@ -5,14 +5,18 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/tj-smith47/shelly-go/reprovision"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
+	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
 // mockResolver is a mock device resolver for testing.
@@ -1061,20 +1065,6 @@ func TestWithPluginRegistry_Option(t *testing.T) {
 	}
 }
 
-// generationAwareResolver implements GenerationAwareResolver for testing.
-type generationAwareResolver struct {
-	device model.Device
-	err    error
-}
-
-func (g *generationAwareResolver) Resolve(_ string) (model.Device, error) {
-	return g.device, g.err
-}
-
-func (g *generationAwareResolver) ResolveWithGeneration(_ context.Context, _ string) (model.Device, error) {
-	return g.device, g.err
-}
-
 // TestService_ResolveWithGeneration_GenerationAwareResolver tests resolution with generation-aware resolver.
 func TestService_ResolveWithGeneration_GenerationAwareResolver(t *testing.T) {
 	t.Parallel()
@@ -1085,8 +1075,8 @@ func TestService_ResolveWithGeneration_GenerationAwareResolver(t *testing.T) {
 		Generation: 2,
 	}
 
-	resolver := &generationAwareResolver{
-		device: expectedDevice,
+	resolver := &testutil.Resolver{
+		Device: expectedDevice,
 	}
 
 	service := New(resolver)
@@ -1108,7 +1098,7 @@ func TestService_WithConnection_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.WithConnection(context.Background(), "nonexistent", func(_ *client.Client) error {
@@ -1126,7 +1116,7 @@ func TestService_WithGen1Connection_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.WithGen1Connection(context.Background(), "nonexistent", func(_ *client.Gen1Client) error {
@@ -1144,7 +1134,7 @@ func TestService_withGenAwareAction_Error(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.withGenAwareAction(
@@ -1188,7 +1178,7 @@ func TestService_ConnectGen1_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	conn, err := service.ConnectGen1(context.Background(), "nonexistent")
@@ -1206,7 +1196,7 @@ func TestService_RawRPC_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	result, err := service.RawRPC(context.Background(), "nonexistent", "Shelly.GetStatus", nil)
@@ -1224,7 +1214,7 @@ func TestService_RawGen1Call_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	result, err := service.RawGen1Call(context.Background(), "nonexistent", "/status")
@@ -1262,7 +1252,7 @@ func TestService_CheckFirmware_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	info, err := service.CheckFirmware(context.Background(), "nonexistent")
@@ -1280,7 +1270,7 @@ func TestService_GetFirmwareStatus_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	status, err := service.GetFirmwareStatus(context.Background(), "nonexistent")
@@ -1298,7 +1288,7 @@ func TestService_UpdateFirmware_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.UpdateFirmware(context.Background(), "nonexistent", nil)
@@ -1313,7 +1303,7 @@ func TestService_UpdateFirmwareStable_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.UpdateFirmwareStable(context.Background(), "nonexistent")
@@ -1328,7 +1318,7 @@ func TestService_UpdateFirmwareBeta_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.UpdateFirmwareBeta(context.Background(), "nonexistent")
@@ -1343,7 +1333,7 @@ func TestService_UpdateFirmwareFromURL_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.UpdateFirmwareFromURL(context.Background(), "nonexistent", "http://example.com/fw.bin")
@@ -1358,7 +1348,7 @@ func TestService_RollbackFirmware_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.RollbackFirmware(context.Background(), "nonexistent")
@@ -1373,7 +1363,7 @@ func TestService_GetFirmwareURL_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	url, err := service.GetFirmwareURL(context.Background(), "nonexistent", "stable")
@@ -1391,7 +1381,7 @@ func TestService_GetWiFiStatusFull_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	status, err := service.GetWiFiStatusFull(context.Background(), "nonexistent")
@@ -1409,7 +1399,7 @@ func TestService_GetWiFiConfigFull_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	cfg, err := service.GetWiFiConfigFull(context.Background(), "nonexistent")
@@ -1427,7 +1417,7 @@ func TestService_ScanWiFiNetworksFull_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	networks, err := service.ScanWiFiNetworksFull(context.Background(), "nonexistent")
@@ -1440,30 +1430,15 @@ func TestService_ScanWiFiNetworksFull_ResolveError(t *testing.T) {
 	}
 }
 
-// TestService_SetWiFiStation_ResolveError tests SetWiFiStation when resolution fails.
-func TestService_SetWiFiStation_ResolveError(t *testing.T) {
-	t.Parallel()
-
-	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
-	service := New(resolver)
-
-	err := service.SetWiFiStation(context.Background(), "nonexistent", "MySSID", "password", true)
-
-	if !errors.Is(err, expectedErr) {
-		t.Errorf("got error %v, want %v", err, expectedErr)
-	}
-}
-
 // TestService_SetWiFiAP_ResolveError tests SetWiFiAP when resolution fails.
 func TestService_SetWiFiAP_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
-	err := service.SetWiFiAP(context.Background(), "nonexistent", "ShellyAP", "password", true)
+	err := service.SetWiFiAP(context.Background(), "nonexistent", "ShellyAP", "password", false, true)
 
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("got error %v, want %v", err, expectedErr)
@@ -1475,7 +1450,7 @@ func TestService_GetMQTTStatus_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	status, err := service.GetMQTTStatus(context.Background(), "nonexistent")
@@ -1493,7 +1468,7 @@ func TestService_GetMQTTConfig_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	cfg, err := service.GetMQTTConfig(context.Background(), "nonexistent")
@@ -1511,7 +1486,7 @@ func TestService_SetMQTTConfig_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	enable := true
@@ -1527,7 +1502,7 @@ func TestService_SetMQTTConfigFull_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	enable := true
@@ -1547,7 +1522,7 @@ func TestService_GetEthernetStatus_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	status, err := service.GetEthernetStatus(context.Background(), "nonexistent")
@@ -1565,7 +1540,7 @@ func TestService_GetEthernetConfig_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	cfg, err := service.GetEthernetConfig(context.Background(), "nonexistent")
@@ -1583,7 +1558,7 @@ func TestService_SetEthernetConfig_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	enable := true
@@ -1599,7 +1574,7 @@ func TestService_GetAuthStatus_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	status, err := service.GetAuthStatus(context.Background(), "nonexistent")
@@ -1617,7 +1592,7 @@ func TestService_SetAuth_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.SetAuth(context.Background(), "nonexistent", "admin", "shelly", "password")
@@ -1632,7 +1607,7 @@ func TestService_DisableAuth_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.DisableAuth(context.Background(), "nonexistent")
@@ -1647,7 +1622,7 @@ func TestService_GetModbusStatus_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	status, err := service.GetModbusStatus(context.Background(), "nonexistent")
@@ -1665,7 +1640,7 @@ func TestService_GetModbusConfig_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	cfg, err := service.GetModbusConfig(context.Background(), "nonexistent")
@@ -1683,7 +1658,7 @@ func TestService_SetModbusConfig_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.SetModbusConfig(context.Background(), "nonexistent", true)
@@ -1698,7 +1673,7 @@ func TestService_GetBTHomeStatus_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	status, err := service.GetBTHomeStatus(context.Background(), "nonexistent")
@@ -1716,7 +1691,7 @@ func TestService_StartBTHomeDiscovery_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	err := service.StartBTHomeDiscovery(context.Background(), "nonexistent", 30)
@@ -1726,71 +1701,24 @@ func TestService_StartBTHomeDiscovery_ResolveError(t *testing.T) {
 	}
 }
 
-// TestService_withGenAwareAction_Gen1 tests withGenAwareAction for Gen1 devices.
-func TestService_withGenAwareAction_Gen1(t *testing.T) {
+// TestService_withGenAwareAction routes each generation to its own function
+// against the in-process device server; the chosen function's sentinel comes
+// back unwrapped.
+func TestService_withGenAwareAction(t *testing.T) {
 	t.Parallel()
-
-	resolver := &generationAwareResolver{
-		device: model.Device{
-			Name:       "gen1-device",
-			Address:    "192.168.1.1",
-			Generation: 1,
-		},
-	}
-	service := New(resolver)
-
-	// Gen1 function will be called, but connection will fail
-	// This is expected since we don't have a real device
-	err := service.withGenAwareAction(
-		context.Background(),
-		"gen1-device",
-		func(_ *client.Gen1Client) error {
-			// Gen1 function is called
-			return errors.New("gen1 called")
-		},
-		func(_ *client.Client) error {
-			t.Error("gen2 function should not be called for Gen1 device")
-			return nil
-		},
-	)
-
-	// The connection will fail before reaching our function, but we verify the Gen1 path is taken
-	if err == nil {
-		t.Error("expected error from gen1 path")
-	}
-}
-
-// TestService_withGenAwareAction_Gen2 tests withGenAwareAction for Gen2 devices.
-func TestService_withGenAwareAction_Gen2(t *testing.T) {
-	t.Parallel()
-
-	resolver := &generationAwareResolver{
-		device: model.Device{
-			Name:       "gen2-device",
-			Address:    "192.168.1.1",
-			Generation: 2,
-		},
-	}
-	service := New(resolver)
-
-	// Gen2 function will be called, but connection will fail
-	// This is expected since we don't have a real device
-	err := service.withGenAwareAction(
-		context.Background(),
-		"gen2-device",
-		func(_ *client.Gen1Client) error {
-			t.Error("gen1 function should not be called for Gen2 device")
-			return nil
-		},
-		func(_ *client.Client) error {
-			// Gen2 function is called
-			return errors.New("gen2 called")
-		},
-	)
-
-	// The connection will fail before reaching our function, but we verify the Gen2 path is taken
-	if err == nil {
-		t.Error("expected error from gen2 path")
+	for _, gen := range []int{1, 2} {
+		t.Run(fmt.Sprintf("gen%d", gen), func(t *testing.T) {
+			t.Parallel()
+			d := newAPDevServer(t, gen)
+			gen1Called, gen2Called := errors.New("gen1 called"), errors.New("gen2 called")
+			err := apdevService(d, gen).withGenAwareAction(context.Background(), "apdev",
+				func(*client.Gen1Client) error { return gen1Called },
+				func(*client.Client) error { return gen2Called })
+			want := map[int]error{1: gen1Called, 2: gen2Called}[gen]
+			if !errors.Is(err, want) {
+				t.Errorf("err = %v, want %v", err, want)
+			}
+		})
 	}
 }
 
@@ -1798,34 +1726,25 @@ func TestService_withGenAwareAction_Gen2(t *testing.T) {
 func TestService_GetDeviceInfoByAddress(t *testing.T) {
 	t.Parallel()
 
-	resolver := &mockResolver{}
-	service := New(resolver)
-
-	// Address that won't connect - we test the delegation happens
-	info, err := service.GetDeviceInfoByAddress(context.Background(), "192.168.1.1")
-
-	// Connection error expected
+	service := New(&mockResolver{})
+	info, err := service.GetDeviceInfoByAddress(context.Background(), refusingAddr(t))
 	if err == nil {
-		t.Error("expected error for non-existent address")
+		t.Error("expected error for an address that refuses connections")
 	}
 	if info != nil {
 		t.Error("expected nil info on error")
 	}
 }
 
-// TestService_ConfigureWiFi tests ConfigureWiFi.
+// TestService_ConfigureWiFi checks the delegation refuses an unknown password
+// before any connection is attempted.
 func TestService_ConfigureWiFi(t *testing.T) {
 	t.Parallel()
 
-	resolver := &mockResolver{}
-	service := New(resolver)
-
-	// Address that won't connect - we test the delegation happens
-	err := service.ConfigureWiFi(context.Background(), "192.168.1.1", "TestSSID", "password")
-
-	// Connection error expected
-	if err == nil {
-		t.Error("expected error for non-existent address")
+	service := New(&mockResolver{})
+	err := service.ConfigureWiFi(context.Background(), refusingAddr(t), "TestSSID", "", false)
+	if !errors.Is(err, reprovision.ErrNoPassphrase) {
+		t.Errorf("err = %v, want ErrNoPassphrase", err)
 	}
 }
 
@@ -1891,7 +1810,7 @@ func TestService_CheckDeviceFirmware_NativeDevice(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	dev := model.Device{
@@ -1939,7 +1858,7 @@ func TestService_UpdateDeviceFirmware_NativeDevice(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	dev := model.Device{
@@ -2000,10 +1919,13 @@ func newTestIOStreams() *iostreams.IOStreams {
 func TestService_CheckFirmwareAll(t *testing.T) {
 	t.Parallel()
 
-	resolver := &generationAwareResolver{
-		device: model.Device{
+	// A refusing loopback address, so the cancelled-context call cannot reach
+	// a real host even if the context check moved.
+	addr := refusingAddr(t)
+	resolver := &testutil.Resolver{
+		Device: model.Device{
 			Name:       "test-device",
-			Address:    "192.168.1.1",
+			Address:    addr,
 			Generation: 2,
 		},
 	}
@@ -2033,10 +1955,13 @@ func TestService_CheckFirmwareAll(t *testing.T) {
 func TestService_CheckFirmwareAllPlatforms(t *testing.T) {
 	t.Parallel()
 
-	resolver := &generationAwareResolver{
-		device: model.Device{
+	// A refusing loopback address, so the cancelled-context call cannot reach
+	// a real host even if the context check moved.
+	addr := refusingAddr(t)
+	resolver := &testutil.Resolver{
+		Device: model.Device{
 			Name:       "test-device",
-			Address:    "192.168.1.1",
+			Address:    addr,
 			Generation: 2,
 		},
 	}
@@ -2053,7 +1978,7 @@ func TestService_CheckFirmwareAllPlatforms(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	deviceConfigs := map[string]model.Device{
-		"device1": {Name: "device1", Address: "192.168.1.1", Platform: "shelly"},
+		"device1": {Name: "device1", Address: addr, Platform: "shelly"},
 	}
 	results = service.CheckFirmwareAllPlatforms(ctx, ios, deviceConfigs)
 	if len(results) != 1 {
@@ -2065,8 +1990,8 @@ func TestService_CheckFirmwareAllPlatforms(t *testing.T) {
 func TestService_CheckDevicesForUpdates(t *testing.T) {
 	t.Parallel()
 
-	resolver := &generationAwareResolver{
-		device: model.Device{
+	resolver := &testutil.Resolver{
+		Device: model.Device{
 			Name:       "test-device",
 			Address:    "192.168.1.1",
 			Generation: 2,
@@ -2095,8 +2020,8 @@ func TestService_CheckDevicesForUpdates(t *testing.T) {
 func TestService_UpdateDevices(t *testing.T) {
 	t.Parallel()
 
-	resolver := &generationAwareResolver{
-		device: model.Device{
+	resolver := &testutil.Resolver{
+		Device: model.Device{
 			Name:       "test-device",
 			Address:    "192.168.1.1",
 			Generation: 2,
@@ -2142,7 +2067,7 @@ func TestService_WithDevice_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	// Call WithDevice - should fail with resolution error
@@ -2161,7 +2086,7 @@ func TestService_DeviceInfo_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("device not found")
-	resolver := &generationAwareResolver{err: expectedErr}
+	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
 	info, err := service.DeviceInfo(context.Background(), "nonexistent")

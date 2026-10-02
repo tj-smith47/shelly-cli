@@ -34,6 +34,7 @@ type provisionService interface {
 	LoadProvisionSource(ctx context.Context, fromDevice, fromTemplate string) (*shelly.ProvisionSource, error)
 	GetWiFiCredentials(ctx context.Context) *shelly.OnboardWiFiConfig
 	HostWiFiCredentials(ctx context.Context) *shelly.OnboardWiFiConfig
+	HostWiFiPassword(ctx context.Context, ssid string) (string, error)
 	DiscoverForOnboard(ctx context.Context, opts *shelly.OnboardOptions, progress func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error)
 	OnboardBLEParallel(ctx context.Context, devices []*shelly.OnboardDevice, wifiCfg *shelly.OnboardWiFiConfig, opts *shelly.OnboardOptions) []*shelly.OnboardResult
 	OnboardViaAP(ctx context.Context, device *shelly.OnboardDevice, wifi *shelly.OnboardWiFiConfig, opts *shelly.OnboardOptions) *shelly.OnboardResult
@@ -45,6 +46,7 @@ type Options struct {
 	Factory      *cmdutil.Factory
 	SSID         string
 	Password     string
+	Open         bool
 	Timezone     string
 	DeviceName   string
 	FromDevice   string
@@ -64,6 +66,11 @@ type Options struct {
 	// svc, when non-nil, overrides the service resolved from the Factory. It is the
 	// test injection seam; production leaves it nil and uses Factory.ShellyService().
 	svc provisionService
+
+	// askPassword and askConfirm, when non-nil, replace the terminal prompts. They
+	// are the test injection seams for the interactive credential flow.
+	askPassword func(message string) (string, error)
+	askConfirm  func(message string, defaultValue bool) (bool, error)
 }
 
 // service returns the injected provisionService when set, otherwise the concrete
@@ -89,8 +96,17 @@ When run without a subcommand, provision scans for unprovisioned Shelly devices
 using BLE (Gen2+) and WiFi AP (Gen1). Found devices are presented for
 interactive selection and provisioned with WiFi credentials automatically.
 
-WiFi credentials are resolved in order: --from-device backup, --ssid/--password
-flags, auto-detected from an existing Gen1 device, or prompted interactively.
+WiFi credentials are resolved in this order:
+  1. --ssid, --password and --open, which win over a --from-device source
+  2. the --from-device source's network, password and open state
+  3. with no network named: a registered Gen1 device's network, else the
+     network this host is on, with its stored password
+  4. a prompt for the network name
+  5. with no password: this host's stored password for the network, else a
+     prompt (without a terminal or with --yes, the stored password is looked up
+     at onboarding and a network with none is refused)
+A network with no password is joined only with --open, a source device whose
+network has no password, or an empty password confirmed at the prompt.
 
 Use --from-device to clone an existing device's full configuration (WiFi, MQTT,
 cloud, light settings, schedules, etc.) onto newly provisioned devices. Use
@@ -118,6 +134,9 @@ To register already-networked devices, use: shelly discover --register`,
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
 
+  # Join a network that has no password
+  shelly provision --ssid GuestWiFi --open --yes
+
   # List discoverable APs as JSON (for scripted before/after scan-diff)
   shelly provision --ap-only --discover-only
 
@@ -142,7 +161,7 @@ To register already-networked devices, use: shelly discover --register`,
 	}
 
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "WiFi SSID for provisioning")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi password for provisioning")
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", shelly.DefaultOnboardScanTimeout, "Discovery timeout")
 	cmd.Flags().StringVar(&opts.DeviceName, "name", "", "Device name to assign after provisioning")
 	cmd.Flags().StringVar(&opts.Timezone, "timezone", "", "Timezone to set on device")
@@ -159,6 +178,7 @@ To register already-networked devices, use: shelly discover --register`,
 	cmd.Flags().StringVar(&opts.DNS, "dns", "", "DNS server for the static IP")
 	cmd.Flags().StringVar(&opts.TargetAP, "target-ap", "", "Provision only the device whose AP SSID matches (non-interactive single device)")
 	cmd.Flags().BoolVar(&opts.DiscoverOnly, "discover-only", false, "List discoverable unprovisioned devices as JSON and exit (no provisioning)")
+	cmdutil.AddOpenFlag(cmd, &opts.Open)
 	cmd.MarkFlagsMutuallyExclusive("from-device", "from-template")
 	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
@@ -242,12 +262,7 @@ func (o *Options) resolveSourceAndCreds(ctx context.Context, svc provisionServic
 		}
 		ios.Success("Config loaded from %s", label)
 
-		// Use WiFi creds from source if available and not overridden by flags
-		if source.WiFi != nil && o.SSID == "" {
-			o.SSID = source.WiFi.SSID
-			o.Password = source.WiFi.Password
-			ios.Info("Using WiFi credentials from source: %s", source.WiFi.SSID)
-		}
+		o.adoptSourceWiFi(source.WiFi)
 	}
 
 	// Resolve WiFi credentials: flags/source → auto-detect → prompt
@@ -257,12 +272,28 @@ func (o *Options) resolveSourceAndCreds(ctx context.Context, svc provisionServic
 	return source, nil
 }
 
+// adoptSourceWiFi uses the network a provision source records unless --ssid
+// named one. A --password or --open flag keeps precedence over the source's key
+// and open state.
+func (o *Options) adoptSourceWiFi(src *shelly.OnboardWiFiConfig) {
+	if src == nil || o.SSID != "" {
+		return
+	}
+	o.SSID = src.SSID
+	if o.Password == "" && !o.Open {
+		o.Password = src.Password
+		o.Open = src.Open
+	}
+	o.Factory.IOStreams().Info("Using WiFi credentials from source: %s", src.SSID)
+}
+
 // buildWiFiConfig assembles the WiFi config (including optional static IP) used
 // to provision selected devices.
 func (o *Options) buildWiFiConfig() *shelly.OnboardWiFiConfig {
 	return &shelly.OnboardWiFiConfig{
 		SSID:     o.SSID,
 		Password: o.Password,
+		Open:     o.Open,
 		StaticIP: o.StaticIP,
 		Gateway:  o.Gateway,
 		Netmask:  o.Netmask,
@@ -318,21 +349,48 @@ func (o *Options) outputDiscovered(devices []shelly.OnboardDevice) error {
 }
 
 // promptWiFiCredentials resolves WiFi credentials for provisioning. Tries in order:
-// 1. Flags (--ssid/--password) — already set, return immediately
+// 1. Flags or source (--ssid/--password/--open) — used as given
 // 2. Auto-detect from an existing Gen1 device on the network
-// 3. Interactive prompt.
+// 3. This host's own network and stored passphrase
+// 4. Interactive prompt.
+//
+// A known network with no password and no --open gets its password from this
+// host's stored credentials or the prompt; without a terminal, or with --yes, it
+// is left empty for provisioning to look up, and refused if none is found.
 func (o *Options) promptWiFiCredentials(ctx context.Context) error {
-	if o.SSID != "" {
-		if o.Password == "" {
-			o.Factory.IOStreams().Warning("No WiFi password provided for %q; configuring as an open network", o.SSID)
-		}
+	ios := o.Factory.IOStreams()
+	if o.SSID == "" && !o.Open && o.detectWiFiCredentials(ctx) {
 		return nil
 	}
 
+	if o.SSID == "" {
+		ssid, err := ios.Input("WiFi SSID:", "")
+		if err != nil {
+			return fmt.Errorf("SSID input failed: %w", err)
+		}
+		if ssid == "" {
+			return fmt.Errorf("WiFi SSID is required")
+		}
+		o.SSID = ssid
+	}
+
+	if o.Password == "" && !o.Open && ios.CanPrompt() && !o.Yes {
+		if err := o.resolvePassword(ctx); err != nil {
+			return err
+		}
+	}
+	if o.Open {
+		ios.Warning("No WiFi password provided for %q; configuring as an open network", o.SSID)
+	}
+	return nil
+}
+
+// detectWiFiCredentials adopts the credentials of a registered device's network,
+// or of the network this host is on, and reports whether it found any.
+func (o *Options) detectWiFiCredentials(ctx context.Context) bool {
 	ios := o.Factory.IOStreams()
 	svc := o.service()
 
-	// Try to auto-detect from an existing device
 	ios.StartProgress("Detecting WiFi credentials from existing devices...")
 	creds := svc.GetWiFiCredentials(ctx)
 	ios.StopProgress()
@@ -341,7 +399,7 @@ func (o *Options) promptWiFiCredentials(ctx context.Context) error {
 		ios.Success("WiFi credentials detected from network: %s", creds.SSID)
 		o.SSID = creds.SSID
 		o.Password = creds.Password
-		return nil
+		return true
 	}
 
 	// Recover the credentials of the network this host is already joined to. AP-hop
@@ -356,27 +414,21 @@ func (o *Options) promptWiFiCredentials(ctx context.Context) error {
 		ios.Success("WiFi credentials recovered from host network: %s", hostCreds.SSID)
 		o.SSID = hostCreds.SSID
 		o.Password = hostCreds.Password
-		return nil
+		return true
 	}
+	return false
+}
 
-	// Fall back to interactive prompt
-	ssid, err := ios.Input("WiFi SSID:", "")
+// resolvePassword finds the password for the named network: this host's stored
+// passphrase, else the prompt. An empty answer joins the network as an open one
+// only when the user confirms it; declining refuses with the passphrase error.
+func (o *Options) resolvePassword(ctx context.Context) error {
+	pass, open, err := cmdutil.ResolveWiFiPassword(ctx, o.Factory.IOStreams(), o.service().HostWiFiPassword, o.SSID,
+		cmdutil.WiFiPasswordPrompts{Password: o.askPassword, Confirm: o.askConfirm})
 	if err != nil {
-		return fmt.Errorf("SSID input failed: %w", err)
+		return err
 	}
-	if ssid == "" {
-		return fmt.Errorf("WiFi SSID is required")
-	}
-	o.SSID = ssid
-
-	if o.Password == "" {
-		pass, passErr := iostreams.Password("WiFi password:")
-		if passErr != nil {
-			return fmt.Errorf("password input failed: %w", passErr)
-		}
-		o.Password = pass
-	}
-
+	o.Password, o.Open = pass, open
 	return nil
 }
 
@@ -462,8 +514,15 @@ func (o *Options) provisionAll(
 		ios.Println()
 		ios.Title("Provisioning %d WiFi AP device(s)...", len(apDevices))
 		for _, dev := range apDevices {
-			ios.Printf("  Connecting to %s...\n", dev.SSID)
-			r := svc.OnboardViaAP(ctx, dev, wifiCfg, onboardOpts)
+			var r *shelly.OnboardResult
+			// r carries the error too, and the results display reports it.
+			if err := cmdutil.RunAtAP(ctx, ios, fmt.Sprintf("Onboarding %s at AP %s", dev.Name, dev.SSID),
+				func(ctx context.Context) error {
+					r = svc.OnboardViaAP(ctx, dev, wifiCfg, onboardOpts)
+					return r.Error
+				}); err != nil {
+				ios.DebugErr("onboard "+dev.Name, err)
+			}
 			results = append(results, r)
 			term.DisplayOnboardResults(ios, []*shelly.OnboardResult{r})
 		}

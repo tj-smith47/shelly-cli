@@ -32,7 +32,11 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 Specify key=value pairs to update. Only the specified keys will be modified.
 
 A key and its value may be separated with "=", ":", or a space — these are
-equivalent ("name=Light", "name:Light", and "name Light" all set name to Light).`,
+equivalent ("name=Light", "name:Light", and "name Light" all set name to Light).
+
+WiFi station keys (sta, sta1 and their fields, such as sta.ssid) are refused:
+a station write needs the network's password planned, so set stations with
+'shelly wifi set'. The other wifi keys (ap, roam) are accepted.`,
 		Example: `  # Set switch name (these are equivalent)
   shelly device config set living-room switch:0 name="Main Light"
   shelly device config set living-room switch:0 name "Main Light"
@@ -71,11 +75,17 @@ func run(ctx context.Context, opts *Options) error {
 		cfg[kv.Key] = config.ParseValue(kv.Value)
 	}
 
+	var warnings []string
 	err = cmdutil.RunWithSpinner(ctx, ios, "Setting configuration...", func(ctx context.Context) error {
-		return svc.SetComponentConfig(ctx, opts.Device, opts.Component, cfg)
+		var setErr error
+		warnings, setErr = svc.SetComponentConfig(ctx, opts.Device, opts.Component, cfg)
+		return setErr
 	})
 	if err != nil {
 		return fmt.Errorf("failed to set configuration: %w", err)
+	}
+	for _, w := range warnings {
+		ios.Warning("%s", w)
 	}
 
 	ios.Success("Configuration updated for %s on %s", opts.Component, opts.Device)

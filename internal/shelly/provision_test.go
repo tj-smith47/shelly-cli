@@ -35,7 +35,7 @@ func TestProvisionDeviceTarget(t *testing.T) {
 		resolver := &recordingResolver{}
 		svc := New(resolver)
 
-		err := svc.ProvisionDevice(context.Background(), model.DeviceProvisionConfig{
+		_, err := svc.ProvisionDevice(context.Background(), model.DeviceProvisionConfig{
 			Name:    "bedroom",
 			Address: "192.168.1.100",
 		}, wifi)
@@ -54,7 +54,7 @@ func TestProvisionDeviceTarget(t *testing.T) {
 		resolver := &recordingResolver{}
 		svc := New(resolver)
 
-		err := svc.ProvisionDevice(context.Background(), model.DeviceProvisionConfig{
+		_, err := svc.ProvisionDevice(context.Background(), model.DeviceProvisionConfig{
 			Name: "bedroom",
 		}, wifi)
 

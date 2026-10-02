@@ -11,10 +11,12 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 )
 
-// ProvisionDevice provisions a single device with WiFi configuration.
-func (s *Service) ProvisionDevice(ctx context.Context, device model.DeviceProvisionConfig, globalWiFi *model.ProvisionWiFiConfig) error {
+// ProvisionDevice provisions a single device with WiFi configuration and
+// returns SetWiFiConfig's warnings.
+func (s *Service) ProvisionDevice(ctx context.Context, device model.DeviceProvisionConfig, globalWiFi *model.ProvisionWiFiConfig) ([]string, error) {
 	// Get WiFi config (device-specific or global)
 	wifi := globalWiFi
 	if device.WiFi != nil {
@@ -22,7 +24,7 @@ func (s *Service) ProvisionDevice(ctx context.Context, device model.DeviceProvis
 	}
 
 	if wifi == nil {
-		return fmt.Errorf("no WiFi configuration")
+		return nil, fmt.Errorf("no WiFi configuration")
 	}
 
 	// An explicit address reaches an unregistered device; an empty address lets
@@ -32,19 +34,21 @@ func (s *Service) ProvisionDevice(ctx context.Context, device model.DeviceProvis
 		target = device.Address
 	}
 
-	// Apply WiFi settings
 	enable := true
-	if err := s.SetWiFiConfig(ctx, target, wifi.SSID, wifi.Password, &enable); err != nil {
-		return fmt.Errorf("failed to set WiFi: %w", err)
+	warnings, err := s.SetWiFiConfig(ctx, target, network.StationWrite{
+		SSID: wifi.SSID, Password: wifi.Password, Open: wifi.Open, Enable: &enable,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set WiFi: %w", err)
 	}
 
 	if device.DevName != "" {
 		if err := s.SetSysName(ctx, target, device.DevName); err != nil {
-			return fmt.Errorf("failed to set device name: %w", err)
+			return warnings, fmt.Errorf("failed to set device name: %w", err)
 		}
 	}
 
-	return nil
+	return warnings, nil
 }
 
 // ProvisionDevices provisions multiple devices in parallel.
@@ -66,8 +70,8 @@ func (s *Service) ProvisionDevices(ctx context.Context, cfg *model.BulkProvision
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			err := s.ProvisionDevice(ctx, device, cfg.WiFi)
-			results <- model.ProvisionResult{Device: device.Name, Err: err}
+			warnings, err := s.ProvisionDevice(ctx, device, cfg.WiFi)
+			results <- model.ProvisionResult{Device: device.Name, Warnings: warnings, Err: err}
 		})
 	}
 
@@ -90,7 +94,13 @@ func (s *Service) ProvisionDevices(ctx context.Context, cfg *model.BulkProvision
 func ValidateBulkProvisionConfig(cfg *model.BulkProvisionConfig, isDeviceRegistered func(name string) bool) error {
 	var errors []string
 
+	if w := cfg.WiFi; w != nil && w.Open && w.Password != "" {
+		errors = append(errors, "wifi: open and password cannot both be set")
+	}
 	for _, d := range cfg.Devices {
+		if w := d.WiFi; w != nil && w.Open && w.Password != "" {
+			errors = append(errors, fmt.Sprintf("%s: wifi open and password cannot both be set", d.Name))
+		}
 		// Validate device name format
 		if err := config.ValidateDeviceName(d.Name); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", d.Name, err))

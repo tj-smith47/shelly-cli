@@ -64,8 +64,7 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	var insp *shelly.APInspection
-	err := cmdutil.RunWithSpinner(ctx, ios,
-		fmt.Sprintf("Inspecting device at AP %s (hopping host WiFi)...", opts.SSID),
+	err := cmdutil.RunAtAP(ctx, ios, fmt.Sprintf("Inspecting device at AP %s", opts.SSID),
 		func(ctx context.Context) error {
 			var inspErr error
 			insp, inspErr = svc.InspectAtAP(ctx, opts.SSID, opts.APIP)

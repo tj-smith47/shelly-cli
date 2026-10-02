@@ -14,6 +14,15 @@ Apply a saved configuration template to a device.
 The template configuration will be merged with the device's current
 settings. Use --dry-run to preview changes without applying them.
 
+WiFi stations in the template: a station's address (ip, netmask, gw,
+nameserver, ipv4mode) is never copied, since it belongs to the device the
+template was captured from. A station on the network the device is already on
+is not written. A station on another network is written with the password
+stored on this host for it; with no stored password it is left out with a
+warning, and the network can be set with 'shelly wifi set'. A device with a
+static address keeps that address on the new network, with a warning.
+--dry-run shows each station's planned write without its password.
+
 Note: Only devices of the same model/generation are fully compatible.
 
 ```

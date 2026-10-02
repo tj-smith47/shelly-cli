@@ -9,7 +9,6 @@ import (
 	"github.com/tj-smith47/shelly-go/provisioning"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -18,11 +17,15 @@ type Options struct {
 	DeviceAddress string
 	SSID          string
 	Password      string
+	Open          bool
 	DeviceName    string
 	Timezone      string
 	EnableCloud   bool
 	DisableCloud  bool
 	Factory       *cmdutil.Factory
+
+	// prompts, when its fields are non-nil, replaces the terminal prompts.
+	prompts cmdutil.WiFiPasswordPrompts
 }
 
 // NewCommand creates the provision ble command.
@@ -43,7 +46,11 @@ BLE provisioning requires:
 - The device to be in BLE advertising mode (typically when unconfigured)
 - The device's BLE address (usually shown as ShellyXXX-YYYYYYYY)
 
-Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.`,
+Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.
+
+Without --password, the network's passphrase is read from this host's stored
+WiFi credentials, or asked for. A network is joined with no password only with
+--open, or when an empty answer at the prompt is confirmed.`,
 		Example: `  # Provision WiFi via BLE
   shelly provision ble ShellyPlus1-ABCD1234 --ssid "MyNetwork" --password "secret"
 
@@ -54,7 +61,10 @@ Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.
   shelly provision ble ShellyPlus1-ABCD1234 --ssid "MyNetwork" --password "secret" --timezone "America/New_York"
 
   # Disable cloud during provisioning
-  shelly provision ble ShellyPlus1-ABCD1234 --ssid "MyNetwork" --password "secret" --no-cloud`,
+  shelly provision ble ShellyPlus1-ABCD1234 --ssid "MyNetwork" --password "secret" --no-cloud
+
+  # Join a network that has no password
+  shelly provision ble ShellyPlus1-ABCD1234 --ssid "GuestWiFi" --open`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.DeviceAddress = args[0]
@@ -63,12 +73,13 @@ Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.
 	}
 
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "WiFi network name (required)")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi password")
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
 	cmd.Flags().StringVar(&opts.DeviceName, "name", "", "Device name to set")
 	cmd.Flags().StringVar(&opts.Timezone, "timezone", "", "Timezone (e.g., America/New_York)")
 	cmd.Flags().BoolVar(&opts.EnableCloud, "cloud", false, "Enable Shelly Cloud")
 	cmd.Flags().BoolVar(&opts.DisableCloud, "no-cloud", false, "Disable Shelly Cloud")
 
+	cmdutil.AddOpenFlag(cmd, &opts.Open)
 	cmd.MarkFlagsMutuallyExclusive("cloud", "no-cloud")
 
 	return cmd
@@ -90,13 +101,14 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("SSID is required for BLE provisioning")
 	}
 
-	// Get password if not provided
-	if opts.Password == "" {
-		password, err := iostreams.Password("WiFi password:")
+	// BLE sends the password as given, so an empty one would join as an
+	// open network; it must be found or confirmed first.
+	if opts.Password == "" && !opts.Open {
+		password, open, err := cmdutil.ResolveWiFiPassword(ctx, ios, opts.Factory.ShellyService().HostWiFiPassword, opts.SSID, opts.prompts)
 		if err != nil {
-			return fmt.Errorf("failed to get password: %w", err)
+			return err
 		}
-		opts.Password = password
+		opts.Password, opts.Open = password, open
 	}
 
 	// Create BLE transmitter

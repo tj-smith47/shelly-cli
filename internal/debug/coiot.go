@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-go/gen1"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/netguard"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -26,6 +27,9 @@ func RunCoIoTListener(ctx context.Context, ios *iostreams.IOStreams, opts CoIoTL
 	ios.Printf("  Joining multicast group %s:%d\n", gen1.CoIoTMulticastAddr, gen1.CoIoTPort)
 	ios.Println()
 
+	if err := netguard.Refuse("CoIoT multicast"); err != nil {
+		return err
+	}
 	listener := gen1.NewCoIoTListener()
 
 	eventCount := 0

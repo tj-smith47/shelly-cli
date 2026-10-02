@@ -1,10 +1,13 @@
 package shelly
 
 import (
+	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -12,11 +15,12 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
+	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
-// The in-scope --to-ap restore / at-AP firmware / reset-honesty functions reach a
-// real device only through Service.WithConnection / WithGen1Connection, which dial
-// the address the resolver hands back. Pointing that resolver at an httptest server
+// The reboot and factory-reset functions reach a real device only through
+// Service.WithConnection / WithGen1Connection, which dial the address the resolver
+// hands back. Pointing that resolver at an httptest server
 // turns every device round-trip into in-process HTTP, so NO real network or host
 // state is ever touched. NONE of these helpers run a WiFi scan, dhcpcd, nmcli, or
 // reach discovery.DefaultAPIP — the resolver substitution is the entire safety seam.
@@ -29,33 +33,103 @@ type apdevServer struct {
 	srv  *httptest.Server
 	gen1 *apdevGen1
 	gen2 *apdevGen2
+	// staSSID is the configured WiFi station SSID both generations report.
+	staSSID string
+	// sta1SSID, when set, is the configured secondary station SSID.
+	sta1SSID string
+	// staStatic, when set, is the station's static address; gateway and
+	// netmask are fixed test values.
+	staStatic string
+	// noStation makes the device report no station at all.
+	noStation bool
+	// wifiReadFail makes every WiFi settings read fail.
+	wifiReadFail bool
+
+	wifiReads atomic.Int32
+	mu        sync.Mutex
+	// writes records each station write: a Gen1 /settings/sta or /settings/sta1
+	// query, or a Gen2 WiFi.SetConfig / Shelly.SetConfig params object.
+	writes []apdevWrite
+	// hits counts requests per URL path.
+	hits map[string]int
 }
+
+// hitsFor returns how many requests reached path.
+func (d *apdevServer) hitsFor(path string) int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.hits[path]
+}
+
+// apdevWrite is one recorded write to the fake device.
+type apdevWrite struct {
+	method string
+	query  url.Values
+	params map[string]any
+}
+
+func (d *apdevServer) record(w apdevWrite) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.writes = append(d.writes, w)
+}
+
+// written returns the recorded writes.
+func (d *apdevServer) written() []apdevWrite {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return append([]apdevWrite(nil), d.writes...)
+}
+
+// gen1Station is the wifi_sta object the fake Gen1 device reports.
+func (d *apdevServer) gen1Station(ssid string) map[string]any {
+	sta := map[string]any{"enabled": true, "ssid": ssid, "ipv4_method": "dhcp"}
+	if d.staStatic != "" {
+		sta["ipv4_method"] = "static"
+		sta["ip"] = d.staStatic
+		sta["gw"] = testGateway
+		sta["mask"] = testNetmask
+	}
+	return sta
+}
+
+// gen2WiFiConfig is the WiFi config the fake Gen2 device reports.
+func (d *apdevServer) gen2WiFiConfig() map[string]any {
+	cfg := map[string]any{}
+	if !d.noStation {
+		sta := map[string]any{"ssid": d.staSSID, "enable": true, "ipv4mode": "dhcp", "is_open": false}
+		if d.staStatic != "" {
+			sta["ipv4mode"] = "static"
+			sta["ip"] = d.staStatic
+			sta["gw"] = testGateway
+			sta["netmask"] = testNetmask
+		}
+		cfg["sta"] = sta
+	}
+	if d.sta1SSID != "" {
+		cfg["sta1"] = map[string]any{"ssid": d.sta1SSID, "enable": true, "is_open": false}
+	}
+	return cfg
+}
+
+const (
+	testGateway = "10.0.0.1"
+	testNetmask = "255.255.255.0"
+)
 
 // apdevGen1 holds the mutable per-route behaviour of a fake Gen1 device.
 type apdevGen1 struct {
-	mu sync.Mutex
-	// fw is the build string returned at /settings (".FW"); its first 8 chars are a
-	// YYYYMMDD date that drives the downgrade decision in ensureGen1FirmwareAtAP. It
-	// is guarded by mu because the /ota handler flips it while /settings reads it.
+	// fw is the build string returned at /shelly and /settings.
 	fw string
-	// uptime is the value returned at /status; >= 12 reads as "stable" to the
-	// pre-station-write gate (gen1StableUptime), < 12 reads as a reboot loop.
+	// uptime is the value returned at /status.
 	uptime int
-	// rebootErr / resetErr / settingsErr, when true, make the matching endpoint
-	// answer 500 so the production call sees a real (non-connectivity) failure.
-	rebootErr   bool
-	resetErr    bool
-	settingsErr bool
+	// rebootErr / resetErr, when true, make the matching endpoint answer 500 so
+	// the production call sees a real (non-connectivity) failure.
+	rebootErr bool
+	resetErr  bool
 
 	rebootHits int32
 	resetHits  int32
-
-	// otaFlipFW, when non-empty, is the build the device "boots onto" the moment its
-	// /ota endpoint is triggered — modelling a successful flash so the post-OTA wait
-	// observes a changed build on its first poll instead of running the full budget.
-	otaFlipFW string
-	otaErr    bool
-	otaHits   int32
 }
 
 // apdevGen2 holds the mutable per-route behaviour of a fake Gen2 device.
@@ -79,7 +153,15 @@ func newAPDevServer(t *testing.T, generation int) *apdevServer {
 	} else {
 		d.registerGen2(t, mux)
 	}
-	d.srv = httptest.NewServer(mux)
+	d.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		d.mu.Lock()
+		if d.hits == nil {
+			d.hits = map[string]int{}
+		}
+		d.hits[r.URL.Path]++
+		d.mu.Unlock()
+		mux.ServeHTTP(w, r)
+	}))
 	t.Cleanup(d.srv.Close)
 	return d
 }
@@ -92,30 +174,18 @@ func (d *apdevServer) addr() string {
 // resolver returns a generation-aware resolver that maps every identifier to this
 // fake device, so WithConnection / WithGen1Connection dial it.
 func (d *apdevServer) resolver(generation int) DeviceResolver {
-	return &generationAwareResolver{device: model.Device{
+	return &testutil.Resolver{Device: model.Device{
 		Name:       "apdev",
 		Address:    d.addr(),
 		Generation: generation,
 	}}
 }
 
-func (g *apdevGen1) currentFW() string {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	return g.fw
-}
-
-func (g *apdevGen1) setFW(fw string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.fw = fw
-}
-
 func (d *apdevServer) registerGen1(mux *http.ServeMux) {
 	// /shelly identifies the device for ConnectGen1.
 	mux.HandleFunc("/shelly", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]any{
-			"type": "SHBDUO-1", "mac": "AABBCCDDEEFF", "fw": d.gen1.currentFW(), "gen": 1,
+			"type": "SHBDUO-1", "mac": "AABBCCDDEEFF", "fw": d.gen1.fw, "gen": 1,
 		})
 	})
 	mux.HandleFunc("/settings", func(w http.ResponseWriter, r *http.Request) {
@@ -128,12 +198,26 @@ func (d *apdevServer) registerGen1(mux *http.ServeMux) {
 			writeJSON(w, map[string]any{"ok": true})
 			return
 		}
-		if d.gen1.settingsErr {
-			http.Error(w, "settings refused", http.StatusInternalServerError)
+		d.wifiReads.Add(1)
+		if d.wifiReadFail {
+			http.Error(w, "settings unavailable", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, map[string]any{"fw": d.gen1.currentFW(), "device": map[string]any{"type": "SHBDUO-1"}})
+		settings := map[string]any{"fw": d.gen1.fw, "device": map[string]any{"type": "SHBDUO-1"}}
+		if !d.noStation {
+			settings["wifi_sta"] = d.gen1Station(d.staSSID)
+		}
+		if d.sta1SSID != "" {
+			settings["wifi_sta1"] = map[string]any{"enabled": true, "ssid": d.sta1SSID}
+		}
+		writeJSON(w, settings)
 	})
+	for _, path := range []string{"/settings/sta", "/settings/sta1"} {
+		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+			d.record(apdevWrite{method: path, query: r.URL.Query()})
+			writeJSON(w, map[string]any{"ok": true})
+		})
+	}
 	mux.HandleFunc("/status", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]any{"uptime": d.gen1.uptime, "unixtime": 1700000000})
 	})
@@ -144,20 +228,6 @@ func (d *apdevServer) registerGen1(mux *http.ServeMux) {
 			return
 		}
 		writeJSON(w, map[string]any{"ok": true})
-	})
-	mux.HandleFunc("/ota", func(w http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&d.gen1.otaHits, 1)
-		// Model a flash that takes: the device "boots onto" the new build, so the
-		// post-OTA wait sees a changed FW (and the already-stable uptime) at once.
-		if d.gen1.otaFlipFW != "" {
-			d.gen1.setFW(d.gen1.otaFlipFW)
-		}
-		if d.gen1.otaErr {
-			http.Error(w, "ota refused", http.StatusInternalServerError)
-			return
-		}
-		const statusKey = "status" // JSON key in the fake Gen1 OTA status response
-		writeJSON(w, map[string]any{statusKey: "updating"})
 	})
 }
 
@@ -170,8 +240,9 @@ func (d *apdevServer) registerGen2(t *testing.T, mux *http.ServeMux) {
 			return
 		}
 		var req struct {
-			ID     any    `json:"id"`
-			Method string `json:"method"`
+			ID     any            `json:"id"`
+			Method string         `json:"method"`
+			Params map[string]any `json:"params"`
 		}
 		if uerr := json.Unmarshal(body, &req); uerr != nil {
 			t.Errorf("decode rpc body: %v", uerr)
@@ -183,6 +254,21 @@ func (d *apdevServer) registerGen2(t *testing.T, mux *http.ServeMux) {
 				"id": "shellyplus1-aabbcc", "mac": "AABBCCDDEEFF", "gen": 2,
 				"model": "SNSW-001P16EU", "fw_id": "20230101-000000",
 			})
+		case "WiFi.GetConfig", "Wifi.GetConfig":
+			d.wifiReads.Add(1)
+			if d.wifiReadFail {
+				d.writeRPCError(w, req.ID)
+				return
+			}
+			d.writeRPCResult(w, req.ID, d.gen2WiFiConfig())
+		case "Shelly.GetConfig":
+			d.wifiReads.Add(1)
+			d.writeRPCResult(w, req.ID, map[string]any{
+				"sys": map[string]any{"device": map[string]any{"name": "apdev", "mac": "AABBCCDDEEFF"}}, "wifi": d.gen2WiFiConfig(),
+			})
+		case "WiFi.SetConfig", "Wifi.SetConfig", "Shelly.SetConfig":
+			d.record(apdevWrite{method: req.Method, params: req.Params})
+			d.writeRPCResult(w, req.ID, map[string]any{"restart_required": false})
 		case "Shelly.Reboot":
 			atomic.AddInt32(&d.gen2.rebootHits, 1)
 			if d.gen2.rebootErr {
@@ -207,15 +293,38 @@ func (d *apdevServer) writeRPCError(w http.ResponseWriter, id any) {
 	})
 }
 
-// writeJSON encodes v as the response body, ignoring encode errors (the test fails
-// downstream if the device response is unusable, which is the real signal).
+// writeJSON encodes v as the response body; an encode failure answers 500 so
+// the caller sees an unusable device response.
 func writeJSON(w http.ResponseWriter, v any) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v) //nolint:errchkjson,errcheck // test stub response
+	if _, err := w.Write(data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // apdevService builds a Service whose resolver points at the fake device, with a
 // real rate limiter so the connection manager is fully wired.
 func apdevService(d *apdevServer, generation int) *Service {
 	return New(d.resolver(generation), WithRateLimiter(ratelimit.New()))
+}
+
+// refusingAddr returns a localhost address whose port is closed, so connection
+// attempts fail fast and deterministically with "connection refused".
+func refusingAddr(t *testing.T) string {
+	t.Helper()
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := ln.Addr().String()
+	if cerr := ln.Close(); cerr != nil {
+		t.Fatalf("close listener: %v", cerr)
+	}
+	return addr
 }

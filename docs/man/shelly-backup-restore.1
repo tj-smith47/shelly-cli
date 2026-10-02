@@ -32,7 +32,7 @@ sections.
 
 .PP
 \fB--dns\fP=""
-	Static IPv4 nameserver (optional, with --static-ip)
+	Static IPv4 nameserver (with --static-ip; default: the backup's)
 
 .PP
 \fB--dry-run\fP[=false]
@@ -44,7 +44,7 @@ sections.
 
 .PP
 \fB--gateway\fP=""
-	Static IPv4 default gateway (with --static-ip)
+	Static IPv4 default gateway (with --static-ip; default: the backup's)
 
 .PP
 \fB-h\fP, \fB--help\fP[=false]
@@ -52,15 +52,19 @@ sections.
 
 .PP
 \fB--name\fP=""
-	Override the device name (defaults to the target identifier when it is a friendly alias)
+	Set the device name (default: a backup of this same device keeps the name it recorded; a backup of another device takes the target's alias)
 
 .PP
 \fB--netmask\fP=""
-	Static IPv4 subnet mask (with --static-ip)
+	Static IPv4 subnet mask (with --static-ip; default: the backup's)
+
+.PP
+\fB--open\fP[=false]
+	Join a network that has no password
 
 .PP
 \fB--password\fP=""
-	WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
+	WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
 
 .PP
 \fB--skip-auth\fP[=false]
@@ -96,7 +100,7 @@ sections.
 
 .PP
 \fB--static-ip\fP=""
-	Override the backup's WiFi with this static IPv4 address
+	Override the backup's WiFi with this static IPv4 address (--gateway, --netmask and --dns default to the backup's)
 
 .PP
 \fB--to-ap\fP=""
@@ -184,10 +188,20 @@ sections.
   # Skip scripts during restore
   shelly backup restore living-room backup.json --skip-scripts
 
+  # Give a clone of another bulb its own address; the gateway, netmask and DNS
+  # are the backup's
+  shelly backup restore new-bulb master-bath-1.json --static-ip 10.23.47.221
+
+  # Restore onto a device that joins a network with no password
+  shelly backup restore guest-plug plug.json --ssid GuestWiFi --open
+
   # Clone another bulb's backup onto this device with a different static IP
   # (identity — MAC, serial, device ID — is never overwritten by restore)
   shelly backup restore new-bulb master-bath-1.json \\
     --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
+
+  # Preview a restore at the factory WiFi AP without hopping the host's WiFi
+  shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF --dry-run
 
   # Restore a sibling's backup straight onto a brand-new device at its factory
   # WiFi AP: hops the host onto the AP, applies the config + static IP, and the

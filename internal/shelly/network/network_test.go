@@ -3,6 +3,7 @@ package network
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
@@ -601,17 +603,9 @@ func TestWiFiService_ConnectionError(t *testing.T) {
 		}
 	})
 
-	t.Run("SetStation", func(t *testing.T) {
-		t.Parallel()
-		err := svc.SetStation(context.Background(), "test-device", "SSID", "pass", true)
-		if !errors.Is(err, expectedErr) {
-			t.Errorf("got error %v, want %v", err, expectedErr)
-		}
-	})
-
 	t.Run("SetAP", func(t *testing.T) {
 		t.Parallel()
-		err := svc.SetAP(context.Background(), "test-device", "SSID", "pass", true)
+		err := svc.SetAP(context.Background(), "test-device", "SSID", "pass", false, true)
 		if !errors.Is(err, expectedErr) {
 			t.Errorf("got error %v, want %v", err, expectedErr)
 		}
@@ -1541,7 +1535,7 @@ func TestMockConnectionProvider_CallbackInvoked(t *testing.T) {
 	provider := &mockConnectionProvider{
 		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
 			callbackInvoked = true
-			// Don't actually call fn since we don't have a real client
+			// fn is not called: there is no real client
 			return errors.New("mock error")
 		},
 	}
@@ -1839,4 +1833,134 @@ func TestIsExpectedCloudClosure(t *testing.T) {
 			t.Error("abnormal closure should not be expected")
 		}
 	})
+}
+
+func TestStationAndAPConfig_PassAndOpen(t *testing.T) {
+	t.Parallel()
+	enable := true
+
+	tests := []struct {
+		name     string
+		password string
+		open     bool
+		wantPass *string
+		wantErr  bool
+	}{
+		{name: "empty keeps the key", wantPass: nil},
+		{name: "password", password: "secret", wantPass: ptr("secret")},
+		{name: "open", open: true, wantPass: ptr("")},
+		{name: "open with a password", password: "secret", open: true, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			sta, staErr := StationConfig(StationWrite{SSID: "home", Password: tt.password, Open: tt.open, Enable: &enable})
+			ap, apErr := apConfig("ShellyAP", tt.password, tt.open, true)
+			if tt.wantErr {
+				if !errors.Is(staErr, types.ErrInvalidParam) || !errors.Is(apErr, types.ErrInvalidParam) {
+					t.Errorf("errors = %v, %v; want ErrInvalidParam", staErr, apErr)
+				}
+				return
+			}
+			if staErr != nil || apErr != nil {
+				t.Fatalf("errors = %v, %v", staErr, apErr)
+			}
+			if !samePass(sta.STA.Pass, tt.wantPass) || !samePass(ap.AP.Pass, tt.wantPass) {
+				t.Errorf("pass sta=%v ap=%v, want %v", sta.STA.Pass, ap.AP.Pass, tt.wantPass)
+			}
+			if sta.STA.IsOpen != nil {
+				t.Error("a station write carries is_open")
+			}
+			switch {
+			case tt.wantPass == nil && ap.AP.IsOpen != nil:
+				t.Error("the AP's is_open was written without its key")
+			case tt.wantPass != nil && (ap.AP.IsOpen == nil || *ap.AP.IsOpen != tt.open):
+				t.Errorf("AP is_open = %v, want %v", ap.AP.IsOpen, tt.open)
+			}
+			if *sta.STA.SSID != "home" || !*sta.STA.Enable {
+				t.Errorf("SSID/Enable not carried: %+v", sta.STA)
+			}
+		})
+	}
+}
+
+func ptr(s string) *string { return &s }
+
+func samePass(got, want *string) bool {
+	if got == nil || want == nil {
+		return got == want
+	}
+	return *got == *want
+}
+
+// TestStationAndAPConfig_Payload marshals each write as it is sent to
+// WiFi.SetConfig and checks which of pass and is_open the payload carries.
+func TestStationAndAPConfig_Payload(t *testing.T) {
+	t.Parallel()
+	enable := true
+	absent := "absent"
+	tests := []struct {
+		name       string
+		password   string
+		open       bool
+		staPass    string // absent: no "pass" key
+		apPass     string
+		apIsOpen   any // nil: no "is_open" key
+		wantRefuse bool
+	}{
+		{name: "empty keeps both keys", staPass: absent, apPass: absent},
+		{name: "password", password: "secret", staPass: "secret", apPass: "secret", apIsOpen: false},
+		{name: "open", open: true, staPass: "", apPass: "", apIsOpen: true},
+		{name: "open with a password", password: "secret", open: true, wantRefuse: true},
+	}
+	section := func(t *testing.T, v any, key string) map[string]any {
+		t.Helper()
+		raw, err := json.Marshal(v)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		var cfg map[string]map[string]any
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			t.Fatalf("unmarshal %s: %v", raw, err)
+		}
+		return cfg[key]
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			pass, passErr := wifiPass(tt.password, tt.open)
+			sta, staErr := StationConfig(StationWrite{SSID: "home", Password: tt.password, Open: tt.open, Enable: &enable})
+			ap, apErr := apConfig("ShellyAP", tt.password, tt.open, true)
+			if tt.wantRefuse {
+				for _, err := range []error{passErr, staErr, apErr} {
+					if !errors.Is(err, types.ErrInvalidParam) {
+						t.Errorf("err = %v, want ErrInvalidParam", err)
+					}
+				}
+				return
+			}
+			if (pass == nil) != (tt.staPass == absent) {
+				t.Errorf("wifiPass = %v, want absent %v", pass, tt.staPass == absent)
+			}
+			staJSON := section(t, sta, "sta")
+			apJSON := section(t, ap, "ap")
+			for _, c := range []struct {
+				name string
+				got  map[string]any
+				want string
+			}{{"sta", staJSON, tt.staPass}, {"ap", apJSON, tt.apPass}} {
+				got, has := c.got["pass"]
+				if (c.want == absent) == has || (has && got != c.want) {
+					t.Errorf("%s pass = %v (present %v), want %q", c.name, got, has, c.want)
+				}
+			}
+			if _, has := staJSON["is_open"]; has {
+				t.Errorf("sta payload carries is_open: %v", staJSON)
+			}
+			got, has := apJSON["is_open"]
+			if (tt.apIsOpen == nil) == has || (has && got != tt.apIsOpen) {
+				t.Errorf("ap is_open = %v (present %v), want %v", got, has, tt.apIsOpen)
+			}
+		})
+	}
 }

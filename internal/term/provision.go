@@ -26,6 +26,9 @@ func DisplayBulkProvisionDryRun(ios *iostreams.IOStreams, cfg *model.BulkProvisi
 func DisplayBulkProvisionResults(ios *iostreams.IOStreams, results []model.ProvisionResult, totalDevices int) int {
 	var failed int
 	for _, r := range results {
+		for _, w := range r.Warnings {
+			ios.Warning("%s: %s", r.Device, w)
+		}
 		if r.Err != nil {
 			ios.Error("Failed to provision %s: %v", r.Device, r.Err)
 			failed++

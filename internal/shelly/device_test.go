@@ -3,11 +3,19 @@ package shelly
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
+	shellybackup "github.com/tj-smith47/shelly-go/backup"
+	"github.com/tj-smith47/shelly-go/types"
+
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
+	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
 const (
@@ -115,7 +123,7 @@ func TestWithGenAwareRestart_ResolveError(t *testing.T) {
 	t.Parallel()
 
 	wantErr := errors.New("device not found")
-	svc := New(&generationAwareResolver{err: wantErr})
+	svc := New(&testutil.Resolver{Err: wantErr})
 	err := svc.DeviceReboot(context.Background(), "ghost", 0)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("DeviceReboot err = %v, want resolve error %v", err, wantErr)
@@ -137,7 +145,7 @@ func TestWithGenAwareRestart_ConnectivityDropIsSuccess(t *testing.T) {
 	t.Parallel()
 
 	addr := refusingAddr(t)
-	svc := New(&generationAwareResolver{device: deviceAt(addr, 1)},
+	svc := New(&testutil.Resolver{Device: deviceAt(addr, 1)},
 		WithRateLimiter(ratelimit.New()))
 
 	if err := svc.DeviceReboot(context.Background(), "dev", 0); err != nil {
@@ -215,7 +223,7 @@ func TestWithGenAwareRestart_CancelledContextErrors(t *testing.T) {
 	t.Parallel()
 
 	addr := refusingAddr(t)
-	svc := New(&generationAwareResolver{device: deviceAt(addr, 1)},
+	svc := New(&testutil.Resolver{Device: deviceAt(addr, 1)},
 		WithRateLimiter(ratelimit.New()))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -232,4 +240,111 @@ func TestWithGenAwareRestart_CancelledContextErrors(t *testing.T) {
 // reads the generation from the resolver without a device round trip.
 func deviceAt(addr string, gen int) model.Device {
 	return model.Device{Name: "dev", Address: addr, Generation: gen}
+}
+
+// TestService_DeviceInfo_Gen1 asserts DeviceInfo identifies a Gen1 device,
+// which answers /shelly and /settings and 404s every /rpc path, whatever
+// generation the registry records for it.
+//
+//nolint:paralleltest // withIsolatedConfig swaps the process-global config
+func TestService_DeviceInfo_Gen1(t *testing.T) {
+	withIsolatedConfig(t)
+	d := newAPDevServer(t, 1)
+	for _, registered := range []int{0, 1, 2} {
+		svc := New(d.resolver(registered), WithRateLimiter(ratelimit.New(ratelimit.WithGen1MinInterval(0))))
+		info, err := svc.DeviceInfo(context.Background(), "apdev")
+		if err != nil {
+			t.Fatalf("registry generation %d: DeviceInfo() error = %v", registered, err)
+		}
+		if info.Generation != 1 || info.Type != "SHBDUO-1" || info.Model != types.ModelDisplayName("SHBDUO-1") {
+			t.Errorf("registry generation %d: generation %d, type %q, model %q; want Gen1 SHBDUO-1",
+				registered, info.Generation, info.Type, info.Model)
+		}
+	}
+}
+
+// TestCheckMigrationCompatibility_Gen1Target asserts migrate's model check
+// reads a Gen1 target's model: the matching backup passes and another model
+// is refused with the Gen1 model named.
+//
+//nolint:paralleltest // withIsolatedConfig swaps the process-global config
+func TestCheckMigrationCompatibility_Gen1Target(t *testing.T) {
+	withIsolatedConfig(t)
+	d := newAPDevServer(t, 1)
+	svc := New(d.resolver(1), WithRateLimiter(ratelimit.New(ratelimit.WithGen1MinInterval(0))))
+	bsvc := backup.NewService(NewBackupConnector(svc))
+	bkp := func(model string) *backup.DeviceBackup {
+		return &backup.DeviceBackup{Backup: &shellybackup.Backup{
+			DeviceInfo: &shellybackup.DeviceInfo{Model: model, Generation: 1},
+		}}
+	}
+	if err := bsvc.CheckMigrationCompatibility(context.Background(), bkp("SHBDUO-1"), "apdev", false); err != nil {
+		t.Errorf("same model: %v, want nil", err)
+	}
+	var compat *backup.CompatibilityError
+	err := bsvc.CheckMigrationCompatibility(context.Background(), bkp("SHSW-1"), "apdev", false)
+	if !errors.As(err, &compat) || compat.TargetModel != "SHBDUO-1" {
+		t.Errorf("other model: %v, want a CompatibilityError naming target SHBDUO-1", err)
+	}
+}
+
+// TestService_DeviceInfo_ResolvesOnce asserts DeviceInfo resolves (and so
+// probes) an identifier once, tries the other generation only when the first
+// gave an answer or the generation is unknown, and gives up after one attempt
+// on a known-Gen2 device that does not answer.
+//
+//nolint:paralleltest // withIsolatedConfig swaps the process-global config
+func TestService_DeviceInfo_ResolvesOnce(t *testing.T) {
+	withIsolatedConfig(t)
+	limiter := func() *ratelimit.DeviceRateLimiter {
+		return ratelimit.New(ratelimit.WithGen1MinInterval(0), ratelimit.WithGen2MinInterval(0))
+	}
+
+	t.Run("known Gen2, online: one Gen2 attempt", func(t *testing.T) {
+		d := newAPDevServer(t, 2)
+		r := &testutil.Resolver{Device: model.Device{Name: "apdev", Address: d.addr(), Generation: 2}}
+		info, err := New(r, WithRateLimiter(limiter())).DeviceInfo(context.Background(), "apdev")
+		if err != nil || info.Generation != 2 {
+			t.Fatalf("DeviceInfo() = %+v, %v; want a Gen2 device", info, err)
+		}
+		if got := r.Calls(); got != 1 {
+			t.Errorf("resolves = %d, want 1", got)
+		}
+		if got := d.hitsFor("/settings"); got != 0 {
+			t.Errorf("Gen1 /settings hits = %d, want 0", got)
+		}
+	})
+
+	t.Run("unknown generation, Gen1 device: Gen2 attempt then Gen1", func(t *testing.T) {
+		d := newAPDevServer(t, 1)
+		r := &testutil.Resolver{Device: model.Device{Address: d.addr()}}
+		info, err := New(r, WithRateLimiter(limiter())).DeviceInfo(context.Background(), d.addr())
+		if err != nil || info.Generation != 1 {
+			t.Fatalf("DeviceInfo() = %+v, %v; want a Gen1 device", info, err)
+		}
+		if got := r.Calls(); got != 1 {
+			t.Errorf("resolves = %d, want 1", got)
+		}
+		if d.hitsFor("/rpc") == 0 || d.hitsFor("/shelly") == 0 {
+			t.Errorf("hits /rpc %d, /shelly %d; want the Gen2 attempt and then Gen1", d.hitsFor("/rpc"), d.hitsFor("/shelly"))
+		}
+	})
+
+	t.Run("known Gen2, offline: one attempt, no Gen1 fallback", func(t *testing.T) {
+		srv := httptest.NewServer(http.NotFoundHandler())
+		addr := strings.TrimPrefix(srv.URL, "http://")
+		srv.Close()
+		rl := limiter()
+		r := &testutil.Resolver{Device: model.Device{Name: "gone", Address: addr, Generation: 2}}
+		_, err := New(r, WithRateLimiter(rl)).DeviceInfo(context.Background(), "gone")
+		if !ratelimit.IsConnectivityFailure(err) {
+			t.Fatalf("DeviceInfo() error = %v, want a connectivity failure", err)
+		}
+		if got := r.Calls(); got != 1 {
+			t.Errorf("resolves = %d, want 1", got)
+		}
+		if stats, _ := rl.Stats(addr); stats.Circuit.FailCount != 1 {
+			t.Errorf("connection attempts = %d, want 1", stats.Circuit.FailCount)
+		}
+	})
 }

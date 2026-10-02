@@ -63,8 +63,7 @@ func run(ctx context.Context, opts *Options) error {
 		cache.TypeDeviceInfo, cache.TTLDeviceInfo,
 		"Getting device info...",
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.DeviceInfo, error) {
-			// Use DeviceInfoAuto to support both Gen1 and Gen2 devices
-			return svc.DeviceInfoAuto(ctx, device)
+			return svc.DeviceInfo(ctx, device)
 		},
 		term.DisplayDeviceInfo)
 }

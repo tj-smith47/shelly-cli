@@ -99,34 +99,48 @@ func (s *Service) DeviceFactoryReset(ctx context.Context, identifier string) err
 	)
 }
 
-// DeviceInfo returns information about the device.
-func (s *Service) DeviceInfo(ctx context.Context, identifier string) (*DeviceInfo, error) {
-	// Resolve first to capture the address
-	dev, err := s.ResolveWithGeneration(ctx, identifier)
+// deviceInfoFrom converts a connection's device info, reached at addr.
+func deviceInfoFrom(info *client.DeviceInfo, addr string) *DeviceInfo {
+	return &DeviceInfo{
+		ID:         info.ID,
+		MAC:        info.MAC,
+		Type:       info.Model,
+		Model:      types.ModelDisplayName(info.Model),
+		Generation: info.Generation,
+		Firmware:   info.Firmware,
+		App:        info.App,
+		AuthEn:     info.AuthEn,
+		Address:    addr,
+	}
+}
+
+// deviceInfoGen2 returns information about the resolved device dev over RPC.
+func (s *Service) deviceInfoGen2(ctx context.Context, identifier string, dev model.Device) (*DeviceInfo, error) {
+	var result *DeviceInfo
+	err := s.connManager.WithDeviceConnection(ctx, dev, func(conn *client.Client) error {
+		result = deviceInfoFrom(conn.Info(), dev.Address)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
+	refreshDeviceMetadata(identifier, result)
+	return result, nil
+}
 
+// deviceInfoGen1 returns information about the resolved device dev over the
+// Gen1 HTTP API.
+func (s *Service) deviceInfoGen1(ctx context.Context, identifier string, dev model.Device) (*DeviceInfo, error) {
 	var result *DeviceInfo
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		info := conn.Info()
-		result = &DeviceInfo{
-			ID:         info.ID,
-			MAC:        info.MAC,
-			Type:       info.Model,
-			Model:      types.ModelDisplayName(info.Model),
-			Generation: info.Generation,
-			Firmware:   info.Firmware,
-			App:        info.App,
-			AuthEn:     info.AuthEn,
-			Address:    dev.Address,
-		}
+	err := s.connManager.WithGen1DeviceConnection(ctx, dev, func(conn *client.Gen1Client) error {
+		result = deviceInfoFrom(conn.Info(), dev.Address)
 		return nil
 	})
-	if err == nil {
-		refreshDeviceMetadata(identifier, result)
+	if err != nil {
+		return nil, err
 	}
-	return result, err
+	refreshDeviceMetadata(identifier, result)
+	return result, nil
 }
 
 // DeviceStatus returns the full status of the device.
@@ -256,79 +270,37 @@ func (s *Service) DeviceStatusAuto(ctx context.Context, identifier string) (*Dev
 }
 
 // DevicePing checks if the device is reachable by attempting to connect.
-// Uses DeviceInfoAuto to support both Gen1 and Gen2 devices.
 func (s *Service) DevicePing(ctx context.Context, identifier string) (*DeviceInfo, error) {
-	return s.DeviceInfoAuto(ctx, identifier)
+	return s.DeviceInfo(ctx, identifier)
 }
 
-// DeviceInfoAuto returns device info, auto-detecting generation (Gen1 vs Gen2).
-// If generation is known from config, it tries that generation first for efficiency.
-// Otherwise it tries Gen2 first (more common), then falls back to Gen1 if Gen2 fails.
-// Use this for TUI/cache where we need to handle all device types.
-func (s *Service) DeviceInfoAuto(ctx context.Context, identifier string) (*DeviceInfo, error) {
-	// First resolve to check if we have a stored generation
-	// Error is intentionally ignored - if resolution fails, we try Gen2 first
-	device, err := s.ResolveWithGeneration(ctx, identifier)
-
-	// If we know it's Gen1, try Gen1 first to avoid wasting time on Gen2
-	if err == nil && device.Generation == 1 {
-		gen1Result, gen1Err := s.DeviceInfoGen1(ctx, identifier)
-		if gen1Err == nil {
-			return gen1Result, nil
-		}
-		// Gen1 failed unexpectedly, try Gen2 as fallback
-		result, err := s.DeviceInfo(ctx, identifier)
-		if err == nil {
-			return result, nil
-		}
-		// Both failed, return Gen1 error since we knew it was Gen1
-		return nil, gen1Err
-	}
-
-	// Gen2+ or unknown: Try Gen2 first (more common)
-	result, err := s.DeviceInfo(ctx, identifier)
-	if err == nil {
-		return result, nil
-	}
-
-	// Gen2 failed, try Gen1
-	gen1Result, gen1Err := s.DeviceInfoGen1(ctx, identifier)
-	if gen1Err == nil {
-		return gen1Result, nil
-	}
-
-	// Both failed, return the original Gen2 error (more informative)
-	return nil, err
-}
-
-// DeviceInfoGen1 returns information about a Gen1 device.
-func (s *Service) DeviceInfoGen1(ctx context.Context, identifier string) (*DeviceInfo, error) {
-	// Resolve first to capture the address
+// DeviceInfo returns information about the device, for any generation. The
+// identifier is resolved once. A device known to be Gen1 is asked over the
+// Gen1 HTTP API first; a Gen2+ or unknown device over RPC first. The other
+// generation is tried next, except when the generation is known and the
+// device did not answer at all: a device of the other generation would have
+// answered, so a second attempt only doubles the wait for an offline device.
+// When both fail the error of the generation tried first is returned.
+func (s *Service) DeviceInfo(ctx context.Context, identifier string) (*DeviceInfo, error) {
 	dev, err := s.ResolveWithGeneration(ctx, identifier)
 	if err != nil {
 		return nil, err
 	}
-
-	var result *DeviceInfo
-	err = s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-		info := conn.Info()
-		result = &DeviceInfo{
-			ID:         info.ID,
-			MAC:        info.MAC,
-			Type:       info.Model,
-			Model:      types.ModelDisplayName(info.Model),
-			Generation: info.Generation,
-			Firmware:   info.Firmware,
-			App:        info.App,
-			AuthEn:     info.AuthEn,
-			Address:    dev.Address,
-		}
-		return nil
-	})
-	if err == nil {
-		refreshDeviceMetadata(identifier, result)
+	first, second := s.deviceInfoGen2, s.deviceInfoGen1
+	if dev.Generation == 1 {
+		first, second = s.deviceInfoGen1, s.deviceInfoGen2
 	}
-	return result, err
+	result, err := first(ctx, identifier, dev)
+	if err == nil {
+		return result, nil
+	}
+	if dev.Generation != 0 && ratelimit.IsConnectivityFailure(err) {
+		return nil, err
+	}
+	if result, otherErr := second(ctx, identifier, dev); otherErr == nil {
+		return result, nil
+	}
+	return nil, err
 }
 
 // refreshDeviceMetadata opportunistically updates stored device metadata
@@ -374,8 +346,8 @@ func (s *Service) RefreshAllDeviceMetadata(ctx context.Context, ios *iostreams.I
 	var wg sync.WaitGroup
 	for name := range devices {
 		wg.Go(func() {
-			// DeviceInfoAuto triggers automatic metadata refresh on success
-			if _, err := s.DeviceInfoAuto(ctx, name); err != nil {
+			// DeviceInfo triggers automatic metadata refresh on success
+			if _, err := s.DeviceInfo(ctx, name); err != nil {
 				debug.TraceEvent("refresh metadata for %s: %v", name, err)
 			}
 		})

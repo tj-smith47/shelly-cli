@@ -18,8 +18,17 @@ using BLE (Gen2+) and WiFi AP (Gen1). Found devices are presented for
 interactive selection and provisioned with WiFi credentials automatically.
 
 .PP
-WiFi credentials are resolved in order: --from-device backup, --ssid/--password
-flags, auto-detected from an existing Gen1 device, or prompted interactively.
+WiFi credentials are resolved in this order:
+  1. --ssid, --password and --open, which win over a --from-device source
+  2. the --from-device source's network, password and open state
+  3. with no network named: a registered Gen1 device's network, else the
+     network this host is on, with its stored password
+  4. a prompt for the network name
+  5. with no password: this host's stored password for the network, else a
+     prompt (without a terminal or with --yes, the stored password is looked up
+     at onboarding and a network with none is refused)
+A network with no password is joined only with --open, a source device whose
+network has no password, or an empty password confirmed at the prompt.
 
 .PP
 Use --from-device to clone an existing device's full configuration (WiFi, MQTT,
@@ -90,8 +99,12 @@ To register already-networked devices, use: shelly discover --register
 	Disable cloud on provisioned devices
 
 .PP
+\fB--open\fP[=false]
+	Join a network that has no password
+
+.PP
 \fB--password\fP=""
-	WiFi password for provisioning
+	WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
 
 .PP
 \fB--ssid\fP=""
@@ -192,6 +205,9 @@ To register already-networked devices, use: shelly discover --register
 
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
+
+  # Join a network that has no password
+  shelly provision --ssid GuestWiFi --open --yes
 
   # List discoverable APs as JSON (for scripted before/after scan-diff)
   shelly provision --ap-only --discover-only

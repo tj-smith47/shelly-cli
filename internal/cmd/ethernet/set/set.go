@@ -67,6 +67,7 @@ Only available on Shelly Pro devices with an Ethernet port.`,
 	cmd.Flags().StringVar(&opts.Nameserver, "dns", "", "DNS server address (for static IP)")
 	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable Ethernet")
 	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable Ethernet")
+	cmd.MarkFlagsMutuallyExclusive("enable", "disable")
 
 	return cmd
 }

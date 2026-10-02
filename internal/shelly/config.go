@@ -5,16 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/spf13/afero"
+	shellybackup "github.com/tj-smith47/shelly-go/backup"
 	"github.com/tj-smith47/shelly-go/gen2/components"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/connection"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 )
 
 // convertToMap converts any struct to a map[string]any via JSON marshaling.
@@ -138,19 +142,44 @@ func IsConfigFile(path string) bool {
 // The config parameter should be a map of component keys to configuration
 // objects. Only specified components will be updated.
 // Note: Gen1 devices have limited config support - only Gen2+ supports bulk config updates.
-func (s *Service) SetConfig(ctx context.Context, identifier string, cfg map[string]any) error {
-	return s.withGenAwareAction(ctx, identifier,
+// A wifi sta or sta1 in cfg follows the station rule of planConfigStations;
+// the returned warnings name each station left out.
+func (s *Service) SetConfig(ctx context.Context, identifier string, cfg map[string]any) ([]string, error) {
+	var warnings []string
+	err := s.withGenAwareAction(ctx, identifier,
 		func(_ *client.Gen1Client) error {
 			return fmt.Errorf("bulk config updates are not supported on Gen1 devices; use component-specific commands instead")
 		},
 		func(conn *client.Client) error {
-			return conn.SetConfig(ctx, cfg)
+			var current map[string]any
+			if configHasStation(cfg) {
+				var err error
+				if current, err = conn.GetConfig(ctx); err != nil {
+					return fmt.Errorf("read current config: %w", err)
+				}
+			}
+			var planned map[string]any
+			planned, warnings = s.planConfigStations(ctx, cfg, current, stationsSameDevice)
+			return conn.SetConfig(ctx, planned)
 		},
 	)
+	return warnings, err
 }
 
-// SetComponentConfig updates a specific component's configuration.
-func (s *Service) SetComponentConfig(ctx context.Context, identifier, component string, cfg map[string]any) error {
+// SetComponentConfig updates a specific component's configuration and returns
+// SetConfig's warnings. WiFi station keys (sta, sta1 and their fields) are
+// refused: a station write needs the passphrase plan SetWiFiConfig makes, which
+// loose keys cannot carry.
+func (s *Service) SetComponentConfig(ctx context.Context, identifier, component string, cfg map[string]any) ([]string, error) {
+	if component == componentWiFi {
+		for key := range cfg {
+			if station, _, _ := strings.Cut(key, "."); slices.Contains(stationNames, station) {
+				return nil, fmt.Errorf("%w: WiFi station settings (%s) are set with `shelly wifi set`, which "+
+					"plans the network's password; config set only takes the other wifi keys (ap, roam)",
+					types.ErrInvalidParam, key)
+			}
+		}
+	}
 	fullConfig := map[string]any{
 		component: cfg,
 	}
@@ -248,41 +277,123 @@ func (s *Service) GetWiFiConfig(ctx context.Context, identifier string) (map[str
 		}
 		// Convert to map for flexibility
 		result = map[string]any{
-			fieldSTA: config.STA,
-			"sta1":   config.STA1,
-			"ap":     config.AP,
-			"roam":   config.Roam,
+			fieldSTA:  config.STA,
+			fieldSTA1: config.STA1,
+			"ap":      config.AP,
+			"roam":    config.Roam,
 		}
 		return nil
 	})
 	return result, err
 }
 
-// SetWiFiConfig updates the WiFi configuration.
-func (s *Service) SetWiFiConfig(ctx context.Context, identifier, ssid, password string, enable *bool) error {
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		wifi := components.NewWiFi(conn.RPCClient())
-
-		// Build the station config
-		staConfig := &components.WiFiStationConfig{}
-		if ssid != "" {
-			staConfig.SSID = &ssid
-		}
-		if password != "" {
-			staConfig.Pass = &password
-		}
-		if enable != nil {
-			staConfig.Enable = enable
-		}
-
-		return wifi.SetConfig(ctx, &components.WiFiConfig{
-			STA: staConfig,
-		})
-	})
-	if err == nil {
-		s.invalidateCache(identifier, cache.TypeWiFi)
+// SetWiFiConfig writes a device's primary WiFi station, on Gen1 and Gen2+.
+// Its key follows one rule: --open (w.Open) writes an open network and a given
+// password is written; otherwise the SSID is compared with the device's
+// configured one. On the same network no key is sent, so the device keeps its
+// own; on a different one the passphrase stored on this host is written, and
+// with none it returns PassphraseError naming the network. A static address
+// takes any gateway, netmask or DNS it lacks from the device's current static
+// settings. The warnings name a static address the device keeps on a changed
+// network.
+func (s *Service) SetWiFiConfig(ctx context.Context, identifier string, w network.StationWrite) ([]string, error) {
+	warnings, err := s.planStationWrite(ctx, identifier, &w)
+	if err != nil {
+		return nil, err
 	}
-	return err
+	err = s.withGenAwareAction(ctx, identifier,
+		func(conn *client.Gen1Client) error { return writeGen1Station(ctx, conn, w) },
+		func(conn *client.Client) error {
+			cfg, err := network.StationConfig(w)
+			if err != nil {
+				return err
+			}
+			return components.NewWiFi(conn.RPCClient()).SetConfig(ctx, cfg)
+		})
+	if err != nil {
+		return nil, err
+	}
+	s.invalidateCache(identifier, cache.TypeWiFi)
+	return warnings, nil
+}
+
+// planStationWrite refuses a write that cannot apply, fills in the passphrase
+// and static addressing SetWiFiConfig decides, and warns when a changed
+// network keeps the device's static address.
+func (s *Service) planStationWrite(ctx context.Context, identifier string, w *network.StationWrite) ([]string, error) {
+	if err := validateStationWrite(w); err != nil {
+		return nil, err
+	}
+	if w.SSID == "" && w.StaticIP == "" {
+		return nil, nil
+	}
+	current, err := s.deviceStations(ctx, identifier)
+	if err != nil {
+		return nil, fmt.Errorf("read the device's WiFi station: %w", err)
+	}
+	if err := resolveStationAddress(w, current.primary.Static); err != nil {
+		return nil, err
+	}
+	changed := w.SSID != "" && w.SSID != current.primary.SSID
+	if changed && !w.Open && w.Password == "" {
+		pass, passErr := s.hostPassphrase(ctx, w.SSID)
+		if passErr != nil {
+			return nil, passErr
+		}
+		w.Password = pass
+	}
+	if changed && w.StaticIP == "" && current.primary.Static.IP != "" {
+		return []string{staticKeptWarning(fieldSTA, w.SSID, current.primary.Static.IP)}, nil
+	}
+	return nil, nil
+}
+
+// validateStationWrite refuses a combination of station settings that no
+// device can apply.
+func validateStationWrite(w *network.StationWrite) error {
+	switch {
+	case w.Open && w.Password != "":
+		return fmt.Errorf("%w: an open network takes no password", types.ErrInvalidParam)
+	case w.SSID == "" && (w.Open || w.Password != "" || w.StaticIP != ""):
+		return fmt.Errorf("%w: a password, an open network or a static address needs an SSID; pass --ssid",
+			types.ErrInvalidParam)
+	case w.StaticIP != "" && w.Enable != nil && !*w.Enable:
+		return fmt.Errorf("%w: a static address cannot be set on a station being disabled", types.ErrInvalidParam)
+	}
+	return nil
+}
+
+// resolveStationAddress fills a static write's missing gateway, netmask and
+// DNS from the device's current static settings; a DHCP write is unchanged.
+func resolveStationAddress(w *network.StationWrite, current shellybackup.StaticNetwork) error {
+	if w.StaticIP == "" {
+		return nil
+	}
+	static, err := shellybackup.ResolveStaticNetwork(
+		shellybackup.StaticNetwork{IP: w.StaticIP, Gateway: w.Gateway, Netmask: w.Netmask, DNS: w.DNS}, current)
+	if err != nil {
+		return fmt.Errorf("%w: %w: %s needs a gateway and a netmask, and the device's station has none to "+
+			"keep; pass --gateway and --netmask", types.ErrInvalidParam, shellybackup.ErrIncompleteStaticNetwork,
+			w.StaticIP)
+	}
+	w.Gateway, w.Netmask, w.DNS = static.Gateway, static.Netmask, static.DNS
+	return nil
+}
+
+// writeGen1Station sends w to a Gen1 device's /settings/sta.
+func writeGen1Station(ctx context.Context, conn *client.Gen1Client, w network.StationWrite) error {
+	dev := conn.Device()
+	switch {
+	case w.Enable != nil && !*w.Enable:
+		return dev.SetWiFiStation(ctx, false, w.SSID, w.Password)
+	case w.StaticIP != "" && w.Open:
+		return dev.SetWiFiStationStaticOpen(ctx, w.SSID, w.StaticIP, w.Gateway, w.Netmask, w.DNS)
+	case w.StaticIP != "":
+		return dev.SetWiFiStationStatic(ctx, w.SSID, w.Password, w.StaticIP, w.Gateway, w.Netmask, w.DNS)
+	case w.Open:
+		return dev.SetWiFiStationOpen(ctx, w.SSID)
+	}
+	return dev.SetWiFiStation(ctx, true, w.SSID, w.Password)
 }
 
 // WiFiScanResult holds a WiFi scan result.

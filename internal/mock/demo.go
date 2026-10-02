@@ -106,8 +106,10 @@ func (d *Demo) InjectIntoFactory(f *cmdutil.Factory) {
 	// Create a shelly service with a resolver bound to this mock's config manager.
 	// This is critical for test isolation - without it, parallel tests would
 	// stomp on each other's global config manager.
+	// The offline scanner keeps demo access point flows from querying or
+	// switching the host's WiFi.
 	resolver := &mockResolver{mgr: d.ConfigMgr}
-	svc := shelly.New(resolver)
+	svc := shelly.New(resolver, shelly.WithWiFiScanner(shelly.OfflineWiFiScanner{}))
 	f.SetShellyService(svc)
 }
 

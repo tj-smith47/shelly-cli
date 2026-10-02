@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"testing"
@@ -345,4 +346,21 @@ func TestMockBrowser_CopyToClipboard(t *testing.T) {
 			t.Error("expected error, got nil")
 		}
 	})
+}
+
+// TestBrowserImpl_RefusesUnderTest verifies the default Browser never starts a
+// host browser or clipboard helper from a test binary.
+func TestBrowserImpl_RefusesUnderTest(t *testing.T) {
+	t.Parallel()
+
+	b := New()
+	if err := b.Browse(context.Background(), testHTTPURL); !errors.Is(err, ErrUnderTest) {
+		t.Errorf("Browse() error = %v, want ErrUnderTest", err)
+	}
+	if err := b.OpenDeviceUI(context.Background(), testIPv4); !errors.Is(err, ErrUnderTest) {
+		t.Errorf("OpenDeviceUI() error = %v, want ErrUnderTest", err)
+	}
+	if err := b.CopyToClipboard(testHTTPURL); !errors.Is(err, ErrUnderTest) {
+		t.Errorf("CopyToClipboard() error = %v, want ErrUnderTest", err)
+	}
 }

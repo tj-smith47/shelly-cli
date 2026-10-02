@@ -18,8 +18,17 @@ When run without a subcommand, provision scans for unprovisioned Shelly devices
 using BLE (Gen2+) and WiFi AP (Gen1). Found devices are presented for
 interactive selection and provisioned with WiFi credentials automatically.
 
-WiFi credentials are resolved in order: --from-device backup, --ssid/--password
-flags, auto-detected from an existing Gen1 device, or prompted interactively.
+WiFi credentials are resolved in this order:
+  1. --ssid, --password and --open, which win over a --from-device source
+  2. the --from-device source's network, password and open state
+  3. with no network named: a registered Gen1 device's network, else the
+     network this host is on, with its stored password
+  4. a prompt for the network name
+  5. with no password: this host's stored password for the network, else a
+     prompt (without a terminal or with --yes, the stored password is looked up
+     at onboarding and a network with none is refused)
+A network with no password is joined only with --open, a source device whose
+network has no password, or an empty password confirmed at the prompt.
 
 Use --from-device to clone an existing device's full configuration (WiFi, MQTT,
 cloud, light settings, schedules, etc.) onto newly provisioned devices. Use
@@ -54,6 +63,9 @@ shelly provision [flags]
 
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
+
+  # Join a network that has no password
+  shelly provision --ssid GuestWiFi --open --yes
 
   # List discoverable APs as JSON (for scripted before/after scan-diff)
   shelly provision --ap-only --discover-only
@@ -90,7 +102,8 @@ shelly provision [flags]
       --name string            Device name to assign after provisioning
       --netmask string         Netmask for the static IP (e.g. 255.255.254.0)
       --no-cloud               Disable cloud on provisioned devices
-      --password string        WiFi password for provisioning
+      --open                   Join a network that has no password
+      --password string        WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
       --ssid string            WiFi SSID for provisioning
       --static-ip string       Assign a static IP to the device (requires --gateway and --netmask)
       --target-ap string       Provision only the device whose AP SSID matches (non-interactive single device)

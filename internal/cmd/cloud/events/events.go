@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/netguard"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -121,6 +122,7 @@ func run(ctx context.Context, opts *Options) error {
 	// Connect to WebSocket
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 30 * time.Second,
+		NetDialContext:   netguard.NetDialContext(),
 	}
 
 	conn, resp, dialErr := dialer.DialContext(ctx, wsURL, nil)

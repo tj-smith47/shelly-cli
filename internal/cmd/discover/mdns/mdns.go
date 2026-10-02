@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
@@ -32,8 +33,8 @@ type Discoverer interface {
 
 // discovererFactory creates a new Discoverer instance.
 // This can be overridden in tests.
-var discovererFactory = func() Discoverer {
-	return discovery.NewMDNSDiscoverer()
+var discovererFactory = func() (Discoverer, error) {
+	return shelly.NewMDNSDiscoverer()
 }
 
 // Options holds the command options.
@@ -101,7 +102,10 @@ func run(ctx context.Context, opts *Options) error {
 		timeout = DefaultTimeout
 	}
 
-	mdnsDiscoverer := discovererFactory()
+	mdnsDiscoverer, err := discovererFactory()
+	if err != nil {
+		return err
+	}
 	defer func() {
 		if err := mdnsDiscoverer.Stop(); err != nil {
 			ios.DebugErrCat(iostreams.CategoryDiscovery, "stopping mDNS discoverer", err)
@@ -109,7 +113,7 @@ func run(ctx context.Context, opts *Options) error {
 	}()
 
 	var devices []discovery.DiscoveredDevice
-	err := cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via mDNS...", func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via mDNS...", func(ctx context.Context) error {
 		var discoverErr error
 		devices, discoverErr = mdnsDiscoverer.Discover(timeout)
 		return discoverErr

@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/afero"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -121,9 +122,10 @@ type ExportResult struct {
 
 // ImportCompleteMsg signals that import operation completed.
 type ImportCompleteMsg struct {
-	Name    string
-	Success bool
-	Err     error
+	Name     string
+	Success  bool
+	Warnings []string
+	Err      error
 }
 
 // Model displays backup and restore operations.
@@ -138,6 +140,7 @@ type Model struct {
 	importing    bool
 	backupDir    string
 	err          error
+	warnings     []string // from the last restore
 	focused      bool
 	panelIndex   int
 	styles       Styles
@@ -474,9 +477,7 @@ func (m Model) importBackup(backupFile File) tea.Cmd {
 
 		cfg := config.Get()
 		if cfg != nil {
-			for name, dev := range cfg.Devices {
-				// Try to match by device info (we could improve this matching)
-				_ = dev
+			for name := range cfg.Devices {
 				if name == deviceInfo.Name || name == deviceInfo.ID {
 					targetDevice = name
 					break
@@ -492,8 +493,17 @@ func (m Model) importBackup(backupFile File) tea.Cmd {
 			}
 		}
 
-		// Restore backup
-		result, err := m.svc.RestoreBackup(ctx, targetDevice, bkp, shellybackup.RestoreOptions{})
+		// The station is planned as on `shelly backup restore`: a changed
+		// network needs this host's passphrase, or nothing is written.
+		ov, plan, err := m.svc.PlanLANStation(ctx, targetDevice, bkp, nil, false)
+		if err != nil {
+			return ImportCompleteMsg{Name: backupFile.Name, Success: false, Err: err}
+		}
+		result, err := m.svc.RestoreBackup(ctx, targetDevice, bkp, shellybackup.RestoreOptions{
+			NetworkOverride: ov,
+			Station1:        plan.Station1Write(),
+			AliasName:       cmdutil.DeviceDisplayName("", targetDevice),
+		})
 		if err != nil {
 			return ImportCompleteMsg{
 				Name:    backupFile.Name,
@@ -512,8 +522,9 @@ func (m Model) importBackup(backupFile File) tea.Cmd {
 		}
 
 		return ImportCompleteMsg{
-			Name:    backupFile.Name,
-			Success: true,
+			Name:     backupFile.Name,
+			Success:  true,
+			Warnings: result.Warnings,
 		}
 	}
 }
@@ -606,6 +617,7 @@ func (m Model) handleExportComplete(msg ExportCompleteMsg) (Model, tea.Cmd) {
 
 func (m Model) handleImportComplete(msg ImportCompleteMsg) (Model, tea.Cmd) {
 	m.importing = false
+	m.warnings = msg.Warnings
 	if !msg.Success {
 		m.err = msg.Err
 	}
@@ -710,6 +722,11 @@ func (m Model) View() string {
 		} else {
 			content.WriteString(m.styles.Muted.Render("  Press 'x' to retry export"))
 		}
+	}
+
+	for _, w := range m.warnings {
+		content.WriteString("\n")
+		content.WriteString(m.styles.Failure.Render("! " + w))
 	}
 
 	// Status indicator with animated loader

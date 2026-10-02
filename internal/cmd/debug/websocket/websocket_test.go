@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,8 +24,19 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/netguard"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+// assertWebSocketRefused fails unless err is the websocket refusal for a
+// fixture at a LAN address, which proves run reached the websocket step
+// without dialing.
+func assertWebSocketRefused(t *testing.T, err error) {
+	t.Helper()
+	if !errors.Is(err, netguard.ErrBlocked) || !strings.Contains(err.Error(), "WebSocket connection failed") {
+		t.Errorf("err = %v, want the websocket refused by netguard", err)
+	}
+}
 
 // testWSServer creates a mock WebSocket server for testing.
 type testWSServer struct {
@@ -688,13 +700,7 @@ func TestRun_Gen2DeviceWebSocketConnectionFails(t *testing.T) {
 
 	err = run(context.Background(), opts)
 
-	// Should fail on WebSocket connection (no real WebSocket server)
-	if err == nil {
-		t.Error("Expected WebSocket connection error")
-	}
-	if !strings.Contains(err.Error(), "WebSocket connection failed") {
-		t.Logf("Error = %v (WebSocket connection failed expected)", err)
-	}
+	assertWebSocketRefused(t, err)
 
 	// Check that device info was displayed in output
 	output := tf.OutString()
@@ -742,10 +748,7 @@ func TestRun_Gen2DeviceWithRawMode(t *testing.T) {
 
 	err = run(context.Background(), opts)
 
-	// Should fail on WebSocket connection
-	if err == nil {
-		t.Error("Expected WebSocket connection error")
-	}
+	assertWebSocketRefused(t, err)
 }
 
 //nolint:paralleltest // Uses global mock config
@@ -832,10 +835,7 @@ func TestExecute_Gen2DeviceWithMock(t *testing.T) {
 
 	err = cmd.Execute()
 
-	// Should fail on WebSocket connection
-	if err == nil {
-		t.Error("Expected WebSocket connection error")
-	}
+	assertWebSocketRefused(t, err)
 
 	output := tf.OutString()
 	if !strings.Contains(output, "WebSocket") {
@@ -881,15 +881,8 @@ func TestExecute_Gen3Device(t *testing.T) {
 
 	err = cmd.Execute()
 
-	// Gen3 should pass the generation check (>= 2)
-	// but fail on WebSocket connection
-	if err == nil {
-		t.Error("Expected WebSocket connection error")
-	}
-	// Should NOT contain Gen2+ error
-	if strings.Contains(err.Error(), "Gen2+") {
-		t.Errorf("Gen3 should be accepted, got: %v", err)
-	}
+	// Reaching the websocket step means the generation check accepted Gen3.
+	assertWebSocketRefused(t, err)
 }
 
 //nolint:paralleltest // Uses global mock config
@@ -973,11 +966,7 @@ func TestRun_WithWebSocketInfoError(t *testing.T) {
 
 	err = run(context.Background(), opts)
 
-	// Will fail at WebSocket connection, but should have gotten past
-	// the device info and WebSocket info steps
-	if err == nil {
-		t.Error("Expected error")
-	}
+	assertWebSocketRefused(t, err)
 
 	output := tf.OutString()
 	if !strings.Contains(output, "WebSocket Configuration") {
@@ -1513,5 +1502,72 @@ func TestRun_DirectWebSocketZeroDuration(t *testing.T) {
 	// (depending on whether connection succeeded before context cancelled)
 	if !strings.Contains(output, "indefinitely") && !strings.Contains(output, "Event Streaming") {
 		t.Errorf("Output should mention streaming indefinitely or Event Streaming, got: %s", output)
+	}
+}
+
+// TestRun_WebSocketAuth asserts the websocket carries the registered device's
+// credentials, and none for a device registered without them.
+//
+//nolint:paralleltest // config.SetFs swaps the process-global config
+func TestRun_WebSocketAuth(t *testing.T) {
+	tests := []struct {
+		name string
+		auth *model.Auth
+		want string
+	}{
+		{name: "device with auth", auth: &model.Auth{Username: "admin", Password: "secret"},
+			want: "Basic YWRtaW46c2VjcmV0"},
+		{name: "device without auth"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			factory.SetupTestFs(t)
+			upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+			upgrades := make(chan string, 4)
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !websocket.IsWebSocketUpgrade(r) {
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write([]byte(`{"id":1,"result":{}}`)) //nolint:errcheck // test fake
+					return
+				}
+				upgrades <- r.Header.Get("Authorization")
+				conn, err := upgrader.Upgrade(w, r, nil)
+				if err != nil {
+					return
+				}
+				defer func() { _ = conn.Close() }() //nolint:errcheck // test fake
+				for {
+					var req struct {
+						ID any `json:"id"`
+					}
+					if err := conn.ReadJSON(&req); err != nil {
+						return
+					}
+					if err := conn.WriteJSON(map[string]any{"id": req.ID, "result": map[string]any{}}); err != nil {
+						return
+					}
+				}
+			}))
+			t.Cleanup(srv.Close)
+			addr := strings.TrimPrefix(srv.URL, "http://")
+			if err := config.RegisterDevice("gb", addr, 2, "", "SNSW-001X16EU", tt.auth); err != nil {
+				t.Fatalf("register device: %v", err)
+			}
+
+			tf := factory.NewTestFactory(t)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			t.Cleanup(cancel)
+			if err := run(ctx, &Options{Factory: tf.Factory, Device: "gb", Duration: 50 * time.Millisecond}); err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			select {
+			case got := <-upgrades:
+				if got != tt.want {
+					t.Errorf("Authorization = %q, want %q", got, tt.want)
+				}
+			default:
+				t.Fatal("no websocket upgrade reached the device")
+			}
+		})
 	}
 }

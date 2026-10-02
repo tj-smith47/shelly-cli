@@ -1,10 +1,17 @@
 package shelly
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
+	"github.com/tj-smith47/shelly-go/discovery"
+	"github.com/tj-smith47/shelly-go/reprovision"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
@@ -441,7 +448,7 @@ func TestRegisterNetworkDevices_Empty(t *testing.T) {
 	}
 }
 
-func TestExtractWiFiFromBackup_Gen1(t *testing.T) {
+func TestProvisionWiFi_Gen1(t *testing.T) {
 	t.Parallel()
 
 	// Gen1 WiFi blob as produced by marshalGen1WiFi: {"sta": {WiFiStaSettings}}.
@@ -454,7 +461,7 @@ func TestExtractWiFiFromBackup_Gen1(t *testing.T) {
 		},
 	}
 
-	creds := extractWiFiFromBackup(bkp)
+	creds := provisionWiFi(bkp)
 	if creds == nil {
 		t.Fatal("expected WiFi credentials, got nil")
 	}
@@ -466,7 +473,7 @@ func TestExtractWiFiFromBackup_Gen1(t *testing.T) {
 	}
 }
 
-func TestExtractWiFiFromBackup_Gen1_FallbackToConfig(t *testing.T) {
+func TestProvisionWiFi_Gen1_FallbackToConfig(t *testing.T) {
 	t.Parallel()
 
 	// No WiFi blob, but Config has the full gen1.Settings with wifi_sta.
@@ -489,7 +496,7 @@ func TestExtractWiFiFromBackup_Gen1_FallbackToConfig(t *testing.T) {
 		},
 	}
 
-	creds := extractWiFiFromBackup(bkp)
+	creds := provisionWiFi(bkp)
 	if creds == nil {
 		t.Fatal("expected WiFi credentials from Config fallback, got nil")
 	}
@@ -501,7 +508,7 @@ func TestExtractWiFiFromBackup_Gen1_FallbackToConfig(t *testing.T) {
 	}
 }
 
-func TestExtractWiFiFromBackup_Gen1_NoWiFi(t *testing.T) {
+func TestProvisionWiFi_Gen1_NoWiFi(t *testing.T) {
 	t.Parallel()
 
 	configData := json.RawMessage(`{}`)
@@ -512,13 +519,13 @@ func TestExtractWiFiFromBackup_Gen1_NoWiFi(t *testing.T) {
 		},
 	}
 
-	creds := extractWiFiFromBackup(bkp)
+	creds := provisionWiFi(bkp)
 	if creds != nil {
 		t.Errorf("expected nil, got %+v", creds)
 	}
 }
 
-func TestExtractWiFiFromBackup_Gen2_WithSSID(t *testing.T) {
+func TestProvisionWiFi_Gen2_WithSSID(t *testing.T) {
 	t.Parallel()
 
 	wifiBlob := json.RawMessage(`{"sta":{"ssid":"` + testSSID + `","is_open":false,"enable":true}}`)
@@ -531,7 +538,7 @@ func TestExtractWiFiFromBackup_Gen2_WithSSID(t *testing.T) {
 		},
 	}
 
-	creds := extractWiFiFromBackup(bkp)
+	creds := provisionWiFi(bkp)
 	if creds == nil {
 		t.Fatal("expected WiFi credentials, got nil")
 	}
@@ -542,9 +549,28 @@ func TestExtractWiFiFromBackup_Gen2_WithSSID(t *testing.T) {
 	if creds.Password != "" {
 		t.Errorf("Password should be empty for Gen2+, got %q", creds.Password)
 	}
+	// A missing key is not an open network.
+	if creds.Open {
+		t.Error("a secured station with no key in the backup must not be marked open")
+	}
 }
 
-func TestExtractWiFiFromBackup_NilConfig(t *testing.T) {
+func TestProvisionWiFi_OpenStation(t *testing.T) {
+	t.Parallel()
+
+	bkp := &backup.DeviceBackup{Backup: &shellybackup.Backup{
+		DeviceInfo: &shellybackup.DeviceInfo{Generation: 2},
+		WiFi:       json.RawMessage(`{"sta":{"ssid":"` + testSSID + `","is_open":true,"enable":true}}`),
+	}}
+
+	creds := provisionWiFi(bkp)
+	want := OnboardWiFiConfig{SSID: testSSID, Open: true}
+	if creds == nil || *creds != want {
+		t.Errorf("creds = %+v, want %+v", creds, want)
+	}
+}
+
+func TestProvisionWiFi_NilConfig(t *testing.T) {
 	t.Parallel()
 
 	bkp := &backup.DeviceBackup{
@@ -553,45 +579,25 @@ func TestExtractWiFiFromBackup_NilConfig(t *testing.T) {
 		},
 	}
 
-	creds := extractWiFiFromBackup(bkp)
+	creds := provisionWiFi(bkp)
 	if creds != nil {
 		t.Errorf("expected nil for nil config, got %+v", creds)
 	}
 }
 
-func TestExtractWiFiFromBlob_Nil(t *testing.T) {
+func TestProvisionWiFi_LeavesOutStaticAddress(t *testing.T) {
 	t.Parallel()
 
-	creds := extractWiFiFromBlob(nil)
-	if creds != nil {
-		t.Errorf("expected nil, got %+v", creds)
+	wifiBlob := json.RawMessage(`{"sta":{"ssid":"` + testSSID + `","key":"secret123","enabled":true,` +
+		`"ipv4_method":"static","ip":"10.0.0.5","gw":"10.0.0.1","mask":"255.255.255.0"}}`)
+	bkp := &backup.DeviceBackup{
+		Backup: &shellybackup.Backup{DeviceInfo: &shellybackup.DeviceInfo{Generation: 1}, WiFi: wifiBlob},
 	}
-}
 
-func TestExtractWiFiFromBlob_InvalidJSON(t *testing.T) {
-	t.Parallel()
-
-	creds := extractWiFiFromBlob(json.RawMessage(`{invalid`))
-	if creds != nil {
-		t.Errorf("expected nil for invalid JSON, got %+v", creds)
-	}
-}
-
-func TestExtractWiFiFromBlob_NoSTA(t *testing.T) {
-	t.Parallel()
-
-	creds := extractWiFiFromBlob(json.RawMessage(`{"ap":{"ssid":"test"}}`))
-	if creds != nil {
-		t.Errorf("expected nil when no sta key, got %+v", creds)
-	}
-}
-
-func TestExtractWiFiFromBlob_EmptySSID(t *testing.T) {
-	t.Parallel()
-
-	creds := extractWiFiFromBlob(json.RawMessage(`{"sta":{"ssid":""}}`))
-	if creds != nil {
-		t.Errorf("expected nil for empty SSID, got %+v", creds)
+	creds := provisionWiFi(bkp)
+	want := OnboardWiFiConfig{SSID: testSSID, Password: "secret123"}
+	if creds == nil || *creds != want {
+		t.Errorf("creds = %+v, want %+v", creds, want)
 	}
 }
 
@@ -622,5 +628,203 @@ func TestProvisionSource_Types(t *testing.T) {
 	}
 	if source2.Template.Name != "test-tpl" {
 		t.Errorf("Template.Name = %q, want %q", source2.Template.Name, "test-tpl")
+	}
+}
+
+// recordingScanner is an in-memory WiFi backend that records every call, so a
+// test can prove it is the backend a service method used.
+type recordingScanner struct {
+	mu        sync.Mutex
+	calls     []string
+	current   string
+	networks  []discovery.WiFiNetwork
+	passwords map[string]string
+}
+
+func (r *recordingScanner) record(call string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, call)
+}
+
+func (r *recordingScanner) called() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.calls...)
+}
+
+func (r *recordingScanner) Scan(context.Context) ([]discovery.WiFiNetwork, error) {
+	r.record("scan")
+	return r.networks, nil
+}
+
+func (r *recordingScanner) Connect(_ context.Context, ssid, password string) error {
+	r.record("connect:" + ssid + ":" + password)
+	return errors.New("connect refused in tests")
+}
+
+func (r *recordingScanner) Disconnect(context.Context) error {
+	r.record("disconnect")
+	return errors.New("disconnect refused in tests")
+}
+
+func (r *recordingScanner) CurrentNetwork(context.Context) (*discovery.WiFiNetwork, error) {
+	r.record("current")
+	if r.current == "" {
+		return nil, errors.New("not on WiFi")
+	}
+	return &discovery.WiFiNetwork{SSID: r.current}, nil
+}
+
+func (r *recordingScanner) HostNetworkPassword(_ context.Context, ssid string) (string, error) {
+	r.record("password:" + ssid)
+	if pw, ok := r.passwords[ssid]; ok {
+		return pw, nil
+	}
+	return "", errors.New("no stored passphrase")
+}
+
+func TestHostWiFiPassword_UsesInjectedScanner(t *testing.T) {
+	t.Parallel()
+
+	scanner := &recordingScanner{passwords: map[string]string{"iot": "stored"}}
+	svc := New(NewConfigResolver(), WithWiFiScanner(scanner))
+
+	pw, err := svc.HostWiFiPassword(context.Background(), "iot")
+	if err != nil || pw != "stored" {
+		t.Errorf("HostWiFiPassword = %q, %v; want the injected scanner's passphrase", pw, err)
+	}
+	if _, err := svc.HostWiFiPassword(context.Background(), "guest"); err == nil {
+		t.Error("an unknown network must be an error")
+	}
+	if _, err := svc.HostWiFiPassword(context.Background(), ""); err == nil {
+		t.Error("no network named must be an error")
+	}
+	if got := strings.Join(scanner.called(), ","); got != "password:iot,password:guest" {
+		t.Errorf("scanner calls = %s", got)
+	}
+
+	noProvider := New(NewConfigResolver(), WithWiFiScanner(fakeScanner{}))
+	if _, err := noProvider.HostWiFiPassword(context.Background(), "iot"); err == nil {
+		t.Error("a backend without passphrase recovery must be an error")
+	}
+}
+
+func TestHostWiFiCredentials_UsesInjectedScanner(t *testing.T) {
+	t.Parallel()
+
+	scanner := &recordingScanner{current: "iot", passwords: map[string]string{"iot": "stored"}}
+	svc := New(NewConfigResolver(), WithWiFiScanner(scanner))
+
+	got := svc.HostWiFiCredentials(context.Background())
+	if got == nil || *got != (OnboardWiFiConfig{SSID: "iot", Password: "stored"}) {
+		t.Errorf("HostWiFiCredentials = %+v", got)
+	}
+	if calls := strings.Join(scanner.called(), ","); calls != "current,password:iot" {
+		t.Errorf("scanner calls = %s", calls)
+	}
+}
+
+func TestDiscoverWiFiAPForOnboard_UsesInjectedScanner(t *testing.T) {
+	t.Parallel()
+
+	scanner := &recordingScanner{networks: []discovery.WiFiNetwork{{SSID: testAPSSID, Signal: -40}}}
+	svc := New(NewConfigResolver(), WithWiFiScanner(scanner))
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	devices, err := svc.discoverWiFiAPForOnboard(ctx)
+	if err != nil {
+		t.Fatalf("discoverWiFiAPForOnboard: %v", err)
+	}
+	if len(devices) != 1 || devices[0].SSID != testAPSSID {
+		t.Errorf("devices = %+v, want the injected scanner's AP", devices)
+	}
+	for _, call := range scanner.called() {
+		if call != "scan" {
+			t.Errorf("discovery made a %s call", call)
+		}
+	}
+}
+
+func TestJoinPassword(t *testing.T) {
+	t.Parallel()
+
+	scanner := &recordingScanner{passwords: map[string]string{"iot": "stored"}}
+	svc := New(NewConfigResolver(), WithWiFiScanner(scanner))
+	tests := []struct {
+		name    string
+		wifi    OnboardWiFiConfig
+		want    OnboardWiFiConfig
+		wantErr string
+	}{
+		{name: "password kept", wifi: OnboardWiFiConfig{SSID: "iot", Password: "given"},
+			want: OnboardWiFiConfig{SSID: "iot", Password: "given"}},
+		{name: "open kept", wifi: OnboardWiFiConfig{SSID: "guest", Open: true},
+			want: OnboardWiFiConfig{SSID: "guest", Open: true}},
+		{name: "host passphrase filled in", wifi: OnboardWiFiConfig{SSID: "iot"},
+			want: OnboardWiFiConfig{SSID: "iot", Password: "stored"}},
+		{name: "none found is refused", wifi: OnboardWiFiConfig{SSID: "guest"},
+			wantErr: `no WiFi passphrase for "guest":`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := svc.joinPassword(context.Background(), &tt.wifi)
+			if tt.wantErr != "" {
+				if err == nil || !strings.HasPrefix(err.Error(), tt.wantErr) || !errors.Is(err, reprovision.ErrNoPassphrase) {
+					t.Errorf("err = %v, want prefix %s", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil || *got != tt.want {
+				t.Errorf("joinPassword = %+v, %v; want %+v", got, err, tt.want)
+			}
+		})
+	}
+}
+
+// TestOnboardBLEParallel_RefusesUnknownPassword proves a BLE onboard never writes
+// a secured network as an open one: with no password, no Open and none stored on
+// the host, every device fails with the passphrase error before BLE is touched.
+func TestOnboardBLEParallel_RefusesUnknownPassword(t *testing.T) {
+	t.Parallel()
+
+	svc := New(NewConfigResolver(), WithWiFiScanner(&recordingScanner{}))
+	devices := []*OnboardDevice{{Name: "ShellyPlus1-AABBCC"}, {Name: "ShellyPlus1-DDEEFF"}}
+
+	results := svc.OnboardBLEParallel(context.Background(), devices, &OnboardWiFiConfig{SSID: "iot"}, &OnboardOptions{})
+
+	if len(results) != len(devices) {
+		t.Fatalf("results = %d, want %d", len(results), len(devices))
+	}
+	for i, r := range results {
+		if r.Device != devices[i] || !errors.Is(r.Error, reprovision.ErrNoPassphrase) {
+			t.Errorf("result %d = %+v, want the passphrase error", i, r)
+		}
+	}
+}
+
+func TestOnboardViaBLE_RefusesUnknownPassword(t *testing.T) {
+	t.Parallel()
+
+	svc := New(NewConfigResolver(), WithWiFiScanner(&recordingScanner{}))
+	dev := &OnboardDevice{Name: "ShellyPlus1-AABBCC"}
+
+	r := svc.OnboardViaBLE(context.Background(), dev, &OnboardWiFiConfig{SSID: "iot"}, &OnboardOptions{})
+
+	if r.Device != dev || r.Method != string(OnboardSourceBLE) || !errors.Is(r.Error, reprovision.ErrNoPassphrase) {
+		t.Errorf("result = %+v, want the passphrase error", r)
+	}
+}
+
+func TestScanner_OfflineInTests(t *testing.T) {
+	t.Parallel()
+	if _, ok := (&Service{}).scanner().(OfflineWiFiScanner); !ok {
+		t.Error("a service built without a scanner reaches the platform WiFi in a test binary")
+	}
+	scanner := &recordingScanner{}
+	if (&Service{wifiScanner: scanner}).scanner() != scanner {
+		t.Error("an injected scanner is not used")
 	}
 }

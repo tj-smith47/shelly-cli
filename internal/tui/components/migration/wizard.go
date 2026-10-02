@@ -77,8 +77,9 @@ type CompareCompleteMsg struct {
 
 // ApplyCompleteMsg signals that migration is complete.
 type ApplyCompleteMsg struct {
-	Success bool
-	Err     error
+	Success  bool
+	Warnings []string
+	Err      error
 }
 
 // Wizard is the migration wizard model.
@@ -99,6 +100,7 @@ type Wizard struct {
 	loading       bool
 	applying      bool
 	err           error
+	warnings      []string
 	focused       bool
 	panelIndex    int
 	includeWiFi   bool
@@ -342,6 +344,7 @@ func (w Wizard) handleApplyComplete(msg ApplyCompleteMsg) (Wizard, tea.Cmd) {
 		w.err = msg.Err
 		return w, nil
 	}
+	w.warnings = msg.Warnings
 	w.step = StepComplete
 	return w, nil
 }
@@ -494,6 +497,7 @@ func (w Wizard) reset() (Wizard, tea.Cmd) {
 	w.diffs = nil
 	w.selectedDiffs = nil
 	w.err = nil
+	w.warnings = nil
 	w.Scroller.SetCursor(0)
 	return w, nil
 }
@@ -580,11 +584,11 @@ func (w Wizard) applyMigration() tea.Cmd {
 	filteredConfig := w.filterSelectedConfig()
 
 	return func() tea.Msg {
-		_, err := w.svc.ApplyTemplate(w.ctx, target.Name, filteredConfig, false)
+		_, warnings, err := w.svc.ApplyTemplate(w.ctx, target.Name, filteredConfig, false)
 		if err != nil {
 			return ApplyCompleteMsg{Err: err}
 		}
-		return ApplyCompleteMsg{Success: true}
+		return ApplyCompleteMsg{Success: true, Warnings: warnings}
 	}
 }
 
@@ -905,6 +909,10 @@ func (w Wizard) renderComplete() string {
 		content.WriteString(w.styles.Muted.Render(" applied to "))
 		content.WriteString(w.styles.DeviceName.Render(target.Name))
 		content.WriteString("\n\n")
+		for _, warning := range w.warnings {
+			content.WriteString(w.styles.Warning.Render("! " + warning))
+			content.WriteString("\n\n")
+		}
 		content.WriteString(w.styles.Muted.Render("Press R to start a new migration"))
 	}
 

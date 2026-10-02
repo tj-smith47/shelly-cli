@@ -706,11 +706,14 @@ func (m *Manage) applyTemplateToDevices(tpl config.DeviceTemplate) tea.Cmd {
 		ctx, cancel := context.WithTimeout(m.ctx, 60*time.Second)
 		defer cancel()
 
-		var errors []string
+		var errors, warnings []string
 		for _, dev := range selected {
-			// Apply template config to device
-			if err := m.svc.SetConfig(ctx, dev.Name, tpl.Config); err != nil {
+			_, devWarnings, err := m.svc.ApplyTemplate(ctx, dev.Name, tpl.Config, false)
+			if err != nil {
 				errors = append(errors, fmt.Sprintf("%s: %v", dev.Name, err))
+			}
+			for _, w := range devWarnings {
+				warnings = append(warnings, dev.Name+": "+w)
 			}
 		}
 
@@ -718,11 +721,12 @@ func (m *Manage) applyTemplateToDevices(tpl config.DeviceTemplate) tea.Cmd {
 			return templates.ActionMsg{
 				Action:       "apply",
 				TemplateName: tpl.Name,
+				Warnings:     warnings,
 				Err:          fmt.Errorf("failed on some devices: %s", strings.Join(errors, "; ")),
 			}
 		}
 
-		return templates.ActionMsg{Action: "apply", TemplateName: tpl.Name}
+		return templates.ActionMsg{Action: "apply", TemplateName: tpl.Name, Warnings: warnings}
 	}
 }
 

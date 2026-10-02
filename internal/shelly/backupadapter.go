@@ -3,6 +3,7 @@ package shelly
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -142,6 +143,21 @@ func (s *Service) CreateBackup(ctx context.Context, identifier string, opts back
 // This is a convenience method that delegates to BackupService.
 func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBackup *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, error) {
 	return s.BackupService().RestoreBackup(ctx, identifier, deviceBackup, opts)
+}
+
+// DescribeRestoreName returns the dry-run line for the device name a restore
+// of bkp onto device with opts writes (see backup.ResolveName). The target's
+// MAC is read from the device unless an explicit name makes it irrelevant.
+func (s *Service) DescribeRestoreName(ctx context.Context, device string, bkp *backup.DeviceBackup, opts backup.RestoreOptions) (string, error) {
+	targetMAC := ""
+	if opts.Name == "" && opts.AliasName != "" {
+		info, err := s.DeviceInfo(ctx, device)
+		if err != nil {
+			return "", fmt.Errorf("read the target's MAC: %w", err)
+		}
+		targetMAC = info.MAC
+	}
+	return backup.DescribeName(opts.Name, opts.AliasName, bkp.RecordedName(), bkp.Device().MAC, targetMAC), nil
 }
 
 // RestoreBackupGen restores a backup using an explicitly supplied generation,

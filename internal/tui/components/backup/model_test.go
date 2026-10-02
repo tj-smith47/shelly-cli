@@ -2,12 +2,22 @@ package backup
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/spf13/afero"
+	sdkbackup "github.com/tj-smith47/shelly-go/backup"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/testutil"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
 
@@ -644,4 +654,69 @@ func newTestModel() Model {
 	svc := &shelly.Service{}
 	deps := Deps{Ctx: ctx, Svc: svc}
 	return New(deps)
+}
+
+func TestModel_ImportComplete_ShowsRestoreWarnings(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m = m.SetSize(120, 40)
+	m.importing = true
+	warning := "secondary WiFi station \"spare\" was not restored; set it with `shelly wifi set`"
+	updated, _ := m.Update(ImportCompleteMsg{Name: "backup.json", Success: true, Warnings: []string{warning}})
+	if !strings.Contains(updated.View(), "shelly wifi set") {
+		t.Errorf("view does not show the restore warning:\n%s", updated.View())
+	}
+}
+
+// TestModel_ImportBackup_Name asserts an import onto the registered device
+// "shellyplus1-test" keeps the name of the device's own backup and writes the
+// alias after the backup's name when the backup came from another device.
+//
+//nolint:paralleltest // SetupTestFs swaps the process-global config
+func TestModel_ImportBackup_Name(t *testing.T) {
+	const backupPath = "/b.json"
+	tests := []struct {
+		name      string
+		targetMAC string
+		want      []string
+	}{
+		{name: "own backup keeps its name", targetMAC: "AABBCCDDEEFF", want: []string{"Test Device"}},
+		{name: "another device's backup takes the alias", targetMAC: "112233445566",
+			want: []string{"Test Device", "shellyplus1-test"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			factory.SetupTestFs(t)
+			dev := testutil.NewGen2NameDevice(t, tt.targetMAC)
+			if err := config.RegisterDevice("shellyplus1-test", dev.Addr, 2, "", "SNSW-001X16EU", nil); err != nil {
+				t.Fatalf("register device: %v", err)
+			}
+			data, err := json.Marshal(sdkbackup.Backup{
+				Version: 1,
+				DeviceInfo: &sdkbackup.DeviceInfo{
+					ID: "shellyplus1-test", Name: "Test Device", Model: "SNSW-001X16EU",
+					Generation: 2, Version: "1.0.0", MAC: "AA:BB:CC:DD:EE:FF",
+				},
+				Config:    json.RawMessage(`{"sys":{"device":{"name":"Test Device"}}}`),
+				CreatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+			})
+			if err != nil {
+				t.Fatalf("marshal backup: %v", err)
+			}
+			if err := afero.WriteFile(config.Fs(), backupPath, data, 0o600); err != nil {
+				t.Fatalf("write backup: %v", err)
+			}
+
+			svc := shelly.New(testutil.Gen2At(dev.Addr),
+				shelly.WithRateLimiter(ratelimit.New(ratelimit.WithGen2MinInterval(0))))
+			m := New(Deps{Ctx: context.Background(), Svc: svc})
+			msg, ok := m.importBackup(File{Name: "b.json", Path: backupPath})().(ImportCompleteMsg)
+			if !ok || !msg.Success {
+				t.Fatalf("import = %+v, want success", msg)
+			}
+			if got := dev.Written(); !slices.Equal(got, tt.want) {
+				t.Errorf("names written %q, want %q", got, tt.want)
+			}
+		})
+	}
 }

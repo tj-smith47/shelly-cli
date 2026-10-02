@@ -2,6 +2,7 @@ package templates
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -196,4 +197,17 @@ func testDeps() ListDeps {
 
 func newTestList() ListModel {
 	return NewList(testDeps())
+}
+
+func TestHandleAction_ShowsApplyWarnings(t *testing.T) {
+	t.Parallel()
+	m := newTestList()
+	m, _ = m.handleAction(ActionMsg{Action: "apply", TemplateName: "tpl",
+		Warnings: []string{"plug: WiFi station sta (\"guest\") was not written"}})
+	if !m.statusWarn {
+		t.Error("apply warnings not marked as a warning")
+	}
+	if footer := m.buildFooter(); !strings.Contains(footer, "was not written") {
+		t.Errorf("footer = %q, want the station warning", footer)
+	}
 }

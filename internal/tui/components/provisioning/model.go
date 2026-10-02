@@ -76,6 +76,15 @@ type ConfiguredMsg struct {
 // PollMsg signals a poll attempt should be made.
 type PollMsg struct{}
 
+// HostPasswordMsg carries the passphrase this host has stored for the entered
+// network, empty when it has none.
+type HostPasswordMsg struct {
+	Password string
+	// lookup is the lookup that produced the message, so the answer of a
+	// cancelled lookup is ignored.
+	lookup int
+}
+
 // Model is the provisioning wizard model.
 type Model struct {
 	panel.Sizable
@@ -85,7 +94,12 @@ type Model struct {
 	deviceInfo   *shelly.ProvisioningDeviceInfo
 	ssid         string
 	password     string
-	inputField   int // 0 = SSID, 1 = password
+	inputField   int  // 0 = SSID, 1 = password
+	open         bool // the user confirmed the network has no password
+	askOpen      bool // the open-network question is showing
+	lookingUp    bool // the host passphrase lookup is running
+	lookup       int  // the number of the running or last host lookup
+	cancelLookup context.CancelFunc
 	err          error
 	credErr      string // inline validation error during credential entry
 	focused      bool
@@ -93,6 +107,9 @@ type Model struct {
 	polling      bool
 	styles       Styles
 	configLoader loading.Model // Extra loader for config step
+
+	// hostPassword, when non-nil, replaces the service's host passphrase lookup.
+	hostPassword func(ctx context.Context, ssid string) (string, error)
 }
 
 // Styles holds styles for the Provisioning component.
@@ -174,6 +191,9 @@ func (m Model) Reset() Model {
 	m.deviceInfo = nil
 	m.ssid = ""
 	m.password = ""
+	m.open = false
+	m.askOpen = false
+	m = m.stopLookup()
 	m.inputField = 0
 	m.err = nil
 	m.credErr = ""
@@ -244,6 +264,8 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleDeviceFound(msg)
 	case ConfiguredMsg:
 		return m.handleConfigured(msg)
+	case HostPasswordMsg:
+		return m.handleHostPassword(msg)
 	case PollMsg:
 		if m.step == StepWaiting {
 			return m, tea.Batch(m.Loader.Tick(), m.checkDevice())
@@ -329,6 +351,17 @@ func (m Model) handleInstructionsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleCredentialsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if m.lookingUp {
+		if msg.String() == keyconst.KeyEsc {
+			m = m.stopLookup()
+			m.inputField = 1
+			m.credErr = "Lookup cancelled; enter the network's password"
+		}
+		return m, nil
+	}
+	if m.askOpen {
+		return m.handleOpenAnswer(msg)
+	}
 	switch msg.String() {
 	case keyconst.KeyTab:
 		// Tab cycles through fields (NavigationMsg handles j/k/arrows)
@@ -339,12 +372,17 @@ func (m Model) handleCredentialsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		case ssid == "":
 			m.credErr = "SSID is required"
 		case m.password != "" && len(m.password) < 8:
-			m.credErr = "Password must be at least 8 characters (WPA2); leave empty for an open network"
+			m.credErr = "Password must be at least 8 characters (WPA2)"
+		case m.password == "":
+			// An empty password is not an open network: the host's stored
+			// passphrase is tried first, and open must be confirmed.
+			m.ssid = ssid
+			m.credErr = ""
+			return m.lookupHostPassword()
 		default:
 			m.ssid = ssid
 			m.credErr = ""
-			m.step = StepConfiguring
-			return m, tea.Batch(m.configLoader.Tick(), m.configureDevice())
+			return m.startConfigure()
 		}
 	case keyconst.KeyEsc:
 		m = m.Reset()
@@ -354,6 +392,70 @@ func (m Model) handleCredentialsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m = m.handleCharInput(msg.String())
 	}
 	return m, nil
+}
+
+// handleOpenAnswer takes the answer to "join as an open network?"; anything but
+// y declines, which is the default.
+func (m Model) handleOpenAnswer(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	m.askOpen = false
+	if msg.String() == "y" {
+		m.open = true
+		return m.startConfigure()
+	}
+	m.credErr = "Enter the network's password, or confirm it as an open network"
+	m.inputField = 1
+	return m, nil
+}
+
+// handleHostPassword configures the device with the host's stored passphrase,
+// or asks whether the network is open when the host has none.
+func (m Model) handleHostPassword(msg HostPasswordMsg) (Model, tea.Cmd) {
+	if !m.lookingUp || msg.lookup != m.lookup {
+		return m, nil
+	}
+	m = m.stopLookup()
+	if msg.Password != "" {
+		m.password = msg.Password
+		return m.startConfigure()
+	}
+	m.askOpen = true
+	return m, nil
+}
+
+func (m Model) startConfigure() (Model, tea.Cmd) {
+	m.step = StepConfiguring
+	return m, tea.Batch(m.configLoader.Tick(), m.configureDevice())
+}
+
+// lookupHostPassword starts the host passphrase lookup; Esc cancels its
+// context through stopLookup.
+func (m Model) lookupHostPassword() (Model, tea.Cmd) {
+	lookup := m.hostPassword
+	if lookup == nil {
+		lookup = m.svc.HostWiFiPassword
+	}
+	ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+	m.lookup++
+	m.lookingUp = true
+	m.cancelLookup = cancel
+	ssid, id := m.ssid, m.lookup
+	return m, func() tea.Msg {
+		pass, err := lookup(ctx, ssid)
+		if err != nil {
+			return HostPasswordMsg{lookup: id}
+		}
+		return HostPasswordMsg{Password: pass, lookup: id}
+	}
+}
+
+// stopLookup ends the running host lookup, cancelling its context.
+func (m Model) stopLookup() Model {
+	if m.cancelLookup != nil {
+		m.cancelLookup()
+		m.cancelLookup = nil
+	}
+	m.lookingUp = false
+	return m
 }
 
 func (m Model) handleBackspace() Model {
@@ -411,7 +513,7 @@ func (m Model) configureDevice() tea.Cmd {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
-		err := m.svc.ConfigureWiFi(ctx, DefaultAPAddress, m.ssid, m.password)
+		err := m.svc.ConfigureWiFi(ctx, DefaultAPAddress, m.ssid, m.password, m.open)
 		return ConfiguredMsg{Err: err}
 	}
 }
@@ -564,7 +666,14 @@ func (m Model) renderCredentials() string {
 		content.WriteString("\n\n")
 	}
 
-	content.WriteString(m.styles.Muted.Render("Tab: switch field | Enter: configure | Esc: cancel (leave Password empty for open network)"))
+	switch {
+	case m.lookingUp:
+		content.WriteString(m.styles.Muted.Render("Looking up this host's stored password for " + m.ssid + "... (Esc to cancel)"))
+	case m.askOpen:
+		content.WriteString(m.styles.Warning.Render(fmt.Sprintf("No stored password for %s. Join it as an open network with no password? (y/N)", m.ssid)))
+	default:
+		content.WriteString(m.styles.Muted.Render("Tab: switch field | Enter: configure | Esc: cancel (an empty password uses this host's stored one)"))
+	}
 
 	return content.String()
 }

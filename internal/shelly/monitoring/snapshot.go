@@ -208,10 +208,13 @@ func (s *Service) SubscribeEvents(ctx context.Context, device string, handler Ev
 	}
 
 	wsURL := fmt.Sprintf("ws://%s/rpc", resolved.Address)
-	ws := transport.NewWebSocket(wsURL,
+	ws, err := client.NewDeviceWebSocket(wsURL,
 		transport.WithReconnect(true),
 		transport.WithPingInterval(30*time.Second),
 	)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
 
 	if err := ws.Connect(ctx); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)

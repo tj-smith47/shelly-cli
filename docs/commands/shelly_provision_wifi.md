@@ -9,6 +9,11 @@ Provision WiFi settings interactively for a device.
 By default, this command scans for available networks and prompts you to select one.
 You can also provide SSID and password directly via flags.
 
+When no password is given and none is typed at the prompt, a device that stays
+on the same network keeps the password it has, and a different network takes
+the password this host has stored for it; with none, the command is refused.
+Use --open for a network that has no password.
+
 ```
 shelly provision wifi <device> [flags]
 ```
@@ -22,6 +27,9 @@ shelly provision wifi <device> [flags]
   # Direct provisioning with credentials
   shelly provision wifi living-room --ssid "MyNetwork" --password "secret"
 
+  # Join a network that has no password
+  shelly provision wifi living-room --ssid "GuestNet" --open
+
   # Skip scan and prompt for SSID
   shelly provision wifi living-room --no-scan
 ```
@@ -31,7 +39,8 @@ shelly provision wifi <device> [flags]
 ```
   -h, --help              help for wifi
       --no-scan           Skip network scan, prompt for SSID
-      --password string   WiFi password
+      --open              Join a network that has no password
+      --password string   WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
       --ssid string       WiFi network name (skip selection)
 ```
 

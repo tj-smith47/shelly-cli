@@ -13,7 +13,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
@@ -36,7 +35,17 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 Keys present in the file are applied to the device; keys absent from the file
 are left unchanged (the device merges the update — there is no whole-config
-replace primitive). Capture a file in this format with 'shelly device config export'.`,
+replace primitive). Capture a file in this format with 'shelly device config export'.
+
+WiFi stations in the file: when the file's sys.device.mac is the device's own,
+a station on the device's current network is written without a password (the
+device keeps its key), and a changed network takes the password stored on this
+host. A file from another device, or one with no MAC, never copies its station
+address (ip, netmask, gw, nameserver, ipv4mode), and its network is written
+only when the device is not already on it and this host has its password. A
+station that cannot be written that way is left out with a warning; set it
+with 'shelly wifi set'. --dry-run shows each station's planned write without
+its password.`,
 		Example: `  # Import configuration
   shelly device config import living-room config-backup.json
 
@@ -77,28 +86,33 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 	ios := opts.Factory.IOStreams()
 
+	var changes, warnings []string
+	msg := "Importing configuration..."
 	if opts.DryRun {
-		// Get current config and show diff
-		var currentConfig map[string]any
-		err = cmdutil.RunWithSpinner(ctx, ios, "Getting current configuration...", func(ctx context.Context) error {
-			var getErr error
-			currentConfig, getErr = svc.GetConfig(ctx, opts.Device)
-			return getErr
-		})
-		if err != nil {
-			return fmt.Errorf("failed to get current configuration: %w", err)
-		}
-
-		ios.Title("Dry run - changes that would be applied")
-		term.DisplayConfigMapDiff(ios, currentConfig, deviceConfig)
-		return nil
+		msg = "Comparing configurations..."
 	}
-
-	err = cmdutil.RunWithSpinner(ctx, ios, "Importing configuration...", func(ctx context.Context) error {
-		return svc.SetConfig(ctx, opts.Device, deviceConfig)
+	err = cmdutil.RunWithSpinner(ctx, ios, msg, func(ctx context.Context) error {
+		var importErr error
+		changes, warnings, importErr = svc.ImportConfig(ctx, opts.Device, deviceConfig, opts.DryRun)
+		return importErr
 	})
 	if err != nil {
 		return fmt.Errorf("failed to import configuration: %w", err)
+	}
+	for _, w := range warnings {
+		ios.Warning("%s", w)
+	}
+
+	if opts.DryRun {
+		if len(changes) == 0 {
+			ios.Info("No changes would be made")
+			return nil
+		}
+		ios.Title("Dry run - changes that would be applied")
+		for _, change := range changes {
+			ios.Printf("  %s\n", change)
+		}
+		return nil
 	}
 
 	ios.Success("Configuration imported to %s", opts.Device)

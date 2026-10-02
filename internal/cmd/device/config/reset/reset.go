@@ -100,7 +100,9 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Reset by setting config to empty/defaults
 	err = cmdutil.RunWithSpinner(ctx, ios, "Resetting configuration...", func(ctx context.Context) error {
-		return svc.SetComponentConfig(ctx, opts.Device, opts.Component, map[string]any{})
+		// An empty component config names no WiFi station, so there are no warnings.
+		_, setErr := svc.SetComponentConfig(ctx, opts.Device, opts.Component, map[string]any{})
+		return setErr
 	})
 	if err != nil {
 		return fmt.Errorf("failed to reset configuration: %w", err)

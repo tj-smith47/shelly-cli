@@ -21,6 +21,10 @@ BLE provisioning requires:
 
 Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.
 
+Without --password, the network's passphrase is read from this host's stored
+WiFi credentials, or asked for. A network is joined with no password only with
+--open, or when an empty answer at the prompt is confirmed.
+
 ```
 shelly provision ble <device-address> [flags]
 ```
@@ -39,6 +43,9 @@ shelly provision ble <device-address> [flags]
 
   # Disable cloud during provisioning
   shelly provision ble ShellyPlus1-ABCD1234 --ssid "MyNetwork" --password "secret" --no-cloud
+
+  # Join a network that has no password
+  shelly provision ble ShellyPlus1-ABCD1234 --ssid "GuestWiFi" --open
 ```
 
 ### Options
@@ -48,7 +55,8 @@ shelly provision ble <device-address> [flags]
   -h, --help              help for ble
       --name string       Device name to set
       --no-cloud          Disable Shelly Cloud
-      --password string   WiFi password
+      --open              Join a network that has no password
+      --password string   WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
       --ssid string       WiFi network name (required)
       --timezone string   Timezone (e.g., America/New_York)
 ```

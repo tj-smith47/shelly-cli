@@ -35,10 +35,20 @@ shelly backup restore <device> <file> [flags]
   # Skip scripts during restore
   shelly backup restore living-room backup.json --skip-scripts
 
+  # Give a clone of another bulb its own address; the gateway, netmask and DNS
+  # are the backup's
+  shelly backup restore new-bulb master-bath-1.json --static-ip 10.23.47.221
+
+  # Restore onto a device that joins a network with no password
+  shelly backup restore guest-plug plug.json --ssid GuestWiFi --open
+
   # Clone another bulb's backup onto this device with a different static IP
   # (identity — MAC, serial, device ID — is never overwritten by restore)
   shelly backup restore new-bulb master-bath-1.json \
     --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
+
+  # Preview a restore at the factory WiFi AP without hopping the host's WiFi
+  shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF --dry-run
 
   # Restore a sibling's backup straight onto a brand-new device at its factory
   # WiFi AP: hops the host onto the AP, applies the config + static IP, and the
@@ -59,14 +69,15 @@ shelly backup restore <device> <file> [flags]
       --allow-firmware-downgrade   Force the older-firmware config write instead of the automatic firmware update (Gen1; the device is updated to matched firmware by default when the backup is newer — this skips that and accepts the reboot-loop risk)
       --ap-ip string               Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)
   -d, --decrypt string             Password to decrypt backup
-      --dns string                 Static IPv4 nameserver (optional, with --static-ip)
+      --dns string                 Static IPv4 nameserver (with --static-ip; default: the backup's)
       --dry-run                    Show what would be restored without applying
       --firmware-url string        Firmware image for the automatic downgrade-recovery update (default: derived from the backup's device model)
-      --gateway string             Static IPv4 default gateway (with --static-ip)
+      --gateway string             Static IPv4 default gateway (with --static-ip; default: the backup's)
   -h, --help                       help for restore
-      --name string                Override the device name (defaults to the target identifier when it is a friendly alias)
-      --netmask string             Static IPv4 subnet mask (with --static-ip)
-      --password string            WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
+      --name string                Set the device name (default: a backup of this same device keeps the name it recorded; a backup of another device takes the target's alias)
+      --netmask string             Static IPv4 subnet mask (with --static-ip; default: the backup's)
+      --open                       Join a network that has no password
+      --password string            WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
       --skip-auth                  Skip authentication configuration
       --skip-meters                Skip restoring meter/energy-meter configuration (e.g. overpower limits)
       --skip-network               Skip network configuration (WiFi, Ethernet)
@@ -75,7 +86,7 @@ shelly backup restore <device> <file> [flags]
       --skip-state                 Skip restoring live component state (color temperature, brightness); apply configuration only
       --skip-webhooks              Skip webhook restoration
       --ssid string                Override the WiFi SSID the device joins (defaults to the backup's network)
-      --static-ip string           Override the backup's WiFi with this static IPv4 address
+      --static-ip string           Override the backup's WiFi with this static IPv4 address (--gateway, --netmask and --dns default to the backup's)
       --to-ap string               Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)
 ```
 

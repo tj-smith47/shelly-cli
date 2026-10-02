@@ -28,23 +28,29 @@ var (
 	defaultFsMu sync.RWMutex
 )
 
-// guardLiveConfigWrite refuses, under `go test`, any write to the user's live
-// config path through a real OS filesystem. Memory filesystems and writes to
-// other (temp) paths are unaffected, so legitimate OS-FS temp-dir tests still
-// work; only the one sacred file is protected.
-func guardLiveConfigWrite(afs afero.Fs, path string) error {
+// isLiveConfigUnderTest reports whether, under `go test`, path is the user's
+// live config reached through a real OS filesystem. Memory filesystems and
+// other (temp) paths are unaffected, so OS-FS temp-dir tests still work.
+func isLiveConfigUnderTest(afs afero.Fs, path string) (isLive bool, live string) {
 	if !testing.Testing() {
-		return nil
+		return false, ""
 	}
 	if _, isOsFs := afs.(*afero.OsFs); !isOsFs {
-		return nil
+		return false, ""
 	}
 	dir, err := Dir()
 	if err != nil {
-		return nil //nolint:nilerr // can't resolve the live path → nothing to guard; fail open (production is never under test)
+		// The live path cannot be resolved, so there is nothing to protect.
+		return false, ""
 	}
-	live := filepath.Clean(filepath.Join(dir, "config.yaml"))
-	if filepath.Clean(path) == live {
+	live = filepath.Clean(filepath.Join(dir, "config.yaml"))
+	return filepath.Clean(path) == live, live
+}
+
+// guardLiveConfigWrite refuses, under `go test`, any write to the user's live
+// config path through a real OS filesystem.
+func guardLiveConfigWrite(afs afero.Fs, path string) error {
+	if isLive, live := isLiveConfigUnderTest(afs, path); isLive {
 		// Loud on purpose: a test reaching this means it lacks filesystem
 		// isolation. The write is refused (the real config is never touched),
 		// but the offending test must be fixed to use SetFs / NewTestManager.
@@ -185,7 +191,13 @@ func (m *Manager) Load() error {
 	// A missing file is fine (first run); any OTHER read error (EACCES, EIO,
 	// transient FS) must abort — treating it as "empty config" would let the
 	// next Save() overwrite the real registry with nothing.
-	data, err := afero.ReadFile(m.Fs(), m.path)
+	var data []byte
+	err := iofs.ErrNotExist
+	// A test sees an empty registry, never the user's real devices, so it
+	// cannot connect to them or depend on what this machine has.
+	if isLive, _ := isLiveConfigUnderTest(m.Fs(), m.path); !isLive {
+		data, err = afero.ReadFile(m.Fs(), m.path)
+	}
 	switch {
 	case err == nil:
 		data = m.migrateSchemaURL(data)

@@ -65,7 +65,9 @@ type LoadedMsg struct {
 type ActionMsg struct {
 	Action       string // "delete", "apply"
 	TemplateName string
-	Err          error
+	// Warnings name each WiFi station an apply left out.
+	Warnings []string
+	Err      error
 }
 
 // CreateTemplateMsg signals that a new template should be created from a device.
@@ -114,6 +116,7 @@ type ListModel struct {
 	panelIndex    int
 	pendingDelete string // Template name pending delete confirmation
 	statusMsg     string // Temporary status message (export/import success)
+	statusWarn    bool   // statusMsg is a warning, not a success
 	styles        ListStyles
 }
 
@@ -307,6 +310,10 @@ func (m ListModel) handleLoaded(msg LoadedMsg) (ListModel, tea.Cmd) {
 
 func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
 	m.applying = false
+	if len(msg.Warnings) > 0 {
+		m.statusMsg = strings.Join(msg.Warnings, "; ")
+		m.statusWarn = true
+	}
 	if msg.Err != nil {
 		m.err = msg.Err
 		return m, nil
@@ -321,6 +328,7 @@ func (m ListModel) handleExport(msg ExportTemplateMsg) (ListModel, tea.Cmd) {
 		return m, nil
 	}
 	m.statusMsg = fmt.Sprintf("Exported %q to %s", msg.TemplateName, msg.FilePath)
+	m.statusWarn = false
 	return m, nil
 }
 
@@ -330,6 +338,7 @@ func (m ListModel) handleImport(msg ImportTemplateMsg) (ListModel, tea.Cmd) {
 		return m, nil
 	}
 	m.statusMsg = fmt.Sprintf("Imported template %q", msg.TemplateName)
+	m.statusWarn = false
 	// Refresh list after import
 	return m, m.loadTemplates()
 }
@@ -591,6 +600,9 @@ func (m ListModel) buildFooter() string {
 	}
 
 	// Show status message if set
+	if m.statusMsg != "" && m.statusWarn {
+		return m.styles.Error.Render(m.statusMsg)
+	}
 	if m.statusMsg != "" {
 		return m.styles.Success.Render(m.statusMsg)
 	}

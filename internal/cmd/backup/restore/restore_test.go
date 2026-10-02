@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	clibackup "github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -617,9 +618,13 @@ func TestValidateFlags(t *testing.T) {
 		{name: "to-ap with static-ip", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", StaticIP: "10.0.0.5"}},
 		{name: "static-ip with skip-network", opts: Options{StaticIP: "10.0.0.5", SkipNetwork: true}, wantErrSubs: "static-ip cannot be used with --skip-network"},
 		{name: "to-ap with skip-network", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", SkipNetwork: true}, wantErrSubs: "to-ap cannot be used with --skip-network"},
-		{name: "to-ap with dry-run", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", DryRun: true}, wantErrSubs: "to-ap cannot be combined with --dry-run"},
+		{name: "to-ap with dry-run", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", DryRun: true}},
 		{name: "ap-ip without to-ap", opts: Options{APIP: "192.168.33.140"}, wantErrSubs: "ap-ip only applies with --to-ap"},
 		{name: "ap-ip with to-ap", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", APIP: "192.168.33.140"}},
+		{name: "ssid with skip-network", opts: Options{SSID: "Guest", SkipNetwork: true}, wantErrSubs: "--ssid cannot be used with --skip-network"},
+		{name: "password with skip-network", opts: Options{Password: "x", SkipNetwork: true}, wantErrSubs: "--password cannot be used with --skip-network"},
+		{name: "open with skip-network", opts: Options{Open: true, SkipNetwork: true}, wantErrSubs: "--open cannot be used with --skip-network"},
+		{name: "dns without static-ip", opts: Options{DNS: "10.0.0.53"}, wantErrSubs: "--gateway, --netmask and --dns only apply with --static-ip"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -747,13 +752,14 @@ func TestRun_ToAP_RestoreViaAPFails(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	// --to-ap drives run through restoreViaAP -> RestoreToAP. The WiFi-less backup
-	// resolves no station passphrase, so it fails in resolveJoinNetwork BEFORE any
-	// host WiFi hop is attempted.
-	opts := &Options{Factory: tf.Factory, Device: "dst", FilePath: backupFile, ToAP: "ShellyBulbDuo-AABBCC"}
+	// --to-ap drives run through restoreViaAP -> RestoreToAP. A test binary's
+	// reprovision flows refuse to reach the network, so the restore fails
+	// before any host WiFi hop is attempted.
+	opts := &Options{Factory: tf.Factory, Device: "dst", FilePath: backupFile, ToAP: "ShellyBulbDuo-AABBCC",
+		SSID: "home", Password: "pw"}
 	err := run(ctx, opts)
 	if err == nil {
-		t.Fatal("expected restore-via-AP to fail without a resolvable passphrase")
+		t.Fatal("expected restore-via-AP to fail")
 	}
 	if !strings.Contains(err.Error(), "failed to restore via AP") {
 		t.Errorf("got %v, want error containing %q", err, "failed to restore via AP")
@@ -863,6 +869,7 @@ func TestRun_DryRun_WithStaticIPOverride(t *testing.T) {
 		Device:   "dst",
 		FilePath: backupFile,
 		DryRun:   true,
+		SSID:     "home",
 		StaticIP: "10.0.0.9",
 		Gateway:  "10.0.0.1",
 		Netmask:  "255.255.255.0",
@@ -948,4 +955,175 @@ func TestAttachTrace(t *testing.T) {
 			t.Errorf("trace file missing written content: %q", data)
 		}
 	})
+}
+
+// TestRun_DryRun_StaticIPTakesBackupAddressing checks that the dry-run preview
+// shows the gateway and netmask the restore will write, taken from the backup's
+// static settings when only --static-ip is given.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_DryRun_StaticIPTakesBackupAddressing(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	tf := factory.NewTestFactory(t)
+	const backupFile = "/test/dry-static.json"
+	data, err := json.Marshal(shellybackup.Backup{
+		Version:    1,
+		DeviceInfo: &shellybackup.DeviceInfo{ID: "shellyplus1-test", Model: "SNSW-001X16EU", Generation: 2, Version: "1.0.0"},
+		Config:     json.RawMessage(`{"sys":{"device":{"name":"src"}}}`),
+		WiFi: json.RawMessage(`{"sta":{"ssid":"HomeNetwork","enable":true,"ipv4mode":"static","ip":"10.0.0.8",` +
+			`"gw":"10.0.0.1","netmask":"255.255.255.0"}}`),
+	})
+	if err != nil {
+		t.Fatalf("marshal backup: %v", err)
+	}
+	if err := afero.WriteFile(config.Fs(), backupFile, data, 0o600); err != nil {
+		t.Fatalf("write backup: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	opts := &Options{Factory: tf.Factory, Device: "dst", FilePath: backupFile, DryRun: true, StaticIP: "10.0.0.9", svc: &stubRestoreService{}}
+	if err := run(ctx, opts); err != nil {
+		t.Fatalf("dry-run restore: %v", err)
+	}
+	want := "WiFi station IP will be overridden to 10.0.0.9 (gateway 10.0.0.1, netmask 255.255.255.0)"
+	if out := tf.OutString() + tf.TestIO.ErrString(); !strings.Contains(out, want) {
+		t.Errorf("preview lacks %q, got %q", want, out)
+	}
+}
+
+// TestRun_DryRun_IncompleteStaticIPRefused checks that a dry run refuses a
+// static address the restore would refuse: --static-ip alone on a backup whose
+// station uses DHCP.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_DryRun_IncompleteStaticIPRefused(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	tf := factory.NewTestFactory(t)
+	const backupFile = "/test/dry-dhcp.json"
+	writeValidBackup(t, backupFile)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	opts := &Options{Factory: tf.Factory, Device: "dst", FilePath: backupFile, DryRun: true, StaticIP: "10.0.0.9"}
+	err := run(ctx, opts)
+	want := "static address 10.0.0.9 needs a gateway and a netmask, and the backup has none — pass --gateway and --netmask"
+	if err == nil || err.Error() != want {
+		t.Errorf("err = %v\nwant %s", err, want)
+	}
+}
+
+// writeStaticBackup writes a Gen2 backup whose station has a static address to
+// the in-memory filesystem and returns its path.
+func writeStaticBackup(t *testing.T) string {
+	t.Helper()
+	const backupFile = "/test/static.json"
+	data, err := json.Marshal(shellybackup.Backup{
+		Version:    1,
+		DeviceInfo: &shellybackup.DeviceInfo{ID: "shellyplus1-test", Model: "SNSW-001X16EU", Generation: 2, Version: "1.0.0"},
+		Config:     json.RawMessage(`{"sys":{"device":{"name":"src"}}}`),
+		WiFi: json.RawMessage(`{"sta":{"ssid":"HomeNetwork","enable":true,"ipv4mode":"static","ip":"10.0.0.8",` +
+			`"gw":"10.0.0.1","netmask":"255.255.255.0"}}`),
+	})
+	if err != nil {
+		t.Fatalf("marshal backup: %v", err)
+	}
+	if err := afero.WriteFile(config.Fs(), backupFile, data, 0o600); err != nil {
+		t.Fatalf("write backup: %v", err)
+	}
+	return backupFile
+}
+
+// TestNewCommand_StaticIPAlone runs the cobra command with --static-ip and no
+// gateway or netmask against an in-process device on the backup's network:
+// cobra accepts the flag on its own, the dry run takes the rest of the address
+// from the backup, and it says the device keeps its station key.
+//
+//nolint:paralleltest // demo.InjectIntoFactory and config.SetFs set global state
+func TestNewCommand_StaticIPAlone(t *testing.T) {
+	tf := demoFactory(t)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"dst", writeStaticBackup(t), "--static-ip", "10.0.0.9", "--dry-run"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	out := tf.OutString() + tf.TestIO.ErrString()
+	for _, want := range []string{
+		"WiFi station IP will be overridden to 10.0.0.9 (gateway 10.0.0.1, netmask 255.255.255.0)",
+		`WiFi station "HomeNetwork": same network as the device, which keeps its current password`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("preview lacks %q, got %q", want, out)
+		}
+	}
+}
+
+// demoFactory returns a test factory whose service reaches an in-process
+// Gen2 device named dst, whose station is on HomeNetwork.
+func demoFactory(t *testing.T) *factory.TestFactory {
+	t.Helper()
+	demo, err := mock.StartWithFixtures(&mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{Devices: []mock.DeviceFixture{
+			{Name: "dst", Address: "192.168.1.101", MAC: "AA:BB:CC:DD:EE:02", Type: "SNSW-001X16EU", Model: "Shelly Plus 1", Generation: 2},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	t.Cleanup(demo.Cleanup)
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+	return tf
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestNewCommand_OpenFlag(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	backupFile := writeStaticBackup(t)
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{name: "open", args: []string{"dst", backupFile, "--ssid", "Guest", "--open", "--dry-run"}},
+		{name: "open with password", args: []string{"dst", backupFile, "--open", "--password", "x"},
+			wantErr: "if any flags in the group [open password] are set none of the others can be"},
+		{name: "open with skip-network", args: []string{"dst", backupFile, "--open", "--skip-network"},
+			wantErr: "--open cannot be used with --skip-network"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := NewCommand(factory.NewTestFactory(t).Factory)
+			cmd.SetArgs(tt.args)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			err := cmd.Execute()
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if f := cmd.Flags().Lookup("open"); f == nil || f.Usage != "Join a network that has no password" {
+					t.Errorf("--open flag = %+v", f)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("err = %v, want %q", err, tt.wantErr)
+			}
+		})
+	}
 }

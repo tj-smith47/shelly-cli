@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
+	"github.com/tj-smith47/shelly-go/reprovision"
 )
 
 // ipv4ModeStatic is the value used to request static IPv4 addressing on both
@@ -127,15 +128,18 @@ func (o *Options) ToExportOptions() *shellybackup.ExportOptions {
 //
 // Identity fields (MAC, device ID, serial) are never written by restore on any
 // generation, so only network settings ever need overriding for a safe clone.
-// SSID and Password are optional: when empty, the backup's own credentials are
-// kept (a Gen1 backup includes the station key; a Gen2 backup omits it).
+// SSID and Password are optional. A restore writes a station key only when one
+// is known: Password, or the key a Gen1 backup holds. With neither, no key is
+// written and the device keeps the one it has.
 type NetworkOverride struct {
 	// SSID overrides the station SSID; empty keeps the backup's SSID.
 	SSID string
-	// Password overrides the station key; empty keeps the backup's key.
+	// Password is written as the station key. Empty writes the key a Gen1
+	// backup holds when SSID leaves the backup's network alone, and otherwise
+	// no key at all, so the device keeps its own.
 	Password string
-	// StaticIP, when set, switches the station to a static IPv4 address.
-	// Gateway and Netmask are required alongside it.
+	// StaticIP, when set, switches the station to a static IPv4 address. An
+	// empty Gateway, Netmask or DNS falls back to the backup's static settings.
 	StaticIP string
 	// Gateway is the static IPv4 default gateway.
 	Gateway string
@@ -143,6 +147,20 @@ type NetworkOverride struct {
 	Netmask string
 	// DNS is the static IPv4 nameserver (optional).
 	DNS string
+	// Open joins the network with no passphrase; Password must be empty.
+	Open bool
+}
+
+// Network returns the override as the SDK's reprovision.Network; a nil
+// override is an empty one.
+func (n *NetworkOverride) Network() reprovision.Network {
+	if n == nil {
+		return reprovision.Network{}
+	}
+	return reprovision.Network{
+		SSID: n.SSID, Password: n.Password, StaticIP: n.StaticIP,
+		Gateway: n.Gateway, Netmask: n.Netmask, DNS: n.DNS, Open: n.Open,
+	}
 }
 
 // IsStatic reports whether a static IPv4 address was requested.
@@ -150,13 +168,77 @@ func (n *NetworkOverride) IsStatic() bool {
 	return n != nil && n.StaticIP != ""
 }
 
+// StaticNetwork returns the static addressing a restore of the backup with
+// override writes: the override's address with any missing gateway, netmask or
+// DNS taken from the backup's own static settings, or the backup's addressing
+// when the override sets no address. IP is empty for a DHCP station. A static
+// address left without a gateway or netmask is refused with the
+// StaticNetworkError wording, which matches backup.ErrIncompleteStaticNetwork.
+func (d *DeviceBackup) StaticNetwork(override *NetworkOverride) (shellybackup.StaticNetwork, error) {
+	static, err := resolveStatic(override, d.Backup)
+	return static, StaticNetworkError(err, override)
+}
+
+// resolveStatic applies shelly-go's static address rule to an override and the
+// station network bkp records.
+func resolveStatic(override *NetworkOverride, bkp *shellybackup.Backup) (shellybackup.StaticNetwork, error) {
+	n := reprovision.NetworkFromBackup(bkp)
+	fromBackup := shellybackup.StaticNetwork{IP: n.StaticIP, Gateway: n.Gateway, Netmask: n.Netmask, DNS: n.DNS}
+	var ov shellybackup.StaticNetwork
+	if override != nil {
+		ov = shellybackup.StaticNetwork{
+			IP: override.StaticIP, Gateway: override.Gateway, Netmask: override.Netmask, DNS: override.DNS,
+		}
+	}
+	return shellybackup.ResolveStaticNetwork(ov, fromBackup)
+}
+
+// MsgIncompleteBackupStatic reports a backup whose static address has no
+// gateway or netmask, when no --static-ip replaces it.
+const MsgIncompleteBackupStatic = "the backup's static address has no gateway or netmask — pass --static-ip " +
+	"with --gateway and --netmask"
+
+// CLIError is an error from shelly-go reworded for the CLI: flag names where the
+// SDK names its options, and the target's name where the SDK says "the device".
+// errors.Is and errors.As still reach the SDK error.
+type CLIError struct {
+	Msg string
+	Err error
+}
+
+// Error returns the CLI wording.
+func (e *CLIError) Error() string { return e.Msg }
+
+// Unwrap returns the SDK error.
+func (e *CLIError) Unwrap() error { return e.Err }
+
+// StaticNetworkError words a static address that shelly-go refused for lacking a
+// gateway or netmask (backup.ErrIncompleteStaticNetwork) in terms of the CLI's
+// flags, given the network override the restore used. Any other error, nil
+// included, is returned unchanged.
+func StaticNetworkError(err error, override *NetworkOverride) error {
+	if !errors.Is(err, shellybackup.ErrIncompleteStaticNetwork) {
+		return err
+	}
+	if override.IsStatic() {
+		return &CLIError{
+			Msg: fmt.Sprintf("static address %s needs a gateway and a netmask, and the backup has none — pass "+
+				"--gateway and --netmask", override.StaticIP),
+			Err: err,
+		}
+	}
+	return &CLIError{Msg: MsgIncompleteBackupStatic, Err: err}
+}
+
 // RestoreOptions configures backup restoration.
 type RestoreOptions struct {
 	// DryRun shows what would be changed without applying.
 	DryRun bool
-	// Name overrides the device's stored display name. Empty leaves the name as
-	// the backup's. Used so a cloned device is named distinctly from its source.
+	// Name is an explicit device name (--name). It is always written.
 	Name string
+	// AliasName is the target's registry alias, applied as the device name
+	// only when the backup's MAC differs from the target's (see ResolveName).
+	AliasName string
 	// SkipNetwork skips WiFi/Ethernet configuration.
 	SkipNetwork bool
 	// NetworkOverride, when non-nil, replaces the backup's WiFi station settings
@@ -206,11 +288,41 @@ type RestoreOptions struct {
 	// pass run at a clockless factory AP, where the device can never sync time and the
 	// LAN second pass re-applies those rules once it has joined the network.
 	SkipClockWait bool
+	// Station1 says how the backup's secondary WiFi station is written. The
+	// zero value writes it as the backup records it, without a key on Gen2+.
+	Station1 Station1Write
 	// StepTrace, when non-nil, receives a per-step diagnostic line during a Gen1
 	// restore (each setting group's warnings/errors and the device's post-write
 	// uptime/stability). It is the debug seam behind --trace-file for pinpointing
 	// which setting destabilizes a fragile device; nil on a normal restore.
 	StepTrace io.Writer
+}
+
+// Station1Write is how a restore writes the backup's secondary WiFi station
+// (sta1).
+type Station1Write struct {
+	// Omit leaves the secondary station out of the write; the restore result
+	// carries a warning naming SSID.
+	Omit bool
+	// SSID is the secondary station's network, for the Omit warning.
+	SSID string
+	// Unread says the Omit is because the device's stations could not be
+	// read, for the warning's wording.
+	Unread bool
+	// Password is written as its key.
+	Password string
+	// Open writes it as an open network.
+	Open bool
+}
+
+// omitWarning is the restore warning for a secondary station left out.
+func (w Station1Write) omitWarning() string {
+	if w.Unread {
+		return fmt.Sprintf("secondary WiFi station %q was not restored: the device's WiFi stations could not be "+
+			"read to compare networks; set it with `shelly wifi set`", w.SSID)
+	}
+	return fmt.Sprintf("secondary WiFi station %q was not restored: the device has a different network there "+
+		"and no password for %q was found on this host; set it with `shelly wifi set`", w.SSID, w.SSID)
 }
 
 // ToRestoreOptions converts RestoreOptions to shelly-go RestoreOptions.

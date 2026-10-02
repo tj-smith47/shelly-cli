@@ -25,6 +25,15 @@ network settings, or --reset-source=false to skip the factory reset
 (warning: this may cause IP conflicts).
 
 .PP
+The target's WiFi address: without --static-ip the target takes the source's
+addressing as the source has it. A source with a static address hands that
+address to the target; the source is then factory reset (the default), and
+with --reset-source=false both devices hold the same address. --static-ip
+gives the target its own address, with any of --gateway, --netmask and --dns
+left off taken from the source. The WiFi station line printed before the
+migration (and by --dry-run) names the address that will be written.
+
+.PP
 Use --dry-run to preview what would change without applying.
 
 
@@ -38,7 +47,7 @@ Use --dry-run to preview what would change without applying.
 
 .PP
 \fB--dns\fP=""
-	Static IPv4 nameserver (optional, with --static-ip)
+	Static IPv4 nameserver (with --static-ip; default: the source device's)
 
 .PP
 \fB--dry-run\fP[=false]
@@ -54,7 +63,7 @@ Use --dry-run to preview what would change without applying.
 
 .PP
 \fB--gateway\fP=""
-	Static IPv4 default gateway (with --static-ip)
+	Static IPv4 default gateway (with --static-ip; default: the source device's)
 
 .PP
 \fB-h\fP, \fB--help\fP[=false]
@@ -62,15 +71,19 @@ Use --dry-run to preview what would change without applying.
 
 .PP
 \fB--name\fP=""
-	Override the target device name (defaults to the target identifier when it is a friendly alias)
+	Set the target device name (default: the target's alias when the source is another device; a target migrated from its own backup keeps the name it recorded)
 
 .PP
 \fB--netmask\fP=""
-	Static IPv4 subnet mask (with --static-ip)
+	Static IPv4 subnet mask (with --static-ip; default: the source device's)
+
+.PP
+\fB--open\fP[=false]
+	Join a network that has no password
 
 .PP
 \fB--password\fP=""
-	WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
+	WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
 
 .PP
 \fB--reset-source\fP[=true]
@@ -110,7 +123,7 @@ Use --dry-run to preview what would change without applying.
 
 .PP
 \fB--static-ip\fP=""
-	Assign this static IPv4 to the target instead of copying the source's IP
+	Assign this static IPv4 to the target instead of copying the source's IP (--gateway, --netmask and --dns default to the source device's)
 
 .PP
 \fB--to-ap\fP=""
@@ -199,6 +212,13 @@ Use --dry-run to preview what would change without applying.
   # Force migration between different device types
   shelly migrate living-room bedroom --force --yes
 
+  # Give the target its own address; the gateway, netmask and DNS are the
+  # source's
+  shelly migrate master-bath-1 new-bulb --static-ip 10.23.47.221
+
+  # Migrate onto a target that joins a network with no password
+  shelly migrate guest-plug new-plug --ssid GuestWiFi --open
+
   # Clone config onto a new bulb with a distinct static IP (keeps both online,
   # source is not reset since there is no IP conflict)
   shelly migrate master-bath-1 new-bulb \\
@@ -209,6 +229,9 @@ Use --dry-run to preview what would change without applying.
   # the LAN, and the source is left untouched (target name = "fr")
   shelly migrate sr fr --to-ap ShellyBulbDuo-D0DCFF \\
     --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
+
+  # Preview that migration without hopping the host's WiFi
+  shelly migrate sr fr --to-ap ShellyBulbDuo-D0DCFF --dry-run
 .EE
 
 

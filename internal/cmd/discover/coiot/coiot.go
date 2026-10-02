@@ -26,8 +26,8 @@ type Discoverer interface {
 
 // newDiscoverer is the factory function for creating discoverers.
 // It can be replaced in tests to inject mock discoverers.
-var newDiscoverer = func() Discoverer {
-	return discovery.NewCoIoTDiscoverer()
+var newDiscoverer = func() (Discoverer, error) {
+	return shelly.NewCoIoTDiscoverer()
 }
 
 // Options holds command options.
@@ -94,7 +94,10 @@ func run(ctx context.Context, opts *Options) error {
 		timeout = DefaultTimeout
 	}
 
-	coiotDiscoverer := newDiscoverer()
+	coiotDiscoverer, err := newDiscoverer()
+	if err != nil {
+		return err
+	}
 	defer func() {
 		if err := coiotDiscoverer.Stop(); err != nil {
 			ios.DebugErr("stopping CoIoT discoverer", err)
@@ -102,7 +105,7 @@ func run(ctx context.Context, opts *Options) error {
 	}()
 
 	var devices []discovery.DiscoveredDevice
-	err := cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via CoIoT...", func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via CoIoT...", func(ctx context.Context) error {
 		var discoverErr error
 		devices, discoverErr = coiotDiscoverer.Discover(timeout)
 		return discoverErr

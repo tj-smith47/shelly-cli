@@ -79,7 +79,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	if !opts.NoVerify {
 		ios.StartProgress("Connecting to device...")
-		info, err := svc.DeviceInfoAuto(ctx, opts.Address)
+		info, err := svc.DeviceInfo(ctx, opts.Address)
 		ios.StopProgress()
 		if err != nil {
 			return fmt.Errorf("couldn't reach device at %s: %w", opts.Address, err)

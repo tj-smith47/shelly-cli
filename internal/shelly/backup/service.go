@@ -9,6 +9,7 @@ import (
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 	"github.com/tj-smith47/shelly-go/gen1"
 	"github.com/tj-smith47/shelly-go/gen2/components"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -185,26 +186,24 @@ func (s *Service) RestoreBackupGen(ctx context.Context, identifier string, gener
 func (s *Service) restoreGen1Backup(ctx context.Context, identifier string, deviceBackup *DeviceBackup, opts RestoreOptions) (*RestoreResult, error) {
 	var result *RestoreResult
 
+	toRestore := deviceBackup.Backup
+	if !opts.SkipNetwork && len(toRestore.WiFi) > 0 {
+		wifi, err := prepareGen1WiFi(toRestore.WiFi, opts)
+		if err != nil {
+			return nil, err
+		}
+		clone := *toRestore
+		clone.WiFi = wifi
+		toRestore = &clone
+	}
 	err := s.connector.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-		r, err := shellybackup.RestoreGen1(ctx, conn.Device(), deviceBackup.Backup, toGen1RestoreOptions(opts))
+		name := ResolveName(opts.Name, opts.AliasName, deviceBackup.Device().MAC, conn.Info().MAC)
+		r, err := shellybackup.RestoreGen1(ctx, conn.Device(), toRestore, toGen1RestoreOptions(opts, name))
 		if err != nil {
 			return err
 		}
-		result = &RestoreResult{
-			Success:          r.Success,
-			ConfigRestored:   r.Success,
-			RestartRequired:  r.RestartRequired,
-			Warnings:         r.Warnings,
-			Errors:           errorStrings(r.Errors),
-			DestabilizedStep: r.DestabilizedStep,
-		}
-		// The library result carries no per-section counts; recover the webhook
-		// count the same way the old in-CLI restore did (number of action entries
-		// in the backup), gated on the webhook restore actually running and the
-		// restore reaching the webhook step (a halted restore never does).
-		if !opts.SkipWebhooks && r.Success {
-			result.WebhooksRestored = countGen1Actions(deviceBackup.Backup)
-		}
+		result = FromLibraryResult(r, 1, deviceBackup.Backup, opts.SkipWebhooks)
+		addStation1Warning(result, opts)
 		// A destabilizing step is a hard failure: the restore halted with the device
 		// in a reboot loop. Surface it as an error so the command never reports a
 		// false success, naming the breaking step for diagnosis.
@@ -217,7 +216,38 @@ func (s *Service) restoreGen1Backup(ctx context.Context, identifier string, devi
 		return nil
 	})
 
-	return result, err
+	return result, StaticNetworkError(err, opts.NetworkOverride)
+}
+
+// FromLibraryResult converts a shelly-go restore result into the CLI result and
+// fills the counts the CLI reports, which the library result does not carry: a
+// Gen1 restore counts the backup's action URLs (none when skipWebhooks is set),
+// a Gen2+ restore counts its scripts, schedules and webhooks. Counts are filled
+// only for a successful restore, since a halted one never reached those steps.
+//
+// Errors and DestabilizedStep are always copied: the library reports rejected
+// sections there with Success=false and a nil top-level error, so dropping them
+// would let a command report a restore the device refused.
+func FromLibraryResult(r *shellybackup.RestoreResult, generation int, bkp *shellybackup.Backup, skipWebhooks bool) *RestoreResult {
+	result := &RestoreResult{
+		Success:          r.Success,
+		RestartRequired:  r.RestartRequired,
+		Warnings:         r.Warnings,
+		Errors:           errorStrings(r.Errors),
+		DestabilizedStep: r.DestabilizedStep,
+	}
+	if !r.Success {
+		return result
+	}
+	if generation != 1 {
+		UpdateResultCounts(result, bkp)
+		return result
+	}
+	result.ConfigRestored = true
+	if !skipWebhooks {
+		result.WebhooksRestored = countGen1Actions(bkp)
+	}
+	return result
 }
 
 // errorStrings renders the library restore errors as display strings for the
@@ -235,10 +265,11 @@ func errorStrings(errs []error) []string {
 }
 
 // toGen1RestoreOptions translates the CLI RestoreOptions into the shelly-go
-// Gen1RestoreOptions consumed by shellybackup.RestoreGen1.
-func toGen1RestoreOptions(opts RestoreOptions) *shellybackup.Gen1RestoreOptions {
+// Gen1RestoreOptions consumed by shellybackup.RestoreGen1, with name (from
+// ResolveName) as the device name to write.
+func toGen1RestoreOptions(opts RestoreOptions, name string) *shellybackup.Gen1RestoreOptions {
 	out := &shellybackup.Gen1RestoreOptions{
-		Name:                   opts.Name,
+		Name:                   name,
 		SkipNetwork:            opts.SkipNetwork,
 		SkipAuth:               opts.SkipAuth,
 		SkipState:              opts.SkipState,
@@ -259,6 +290,7 @@ func toGen1RestoreOptions(opts RestoreOptions) *shellybackup.Gen1RestoreOptions 
 			Gateway:  opts.NetworkOverride.Gateway,
 			Netmask:  opts.NetworkOverride.Netmask,
 			DNS:      opts.NetworkOverride.DNS,
+			Open:     opts.NetworkOverride.Open,
 		}
 	}
 	return out
@@ -285,11 +317,11 @@ func (s *Service) restoreGen2Backup(ctx context.Context, identifier string, devi
 	err := s.connector.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := shellybackup.New(conn.RPCClient())
 
-		// Apply a network override (if any) onto a shallow copy so the caller's
-		// backup is left untouched; the rewritten WiFi blob is what gets restored.
+		// The WiFi blob is prepared on a shallow copy so the caller's backup is
+		// left untouched.
 		toRestore := deviceBackup.Backup
-		if opts.NetworkOverride != nil && !opts.SkipNetwork {
-			wifi, overrideErr := applyGen2WiFiOverride(toRestore.WiFi, opts.NetworkOverride)
+		if !opts.SkipNetwork && (toRestore.WiFi != nil || opts.NetworkOverride != nil) {
+			wifi, overrideErr := applyGen2WiFiOverride(toRestore.WiFi, opts.NetworkOverride, opts.Station1)
 			if overrideErr != nil {
 				return overrideErr
 			}
@@ -310,28 +342,13 @@ func (s *Service) restoreGen2Backup(ctx context.Context, identifier string, devi
 			return fmt.Errorf("failed to restore backup: %w", err)
 		}
 
-		// Convert result. Errors and DestabilizedStep MUST be copied: the
-		// shelly-go restore reports per-section rejections (WiFi/Cloud/MQTT/BLE/
-		// auth/schedules/webhooks) in Errors with Success=false and a nil
-		// top-level error. Dropping them here let the command print a false
-		// "Backup restored" and exit 0 while sections were silently rejected.
-		result = &RestoreResult{
-			Success:          restoreResult.Success,
-			RestartRequired:  restoreResult.RestartRequired,
-			Warnings:         restoreResult.Warnings,
-			Errors:           errorStrings(restoreResult.Errors),
-			DestabilizedStep: restoreResult.DestabilizedStep,
-		}
+		result = FromLibraryResult(restoreResult, 2, deviceBackup.Backup, opts.SkipWebhooks)
+		addStation1Warning(result, opts)
 
-		// Count restored items from backup
-		if restoreResult.Success {
-			UpdateResultCounts(result, deviceBackup.Backup)
-		}
-
-		// The shelly-go restore does not apply Sys config, so a name override
-		// must be set explicitly. Failures are non-fatal warnings.
-		if opts.Name != "" && !opts.DryRun {
-			name := opts.Name
+		// The restore writes the backup's Sys config, recorded name included;
+		// a resolved name replaces it afterwards. Failures are non-fatal warnings.
+		name := ResolveName(opts.Name, opts.AliasName, deviceBackup.Device().MAC, conn.Info().MAC)
+		if name != "" && !opts.DryRun {
 			sys := components.NewSys(conn.RPCClient())
 			if nameErr := sys.SetConfig(ctx, &components.SysConfig{
 				Device: &components.SysDeviceConfig{Name: &name},
@@ -343,25 +360,44 @@ func (s *Service) restoreGen2Backup(ctx context.Context, identifier string, devi
 		return nil
 	})
 
-	return result, err
+	return result, StaticNetworkError(err, opts.NetworkOverride)
 }
 
-// applyGen2WiFiOverride overlays a NetworkOverride onto a Gen2 WiFi config blob
-// (the raw WiFi.GetConfig result) and returns the rewritten blob. SSID and pass
-// are replaced only when explicitly provided; a static IP switches the station
-// to static IPv4 addressing. The blob shape ({ap, sta, sta1}) is preserved so it
-// round-trips through WiFi.SetConfig unchanged apart from the override.
-func applyGen2WiFiOverride(wifiBlob json.RawMessage, ov *NetworkOverride) (json.RawMessage, error) {
+// applyGen2WiFiOverride prepares a Gen2 WiFi config blob (the raw
+// WiFi.GetConfig result) for WiFi.SetConfig and overlays ov when it is non-nil.
+// The stations' pass and is_open keys are always removed first: the device
+// derives is_open from the passphrase and ignores a write of it (seen on a Plus
+// 2PM), and a station written without pass keeps the key the device has. A pass
+// is then written only for an explicit password, or empty for Open. With ov,
+// SSID is replaced only when given and a static IP switches the station to
+// static IPv4 addressing, its gateway, netmask and DNS falling back to the
+// backup's static settings by the same rule as a Gen1 restore. Without ov the
+// station is written as the backup records it, so a disabled one stays
+// disabled. st1 drops sta1 or gives it a key. The blob shape ({ap, sta, sta1})
+// is otherwise preserved.
+func applyGen2WiFiOverride(wifiBlob json.RawMessage, ov *NetworkOverride, st1 Station1Write) (json.RawMessage, error) {
 	cfg := map[string]any{}
 	if len(wifiBlob) > 0 {
 		if err := json.Unmarshal(wifiBlob, &cfg); err != nil {
 			return nil, fmt.Errorf("failed to parse WiFi config for override: %w", err)
 		}
 	}
+	stripStationKeys(cfg)
+	applyStation1(cfg, st1, "pass")
+	if ov == nil {
+		return json.Marshal(cfg)
+	}
 
 	sta, ok := cfg["sta"].(map[string]any)
 	if !ok || sta == nil {
 		sta = map[string]any{}
+	}
+	if ov.Open && ov.Password != "" {
+		return nil, fmt.Errorf("%w: an open network takes no password", types.ErrInvalidParam)
+	}
+	static, err := resolveStatic(ov, &shellybackup.Backup{WiFi: wifiBlob})
+	if err != nil {
+		return nil, err
 	}
 	sta["enable"] = true
 	if ov.SSID != "" {
@@ -370,18 +406,90 @@ func applyGen2WiFiOverride(wifiBlob json.RawMessage, ov *NetworkOverride) (json.
 	if ov.Password != "" {
 		sta["pass"] = ov.Password
 	}
+	if ov.Open {
+		sta["pass"] = ""
+	}
 	if ov.IsStatic() {
-		sta["ipv4mode"] = ipv4ModeStatic
-		sta["ip"] = ov.StaticIP
-		sta["netmask"] = ov.Netmask
-		sta["gw"] = ov.Gateway
-		if ov.DNS != "" {
-			sta["nameserver"] = ov.DNS
-		}
+		setStaticSTA(sta, static)
 	}
 	cfg["sta"] = sta
 
 	return json.Marshal(cfg)
+}
+
+// stripStationKeys removes pass and is_open from both station sections of a
+// Gen2 WiFi config; the ap section keeps them, as is_open is a real AP setting.
+func stripStationKeys(cfg map[string]any) {
+	for _, key := range []string{"sta", "sta1"} {
+		if station, ok := cfg[key].(map[string]any); ok {
+			delete(station, "pass")
+			delete(station, "is_open")
+		}
+	}
+}
+
+// applyStation1 applies st1 to the sta1 section of a WiFi config whose
+// station key field is keyField ("pass" on Gen2+, "key" on Gen1).
+func applyStation1(cfg map[string]any, st1 Station1Write, keyField string) {
+	if st1.Omit {
+		delete(cfg, "sta1")
+		return
+	}
+	sta1, ok := cfg["sta1"].(map[string]any)
+	if !ok {
+		return
+	}
+	switch {
+	case st1.Open:
+		sta1[keyField] = ""
+	case st1.Password != "":
+		sta1[keyField] = st1.Password
+	}
+}
+
+// prepareGen1WiFi returns a Gen1 backup's WiFi blob ready for the restore. A
+// disabled station loses its key, so it is written disabled and without one;
+// the primary station is enabled by any network override, so it keeps its key
+// then. opts.Station1 drops sta1 or gives it a key.
+func prepareGen1WiFi(wifiBlob json.RawMessage, opts RestoreOptions) (json.RawMessage, error) {
+	cfg := map[string]any{}
+	if err := json.Unmarshal(wifiBlob, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse WiFi config: %w", err)
+	}
+	if opts.NetworkOverride == nil {
+		dropDisabledKey(cfg, "sta")
+	}
+	dropDisabledKey(cfg, "sta1")
+	applyStation1(cfg, opts.Station1, "key")
+	return json.Marshal(cfg)
+}
+
+func dropDisabledKey(cfg map[string]any, station string) {
+	sta, ok := cfg[station].(map[string]any)
+	if !ok {
+		return
+	}
+	if enabled, set := sta["enabled"].(bool); set && !enabled {
+		delete(sta, "key")
+	}
+}
+
+// addStation1Warning records a secondary station the restore left out.
+func addStation1Warning(result *RestoreResult, opts RestoreOptions) {
+	if result != nil && opts.Station1.Omit && !opts.SkipNetwork {
+		result.Warnings = append(result.Warnings, opts.Station1.omitWarning())
+	}
+}
+
+// setStaticSTA switches a Gen2 station section to static IPv4 addressing.
+func setStaticSTA(sta map[string]any, static shellybackup.StaticNetwork) {
+	sta["ipv4mode"] = ipv4ModeStatic
+	sta["ip"] = static.IP
+	sta["netmask"] = static.Netmask
+	sta["gw"] = static.Gateway
+	if static.DNS != "" {
+		sta["nameserver"] = static.DNS
+	}
 }
 
 // CompareBackup compares a backup with a device's current state.
@@ -401,7 +509,7 @@ func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBa
 }
 
 // compareGen1Backup performs a basic comparison for Gen1 devices.
-// Gen1 doesn't have structured RPC config, so we compare device info only.
+// Gen1 doesn't have structured RPC config, so only device info is compared.
 func (s *Service) compareGen1Backup(_ context.Context, _ string, _ *DeviceBackup) (*model.BackupDiff, error) {
 	diff := &model.BackupDiff{}
 	diff.Warnings = append(diff.Warnings, "detailed comparison is not available for Gen1 devices; restore will apply all settings")

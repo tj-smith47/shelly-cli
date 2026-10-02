@@ -50,32 +50,57 @@ func (s *Service) CaptureTemplate(ctx context.Context, identifier string, includ
 	return result, err
 }
 
-// ApplyTemplate applies a template configuration to a device.
-// Returns a list of changes made.
-func (s *Service) ApplyTemplate(ctx context.Context, identifier string, cfg map[string]any, dryRun bool) ([]string, error) {
-	var changes []string
+// ApplyTemplate applies a template configuration to a device and returns the
+// changes made, plus a warning for each WiFi station left out of the write. A
+// template's station address belongs to the device it was captured from and
+// is never copied; its network is written only when the device is not already
+// on it and this host has the network's password.
+func (s *Service) ApplyTemplate(ctx context.Context, identifier string, cfg map[string]any, dryRun bool) (changes, warnings []string, err error) {
+	return s.applyTemplate(ctx, identifier, cfg, dryRun, stationsCrossDevice)
+}
 
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		if dryRun {
-			// In dry run mode, just compare and report what would change
-			current, err := conn.GetConfig(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get current config: %w", err)
-			}
-			changes = compareForApply(current, cfg)
-			return nil
-		}
-
-		// Apply the configuration
-		if err := conn.SetConfig(ctx, cfg); err != nil {
-			return fmt.Errorf("failed to apply config: %w", err)
-		}
-
-		changes = []string{"Configuration applied successfully"}
-		return nil
+func (s *Service) applyTemplate(ctx context.Context, identifier string, cfg map[string]any, dryRun bool, mode stationMode) (changes, warnings []string, err error) {
+	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		changes, warnings, err = s.applyConfig(ctx, conn, cfg, dryRun, mode)
+		return err
 	})
+	return changes, warnings, err
+}
 
-	return changes, err
+// ImportConfig writes a full config file to a Gen2+ device, or on a dry run
+// returns the changes it would make. The file's stations follow the template
+// rule unless its sys.device.mac is the device's own, in which case they
+// follow the same-device rule; the warnings name each station left out.
+func (s *Service) ImportConfig(ctx context.Context, identifier string, cfg map[string]any, dryRun bool) (changes, warnings []string, err error) {
+	err = s.withGenAwareAction(ctx, identifier,
+		func(_ *client.Gen1Client) error {
+			return fmt.Errorf("bulk config updates are not supported on Gen1 devices; use component-specific commands instead")
+		},
+		func(conn *client.Client) error {
+			changes, warnings, err = s.applyConfig(ctx, conn, cfg, dryRun, stationsMatchMAC)
+			return err
+		})
+	return changes, warnings, err
+}
+
+// applyConfig plans cfg's stations for mode and writes cfg with
+// Shelly.SetConfig, or on a dry run returns the top-level changes and one line
+// per planned station.
+func (s *Service) applyConfig(ctx context.Context, conn *client.Client, cfg map[string]any, dryRun bool, mode stationMode) (changes, warnings []string, err error) {
+	var current map[string]any
+	if dryRun || (mode != stationsOmit && configHasStation(cfg)) {
+		if current, err = conn.GetConfig(ctx); err != nil {
+			return nil, nil, fmt.Errorf("failed to get current config: %w", err)
+		}
+	}
+	planned, warnings := s.planConfigStations(ctx, cfg, current, mode)
+	if dryRun {
+		return append(compareForApply(current, planned), describeStations(planned)...), warnings, nil
+	}
+	if err := conn.SetConfig(ctx, planned); err != nil {
+		return nil, warnings, fmt.Errorf("failed to apply config: %w", err)
+	}
+	return []string{"Configuration applied successfully"}, warnings, nil
 }
 
 // CompareTemplate compares a template configuration with a device's current config.
@@ -115,11 +140,11 @@ func (s *Service) GetDeviceInfo(ctx context.Context, identifier string) (*Device
 // sanitizeConfig removes sensitive data from config.
 func sanitizeConfig(cfg map[string]any) {
 	// Remove WiFi credentials
-	if wifi, ok := cfg["wifi"].(map[string]any); ok {
+	if wifi, ok := cfg[componentWiFi].(map[string]any); ok {
 		if sta, ok := wifi[fieldSTA].(map[string]any); ok {
 			delete(sta, "pass")
 		}
-		if sta1, ok := wifi["sta1"].(map[string]any); ok {
+		if sta1, ok := wifi[fieldSTA1].(map[string]any); ok {
 			delete(sta1, "pass")
 		}
 		if ap, ok := wifi["ap"].(map[string]any); ok {

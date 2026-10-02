@@ -3,8 +3,10 @@ package network
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
@@ -201,32 +203,77 @@ func (s *WiFiService) ScanNetworksFull(ctx context.Context, identifier string) (
 	return result, err
 }
 
-// SetStation configures the primary WiFi station.
-func (s *WiFiService) SetStation(ctx context.Context, identifier, ssid, password string, enable bool) error {
-	return s.provider.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		wifi := components.NewWiFi(conn.RPCClient())
-		cfg := &components.WiFiConfig{
-			STA: &components.WiFiStationConfig{
-				SSID:   &ssid,
-				Pass:   &password,
-				Enable: &enable,
-			},
+// StationWrite is a change to a Gen2+ device's primary WiFi station.
+type StationWrite struct {
+	// SSID is the network; empty leaves it unchanged.
+	SSID string
+	// Password is written as the key; empty with Open false writes no key.
+	Password string
+	// Open joins a network that has no password.
+	Open bool
+	// Enable switches the station on or off; nil leaves it unchanged.
+	Enable *bool
+	// StaticIP, Gateway, Netmask and DNS switch the station to static IPv4
+	// addressing when StaticIP is set; an empty DNS is left out.
+	StaticIP, Gateway, Netmask, DNS string
+}
+
+// StationConfig builds the WiFi.SetConfig payload for w. A pass is sent only
+// for a password or an open network, so the device otherwise keeps its key;
+// is_open is never sent, as the device derives it from the key.
+func StationConfig(w StationWrite) (*components.WiFiConfig, error) {
+	pass, err := wifiPass(w.Password, w.Open)
+	if err != nil {
+		return nil, err
+	}
+	sta := &components.WiFiStationConfig{Pass: pass, Enable: w.Enable}
+	if w.SSID != "" {
+		sta.SSID = &w.SSID
+	}
+	if w.StaticIP != "" {
+		mode := "static"
+		sta.IPv4Mode, sta.IP, sta.GW, sta.Netmask = &mode, &w.StaticIP, &w.Gateway, &w.Netmask
+		if w.DNS != "" {
+			sta.Nameserver = &w.DNS
 		}
-		return wifi.SetConfig(ctx, cfg)
+	}
+	return &components.WiFiConfig{STA: sta}, nil
+}
+
+// SetAP configures the access point. open makes it an open access point;
+// otherwise an empty password keeps its current key.
+func (s *WiFiService) SetAP(ctx context.Context, identifier, ssid, password string, open, enable bool) error {
+	cfg, err := apConfig(ssid, password, open, enable)
+	if err != nil {
+		return err
+	}
+	return s.provider.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		return components.NewWiFi(conn.RPCClient()).SetConfig(ctx, cfg)
 	})
 }
 
-// SetAP configures the access point.
-func (s *WiFiService) SetAP(ctx context.Context, identifier, ssid, password string, enable bool) error {
-	return s.provider.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		wifi := components.NewWiFi(conn.RPCClient())
-		cfg := &components.WiFiConfig{
-			AP: &components.WiFiAPConfig{
-				SSID:   &ssid,
-				Pass:   &password,
-				Enable: &enable,
-			},
-		}
-		return wifi.SetConfig(ctx, cfg)
-	})
+// apConfig sets the access point's is_open only when its key is written: on
+// the access point, unlike a station, the device takes is_open as a setting.
+func apConfig(ssid, password string, open, enable bool) (*components.WiFiConfig, error) {
+	pass, err := wifiPass(password, open)
+	if err != nil {
+		return nil, err
+	}
+	ap := &components.WiFiAPConfig{SSID: &ssid, Pass: pass, Enable: &enable}
+	if pass != nil {
+		ap.IsOpen = &open
+	}
+	return &components.WiFiConfig{AP: ap}, nil
+}
+
+// wifiPass returns the pass to write: empty for open, the password when one is
+// given, and nil (left out, keeping the device's key) otherwise.
+func wifiPass(password string, open bool) (pass *string, err error) {
+	if open && password != "" {
+		return nil, fmt.Errorf("%w: an open network takes no password", types.ErrInvalidParam)
+	}
+	if open || password != "" {
+		pass = &password
+	}
+	return pass, nil
 }

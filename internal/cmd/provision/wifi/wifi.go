@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 )
 
 // Options holds command options.
@@ -18,6 +19,7 @@ type Options struct {
 	Device   string
 	SSID     string
 	Password string
+	Open     bool
 	NoScan   bool
 	Factory  *cmdutil.Factory
 }
@@ -33,12 +35,20 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Provision WiFi settings interactively for a device.
 
 By default, this command scans for available networks and prompts you to select one.
-You can also provide SSID and password directly via flags.`,
+You can also provide SSID and password directly via flags.
+
+When no password is given and none is typed at the prompt, a device that stays
+on the same network keeps the password it has, and a different network takes
+the password this host has stored for it; with none, the command is refused.
+Use --open for a network that has no password.`,
 		Example: `  # Interactive provisioning with network scan
   shelly provision wifi living-room
 
   # Direct provisioning with credentials
   shelly provision wifi living-room --ssid "MyNetwork" --password "secret"
+
+  # Join a network that has no password
+  shelly provision wifi living-room --ssid "GuestNet" --open
 
   # Skip scan and prompt for SSID
   shelly provision wifi living-room --no-scan`,
@@ -51,7 +61,8 @@ You can also provide SSID and password directly via flags.`,
 	}
 
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "WiFi network name (skip selection)")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi password")
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
+	cmdutil.AddOpenFlag(cmd, &opts.Open)
 	cmd.Flags().BoolVar(&opts.NoScan, "no-scan", false, "Skip network scan, prompt for SSID")
 
 	return cmd
@@ -85,9 +96,10 @@ func run(ctx context.Context, opts *Options) error {
 		opts.SSID = ssid
 	}
 
-	// Get password if not provided
-	if opts.Password == "" {
-		password, err := iostreams.Password("WiFi password:")
+	// A blank answer means "not known", so the service decides from the
+	// device's current network and this host's stored credentials.
+	if opts.Password == "" && !opts.Open && ios.CanPrompt() {
+		password, err := iostreams.Password("WiFi password (blank to keep or look up):")
 		if err != nil {
 			return fmt.Errorf("failed to get password: %w", err)
 		}
@@ -96,9 +108,13 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Apply configuration
 	ios.Info("Configuring WiFi...")
-	enable := true
-	if err := svc.SetWiFiConfig(ctx, opts.Device, opts.SSID, opts.Password, &enable); err != nil {
+	write := network.StationWrite{SSID: opts.SSID, Password: opts.Password, Open: opts.Open, Enable: new(true)}
+	warnings, err := svc.SetWiFiConfig(ctx, opts.Device, write)
+	if err != nil {
 		return fmt.Errorf("failed to configure WiFi: %w", err)
+	}
+	for _, w := range warnings {
+		ios.Warning("%s", w)
 	}
 
 	ios.Success("WiFi configured on %q", opts.Device)

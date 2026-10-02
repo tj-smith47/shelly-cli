@@ -37,7 +37,7 @@ func (m *mockDiscoverer) Stop() error {
 // setMockDiscoverer sets the discoverer factory to return a mock.
 func setMockDiscoverer(m *mockDiscoverer) func() {
 	original := discovererFactory
-	discovererFactory = func() Discoverer { return m }
+	discovererFactory = func() (Discoverer, error) { return m, nil }
 	return func() { discovererFactory = original }
 }
 

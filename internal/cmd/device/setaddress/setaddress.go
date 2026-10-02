@@ -75,7 +75,7 @@ func run(ctx context.Context, opts *Options) error {
 	if !opts.NoVerify {
 		svc := opts.Factory.ShellyService()
 		ios.StartProgress("Verifying device at new address...")
-		_, err := svc.DeviceInfoAuto(ctx, opts.Address)
+		_, err := svc.DeviceInfo(ctx, opts.Address)
 		ios.StopProgress()
 		if err != nil {
 			return fmt.Errorf("couldn't reach a device at %s: %w (use --no-verify to set it anyway)", opts.Address, err)

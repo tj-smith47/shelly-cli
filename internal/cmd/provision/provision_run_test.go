@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tj-smith47/shelly-go/reprovision"
+
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -19,6 +21,7 @@ type stubProvisionService struct {
 	loadSource    func(context.Context, string, string) (*shelly.ProvisionSource, error)
 	getWiFiCreds  func(context.Context) *shelly.OnboardWiFiConfig
 	hostWiFiCreds func(context.Context) *shelly.OnboardWiFiConfig
+	hostPassword  func(context.Context, string) (string, error)
 	discover      func(context.Context, *shelly.OnboardOptions, func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error)
 	onboardBLE    func(context.Context, []*shelly.OnboardDevice, *shelly.OnboardWiFiConfig, *shelly.OnboardOptions) []*shelly.OnboardResult
 	onboardAP     func(context.Context, *shelly.OnboardDevice, *shelly.OnboardWiFiConfig, *shelly.OnboardOptions) *shelly.OnboardResult
@@ -46,6 +49,13 @@ func (s *stubProvisionService) HostWiFiCredentials(ctx context.Context) *shelly.
 		return s.hostWiFiCreds(ctx)
 	}
 	return nil
+}
+
+func (s *stubProvisionService) HostWiFiPassword(ctx context.Context, ssid string) (string, error) {
+	if s.hostPassword != nil {
+		return s.hostPassword(ctx, ssid)
+	}
+	return "", errors.New("no stored passphrase")
 }
 
 func (s *stubProvisionService) DiscoverForOnboard(ctx context.Context, opts *shelly.OnboardOptions, progress func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error) {
@@ -453,5 +463,203 @@ func TestOutputDiscovered_JSON(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q, got %q", want, out)
 		}
+	}
+}
+
+// ttyFactory returns a test factory whose terminal can prompt.
+func ttyFactory(t *testing.T) *factory.TestFactory {
+	t.Helper()
+	tf := factory.NewTestFactory(t)
+	tf.TestIO.SetStdinTTY(true)
+	tf.TestIO.SetStdoutTTY(true)
+	return tf
+}
+
+// TestPromptWiFiCredentials_EmptyPassword covers a named network with no
+// password at a terminal: the host's stored passphrase is used when there is
+// one; otherwise an empty answer joins it as an open network only when the user
+// confirms, and declining refuses with the passphrase error.
+func TestPromptWiFiCredentials_EmptyPassword(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		hostPassword string
+		answer       string
+		confirm      bool
+		wantPassword string
+		wantOpen     bool
+		wantErr      string
+		wantAsked    bool
+	}{
+		{name: "host passphrase", hostPassword: "stored", wantPassword: "stored"},
+		{name: "typed password", answer: "typed", wantPassword: "typed", wantAsked: true},
+		{name: "empty answer confirmed", confirm: true, wantOpen: true, wantAsked: true},
+		{name: "empty answer declined", wantAsked: true,
+			wantErr: `no WiFi passphrase for "` + testSSID + `":`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tf := ttyFactory(t)
+			stub := &stubProvisionService{hostPassword: func(_ context.Context, ssid string) (string, error) {
+				if ssid != testSSID {
+					t.Errorf("host lookup for %q, want %q", ssid, testSSID)
+				}
+				if tt.hostPassword == "" {
+					return "", errors.New("none stored")
+				}
+				return tt.hostPassword, nil
+			}}
+			asked := false
+			var confirmMsg string
+			opts := &Options{
+				Factory: tf.Factory, SSID: testSSID, svc: stub,
+				askPassword: func(string) (string, error) {
+					asked = true
+					return tt.answer, nil
+				},
+				askConfirm: func(msg string, def bool) (bool, error) {
+					confirmMsg = msg
+					if def {
+						t.Error("the open-network confirmation must default to no")
+					}
+					return tt.confirm, nil
+				},
+			}
+
+			err := opts.promptWiFiCredentials(context.Background())
+
+			if tt.wantErr != "" {
+				if err == nil || !strings.HasPrefix(err.Error(), tt.wantErr) || !errors.Is(err, reprovision.ErrNoPassphrase) {
+					t.Fatalf("err = %v, want prefix %s", err, tt.wantErr)
+				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if asked != tt.wantAsked {
+				t.Errorf("password prompt asked = %v, want %v", asked, tt.wantAsked)
+			}
+			if opts.Password != tt.wantPassword || opts.Open != tt.wantOpen {
+				t.Errorf("Password=%q Open=%v, want %q %v", opts.Password, opts.Open, tt.wantPassword, tt.wantOpen)
+			}
+			if tt.wantAsked && tt.answer == "" && confirmMsg != "Join "+testSSID+" as an open network with no password?" {
+				t.Errorf("confirmation = %q", confirmMsg)
+			}
+			if warned := strings.Contains(tf.TestIO.ErrString(), "open network"); warned != tt.wantOpen {
+				t.Errorf("open-network warning shown = %v, want %v", warned, tt.wantOpen)
+			}
+		})
+	}
+}
+
+// TestPromptWiFiCredentials_NoPromptLeavesPasswordUnknown proves that without a
+// terminal, or with --yes, a missing password is neither prompted for nor
+// treated as open: it is left for provisioning to look up.
+func TestPromptWiFiCredentials_NoPromptLeavesPasswordUnknown(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name string
+		tty  bool
+		yes  bool
+	}{{name: "no terminal"}, {name: "yes at a terminal", tty: true, yes: true}} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tf := factory.NewTestFactory(t)
+			tf.TestIO.SetStdinTTY(tt.tty)
+			tf.TestIO.SetStdoutTTY(tt.tty)
+			stub := &stubProvisionService{hostPassword: func(context.Context, string) (string, error) {
+				t.Error("no host lookup expected")
+				return "", nil
+			}}
+			opts := &Options{
+				Factory: tf.Factory, SSID: testSSID, Yes: tt.yes, svc: stub,
+				askPassword: func(string) (string, error) {
+					t.Error("no prompt expected")
+					return "", nil
+				},
+			}
+			if err := opts.promptWiFiCredentials(context.Background()); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if opts.Password != "" || opts.Open {
+				t.Errorf("Password=%q Open=%v, want unknown and not open", opts.Password, opts.Open)
+			}
+			if strings.Contains(tf.TestIO.ErrString(), "open network") {
+				t.Errorf("open-network warning shown for a secured network: %q", tf.TestIO.ErrString())
+			}
+		})
+	}
+}
+
+// TestRun_SourceWithoutKey_NotOpen drives a --from-device source whose backup
+// names a network but holds no key: the AP onboard receives that network with
+// an empty password and Open unset, for the SDK to look up the passphrase.
+func TestRun_SourceWithoutKey_NotOpen(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name     string
+		open     bool
+		wantWarn bool
+	}{{name: "secured station"}, {name: "open station", open: true, wantWarn: true}} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tf := factory.NewTestFactory(t)
+			var got *shelly.OnboardWiFiConfig
+			stub := &stubProvisionService{
+				loadSource: func(context.Context, string, string) (*shelly.ProvisionSource, error) {
+					return &shelly.ProvisionSource{WiFi: &shelly.OnboardWiFiConfig{SSID: "FromSource", Open: tt.open}}, nil
+				},
+				discover: func(context.Context, *shelly.OnboardOptions, func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error) {
+					return []shelly.OnboardDevice{apDevice("bulb2", "shellycolorbulb-AABBCC")}, nil
+				},
+				onboardAP: func(_ context.Context, d *shelly.OnboardDevice, w *shelly.OnboardWiFiConfig, _ *shelly.OnboardOptions) *shelly.OnboardResult {
+					got = w
+					return &shelly.OnboardResult{Device: d}
+				},
+			}
+			opts := &Options{Factory: tf.Factory, FromDevice: "living-room", Yes: true, svc: stub}
+
+			if err := run(provisionTestCtx(t), opts); err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			want := shelly.OnboardWiFiConfig{SSID: "FromSource", Open: tt.open}
+			if got == nil || *got != want {
+				t.Errorf("onboard WiFi = %+v, want %+v", got, want)
+			}
+			if warned := strings.Contains(tf.TestIO.ErrString(), "open network"); warned != tt.wantWarn {
+				t.Errorf("open-network warning shown = %v, want %v", warned, tt.wantWarn)
+			}
+		})
+	}
+}
+
+// TestRun_APOnboardShowsSteps proves AP onboarding runs under the labelled
+// progress line with a step reporter in its context, as restore and inspect do.
+func TestRun_APOnboardShowsSteps(t *testing.T) {
+	t.Parallel()
+	tf := factory.NewTestFactory(t)
+	hasReporter := false
+	stub := &stubProvisionService{
+		discover: func(context.Context, *shelly.OnboardOptions, func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error) {
+			return []shelly.OnboardDevice{apDevice("bulb2", "shellycolorbulb-AABBCC")}, nil
+		},
+		onboardAP: func(ctx context.Context, d *shelly.OnboardDevice, _ *shelly.OnboardWiFiConfig, _ *shelly.OnboardOptions) *shelly.OnboardResult {
+			hasReporter = shelly.StepReporter(ctx) != nil
+			return &shelly.OnboardResult{Device: d}
+		},
+	}
+	opts := &Options{Factory: tf.Factory, SSID: testSSID, Password: "secret", Yes: true, svc: stub}
+
+	if err := run(provisionTestCtx(t), opts); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if !hasReporter {
+		t.Error("OnboardViaAP ran without a step reporter")
+	}
+	if want := "Onboarding bulb2 at AP shellycolorbulb-AABBCC (hopping host WiFi)..."; !strings.Contains(tf.TestIO.ErrString(), want) {
+		t.Errorf("progress line %q missing; stderr = %q", want, tf.TestIO.ErrString())
 	}
 }

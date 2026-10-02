@@ -61,6 +61,7 @@ change the webhook's active state.`,
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Webhook name")
 	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable webhook")
 	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable webhook")
+	cmd.MarkFlagsMutuallyExclusive("enable", "disable")
 
 	return cmd
 }

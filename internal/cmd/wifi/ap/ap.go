@@ -56,6 +56,7 @@ can connect to. Use --clients to list connected clients.`,
 	cmd.Flags().StringVar(&opts.Password, "password", "", "Access point password")
 	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable access point")
 	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable access point")
+	cmd.MarkFlagsMutuallyExclusive("enable", "disable")
 	cmd.Flags().BoolVar(&opts.Clients, "clients", false, "List connected clients")
 
 	return cmd

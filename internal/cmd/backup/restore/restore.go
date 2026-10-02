@@ -23,6 +23,9 @@ import (
 type restoreService interface {
 	RestoreBackup(ctx context.Context, identifier string, deviceBackup *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, error)
 	RestoreToAP(ctx context.Context, apSSID, apHostIP, registryName string, bkp *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, string, error)
+	cmdutil.LANStationPlanner
+	cmdutil.APStationPlanner
+	cmdutil.RestoreNameDescriber
 }
 
 // Options holds the command options.
@@ -48,6 +51,7 @@ type Options struct {
 	APIP                   string
 	SSID                   string
 	Password               string
+	Open                   bool
 	AllowFirmwareDowngrade bool
 	FirmwareURL            string
 	TraceFile              string
@@ -97,10 +101,20 @@ sections.`,
   # Skip scripts during restore
   shelly backup restore living-room backup.json --skip-scripts
 
+  # Give a clone of another bulb its own address; the gateway, netmask and DNS
+  # are the backup's
+  shelly backup restore new-bulb master-bath-1.json --static-ip 10.23.47.221
+
+  # Restore onto a device that joins a network with no password
+  shelly backup restore guest-plug plug.json --ssid GuestWiFi --open
+
   # Clone another bulb's backup onto this device with a different static IP
   # (identity — MAC, serial, device ID — is never overwritten by restore)
   shelly backup restore new-bulb master-bath-1.json \
     --static-ip 10.23.47.221 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
+
+  # Preview a restore at the factory WiFi AP without hopping the host's WiFi
+  shelly backup restore fr sr.json --to-ap ShellyBulbDuo-D0DCFF --dry-run
 
   # Restore a sibling's backup straight onto a brand-new device at its factory
   # WiFi AP: hops the host onto the AP, applies the config + static IP, and the
@@ -130,15 +144,15 @@ sections.`,
 	cmd.Flags().BoolVar(&opts.SkipState, "skip-state", false, "Skip restoring live component state (color temperature, brightness); apply configuration only")
 	cmd.Flags().BoolVar(&opts.SkipMeters, "skip-meters", false, "Skip restoring meter/energy-meter configuration (e.g. overpower limits)")
 	cmd.Flags().StringVarP(&opts.Decrypt, "decrypt", "d", "", "Password to decrypt backup")
-	cmd.Flags().StringVar(&opts.StaticIP, "static-ip", "", "Override the backup's WiFi with this static IPv4 address")
-	cmd.Flags().StringVar(&opts.Gateway, "gateway", "", "Static IPv4 default gateway (with --static-ip)")
-	cmd.Flags().StringVar(&opts.Netmask, "netmask", "", "Static IPv4 subnet mask (with --static-ip)")
-	cmd.Flags().StringVar(&opts.DNS, "dns", "", "Static IPv4 nameserver (optional, with --static-ip)")
-	cmd.Flags().StringVar(&opts.Name, "name", "", "Override the device name (defaults to the target identifier when it is a friendly alias)")
+	cmdutil.AddStaticIPFlags(cmd, &opts.StaticIP, &opts.Gateway, &opts.Netmask, &opts.DNS,
+		"Override the backup's WiFi with this static IPv4 address (--gateway, --netmask and --dns default to the backup's)",
+		"the backup's")
+	cmd.Flags().StringVar(&opts.Name, "name", "", "Set the device name (default: a backup of this same device keeps the name it recorded; a backup of another device takes the target's alias)")
 	cmd.Flags().StringVar(&opts.ToAP, "to-ap", "", "Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)")
 	cmd.Flags().StringVar(&opts.APIP, "ap-ip", "", "Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)")
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the device joins (defaults to the backup's network)")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)")
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
+	cmdutil.AddOpenFlag(cmd, &opts.Open)
 	cmd.Flags().BoolVar(&opts.AllowFirmwareDowngrade, "allow-firmware-downgrade", false, "Force the older-firmware config write instead of the automatic firmware update (Gen1; the device is updated to matched firmware by default when the backup is newer — this skips that and accepts the reboot-loop risk)")
 	cmd.Flags().StringVar(&opts.FirmwareURL, "firmware-url", "", "Firmware image for the automatic downgrade-recovery update (default: derived from the backup's device model)")
 	cmd.Flags().StringVar(&opts.TraceFile, "trace-file", "", "Write a per-step Gen1 restore diagnostic (which setting destabilizes the device) to this file")
@@ -146,7 +160,6 @@ sections.`,
 		// MarkHidden only fails on an unknown flag name; the flag is defined above.
 		panic(err)
 	}
-	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
 	return cmd
 }
@@ -173,17 +186,49 @@ func (o *Options) attachTrace(restoreOpts *backup.RestoreOptions) (func(), error
 	}, nil
 }
 
+// network returns the WiFi override flags.
+func (o *Options) network() *cmdutil.NetworkFlags {
+	return &cmdutil.NetworkFlags{
+		SSID:     o.SSID,
+		Password: o.Password,
+		Open:     o.Open,
+		StaticIP: o.StaticIP,
+		Gateway:  o.Gateway,
+		Netmask:  o.Netmask,
+		DNS:      o.DNS,
+	}
+}
+
+// previewRestore prints what a dry run would restore: the static address, the
+// device name and the WiFi station that would be written and, for --to-ap, the
+// firmware update and access point hop that would run.
+func (o *Options) previewRestore(ctx context.Context, svc restoreService, bkp *backup.DeviceBackup, restoreOpts backup.RestoreOptions) error {
+	ios := o.Factory.IOStreams()
+	ios.Title("Dry run - Restore preview")
+	ios.Println()
+	term.DisplayRestorePreview(ios, bkp, restoreOpts)
+	if override := restoreOpts.NetworkOverride; override.IsStatic() {
+		static, err := bkp.StaticNetwork(override)
+		if err != nil {
+			return err
+		}
+		ios.Info("WiFi station IP will be overridden to %s (gateway %s, netmask %s)", static.IP, static.Gateway, static.Netmask)
+	}
+	if o.ToAP != "" {
+		return cmdutil.PreviewAPRestore(ctx, ios, svc, o.ToAP, bkp, restoreOpts)
+	}
+	cmdutil.PrintRestoreName(ctx, ios, svc, o.Device, bkp, restoreOpts)
+	return cmdutil.PlanLANStation(ctx, ios, svc, o.Device, bkp, &restoreOpts)
+}
+
 // validateFlags rejects incompatible flag combinations before any device I/O.
 func (o *Options) validateFlags() error {
-	if o.StaticIP != "" && o.SkipNetwork {
-		return fmt.Errorf("--static-ip cannot be used with --skip-network")
+	if err := o.network().Validate(o.SkipNetwork); err != nil {
+		return err
 	}
 	if o.ToAP != "" {
 		if o.SkipNetwork {
 			return fmt.Errorf("--to-ap cannot be used with --skip-network (the device needs WiFi to leave its AP)")
-		}
-		if o.DryRun {
-			return fmt.Errorf("--to-ap cannot be combined with --dry-run (the target is not reachable until it joins the network)")
 		}
 	}
 	if o.APIP != "" && o.ToAP == "" {
@@ -227,17 +272,7 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	var override *backup.NetworkOverride
-	if opts.StaticIP != "" || opts.SSID != "" || opts.Password != "" {
-		override = &backup.NetworkOverride{
-			SSID:     opts.SSID,
-			Password: opts.Password,
-			StaticIP: opts.StaticIP,
-			Gateway:  opts.Gateway,
-			Netmask:  opts.Netmask,
-			DNS:      opts.DNS,
-		}
-	}
+	override := opts.network().Override()
 
 	restoreOpts := backup.RestoreOptions{
 		DryRun:                 opts.DryRun,
@@ -249,22 +284,26 @@ func run(ctx context.Context, opts *Options) error {
 		SkipState:              opts.SkipState,
 		SkipMeters:             opts.SkipMeters,
 		NetworkOverride:        override,
-		Name:                   cmdutil.DeviceDisplayName(opts.Name, opts.Device),
+		Name:                   opts.Name,
+		AliasName:              cmdutil.DeviceDisplayName("", opts.Device),
 		AllowFirmwareDowngrade: opts.AllowFirmwareDowngrade,
 		FirmwareURL:            opts.FirmwareURL,
 	}
 
+	svc := opts.service()
+
 	if opts.DryRun {
-		ios.Title("Dry run - Restore preview")
-		ios.Println()
-		term.DisplayRestorePreview(ios, bkp, restoreOpts)
-		if override != nil {
-			ios.Info("WiFi station IP will be overridden to %s (gateway %s, netmask %s)", override.StaticIP, override.Gateway, override.Netmask)
-		}
-		return nil
+		return opts.previewRestore(ctx, svc, bkp, restoreOpts)
 	}
 
-	svc := opts.service()
+	// The dry run refuses network flags that name no network, or a network
+	// this host has no passphrase for, before any hop; the real run refuses
+	// them the same way, before the trace file or the hop.
+	if opts.ToAP != "" {
+		if _, err := svc.PlanAPStation(ctx, bkp, restoreOpts.NetworkOverride); err != nil {
+			return err
+		}
+	}
 
 	// --trace-file streams a per-step Gen1 restore diagnostic to a file: which
 	// setting each device tolerated and which one drove it into a reboot loop.
@@ -278,6 +317,10 @@ func run(ctx context.Context, opts *Options) error {
 	// network override move it onto the LAN — provisioning and restore in one.
 	if opts.ToAP != "" {
 		return opts.restoreViaAP(ctx, svc, bkp, restoreOpts)
+	}
+
+	if err := cmdutil.PlanLANStation(ctx, ios, svc, opts.Device, bkp, &restoreOpts); err != nil {
+		return err
 	}
 
 	var result *backup.RestoreResult

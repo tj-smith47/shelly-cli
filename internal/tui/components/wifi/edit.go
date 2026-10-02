@@ -3,6 +3,7 @@ package wifi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 )
@@ -34,6 +36,7 @@ type Field int
 const (
 	FieldSSID Field = iota
 	FieldPassword
+	FieldOpen
 	FieldEnabled
 	FieldCount
 )
@@ -51,15 +54,21 @@ type EditModel struct {
 	// Station fields
 	staSSID     textinput.Model
 	staPassword textinput.Model
+	staOpen     bool
 	staEnabled  bool
 
 	// AP fields
 	apSSID     textinput.Model
 	apPassword textinput.Model
+	apOpen     bool
 	apEnabled  bool
 
 	// Original values for cancel
 	origConfig *network.WiFiConfigFull
+
+	// setStation and setAP write the form; tests replace setAP.
+	setStation func(ctx context.Context, device string, w network.StationWrite) ([]string, error)
+	setAP      func(ctx context.Context, device, ssid, password string, open, enable bool) error
 }
 
 // NewEditModel creates a new WiFi edit modal.
@@ -82,7 +91,7 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	staSSID.SetStyles(inputStyles)
 
 	staPassword := textinput.New()
-	staPassword.Placeholder = "Password"
+	staPassword.Placeholder = "Password (blank keeps current)"
 	staPassword.EchoMode = textinput.EchoPassword
 	staPassword.CharLimit = 64
 	staPassword.SetWidth(30)
@@ -95,7 +104,7 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	apSSID.SetStyles(inputStyles)
 
 	apPassword := textinput.New()
-	apPassword.Placeholder = "Password"
+	apPassword.Placeholder = "Password (blank keeps current)"
 	apPassword.EchoMode = textinput.EchoPassword
 	apPassword.CharLimit = 64
 	apPassword.SetWidth(30)
@@ -112,6 +121,8 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 		staPassword: staPassword,
 		apSSID:      apSSID,
 		apPassword:  apPassword,
+		setStation:  svc.SetWiFiConfig,
+		setAP:       svc.SetWiFiAP,
 	}
 }
 
@@ -133,15 +144,20 @@ func (m EditModel) Show(device string, config *network.WiFiConfigFull, networks 
 			m.staSSID.SetValue(config.STA.SSID)
 			m.staEnabled = config.STA.Enabled
 		}
-		if config.AP != nil {
-			m.apSSID.SetValue(config.AP.SSID)
-			m.apEnabled = config.AP.Enabled
-		}
 	}
 
-	// Clear passwords (never show existing)
+	// Passwords are never shown. The access point's open state is a setting the
+	// device reports, so the toggle starts from it; a station is joined as an
+	// open network only on request.
 	m.staPassword.SetValue("")
 	m.apPassword.SetValue("")
+	m.staOpen = false
+	m.apOpen = false
+	if config != nil && config.AP != nil {
+		m.apSSID.SetValue(config.AP.SSID)
+		m.apEnabled = config.AP.Enabled
+		m.apOpen = config.AP.IsOpen
+	}
 
 	// Focus first field
 	m.staSSID.Focus()
@@ -186,6 +202,9 @@ func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 		// returned cmd since the parent model handles close detection
 		// and EditClosedMsg sending via the IsVisible() check.
 		m.HandleSaveResult(msg)
+		if msg.Success && msg.Message != "" {
+			return m, toast.Warning(msg.Message)
+		}
 		return m, nil
 
 	// Action messages from context system
@@ -198,14 +217,7 @@ func (m EditModel) handleMessage(msg tea.Msg) (EditModel, tea.Cmd) {
 		if m.Base.Saving {
 			return m, nil
 		}
-		if Field(m.Cursor) == FieldEnabled {
-			if m.mode == EditModeStation {
-				m.staEnabled = !m.staEnabled
-			} else {
-				m.apEnabled = !m.apEnabled
-			}
-		}
-		return m, nil
+		return m.toggleField(), nil
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 	}
@@ -268,24 +280,38 @@ func (m EditModel) handleKeyPress(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 		return m, nil
 
 	case keyconst.KeyEnter:
-		if Field(m.Cursor) == FieldEnabled {
-			// Toggle enabled state
-			if m.mode == EditModeStation {
-				m.staEnabled = !m.staEnabled
-			} else {
-				m.apEnabled = !m.apEnabled
-			}
-			return m, nil
+		if f := Field(m.Cursor); f == FieldEnabled || f == FieldOpen {
+			return m.toggleField(), nil
 		}
 		// Move to next field
 		return m.nextField(), nil
 
 	case keyconst.KeyCtrlS:
-		// Save
-		return m, m.save()
+		return m.save()
 	}
 
 	return m, nil
+}
+
+// toggleField flips the focused toggle of the current mode.
+func (m EditModel) toggleField() EditModel {
+	station := m.mode == EditModeStation
+	switch Field(m.Cursor) {
+	case FieldEnabled:
+		if station {
+			m.staEnabled = !m.staEnabled
+		} else {
+			m.apEnabled = !m.apEnabled
+		}
+	case FieldOpen:
+		if station {
+			m.staOpen = !m.staOpen
+		} else {
+			m.apOpen = !m.apOpen
+		}
+	case FieldSSID, FieldPassword, FieldCount:
+	}
+	return m
 }
 
 func (m EditModel) blurAllInputs() EditModel {
@@ -328,35 +354,66 @@ func (m EditModel) focusCurrentField() EditModel {
 		} else {
 			m.apPassword.Focus()
 		}
-	case FieldEnabled, FieldCount:
+	case FieldOpen, FieldEnabled, FieldCount:
 		// Toggle fields don't need text input focus
 	}
 	return m
 }
 
-func (m EditModel) save() tea.Cmd {
+// validateAP refuses an access point write that would drop its security
+// without a key. The station is checked by Service.SetWiFiConfig, which
+// applies the same rule as `shelly wifi set`.
+func (m EditModel) validateAP() error {
+	if m.apSSID.Value() == "" {
+		return nil
+	}
+	switch {
+	case m.apOpen && m.apPassword.Value() != "":
+		return errors.New("AP: an open access point takes no password")
+	case !m.apOpen && m.apPassword.Value() == "" && m.origAPOpen():
+		return errors.New("AP: the access point is open; enter a password to secure it, or leave Open on")
+	}
+	return nil
+}
+
+// origAPOpen reports whether the device's access point was open when the form
+// was shown.
+func (m EditModel) origAPOpen() bool {
+	return m.origConfig != nil && m.origConfig.AP != nil && m.origConfig.AP.IsOpen
+}
+
+func (m EditModel) save() (EditModel, tea.Cmd) {
+	if err := m.validateAP(); err != nil {
+		m.SetErr(err)
+		return m, nil
+	}
 	m.StartSave()
-	return func() tea.Msg {
+	return m, func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.Ctx, 30*time.Second)
 		defer cancel()
 
-		// Save station config
+		var warnings []string
 		if m.staSSID.Value() != "" {
-			err := m.Svc.SetWiFiStation(ctx, m.Base.Device, m.staSSID.Value(), m.staPassword.Value(), m.staEnabled)
+			enable := m.staEnabled
+			var err error
+			warnings, err = m.setStation(ctx, m.Base.Device, network.StationWrite{
+				SSID: m.staSSID.Value(), Password: m.staPassword.Value(), Open: m.staOpen, Enable: &enable,
+			})
 			if err != nil {
 				return messages.NewSaveError(nil, fmt.Errorf("station: %w", err))
 			}
 		}
 
-		// Save AP config
 		if m.apSSID.Value() != "" {
-			err := m.Svc.SetWiFiAP(ctx, m.Base.Device, m.apSSID.Value(), m.apPassword.Value(), m.apEnabled)
+			err := m.setAP(ctx, m.Base.Device, m.apSSID.Value(), m.apPassword.Value(), m.apOpen, m.apEnabled)
 			if err != nil {
 				return messages.NewSaveError(nil, fmt.Errorf("AP: %w", err))
 			}
 		}
 
-		return messages.NewSaveResultWithMessage(nil, "WiFi settings saved")
+		// The message carries only the station warnings, which the form shows
+		// as a toast once it closes.
+		return messages.NewSaveResultWithMessage(nil, strings.Join(warnings, "; "))
 	}
 }
 
@@ -415,6 +472,9 @@ func (m EditModel) renderStationFields() string {
 	content.WriteString(m.renderFieldRow("Password", m.staPassword.View()))
 	content.WriteString("\n")
 
+	content.WriteString(m.renderToggleRow("Open", m.staOpen, Field(m.Cursor) == FieldOpen))
+	content.WriteString("\n")
+
 	// Enabled toggle
 	content.WriteString(m.renderToggleRow("Enabled", m.staEnabled, Field(m.Cursor) == FieldEnabled))
 
@@ -436,6 +496,9 @@ func (m EditModel) renderAPFields() string {
 
 	// Password
 	content.WriteString(m.renderFieldRow("Password", m.apPassword.View()))
+	content.WriteString("\n")
+
+	content.WriteString(m.renderToggleRow("Open", m.apOpen, Field(m.Cursor) == FieldOpen))
 	content.WriteString("\n")
 
 	// Enabled toggle

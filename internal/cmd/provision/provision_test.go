@@ -1,10 +1,13 @@
 package provision
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
@@ -287,30 +290,67 @@ func TestOptions_BuildOnboardOptions_NoSSID(t *testing.T) {
 func TestOptions_PromptWiFiCredentials_AlreadySet(t *testing.T) {
 	t.Parallel()
 
-	opts := &Options{Factory: cmdutil.NewFactory(), SSID: testSSID}
+	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, SSID: testSSID, Password: "secret"}
 	err := opts.promptWiFiCredentials(context.Background())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if opts.SSID != testSSID {
-		t.Errorf("SSID = %q, want %q", opts.SSID, testSSID)
+	if opts.SSID != testSSID || opts.Password != "secret" || opts.Open {
+		t.Errorf("SSID=%q Password=%q Open=%v, want the flags unchanged", opts.SSID, opts.Password, opts.Open)
 	}
 }
 
-// A flag-supplied SSID with no password configures an open network; the user
-// must be warned rather than silently provisioned with empty credentials.
-func TestOptions_PromptWiFiCredentials_FlagSSIDNoPasswordWarns(t *testing.T) {
+// --open configures an open network, and the user is warned about it.
+func TestOptions_PromptWiFiCredentials_OpenWarns(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, SSID: testSSID}
+	opts := &Options{Factory: tf.Factory, SSID: testSSID, Open: true}
 
 	err := opts.promptWiFiCredentials(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(tf.TestIO.ErrString(), "open network") {
+	if want := `No WiFi password provided for "` + testSSID + `"; configuring as an open network`; !strings.Contains(tf.TestIO.ErrString(), want) {
 		t.Errorf("expected open-network warning, got stderr: %q", tf.TestIO.ErrString())
+	}
+}
+
+func TestNewCommand_OpenFlag(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{name: "open", args: []string{"--ssid", "Guest", "--open"}},
+		{name: "open with password", args: []string{"--ssid", "Guest", "--open", "--password", "x"},
+			wantErr: "if any flags in the group [open password] are set none of the others can be"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := NewCommand(factory.NewTestFactory(t).Factory)
+			cmd.RunE = func(*cobra.Command, []string) error { return nil }
+			cmd.SetArgs(tt.args)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			err := cmd.Execute()
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if f := cmd.Flags().Lookup("open"); f == nil || f.Usage != "Join a network that has no password" {
+					t.Errorf("--open flag = %+v", f)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("err = %v, want %q", err, tt.wantErr)
+			}
+		})
 	}
 }
 

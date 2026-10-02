@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-go/rpc"
 	"github.com/tj-smith47/shelly-go/transport"
 
+	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -99,11 +100,8 @@ func run(ctx context.Context, opts *Options) error {
 		transport.WithReconnect(true),
 		transport.WithPingInterval(15 * time.Second),
 	}
-	if cfg, err := opts.Factory.Config(); err == nil {
-		creds := cfg.GetAllDeviceCredentials()
-		if cred, ok := creds[opts.Device]; ok && cred.Password != "" {
-			wsOpts = append(wsOpts, transport.WithAuth(cred.Username, cred.Password))
-		}
+	if auth := resolved.Auth; auth != nil && auth.Password != "" {
+		wsOpts = append(wsOpts, transport.WithAuth(auth.Username, auth.Password))
 	}
 
 	// Connect to WebSocket
@@ -111,7 +109,10 @@ func run(ctx context.Context, opts *Options) error {
 	ios.Printf("  Connecting to %s\n", wsURL)
 	ios.Println()
 
-	ws := transport.NewWebSocket(wsURL, wsOpts...)
+	ws, err := client.NewDeviceWebSocket(wsURL, wsOpts...)
+	if err != nil {
+		return fmt.Errorf("WebSocket connection failed: %w", err)
+	}
 	ws.OnStateChange(func(state transport.ConnectionState) {
 		term.DisplayWebSocketConnectionState(ios, state.String())
 	})

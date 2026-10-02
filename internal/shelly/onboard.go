@@ -2,17 +2,16 @@ package shelly
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/discovery"
-	gen1 "github.com/tj-smith47/shelly-go/gen1"
 	"github.com/tj-smith47/shelly-go/provisioning"
+	"github.com/tj-smith47/shelly-go/reprovision"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -62,6 +61,10 @@ type OnboardDevice struct {
 type OnboardWiFiConfig struct {
 	SSID     string
 	Password string
+	// Open joins a network that has no password. Without it an empty Password
+	// means the password is not known, and it is looked up in this host's stored
+	// credentials for SSID.
+	Open bool
 	// Static IP configuration (all four required together; empty StaticIP = DHCP).
 	StaticIP string // device's static address on the target network
 	Gateway  string
@@ -238,7 +241,7 @@ func (s *Service) discoverBLEForOnboard(ctx context.Context) ([]OnboardDevice, e
 // different channels or with weak signal. This function retries the scan
 // every 3 seconds until the context deadline, accumulating unique results.
 func (s *Service) discoverWiFiAPForOnboard(ctx context.Context) ([]OnboardDevice, error) {
-	wifiDisc := discovery.NewWiFiDiscoverer()
+	wifiDisc := discovery.NewWiFiDiscovererWithScanner(s.scanner())
 	seen := make(map[string]OnboardDevice) // keyed by SSID
 
 	const scanInterval = 3 * time.Second
@@ -265,7 +268,7 @@ func (s *Service) discoverWiFiAPForOnboard(ctx context.Context) ([]OnboardDevice
 		// Wait before next scan, or exit if context is done.
 		select {
 		case <-ctx.Done():
-			// Return whatever we found so far.
+			// A cancelled search still reports the devices seen before it ended.
 			if len(seen) == 0 && lastErr != nil {
 				return nil, lastErr
 			}
@@ -396,6 +399,12 @@ func (s *Service) OnboardViaBLE(
 ) *OnboardResult {
 	result := &OnboardResult{Device: device, Method: string(OnboardSourceBLE)}
 
+	wifi, err := s.joinPassword(ctx, wifi)
+	if err != nil {
+		result.Error = err
+		return result
+	}
+
 	// Initialize BLE transmitter
 	transmitter, err := provisioning.NewTinyGoBLETransmitter()
 	if err != nil {
@@ -428,7 +437,7 @@ func (s *Service) OnboardViaBLE(
 		Password: wifi.Password,
 	}
 	if wifi.IsStatic() {
-		bleWiFi.StaticIP = "static"
+		bleWiFi.StaticIP = ipv4Static
 		bleWiFi.IP = wifi.StaticIP
 		bleWiFi.Netmask = wifi.Netmask
 		bleWiFi.Gateway = wifi.Gateway
@@ -482,262 +491,6 @@ func (s *Service) OnboardViaBLE(
 	}
 
 	return result
-}
-
-// OnboardViaAP provisions a Gen1 device by connecting to its WiFi AP,
-// configuring WiFi credentials, reconnecting to the home network, and
-// waiting for the device to appear.
-func (s *Service) OnboardViaAP(
-	ctx context.Context,
-	device *OnboardDevice,
-	wifi *OnboardWiFiConfig,
-	opts *OnboardOptions,
-) *OnboardResult {
-	result := &OnboardResult{Device: device, Method: "WiFi AP"}
-
-	// Configure WiFi on the device at 192.168.33.1 while the host is hopped onto
-	// the device's own AP (Gen2+ via RPC, Gen1 via HTTP settings). The host
-	// returns to the home network (wifi) once configuration completes.
-	var configErr error
-	if hopErr := s.withAPHop(ctx, device.SSID, "", wifi, func(ctx context.Context) error {
-		// Never write to a device the host only reached because it joined the wrong
-		// AP — confirm the device at the AP matches the SSID's MAC suffix first.
-		if idErr := s.confirmAPDeviceIdentity(ctx, device.Generation, device.SSID); idErr != nil {
-			configErr = idErr
-			return idErr
-		}
-		configErr = s.configureWiFiAtAP(ctx, wifi, device.Generation)
-		return configErr
-	}); hopErr != nil && configErr == nil {
-		// hopErr with no configErr means the host could not reach the AP.
-		result.Error = hopErr
-		return result
-	}
-
-	if configErr != nil {
-		result.Error = fmt.Errorf("failed to configure WiFi on device: %w", configErr)
-		return result
-	}
-
-	// Confirm the device rejoined the LAN, then carry the address (and any
-	// non-fatal note) onto the result.
-	newIP, note := s.confirmRejoinedLAN(ctx, device, wifi)
-	result.NewAddress = newIP
-	if note != "" {
-		result.Note = note
-	}
-
-	// Register
-	if newIP != "" {
-		if regErr := RegisterOnboardedDevice(device, newIP); regErr != nil {
-			debug.TraceEvent("onboard register %s: %v", device.Name, regErr)
-		} else {
-			result.Registered = true
-		}
-	}
-
-	return result
-}
-
-// confirmRejoinedLAN confirms a device rejoined the LAN after an AP hop and
-// returns its address plus a non-fatal note describing any failure to locate it.
-// It delegates to the shared confirmRejoin racer — route-independent presence
-// signals (mDNS, plus CoIoT on Gen1) raced against unicast probes across every host
-// interface — so onboard and the restore/migrate --to-ap flows confirm identically;
-// only the policy differs. Onboarding only needs the device's address to register
-// it, so a route-independent presence sighting with no unicast route from this host
-// (writeable=false) is still a usable success here, unlike restore whose LAN pass
-// needs the unicast route; a total miss becomes a non-fatal note.
-func (s *Service) confirmRejoinedLAN(
-	ctx context.Context,
-	device *OnboardDevice,
-	wifi *OnboardWiFiConfig,
-) (addr, note string) {
-	staticIP := ""
-	if wifi.IsStatic() {
-		staticIP = wifi.StaticIP
-	}
-	conf, err := s.confirmRejoin(ctx, device.Generation, staticIP, device.MACAddress)
-	if err != nil {
-		// Provisioning succeeded but the device could not be located; carry the
-		// cause so the UI warns instead of reporting a success it cannot prove.
-		debug.TraceEvent("onboard AP post-provision confirm failed for %s: %v", device.Name, err)
-		return "", fmt.Sprintf("provisioned but %v", err)
-	}
-	if !conf.writeable {
-		debug.TraceEvent("onboard %s seen via %s at %s with no unicast route from this host",
-			device.Name, conf.via, conf.addr)
-	}
-	return conf.addr, ""
-}
-
-// configureWiFiAtAP sends WiFi credentials to a device at 192.168.33.1.
-// Uses Gen1 HTTP settings API for Gen1 devices, RPC for Gen2+.
-func (s *Service) configureWiFiAtAP(ctx context.Context, wifi *OnboardWiFiConfig, generation int) error {
-	address := discovery.DefaultAPIP
-
-	if generation == 1 {
-		// Gen1: use WithGen1Connection → Device().SetWiFiStation[Static]
-		return s.WithGen1Connection(ctx, address, func(conn *client.Gen1Client) error {
-			if wifi.IsStatic() {
-				return conn.Device().SetWiFiStationStatic(ctx, wifi.SSID, wifi.Password,
-					wifi.StaticIP, wifi.Gateway, wifi.Netmask, wifi.DNS)
-			}
-			return conn.Device().SetWiFiStation(ctx, true, wifi.SSID, wifi.Password)
-		})
-	}
-
-	// Gen2+: RPC-based WiFi.SetConfig (static or DHCP).
-	if wifi.IsStatic() {
-		return s.ConfigureWiFiStatic(ctx, address, wifi.SSID, wifi.Password,
-			wifi.StaticIP, wifi.Netmask, wifi.Gateway, wifi.DNS)
-	}
-	return s.ConfigureWiFi(ctx, address, wifi.SSID, wifi.Password)
-}
-
-// reconnectCredentials determines the SSID and password for reconnecting to
-// the home network after AP provisioning. If the original network differs from
-// the provisioning target, returns the original SSID with an empty password
-// (NetworkManager may have saved credentials). Otherwise returns the target
-// WiFi credentials directly since nl80211 has no credential store.
-func reconnectCredentials(originalNet *discovery.WiFiNetwork, wifi *OnboardWiFiConfig) (ssid, password string) {
-	if originalNet != nil && originalNet.SSID != "" && originalNet.SSID != wifi.SSID {
-		return originalNet.SSID, ""
-	}
-	return wifi.SSID, wifi.Password
-}
-
-// withAPHop connects the host's WiFi to an open Shelly AP, runs fn (which talks
-// to the device at discovery.DefaultAPIP), then returns the host to its original
-// network — even if fn fails. homeWiFi supplies the credentials to rejoin the
-// home network on platforms without a saved-credential store (nl80211);
-// reconnectCredentials prefers the previously-joined network when NetworkManager
-// can restore it from saved profiles. An error reaching the AP is returned
-// before fn runs; otherwise fn's error is returned. Shared by AP-based onboard
-// and restore/migrate --to-ap.
-func (s *Service) withAPHop(
-	ctx context.Context,
-	apSSID string,
-	apHostIP string,
-	homeWiFi *OnboardWiFiConfig,
-	fn func(context.Context) error,
-) error {
-	if homeWiFi == nil {
-		homeWiFi = &OnboardWiFiConfig{}
-	}
-
-	wifiDisc := discovery.NewWiFiDiscoverer()
-	scanner := wifiDisc.Scanner
-	if scanner == nil {
-		return fmt.Errorf("WiFi scanning not supported on this platform")
-	}
-
-	// Override the host's static AP-subnet IP when requested (empty is ignored,
-	// keeping discovery.DefaultAPHostIP). Only the Linux scanner needs this.
-	if setter, ok := scanner.(discovery.APHostIPSetter); ok {
-		setter.SetAPHostIP(apHostIP)
-	}
-
-	// Remember current network for reconnection (may fail if not connected).
-	originalNet, netErr := scanner.CurrentNetwork(ctx)
-	if netErr != nil {
-		debug.TraceEvent("AP hop: could not detect current network: %v", netErr)
-	}
-
-	// Connect to the Shelly AP (open network, no password).
-	if err := scanner.Connect(ctx, apSSID, ""); err != nil {
-		return fmt.Errorf("failed to connect to Shelly AP %q: %w", apSSID, err)
-	}
-
-	// Return to the home network no matter how fn exits — a normal return, an
-	// error, or a panic — so a failure mid-hop never strands the host on the
-	// device AP. A cancel-immune context lets the reconnect (and AP-block cleanup)
-	// run even when ctx was already cancelled, bounded by its own timeout.
-	defer func() {
-		returnCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), apReturnHomeTimeout)
-		defer cancel()
-		s.returnFromAPHop(returnCtx, scanner, apSSID, originalNet, homeWiFi)
-	}()
-
-	// Wait until the AP link is actually up and the device answers at its AP
-	// address before sending any request. A fixed DHCP delay races association
-	// on slower WiFi stacks, so the first request would leave before a route to
-	// the AP subnet exists and fail with a deadline-exceeded error.
-	s.waitForAPReady(ctx, apReadyTimeout)
-
-	return fn(ctx)
-}
-
-// apReturnHomeTimeout bounds the reconnect-to-home (and AP-block cleanup) that
-// runs on return from an AP hop. It runs on a cancel-immune context so it still
-// executes when the hop's own context was cancelled, but must not block shutdown
-// indefinitely.
-const apReturnHomeTimeout = 30 * time.Second
-
-// returnFromAPHop reconnects the host to its home network after an AP hop and
-// drops the transient device-AP block. It prefers the previously-joined network
-// (NetworkManager may have saved creds), falling back to the supplied home
-// credentials when that SSID differs and the first attempt fails (nl80211 has no
-// credential store). Best-effort: it runs as cleanup on the AP-hop return, so
-// failures are traced, not returned.
-func (s *Service) returnFromAPHop(
-	ctx context.Context,
-	scanner discovery.WiFiScanner,
-	apSSID string,
-	originalNet *discovery.WiFiNetwork,
-	homeWiFi *OnboardWiFiConfig,
-) {
-	reconnectSSID, reconnectPass := reconnectCredentials(originalNet, homeWiFi)
-	if reconnErr := scanner.Connect(ctx, reconnectSSID, reconnectPass); reconnErr != nil {
-		debug.TraceEvent("AP hop reconnect to %s failed: %v", reconnectSSID, reconnErr)
-		if reconnectSSID != homeWiFi.SSID {
-			if err := scanner.Connect(ctx, homeWiFi.SSID, homeWiFi.Password); err != nil {
-				debug.TraceEvent("AP hop fallback connect to %s also failed: %v", homeWiFi.SSID, err)
-			}
-		}
-	}
-
-	// Drop the transient AP block so hops across a fleet of devices do not leave
-	// stale (disabled) wpa_supplicant blocks behind. Only the Linux/wpa_cli
-	// scanner needs this; other platforms manage AP profiles through the OS.
-	if forgetter, ok := scanner.(discovery.APNetworkForgetter); ok {
-		if err := forgetter.ForgetNetwork(ctx, apSSID); err != nil {
-			debug.TraceEvent("AP hop: forget AP network %s failed: %v", apSSID, err)
-		}
-	}
-}
-
-// apReadyTimeout bounds how long withAPHop waits for the host to associate with
-// a Shelly AP and obtain a route to it before sending the first device request.
-const apReadyTimeout = 25 * time.Second
-
-// waitForAPReady polls the device's AP address until a TCP connection to its
-// HTTP port succeeds or the deadline elapses, confirming the host has associated
-// with the AP and obtained a route. This replaces a fixed DHCP delay, which
-// races WiFi association — the device is unreachable for the first second or two
-// after scanner.Connect returns, so an immediate request fails before any route
-// to the 192.168.33.0/24 AP subnet exists.
-func (s *Service) waitForAPReady(ctx context.Context, timeout time.Duration) {
-	addr := net.JoinHostPort(discovery.DefaultAPIP, "80")
-	deadline := time.Now().Add(timeout)
-	dialer := net.Dialer{Timeout: 2 * time.Second}
-
-	for time.Now().Before(deadline) {
-		conn, err := dialer.DialContext(ctx, "tcp", addr)
-		if err == nil {
-			if cerr := conn.Close(); cerr != nil {
-				debug.TraceEvent("AP hop: closing readiness probe: %v", cerr)
-			}
-			return
-		}
-		debug.TraceEvent("AP hop: waiting for %s: %v", addr, err)
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(1 * time.Second):
-		}
-	}
 }
 
 // WaitForDeviceOnNetwork waits for a provisioned device to appear on the
@@ -850,6 +603,14 @@ func (s *Service) OnboardBLEParallel(
 	opts *OnboardOptions,
 ) []*OnboardResult {
 	results := make([]*OnboardResult, len(devices))
+	// One host lookup serves every device rather than one per device.
+	wifiCfg, err := s.joinPassword(ctx, wifiCfg)
+	if err != nil {
+		for i, dev := range devices {
+			results[i] = &OnboardResult{Device: dev, Method: string(OnboardSourceBLE), Error: err}
+		}
+		return results
+	}
 	var wg sync.WaitGroup
 
 	for i, dev := range devices {
@@ -891,25 +652,122 @@ func (s *Service) GetWiFiCredentials(ctx context.Context) *OnboardWiFiConfig {
 // from a machine already on the target WiFi, so the host already holds both the
 // SSID and the passphrase — no Shelly device surrenders its station key, and no
 // previously-registered device is required. This mirrors the host-credential
-// recovery that restore --to-ap performs in resolveJoinNetwork, so the two
-// AP-hop flows resolve credentials identically. Returns nil when the host is not
-// on WiFi or the platform cannot recover the passphrase.
+// recovery that restore --to-ap performs, so the two AP-hop flows resolve
+// credentials identically. Returns nil when the host is not on WiFi or the
+// platform cannot recover the passphrase.
 func (s *Service) HostWiFiCredentials(ctx context.Context) *OnboardWiFiConfig {
-	scanner := discovery.NewWiFiDiscoverer().Scanner
-	if scanner == nil {
+	ssid := s.hostCurrentSSID(ctx)
+	if ssid == "" {
 		return nil
+	}
+	pass, passErr := s.HostWiFiPassword(ctx, ssid)
+	if passErr != nil || pass == "" {
+		debug.TraceEvent("onboard: host passphrase for %q not recovered: %v", ssid, passErr)
+		return nil
+	}
+	return &OnboardWiFiConfig{SSID: ssid, Password: pass}
+}
+
+// hostCurrentSSID returns the SSID of the WiFi network this host is on, or ""
+// when it is on none or the platform cannot tell. It only reads the host's WiFi
+// state.
+func (s *Service) hostCurrentSSID(ctx context.Context) string {
+	scanner := s.scanner()
+	if scanner == nil {
+		return ""
 	}
 	current, err := scanner.CurrentNetwork(ctx)
 	if err != nil || current == nil || current.SSID == "" {
-		debug.TraceEvent("onboard: host not on a recoverable WiFi network: %v", err)
-		return nil
+		debug.TraceEvent("host not on a WiFi network: %v", err)
+		return ""
 	}
-	pass, passErr := s.hostWiFiPassword(ctx, current.SSID)
-	if passErr != nil || pass == "" {
-		debug.TraceEvent("onboard: host passphrase for %q not recovered: %v", current.SSID, passErr)
-		return nil
+	return current.SSID
+}
+
+// HostWiFiPassword recovers the passphrase this host has stored for ssid from the
+// OS credential store, when the WiFi backend supports it. No Shelly device
+// returns its station key, so this lets a device join a network the host knows
+// without the passphrase being typed again.
+func (s *Service) HostWiFiPassword(ctx context.Context, ssid string) (string, error) {
+	if ssid == "" {
+		return "", fmt.Errorf("no WiFi network named")
 	}
-	return &OnboardWiFiConfig{SSID: current.SSID, Password: pass}
+	scanner := s.scanner()
+	if scanner == nil {
+		return "", fmt.Errorf("WiFi not supported on this platform")
+	}
+	provider, ok := scanner.(discovery.HostNetworkPasswordProvider)
+	if !ok {
+		return "", fmt.Errorf("host passphrase recovery not supported on this platform")
+	}
+	return provider.HostNetworkPassword(ctx, ssid)
+}
+
+// hostPassphrase returns the passphrase this host has stored for ssid, or
+// PassphraseError naming ssid when there is none. Why the lookup failed goes to
+// the debug trace, since the passphrase error is what the user acts on.
+func (s *Service) hostPassphrase(ctx context.Context, ssid string) (string, error) {
+	pass, err := s.HostWiFiPassword(ctx, ssid)
+	if err != nil || pass == "" {
+		debug.TraceEvent("host passphrase for %q not recovered: %v", ssid, err)
+		return "", PassphraseError(ssid)
+	}
+	return pass, nil
+}
+
+// scanner returns the WiFi backend set with WithWiFiScanner, or the platform's.
+func (s *Service) scanner() discovery.WiFiScanner {
+	if s.wifiScanner != nil {
+		return s.wifiScanner
+	}
+	// A test binary never reaches the host's WiFi, whichever way its service
+	// was built.
+	if testing.Testing() {
+		return OfflineWiFiScanner{}
+	}
+	return discovery.NewWiFiDiscoverer().Scanner
+}
+
+// errNoWiFi is returned by every OfflineWiFiScanner call.
+var errNoWiFi = errors.New("WiFi is not available")
+
+// OfflineWiFiScanner is a WiFi backend with no network: it reports no current
+// network, knows no stored passphrase and refuses every scan and connect, so a
+// service using it never queries or moves the host's WiFi. Demo mode and tests
+// use it.
+type OfflineWiFiScanner struct{}
+
+// Scan refuses to scan.
+func (OfflineWiFiScanner) Scan(context.Context) ([]discovery.WiFiNetwork, error) {
+	return nil, errNoWiFi
+}
+
+// Connect refuses to connect.
+func (OfflineWiFiScanner) Connect(context.Context, string, string) error { return errNoWiFi }
+
+// Disconnect refuses to disconnect.
+func (OfflineWiFiScanner) Disconnect(context.Context) error { return errNoWiFi }
+
+// CurrentNetwork reports that the host is on no WiFi network.
+func (OfflineWiFiScanner) CurrentNetwork(context.Context) (*discovery.WiFiNetwork, error) {
+	return nil, errNoWiFi
+}
+
+// joinPassword returns wifi with its passphrase filled in from this host's
+// stored credentials when it has none and the network is not open. A network
+// with no passphrase from either is refused with PassphraseError, so a secured
+// network is never written as an open one.
+func (s *Service) joinPassword(ctx context.Context, wifi *OnboardWiFiConfig) (*OnboardWiFiConfig, error) {
+	if wifi.Open || wifi.Password != "" {
+		return wifi, nil
+	}
+	pass, err := s.hostPassphrase(ctx, wifi.SSID)
+	if err != nil {
+		return nil, err
+	}
+	resolved := *wifi
+	resolved.Password = pass
+	return &resolved, nil
 }
 
 // wifiReading is one device's reported station SSID and (Gen1, unmasked) key.
@@ -1029,8 +887,7 @@ func (s *Service) LoadProvisionSource(ctx context.Context, fromDevice, fromTempl
 		}
 		source.Backup = bkp
 
-		// Extract WiFi credentials from backup (Gen1 devices include the password)
-		source.WiFi = extractWiFiFromBackup(bkp)
+		source.WiFi = provisionWiFi(bkp)
 
 	case fromTemplate != "":
 		tpl, ok := config.GetDeviceTemplate(fromTemplate)
@@ -1043,56 +900,16 @@ func (s *Service) LoadProvisionSource(ctx context.Context, fromDevice, fromTempl
 	return source, nil
 }
 
-// extractWiFiFromBackup extracts WiFi credentials from a device backup.
-// Prefers bkp.WiFi (always populated during backup) over parsing bkp.Config.
-// Gen1 backups include the WiFi password ("key"); Gen2+ include only the SSID.
-func extractWiFiFromBackup(bkp *backup.DeviceBackup) *OnboardWiFiConfig {
-	// Primary: use the dedicated WiFi blob (populated by marshalGen1WiFi / Gen2 export).
-	if cfg := extractWiFiFromBlob(bkp.WiFi); cfg != nil {
-		return cfg
-	}
-
-	// Fallback for Gen1: parse the full settings from Config.
-	if bkp.DeviceInfo != nil && bkp.DeviceInfo.Generation == 1 && bkp.Config != nil {
-		var settings gen1.Settings
-		if err := json.Unmarshal(bkp.Config, &settings); err != nil {
-			debug.TraceEvent("extractWiFiFromBackup: failed to parse Gen1 settings: %v", err)
-			return nil
-		}
-		if settings.WiFiSta != nil && settings.WiFiSta.SSID != "" && settings.WiFiSta.Key != "" {
-			return &OnboardWiFiConfig{
-				SSID:     settings.WiFiSta.SSID,
-				Password: settings.WiFiSta.Key,
-			}
-		}
-	}
-
-	return nil
-}
-
-// extractWiFiFromBlob parses the backup WiFi blob for station SSID and password.
-// Gen1 blobs include "key" (password); Gen2+ blobs include only "ssid".
-func extractWiFiFromBlob(data json.RawMessage) *OnboardWiFiConfig {
-	if data == nil {
+// provisionWiFi returns the network a source device's backup records, for a
+// new device to join, or nil when the backup records none. An open station
+// stays open; a secured one comes with its key only when the backup holds it.
+// The static address is left out because it belongs to the source device.
+func provisionWiFi(bkp *backup.DeviceBackup) *OnboardWiFiConfig {
+	n := reprovision.NetworkFromBackup(bkp.Backup)
+	if n.SSID == "" {
 		return nil
 	}
-	var wifiData map[string]any
-	if err := json.Unmarshal(data, &wifiData); err != nil {
-		return nil
-	}
-	sta, ok := wifiData[fieldSTA].(map[string]any)
-	if !ok {
-		return nil
-	}
-	ssid, ok := sta["ssid"].(string)
-	if !ok || ssid == "" {
-		return nil
-	}
-	cfg := &OnboardWiFiConfig{SSID: ssid}
-	if key, ok := sta["key"].(string); ok && key != "" {
-		cfg.Password = key
-	}
-	return cfg
+	return &OnboardWiFiConfig{SSID: n.SSID, Password: n.Password, Open: n.Open}
 }
 
 // ApplyProvisionSource applies a previously loaded provision source to a newly
@@ -1115,7 +932,7 @@ func (s *Service) ApplyProvisionSource(ctx context.Context, deviceAddr string, s
 		return nil
 
 	case source.Template != nil:
-		_, err := s.ApplyTemplate(ctx, deviceAddr, source.Template.Config, false)
+		_, _, err := s.applyTemplate(ctx, deviceAddr, source.Template.Config, false, stationsOmit)
 		return err
 	}
 

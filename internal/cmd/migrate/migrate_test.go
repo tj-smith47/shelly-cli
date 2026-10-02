@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -611,14 +612,18 @@ func TestValidateFlags(t *testing.T) {
 		{name: "to-ap with static-ip", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", StaticIP: "10.0.0.5", Gateway: "10.0.0.1", Netmask: "255.255.255.0"}},
 		{name: "static-ip with skip-network", opts: Options{StaticIP: "10.0.0.5", Gateway: "10.0.0.1", Netmask: "255.255.255.0", SkipNetwork: true}, wantErrSubs: "static-ip cannot be used with --skip-network"},
 		{name: "to-ap with skip-network", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", SkipNetwork: true}, wantErrSubs: "to-ap cannot be used with --skip-network"},
-		{name: "to-ap with dry-run", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", DryRun: true}, wantErrSubs: "to-ap cannot be combined with --dry-run"},
+		{name: "to-ap with dry-run", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", DryRun: true}},
 		{name: "ap-ip without to-ap", opts: Options{APIP: "192.168.33.140"}, wantErrSubs: "ap-ip only applies with --to-ap"},
 		{name: "ap-ip with to-ap", opts: Options{ToAP: "ShellyBulbDuo-AABBCC", APIP: "192.168.33.140"}},
+		{name: "ssid with skip-network", opts: Options{SSID: "Guest", SkipNetwork: true}, wantErrSubs: "--ssid cannot be used with --skip-network"},
+		{name: "password with skip-network", opts: Options{Password: "x", SkipNetwork: true}, wantErrSubs: "--password cannot be used with --skip-network"},
+		{name: "open with skip-network", opts: Options{Open: true, SkipNetwork: true}, wantErrSubs: "--open cannot be used with --skip-network"},
+		{name: "dns without static-ip", opts: Options{DNS: "10.0.0.53"}, wantErrSubs: "--gateway, --netmask and --dns only apply with --static-ip"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := tt.opts.validateFlags(tt.opts.networkOverride())
+			err := tt.opts.validateFlags()
 			if tt.wantErrSubs == "" {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
@@ -722,7 +727,7 @@ func TestPreviewMigration_CompareFails(t *testing.T) {
 	// TEST-NET-1 target: CompareBackup cannot reach a device, so previewMigration
 	// returns the wrapped compare error before any display work.
 	opts := &Options{Factory: tf.Factory, Source: "src", Target: "192.0.2.10"}
-	err := opts.previewMigration(ctx, noWiFiBackup(), nil)
+	err := opts.previewMigration(ctx, noWiFiBackup(), shellybackup.StaticNetwork{}, opts.restoreOptions(nil))
 	if err == nil {
 		t.Fatal("expected previewMigration to fail against an unreachable target")
 	}
@@ -741,7 +746,8 @@ func TestMigrateViaAP_ConfirmCancels(t *testing.T) {
 	// Non-TTY confirm declines, so migrateViaAP returns nil before RestoreToAP —
 	// no WiFi hop is attempted.
 	opts := &Options{Factory: tf.Factory, Source: "src", Target: "dst", ToAP: "ShellyBulbDuo-AABBCC"}
-	if err := opts.migrateViaAP(ctx, tf.ShellyService(), noWiFiBackup(), nil); err != nil {
+	override := &clibackup.NetworkOverride{SSID: "home", Password: "pw"}
+	if err := opts.migrateViaAP(ctx, tf.ShellyService(), noWiFiBackup(), shellybackup.StaticNetwork{}, override); err != nil {
 		t.Fatalf("migrateViaAP with declined confirm: %v", err)
 	}
 	if !strings.Contains(tf.OutString(), "Migration cancelled") {
@@ -756,12 +762,13 @@ func TestMigrateViaAP_RestoreFailsBeforeHop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	// Yes skips the prompt so RestoreToAP runs; the WiFi-less backup resolves no
-	// passphrase, so it fails in resolveJoinNetwork BEFORE any host WiFi hop.
+	// Yes skips the prompt so RestoreToAP runs; a test binary's reprovision
+	// flows refuse to reach the network, so it fails before any host WiFi hop.
 	opts := &Options{Factory: tf.Factory, Source: "src", Target: "dst", ToAP: "ShellyBulbDuo-AABBCC", Yes: true}
-	err := opts.migrateViaAP(ctx, tf.ShellyService(), noWiFiBackup(), nil)
+	override := &clibackup.NetworkOverride{SSID: "home", Password: "pw"}
+	err := opts.migrateViaAP(ctx, tf.ShellyService(), noWiFiBackup(), shellybackup.StaticNetwork{}, override)
 	if err == nil {
-		t.Fatal("expected migrateViaAP to fail without a resolvable WiFi passphrase")
+		t.Fatal("expected migrateViaAP to fail")
 	}
 	if !strings.Contains(err.Error(), "migration via AP failed") {
 		t.Errorf("got %v, want error containing %q", err, "migration via AP failed")
@@ -829,5 +836,48 @@ func TestShouldResetSource_StaticIP(t *testing.T) {
 	opts := &Options{StaticIP: "10.0.0.9"}
 	if opts.shouldResetSource() {
 		t.Error("shouldResetSource() = true with --static-ip, want false")
+	}
+}
+
+func TestNewCommand_OpenFlag(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{name: "open", args: []string{"src", "dst", "--ssid", "Guest", "--open"}},
+		{name: "open with password", args: []string{"src", "dst", "--open", "--password", "x"},
+			wantErr: "if any flags in the group [open password] are set none of the others can be"},
+		{name: "open with skip-network", args: []string{"src", "dst", "--open", "--skip-network"},
+			wantErr: "--open cannot be used with --skip-network"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tf := factory.NewTestFactory(t)
+			cmd := NewCommand(tf.Factory)
+			if tt.wantErr == "" {
+				cmd.RunE = func(*cobra.Command, []string) error { return nil }
+			}
+			cmd.SetContext(context.Background())
+			cmd.SetArgs(tt.args)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			err := cmd.Execute()
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if f := cmd.Flags().Lookup("open"); f == nil || f.Usage != "Join a network that has no password" {
+					t.Errorf("--open flag = %+v", f)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("err = %v, want %q", err, tt.wantErr)
+			}
+		})
 	}
 }

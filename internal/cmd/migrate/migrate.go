@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate/diff"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate/validate"
@@ -29,6 +30,9 @@ type migrateService interface {
 	CompareBackup(ctx context.Context, identifier string, deviceBackup *backup.DeviceBackup) (*model.BackupDiff, error)
 	RestoreBackup(ctx context.Context, identifier string, deviceBackup *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, error)
 	RestoreToAP(ctx context.Context, apSSID, apHostIP, registryName string, bkp *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, string, error)
+	cmdutil.LANStationPlanner
+	cmdutil.APStationPlanner
+	cmdutil.RestoreNameDescriber
 	DeviceFactoryReset(ctx context.Context, identifier string) error
 }
 
@@ -57,6 +61,7 @@ type Options struct {
 	APIP          string
 	SSID          string
 	Password      string
+	Open          bool
 
 	AllowFirmwareDowngrade bool
 	FirmwareURL            string
@@ -98,6 +103,14 @@ Use --skip-network to keep both devices online with their current
 network settings, or --reset-source=false to skip the factory reset
 (warning: this may cause IP conflicts).
 
+The target's WiFi address: without --static-ip the target takes the source's
+addressing as the source has it. A source with a static address hands that
+address to the target; the source is then factory reset (the default), and
+with --reset-source=false both devices hold the same address. --static-ip
+gives the target its own address, with any of --gateway, --netmask and --dns
+left off taken from the source. The WiFi station line printed before the
+migration (and by --dry-run) names the address that will be written.
+
 Use --dry-run to preview what would change without applying.`,
 		Example: `  # Preview migration (dry run)
   shelly migrate living-room bedroom --dry-run
@@ -114,6 +127,13 @@ Use --dry-run to preview what would change without applying.`,
   # Force migration between different device types
   shelly migrate living-room bedroom --force --yes
 
+  # Give the target its own address; the gateway, netmask and DNS are the
+  # source's
+  shelly migrate master-bath-1 new-bulb --static-ip 10.23.47.221
+
+  # Migrate onto a target that joins a network with no password
+  shelly migrate guest-plug new-plug --ssid GuestWiFi --open
+
   # Clone config onto a new bulb with a distinct static IP (keeps both online,
   # source is not reset since there is no IP conflict)
   shelly migrate master-bath-1 new-bulb \
@@ -123,7 +143,10 @@ Use --dry-run to preview what would change without applying.`,
   # hops the host onto the AP, applies the config + static IP, the device joins
   # the LAN, and the source is left untouched (target name = "fr")
   shelly migrate sr fr --to-ap ShellyBulbDuo-D0DCFF \
-    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1`,
+    --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
+
+  # Preview that migration without hopping the host's WiFi
+  shelly migrate sr fr --to-ap ShellyBulbDuo-D0DCFF --dry-run`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Source = args[0]
@@ -144,18 +167,17 @@ Use --dry-run to preview what would change without applying.`,
 	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Skip webhook migration")
 	cmd.Flags().BoolVar(&opts.SkipState, "skip-state", false, "Skip migrating live component state (color temperature, brightness); apply configuration only")
 	cmd.Flags().BoolVar(&opts.SkipMeters, "skip-meters", false, "Skip migrating meter/energy-meter configuration (e.g. overpower limits)")
-	cmd.Flags().StringVar(&opts.StaticIP, "static-ip", "", "Assign this static IPv4 to the target instead of copying the source's IP")
-	cmd.Flags().StringVar(&opts.Gateway, "gateway", "", "Static IPv4 default gateway (with --static-ip)")
-	cmd.Flags().StringVar(&opts.Netmask, "netmask", "", "Static IPv4 subnet mask (with --static-ip)")
-	cmd.Flags().StringVar(&opts.DNS, "dns", "", "Static IPv4 nameserver (optional, with --static-ip)")
-	cmd.Flags().StringVar(&opts.Name, "name", "", "Override the target device name (defaults to the target identifier when it is a friendly alias)")
+	cmdutil.AddStaticIPFlags(cmd, &opts.StaticIP, &opts.Gateway, &opts.Netmask, &opts.DNS,
+		"Assign this static IPv4 to the target instead of copying the source's IP (--gateway, --netmask and --dns default to the source device's)",
+		"the source device's")
+	cmd.Flags().StringVar(&opts.Name, "name", "", "Set the target device name (default: the target's alias when the source is another device; a target migrated from its own backup keeps the name it recorded)")
 	cmd.Flags().StringVar(&opts.ToAP, "to-ap", "", "Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)")
 	cmd.Flags().StringVar(&opts.APIP, "ap-ip", "", "Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)")
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the target joins (defaults to the source's network)")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)")
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
+	cmdutil.AddOpenFlag(cmd, &opts.Open)
 	cmd.Flags().BoolVar(&opts.AllowFirmwareDowngrade, "allow-firmware-downgrade", false, "Force the older-firmware config write instead of the automatic firmware update (Gen1; the target is updated to matched firmware by default when the source is newer — this skips that and accepts the reboot-loop risk)")
 	cmd.Flags().StringVar(&opts.FirmwareURL, "firmware-url", "", "Firmware image for the automatic downgrade-recovery update (default: derived from the source device model)")
-	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
 	cmd.AddCommand(validate.NewCommand(f))
 	cmd.AddCommand(diff.NewCommand(f))
@@ -183,35 +205,49 @@ func (o *Options) shouldResetSource() bool {
 	return !o.SkipNetwork
 }
 
-// previewMigration renders the dry-run preview, noting any network override and
-// whether the source will be factory reset.
-func (o *Options) previewMigration(ctx context.Context, bkp *backup.DeviceBackup, override *backup.NetworkOverride) error {
+// previewMigration renders the dry-run preview, noting the target's static
+// address, when one was given, the device name the target gets, and whether
+// the source will be factory reset. A --to-ap target is unreachable until it
+// joins the network, so its preview lists what the backup restores instead of
+// a diff, and adds the station, firmware and access point hop plan.
+func (o *Options) previewMigration(
+	ctx context.Context, bkp *backup.DeviceBackup, static shellybackup.StaticNetwork, restoreOpts backup.RestoreOptions,
+) error {
 	ios := o.Factory.IOStreams()
-	d, err := o.service().CompareBackup(ctx, o.Target, bkp)
-	if err != nil {
-		return fmt.Errorf("failed to compare: %w", err)
+	svc := o.service()
+	if o.ToAP != "" {
+		ios.Title("Migration Preview (dry run)")
+		ios.Println()
+		term.DisplayRestorePreview(ios, bkp, restoreOpts)
+	} else {
+		d, err := svc.CompareBackup(ctx, o.Target, bkp)
+		if err != nil {
+			return fmt.Errorf("failed to compare: %w", err)
+		}
+		term.DisplayMigrationPreview(ios, o.Source, string(backup.SourceDevice), o.Target, d)
+		cmdutil.PrintRestoreName(ctx, ios, svc, o.Target, bkp, restoreOpts)
 	}
-	term.DisplayMigrationPreview(ios, o.Source, string(backup.SourceDevice), o.Target, d)
-	if override != nil {
-		ios.Info("Target %q will get static IP %s; source %q keeps its own address", o.Target, override.StaticIP, o.Source)
+	if static.IP != "" {
+		ios.Info("Target %q will get static IP %s (gateway %s, netmask %s); source %q keeps its own address",
+			o.Target, static.IP, static.Gateway, static.Netmask, o.Source)
 	}
 	if o.shouldResetSource() {
 		ios.Warning("Source device %q will be factory reset after migration", o.Source)
+	}
+	if o.ToAP != "" {
+		return cmdutil.PreviewAPRestore(ctx, ios, svc, o.ToAP, bkp, restoreOpts)
 	}
 	return nil
 }
 
 // validateFlags rejects incompatible flag combinations before any device I/O.
-func (o *Options) validateFlags(override *backup.NetworkOverride) error {
-	if override != nil && o.SkipNetwork {
-		return fmt.Errorf("--static-ip cannot be used with --skip-network")
+func (o *Options) validateFlags() error {
+	if err := o.network().Validate(o.SkipNetwork); err != nil {
+		return err
 	}
 	if o.ToAP != "" {
 		if o.SkipNetwork {
 			return fmt.Errorf("--to-ap cannot be used with --skip-network (the device needs WiFi to leave its AP)")
-		}
-		if o.DryRun {
-			return fmt.Errorf("--to-ap cannot be combined with --dry-run (the target is not reachable until it joins the network)")
 		}
 	}
 	if o.APIP != "" && o.ToAP == "" {
@@ -220,20 +256,28 @@ func (o *Options) validateFlags(override *backup.NetworkOverride) error {
 	return nil
 }
 
-// networkOverride builds a NetworkOverride from the static-IP flags, or nil when
-// no static IP was requested.
-func (o *Options) networkOverride() *backup.NetworkOverride {
-	if o.StaticIP == "" && o.SSID == "" && o.Password == "" {
-		return nil
-	}
-	return &backup.NetworkOverride{
+// network returns the WiFi override flags.
+func (o *Options) network() *cmdutil.NetworkFlags {
+	return &cmdutil.NetworkFlags{
 		SSID:     o.SSID,
 		Password: o.Password,
+		Open:     o.Open,
 		StaticIP: o.StaticIP,
 		Gateway:  o.Gateway,
 		Netmask:  o.Netmask,
 		DNS:      o.DNS,
 	}
+}
+
+// staticNetwork returns the static address the target gets, with any gateway,
+// netmask or DNS left off the flags taken from the source device. Its IP is
+// empty when --static-ip was not given.
+func (o *Options) staticNetwork(bkp *backup.DeviceBackup) (shellybackup.StaticNetwork, error) {
+	override := o.network().Override()
+	if !override.IsStatic() {
+		return shellybackup.StaticNetwork{}, nil
+	}
+	return bkp.StaticNetwork(override)
 }
 
 // confirmMigration prompts the user for confirmation unless --yes was passed.
@@ -256,6 +300,26 @@ func (o *Options) confirmMigration(resetSource bool) (bool, error) {
 	return confirmed, nil
 }
 
+// restoreOptions builds the restore options for the target from the flags.
+func (o *Options) restoreOptions(override *backup.NetworkOverride) backup.RestoreOptions {
+	return backup.RestoreOptions{
+		DryRun:          o.DryRun,
+		SkipAuth:        o.SkipAuth,
+		SkipNetwork:     o.SkipNetwork,
+		SkipScripts:     o.SkipScripts,
+		SkipSchedules:   o.SkipSchedules,
+		SkipWebhooks:    o.SkipWebhooks,
+		SkipState:       o.SkipState,
+		SkipMeters:      o.SkipMeters,
+		NetworkOverride: override,
+		Name:            o.Name,
+		AliasName:       cmdutil.DeviceDisplayName("", o.Target),
+
+		AllowFirmwareDowngrade: o.AllowFirmwareDowngrade,
+		FirmwareURL:            o.FirmwareURL,
+	}
+}
+
 // migrateViaAP clones the source backup onto a target sitting at its factory
 // WiFi AP, moving it onto the LAN in one step. Network settings are always
 // applied (they are what take the device off its AP), the source is never reset
@@ -265,26 +329,23 @@ func (o *Options) migrateViaAP(
 	ctx context.Context,
 	svc migrateService,
 	bkp *backup.DeviceBackup,
+	static shellybackup.StaticNetwork,
 	override *backup.NetworkOverride,
 ) error {
 	ios := o.Factory.IOStreams()
-
-	if confirmed, err := o.confirmMigration(false); err != nil || !confirmed {
+	restoreOpts := o.restoreOptions(override)
+	if o.DryRun {
+		return o.previewMigration(ctx, bkp, static, restoreOpts)
+	}
+	// The dry run refuses network flags that name no network, or a network
+	// this host has no passphrase for; the real run refuses them the same way,
+	// before the prompt and the hop.
+	if _, err := svc.PlanAPStation(ctx, bkp, override); err != nil {
 		return err
 	}
 
-	restoreOpts := backup.RestoreOptions{
-		SkipAuth:        o.SkipAuth,
-		SkipScripts:     o.SkipScripts,
-		SkipSchedules:   o.SkipSchedules,
-		SkipWebhooks:    o.SkipWebhooks,
-		SkipState:       o.SkipState,
-		SkipMeters:      o.SkipMeters,
-		NetworkOverride: override,
-		Name:            cmdutil.DeviceDisplayName(o.Name, o.Target),
-
-		AllowFirmwareDowngrade: o.AllowFirmwareDowngrade,
-		FirmwareURL:            o.FirmwareURL,
+	if confirmed, err := o.confirmMigration(false); err != nil || !confirmed {
+		return err
 	}
 
 	// The AP-hop restore-and-report sequence (including partial-failure handling)
@@ -307,10 +368,10 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.service()
 
-	override := opts.networkOverride()
-	if err := opts.validateFlags(override); err != nil {
+	if err := opts.validateFlags(); err != nil {
 		return err
 	}
+	override := opts.network().Override()
 
 	// Back up source device
 	var bkp *backup.DeviceBackup
@@ -323,21 +384,23 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("failed to read source device: %w", err)
 	}
 
-	// --to-ap: target sits at its factory AP, unreachable until provisioned, so
-	// the on-network compatibility/dry-run paths are skipped; the Gen-aware
-	// restore handles the device directly at the AP.
-	if opts.ToAP != "" {
-		return opts.migrateViaAP(ctx, svc, bkp, override)
-	}
-
-	// Check target device compatibility
-	if err := svc.CheckMigrationCompatibility(ctx, bkp, opts.Target, opts.Force); err != nil {
-		term.DisplayCompatibilityError(ios, err)
+	// An address the source cannot complete is refused before the target is
+	// touched or the user is asked to confirm.
+	static, err := opts.staticNetwork(bkp)
+	if err != nil {
 		return err
 	}
 
-	if opts.DryRun {
-		return opts.previewMigration(ctx, bkp, override)
+	// --to-ap: target sits at its factory AP, unreachable until provisioned, so
+	// the on-network compatibility check and diff are skipped; the Gen-aware
+	// restore handles the device directly at the AP.
+	if opts.ToAP != "" {
+		return opts.migrateViaAP(ctx, svc, bkp, static, override)
+	}
+
+	restoreOpts, err := opts.prepareTarget(ctx, svc, bkp, static, override)
+	if err != nil || opts.DryRun {
+		return err
 	}
 
 	resetSource := opts.shouldResetSource()
@@ -354,21 +417,6 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	// Perform migration
-	restoreOpts := backup.RestoreOptions{
-		SkipAuth:        opts.SkipAuth,
-		SkipNetwork:     opts.SkipNetwork,
-		SkipScripts:     opts.SkipScripts,
-		SkipSchedules:   opts.SkipSchedules,
-		SkipWebhooks:    opts.SkipWebhooks,
-		SkipState:       opts.SkipState,
-		SkipMeters:      opts.SkipMeters,
-		NetworkOverride: override,
-		Name:            cmdutil.DeviceDisplayName(opts.Name, opts.Target),
-
-		AllowFirmwareDowngrade: opts.AllowFirmwareDowngrade,
-		FirmwareURL:            opts.FirmwareURL,
-	}
 	var result *backup.RestoreResult
 	err = cmdutil.RunWithSpinner(ctx, ios, "Migrating configuration...", func(ctx context.Context) error {
 		var restoreErr error
@@ -388,6 +436,24 @@ func run(ctx context.Context, opts *Options) error {
 
 	opts.factoryResetSource(ctx, svc, resetSource)
 	return nil
+}
+
+// prepareTarget checks the target can take the backup, previews the migration
+// on a dry run, and settles which WiFi station key the restore writes.
+func (o *Options) prepareTarget(ctx context.Context, svc migrateService, bkp *backup.DeviceBackup, static shellybackup.StaticNetwork, override *backup.NetworkOverride) (backup.RestoreOptions, error) {
+	ios := o.Factory.IOStreams()
+	restoreOpts := o.restoreOptions(override)
+	if err := svc.CheckMigrationCompatibility(ctx, bkp, o.Target, o.Force); err != nil {
+		term.DisplayCompatibilityError(ios, err)
+		return restoreOpts, err
+	}
+	if o.DryRun {
+		if err := o.previewMigration(ctx, bkp, static, restoreOpts); err != nil {
+			return restoreOpts, err
+		}
+	}
+	err := cmdutil.PlanLANStation(ctx, ios, svc, o.Target, bkp, &restoreOpts)
+	return restoreOpts, err
 }
 
 // factoryResetSource factory-resets the source device after a successful

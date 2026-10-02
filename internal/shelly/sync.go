@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -47,18 +48,29 @@ func (s *Service) FetchDeviceConfig(ctx context.Context, device string) SyncResu
 	return SyncResult{Config: deviceConfig}
 }
 
-// PushDeviceConfig pushes config to a device.
-func (s *Service) PushDeviceConfig(ctx context.Context, device string, cfg map[string]any) error {
+// PushDeviceConfig pushes a config captured from the same device back to it
+// and returns a warning for each WiFi station left out. A station on the
+// network the device is already on is written without a key so the device
+// keeps its own; a changed network takes this host's stored password, or the
+// station is left out.
+func (s *Service) PushDeviceConfig(ctx context.Context, device string, cfg map[string]any) ([]string, error) {
 	conn, err := s.Connect(ctx, device)
 	if err != nil {
-		return fmt.Errorf("connect: %w", err)
+		return nil, fmt.Errorf("connect: %w", err)
 	}
-	_, err = conn.Call(ctx, "Shelly.SetConfig", map[string]any{fieldConfig: cfg})
-	iostreams.CloseWithDebug("closing sync push connection", conn)
-	if err != nil {
-		return err
+	defer iostreams.CloseWithDebug("closing sync push connection", conn)
+
+	var current map[string]any
+	if configHasStation(cfg) {
+		if current, err = conn.GetConfig(ctx); err != nil {
+			return nil, fmt.Errorf("read current config: %w", err)
+		}
 	}
-	return nil
+	planned, warnings := s.planConfigStations(ctx, cfg, current, stationsSameDevice)
+	if _, err := conn.Call(ctx, "Shelly.SetConfig", map[string]any{fieldConfig: planned}); err != nil {
+		return warnings, err
+	}
+	return warnings, nil
 }
 
 // SyncDeviceResult holds the result of a device sync operation.
@@ -167,27 +179,40 @@ func (s *Service) PushDeviceConfigs(ctx context.Context, syncDir string, deviceF
 	for _, item := range items {
 		it := item
 		wg.Go(func() {
-			configData, loadErr := config.LoadSyncConfig(syncDir, it.fileName)
-			if loadErr != nil {
-				progress(SyncDeviceResult{Device: it.deviceName, Status: fmt.Sprintf("failed (%v)", loadErr), Err: loadErr})
+			if s.pushSyncFile(ctx, syncDir, it.deviceName, it.fileName, progress) {
+				successCount.Add(1)
+			} else {
 				failedCount.Add(1)
-				return
 			}
-
-			devCtx, cancel := context.WithTimeout(ctx, DefaultTimeout)
-			defer cancel()
-
-			if pushErr := s.PushDeviceConfig(devCtx, it.deviceName, configData); pushErr != nil {
-				progress(SyncDeviceResult{Device: it.deviceName, Status: fmt.Sprintf("failed (%v)", pushErr), Err: pushErr})
-				failedCount.Add(1)
-				return
-			}
-
-			progress(SyncDeviceResult{Device: it.deviceName, Status: "pushed"})
-			successCount.Add(1)
 		})
 	}
 
 	wg.Wait()
 	return int(successCount.Load()), int(failedCount.Load()), skippedCount, nil
+}
+
+// pushSyncFile pushes one device's sync file and reports the outcome to
+// progress; it returns false when the push failed.
+func (s *Service) pushSyncFile(ctx context.Context, syncDir, deviceName, fileName string, progress SyncProgressCallback) bool {
+	configData, err := config.LoadSyncConfig(syncDir, fileName)
+	if err != nil {
+		progress(SyncDeviceResult{Device: deviceName, Status: fmt.Sprintf("failed (%v)", err), Err: err})
+		return false
+	}
+
+	devCtx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+	defer cancel()
+
+	warnings, err := s.PushDeviceConfig(devCtx, deviceName, configData)
+	if err != nil {
+		progress(SyncDeviceResult{Device: deviceName, Status: fmt.Sprintf("failed (%v)", err), Err: err})
+		return false
+	}
+
+	status := "pushed"
+	if len(warnings) > 0 {
+		status += " (" + strings.Join(warnings, "; ") + ")"
+	}
+	progress(SyncDeviceResult{Device: deviceName, Status: status})
+	return true
 }

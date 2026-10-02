@@ -3,11 +3,17 @@ package backup
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -911,6 +917,9 @@ func TestLoadAndValidate_InvalidBackup(t *testing.T) {
 // or device I/O. fw seeds the device's live firmware; uptime/unixtime control the
 // stability and clock the restore observes.
 type gen1RestoreFixture struct {
+	settings func(url.Values) // receives each /settings write, when set
+	sta      func(url.Values) // receives each /settings/sta write, when set
+	sta1     func(url.Values) // receives each /settings/sta1 write, when set
 	fw       string
 	uptime   int
 	unixtime int64
@@ -931,8 +940,23 @@ func (f gen1RestoreFixture) newGen1Server(t *testing.T) *httptest.Server {
 	})
 	// /settings is both the live-firmware read (no query) and the write target for
 	// every paced step (with a query); a flat object satisfies both.
-	mux.HandleFunc("/settings", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/settings", func(w http.ResponseWriter, r *http.Request) {
+		if f.settings != nil && len(r.URL.Query()) > 0 {
+			f.settings(r.URL.Query())
+		}
 		writeJSON(t, w, map[string]any{"fw": f.fw, "name": "shelly1"})
+	})
+	mux.HandleFunc("/settings/sta", func(w http.ResponseWriter, r *http.Request) {
+		if f.sta != nil {
+			f.sta(r.URL.Query())
+		}
+		writeJSON(t, w, map[string]any{})
+	})
+	mux.HandleFunc("/settings/sta1", func(w http.ResponseWriter, r *http.Request) {
+		if f.sta1 != nil {
+			f.sta1(r.URL.Query())
+		}
+		writeJSON(t, w, map[string]any{})
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(t, w, map[string]any{})
@@ -994,10 +1018,10 @@ func (c fakeGen1Connector) ListWebhooks(context.Context, string) ([]WebhookInfoR
 // modernGen1Backup builds a minimal backup carrying modern firmware (fast 750ms
 // pacing) and two webhook actions, with everything but webhooks skippable so the
 // success path runs a short sequence.
-func modernGen1Backup(fw string) *DeviceBackup {
+func modernGen1Backup() *DeviceBackup {
 	return &DeviceBackup{Backup: &shellybackup.Backup{
 		DeviceInfo: &shellybackup.DeviceInfo{Model: "SHSW-1"},
-		Config:     json.RawMessage(`{"fw":"` + fw + `","name":"shelly1"}`),
+		Config:     json.RawMessage(`{"fw":"` + modernGen1FW + `","name":"shelly1"}`),
 		Webhooks: json.RawMessage(`{"actions":{
 			"out_on_url":[{"index":0,"urls":["http://localhost/on"],"enabled":true}],
 			"out_off_url":[{"index":0,"urls":[],"enabled":false}]}}`),
@@ -1016,7 +1040,7 @@ func TestRestoreGen1Backup_Success(t *testing.T) {
 
 	// Skip every step except webhooks so a stable device completes quickly while
 	// still exercising the success result-shaping and the webhook-count branch.
-	res, err := svc.restoreGen1Backup(ctx, "dev", modernGen1Backup(modernGen1FW), RestoreOptions{
+	res, err := svc.restoreGen1Backup(ctx, "dev", modernGen1Backup(), RestoreOptions{
 		SkipNetwork: true, SkipAuth: true, SkipState: true, SkipMeters: true,
 	})
 	if err != nil {
@@ -1047,7 +1071,7 @@ func TestRestoreGen1Backup_SuccessSkipWebhooks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	res, err := svc.restoreGen1Backup(ctx, "dev", modernGen1Backup(modernGen1FW), RestoreOptions{
+	res, err := svc.restoreGen1Backup(ctx, "dev", modernGen1Backup(), RestoreOptions{
 		SkipNetwork: true, SkipAuth: true, SkipState: true, SkipMeters: true, SkipWebhooks: true,
 	})
 	if err != nil {
@@ -1095,7 +1119,7 @@ func TestRestoreGen1Backup_Destabilized(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	res, err := svc.restoreGen1Backup(ctx, "dev", modernGen1Backup(modernGen1FW), RestoreOptions{
+	res, err := svc.restoreGen1Backup(ctx, "dev", modernGen1Backup(), RestoreOptions{
 		SkipNetwork: true, SkipAuth: true, SkipState: true, SkipMeters: true,
 	})
 	if err == nil {
@@ -1216,4 +1240,478 @@ func TestDeviceBackup_Counts(t *testing.T) {
 	if empty.ConfigKeyCount() != 0 || empty.WebhookCount() != 0 || empty.ScheduleCount() != 0 {
 		t.Error("an empty backup must count zero of everything")
 	}
+}
+
+// gen1StaticBackup is modernGen1Backup with a WiFi station on a static address
+// whose gateway and netmask a --static-ip override can fall back to.
+func gen1StaticBackup() *DeviceBackup {
+	bkp := modernGen1Backup()
+	bkp.WiFi = json.RawMessage(`{"sta":{"enabled":true,"ssid":"home","key":"pw","ipv4_method":"static",` +
+		`"ip":"10.0.0.9","gw":"10.0.0.1","mask":"255.255.255.0"}}`)
+	return bkp
+}
+
+func TestRestoreGen1Backup_StaticIPTakesBackupGatewayAndNetmask(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var writes []url.Values
+	fixture := gen1RestoreFixture{fw: modernGen1FW, uptime: 120, unixtime: 1699300000, sta: func(q url.Values) {
+		mu.Lock()
+		defer mu.Unlock()
+		writes = append(writes, q)
+	}}
+	svc := NewService(fakeGen1Connector{t: t, serverURL: fixture.newGen1Server(t).URL})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	_, err := svc.restoreGen1Backup(ctx, "dev", gen1StaticBackup(), RestoreOptions{
+		SkipAuth: true, SkipState: true, SkipMeters: true, SkipWebhooks: true,
+		NetworkOverride: &NetworkOverride{StaticIP: "10.0.0.5"},
+	})
+	if err != nil {
+		t.Fatalf("restoreGen1Backup() error = %v", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(writes) == 0 {
+		t.Fatal("no station write reached the device")
+	}
+	values := map[string]bool{}
+	for _, vs := range writes[len(writes)-1] {
+		for _, v := range vs {
+			values[v] = true
+		}
+	}
+	for _, want := range []string{"10.0.0.5", "10.0.0.1", "255.255.255.0"} {
+		if !values[want] {
+			t.Errorf("station write %v lacks %s", writes[len(writes)-1], want)
+		}
+	}
+}
+
+func TestRestoreGen1Backup_IncompleteStaticRefused(t *testing.T) {
+	t.Parallel()
+	var staWritten atomic.Bool
+	fixture := gen1RestoreFixture{fw: modernGen1FW, uptime: 120, unixtime: 1699300000, sta: func(url.Values) {
+		staWritten.Store(true)
+	}}
+	svc := NewService(fakeGen1Connector{t: t, serverURL: fixture.newGen1Server(t).URL})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// The backup's station uses DHCP, so there is no gateway or netmask to fall back to.
+	_, err := svc.restoreGen1Backup(ctx, "dev", modernGen1Backup(), RestoreOptions{
+		SkipAuth: true, SkipState: true, SkipMeters: true, SkipWebhooks: true,
+		NetworkOverride: &NetworkOverride{StaticIP: "10.0.0.5"},
+	})
+	want := "static address 10.0.0.5 needs a gateway and a netmask, and the backup has none — pass --gateway and --netmask"
+	if err == nil || err.Error() != want {
+		t.Fatalf("err = %v\nwant %s", err, want)
+	}
+	if !errors.Is(err, shellybackup.ErrIncompleteStaticNetwork) {
+		t.Error("errors.Is(ErrIncompleteStaticNetwork) = false")
+	}
+	if staWritten.Load() {
+		t.Error("a station config was written despite the refusal")
+	}
+}
+
+// fakeGen2Connector bridges a Gen2 restore onto a real client.Client pointed at
+// an in-process RPC server that records the WiFi.SetConfig station it receives.
+type fakeGen2Connector struct {
+	fakeGen1Connector
+}
+
+func (c fakeGen2Connector) WithConnection(ctx context.Context, _ string, fn func(*client.Client) error) error {
+	conn, err := client.Connect(ctx, model.Device{Address: c.serverURL})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			c.t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+	return fn(conn)
+}
+
+func (c fakeGen2Connector) IsGen1Device(context.Context, string) (bool, error) { return false, nil }
+
+// newGen2WiFiServer answers every RPC with an empty result and hands each
+// WiFi.SetConfig "config" object to record.
+func newGen2WiFiServer(t *testing.T, record func(map[string]any)) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			ID     any            `json:"id"`
+			Method string         `json:"method"`
+			Params map[string]any `json:"params"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode rpc: %v", err)
+			return
+		}
+		result := map[string]any{}
+		switch req.Method {
+		case "Shelly.GetDeviceInfo":
+			result = map[string]any{"id": "shellyplus2pm-aabbcc", "mac": "AABBCCDDEEFF", "gen": 2, "model": "SNSW-102P16EU"}
+		case "WiFi.SetConfig":
+			cfg, ok := req.Params["config"].(map[string]any)
+			if !ok {
+				t.Errorf("WiFi.SetConfig params = %v, want a config object", req.Params)
+			}
+			record(cfg)
+		}
+		writeJSON(t, w, map[string]any{"id": req.ID, "jsonrpc": "2.0", "result": result})
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func gen2WiFiBackup() *DeviceBackup {
+	return &DeviceBackup{Backup: &shellybackup.Backup{
+		DeviceInfo: &shellybackup.DeviceInfo{Model: "SNSW-102P16EU", Generation: 2},
+		WiFi: json.RawMessage(`{"sta":{"ssid":"home","is_open":false,"enable":true},` +
+			`"sta1":{"ssid":"backup","is_open":true,"enable":false},"ap":{"ssid":"ShellyAP","is_open":true}}`),
+	}}
+}
+
+func TestRestoreGen2Backup_StationKeyWrites(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		ov       *NetworkOverride
+		wantPass any // nil: pass must be absent
+	}{
+		{name: "same network keeps the device's key", ov: nil, wantPass: nil},
+		{name: "a known password is written", ov: &NetworkOverride{SSID: "other", Password: "secret"}, wantPass: "secret"},
+		{name: "open is written as an empty pass", ov: &NetworkOverride{SSID: "guest", Open: true}, wantPass: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var mu sync.Mutex
+			var written []map[string]any
+			srv := newGen2WiFiServer(t, func(cfg map[string]any) {
+				mu.Lock()
+				defer mu.Unlock()
+				written = append(written, cfg)
+			})
+			svc := NewService(fakeGen2Connector{fakeGen1Connector{t: t, serverURL: srv.URL}})
+			if _, err := svc.restoreGen2Backup(context.Background(), "dev", gen2WiFiBackup(), RestoreOptions{NetworkOverride: tt.ov}); err != nil {
+				t.Fatalf("restoreGen2Backup() error = %v", err)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if len(written) != 1 {
+				t.Fatalf("WiFi.SetConfig calls = %d, want 1", len(written))
+			}
+			for _, key := range []string{"sta", "sta1"} {
+				station, ok := written[0][key].(map[string]any)
+				if !ok {
+					continue
+				}
+				if _, ok := station["is_open"]; ok {
+					t.Errorf("%s carries is_open: %v", key, station)
+				}
+			}
+			sta, ok := written[0]["sta"].(map[string]any)
+			if !ok {
+				t.Fatalf("written = %v, want a sta object", written[0])
+			}
+			pass, has := sta["pass"]
+			switch {
+			case tt.wantPass == nil && has:
+				t.Errorf("sta carries pass %v, want none", pass)
+			case tt.wantPass != nil && pass != tt.wantPass:
+				t.Errorf("sta pass = %v (present %v), want %v", pass, has, tt.wantPass)
+			}
+			if ap, ok := written[0]["ap"].(map[string]any); !ok || ap["is_open"] != true {
+				t.Errorf("ap is_open changed: %v", written[0]["ap"])
+			}
+		})
+	}
+}
+
+func TestRestoreGen1Backup_SameNetworkSendsNoKey(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var writes []url.Values
+	fixture := gen1RestoreFixture{fw: modernGen1FW, uptime: 120, unixtime: 1699300000, sta: func(q url.Values) {
+		mu.Lock()
+		defer mu.Unlock()
+		writes = append(writes, q)
+	}}
+	svc := NewService(fakeGen1Connector{t: t, serverURL: fixture.newGen1Server(t).URL})
+	bkp := modernGen1Backup()
+	bkp.WiFi = json.RawMessage(`{"sta":{"enabled":true,"ssid":"home","ipv4_method":"dhcp"}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	if _, err := svc.restoreGen1Backup(ctx, "dev", bkp, RestoreOptions{
+		SkipAuth: true, SkipState: true, SkipMeters: true, SkipWebhooks: true,
+	}); err != nil {
+		t.Fatalf("restoreGen1Backup() error = %v", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(writes) == 0 {
+		t.Fatal("no station write reached the device")
+	}
+	for _, q := range writes {
+		if q.Has("key") {
+			t.Errorf("station write %v carries a key", q)
+		}
+		if q.Get("ssid") != "home" {
+			t.Errorf("station write %v, want ssid home", q)
+		}
+	}
+}
+
+// TestRestoreGen2Backup_DisabledAndSecondaryStation checks the WiFi.SetConfig
+// payload for a disabled station and for each secondary-station write.
+func TestRestoreGen2Backup_DisabledAndSecondaryStation(t *testing.T) {
+	t.Parallel()
+	const blob = `{"sta":{"ssid":"home","enable":false,"is_open":false},"sta1":{"ssid":"spare","enable":true,"is_open":false}}`
+	tests := []struct {
+		name        string
+		st1         Station1Write
+		wantSta1    bool
+		wantPass    any // nil: sta1 carries no pass
+		wantWarning bool
+	}{
+		{name: "as recorded", wantSta1: true},
+		{name: "host key", st1: Station1Write{Password: "sp"}, wantSta1: true, wantPass: "sp"},
+		{name: "open", st1: Station1Write{Open: true}, wantSta1: true, wantPass: ""},
+		{name: "left out", st1: Station1Write{Omit: true, SSID: "spare"}, wantWarning: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var mu sync.Mutex
+			var written []map[string]any
+			srv := newGen2WiFiServer(t, func(cfg map[string]any) {
+				mu.Lock()
+				defer mu.Unlock()
+				written = append(written, cfg)
+			})
+			svc := NewService(fakeGen2Connector{fakeGen1Connector{t: t, serverURL: srv.URL}})
+			bkp := gen2WiFiBackup()
+			bkp.WiFi = json.RawMessage(blob)
+			result, err := svc.restoreGen2Backup(context.Background(), "dev", bkp, RestoreOptions{Station1: tt.st1})
+			if err != nil {
+				t.Fatalf("restoreGen2Backup() error = %v", err)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if len(written) != 1 {
+				t.Fatalf("WiFi.SetConfig calls = %d, want 1", len(written))
+			}
+			sta, ok := written[0]["sta"].(map[string]any)
+			if !ok {
+				t.Fatalf("written = %v, want a sta object", written[0])
+			}
+			if sta["enable"] != false {
+				t.Errorf("sta = %v, want it kept disabled", sta)
+			}
+			if _, has := sta["pass"]; has {
+				t.Errorf("disabled sta carries pass: %v", sta)
+			}
+			sta1, has := written[0]["sta1"].(map[string]any)
+			if has != tt.wantSta1 {
+				t.Fatalf("sta1 written = %v, want %v (%v)", has, tt.wantSta1, written[0])
+			}
+			if has {
+				pass, hasPass := sta1["pass"]
+				if (tt.wantPass == nil) == hasPass || (hasPass && pass != tt.wantPass) {
+					t.Errorf("sta1 = %v, want pass %v", sta1, tt.wantPass)
+				}
+			}
+			warned := slices.ContainsFunc(result.Warnings, func(w string) bool { return strings.Contains(w, `"spare"`) })
+			if warned != tt.wantWarning {
+				t.Errorf("warnings = %v, want a secondary-station warning %v", result.Warnings, tt.wantWarning)
+			}
+		})
+	}
+}
+
+// TestRestoreGen1Backup_DisabledAndSecondaryStation checks the Gen1 station
+// writes for a disabled station holding a key and for each secondary-station
+// write.
+func TestRestoreGen1Backup_DisabledAndSecondaryStation(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		st1         Station1Write
+		wantSta1    bool
+		wantKey     string
+		wantWarning bool
+	}{
+		{name: "as recorded", wantSta1: true},
+		{name: "host key", st1: Station1Write{Password: "sp"}, wantSta1: true, wantKey: "sp"},
+		{name: "left out", st1: Station1Write{Omit: true, SSID: "spare"}, wantWarning: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var mu sync.Mutex
+			var staWrites, sta1Writes []url.Values
+			fixture := gen1RestoreFixture{fw: modernGen1FW, uptime: 120, unixtime: 1699300000,
+				sta: func(q url.Values) {
+					mu.Lock()
+					defer mu.Unlock()
+					staWrites = append(staWrites, q)
+				},
+				sta1: func(q url.Values) {
+					mu.Lock()
+					defer mu.Unlock()
+					sta1Writes = append(sta1Writes, q)
+				}}
+			svc := NewService(fakeGen1Connector{t: t, serverURL: fixture.newGen1Server(t).URL})
+			bkp := modernGen1Backup()
+			bkp.WiFi = json.RawMessage(`{"sta":{"enabled":false,"ssid":"home","key":"bk"},` +
+				`"sta1":{"enabled":true,"ssid":"spare"}}`)
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			result, err := svc.restoreGen1Backup(ctx, "dev", bkp, RestoreOptions{
+				SkipAuth: true, SkipState: true, SkipMeters: true, SkipWebhooks: true, Station1: tt.st1,
+			})
+			if err != nil {
+				t.Fatalf("restoreGen1Backup() error = %v", err)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if len(staWrites) == 0 {
+				t.Fatal("no station write reached the device")
+			}
+			for _, q := range staWrites {
+				if q.Has("key") || q.Get("enabled") != "false" {
+					t.Errorf("station write %v, want it disabled and without a key", q)
+				}
+			}
+			if (len(sta1Writes) > 0) != tt.wantSta1 {
+				t.Fatalf("sta1 writes = %v, want written %v", sta1Writes, tt.wantSta1)
+			}
+			for _, q := range sta1Writes {
+				if q.Get("key") != tt.wantKey || q.Has("key") != (tt.wantKey != "") {
+					t.Errorf("sta1 write %v, want key %q", q, tt.wantKey)
+				}
+			}
+			warned := slices.ContainsFunc(result.Warnings, func(w string) bool { return strings.Contains(w, `"spare"`) })
+			if warned != tt.wantWarning {
+				t.Errorf("warnings = %v, want a secondary-station warning %v", result.Warnings, tt.wantWarning)
+			}
+		})
+	}
+}
+
+// TestRestore_NameWrites covers the device name each restore path writes for
+// a backup whose MAC is or is not the target's (AA:BB:CC:DD:EE:FF on both fake
+// devices): the alias only for another device's backup, --name always.
+func TestRestore_NameWrites(t *testing.T) {
+	t.Parallel()
+	const sameMAC, otherMAC = "aa:bb:cc:dd:ee:ff", "11:22:33:44:55:66"
+	tests := []struct {
+		name      string
+		backupMAC string
+		explicit  string
+		want      string // "" when no name beyond the backup's is written
+	}{
+		{name: "own backup", backupMAC: sameMAC},
+		{name: "another device's backup", backupMAC: otherMAC, want: "alias"},
+		{name: "--name, own backup", backupMAC: sameMAC, explicit: "given", want: "given"},
+		{name: "--name, another device's backup", backupMAC: otherMAC, explicit: "given", want: "given"},
+	}
+	for _, tt := range tests {
+		opts := RestoreOptions{Name: tt.explicit, AliasName: "alias", SkipNetwork: true, SkipAuth: true,
+			SkipState: true, SkipMeters: true, SkipWebhooks: true}
+		t.Run("gen1/"+tt.name, func(t *testing.T) {
+			t.Parallel()
+			var mu sync.Mutex
+			var names []string
+			fixture := gen1RestoreFixture{fw: modernGen1FW, uptime: 120, unixtime: 1699300000, settings: func(q url.Values) {
+				if q.Has("name") {
+					mu.Lock()
+					defer mu.Unlock()
+					names = append(names, q.Get("name"))
+				}
+			}}
+			svc := NewService(fakeGen1Connector{t: t, serverURL: fixture.newGen1Server(t).URL})
+			bkp := modernGen1Backup()
+			bkp.DeviceInfo.MAC = tt.backupMAC
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			if _, err := svc.restoreGen1Backup(ctx, "dev", bkp, opts); err != nil {
+				t.Fatalf("restoreGen1Backup() error = %v", err)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			// With no resolved name the restore writes the backup's own, "shelly1".
+			if want := cmp.Or(tt.want, "shelly1"); len(names) == 0 || names[len(names)-1] != want {
+				t.Errorf("names written = %q, want the last to be %q", names, want)
+			}
+		})
+		t.Run("gen2/"+tt.name, func(t *testing.T) {
+			t.Parallel()
+			var mu sync.Mutex
+			var names []string
+			srv := newGen2NameServer(t, func(name string) {
+				mu.Lock()
+				defer mu.Unlock()
+				names = append(names, name)
+			})
+			svc := NewService(fakeGen2Connector{fakeGen1Connector{t: t, serverURL: srv.URL}})
+			bkp := gen2WiFiBackup()
+			bkp.DeviceInfo.MAC = tt.backupMAC
+			if _, err := svc.restoreGen2Backup(context.Background(), "dev", bkp, opts); err != nil {
+				t.Fatalf("restoreGen2Backup() error = %v", err)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			var want []string
+			if tt.want != "" {
+				want = []string{tt.want}
+			}
+			if !slices.Equal(names, want) {
+				t.Errorf("names written = %q, want %q", names, want)
+			}
+		})
+	}
+}
+
+// newGen2NameServer answers every RPC like newGen2WiFiServer and hands each
+// name written through Sys.SetConfig to record.
+func newGen2NameServer(t *testing.T, record func(string)) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			ID     any    `json:"id"`
+			Method string `json:"method"`
+			Params struct {
+				Config struct {
+					Device struct {
+						Name *string `json:"name"`
+					} `json:"device"`
+				} `json:"config"`
+			} `json:"params"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode rpc: %v", err)
+			return
+		}
+		result := map[string]any{}
+		switch req.Method {
+		case "Shelly.GetDeviceInfo":
+			result = map[string]any{"id": "shellyplus2pm-aabbcc", "mac": "AABBCCDDEEFF", "gen": 2, "model": "SNSW-102P16EU"}
+		case "Sys.SetConfig":
+			if n := req.Params.Config.Device.Name; n != nil {
+				record(*n)
+			}
+		}
+		writeJSON(t, w, map[string]any{"id": req.ID, "jsonrpc": "2.0", "result": result})
+	}))
+	t.Cleanup(srv.Close)
+	return srv
 }

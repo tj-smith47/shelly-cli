@@ -4,8 +4,11 @@ package provision
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
+	"github.com/tj-smith47/shelly-go/reprovision"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
@@ -61,9 +64,16 @@ func (s *Service) GetDeviceInfoByAddress(ctx context.Context, address string) (*
 	return result, err
 }
 
-// ConfigureWiFi configures a device's WiFi station settings.
-// Used during provisioning to set up the device's network connection.
-func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password string) error {
+// ConfigureWiFi joins a device's WiFi station to ssid. open writes an empty
+// passphrase, for a network that has none; otherwise password must be the
+// network's passphrase, because a device given no key would join as open.
+func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password string, open bool) error {
+	switch {
+	case open && password != "":
+		return fmt.Errorf("%w: an open network takes no password", types.ErrInvalidParam)
+	case !open && password == "":
+		return &reprovision.NoPassphraseError{SSID: ssid}
+	}
 	return s.provider.WithConnection(ctx, address, func(conn *client.Client) error {
 		params := map[string]any{
 			"config": map[string]any{
@@ -74,28 +84,6 @@ func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password str
 				},
 			},
 		}
-		_, err := conn.Call(ctx, "WiFi.SetConfig", params)
-		return err
-	})
-}
-
-// ConfigureWiFiStatic configures a Gen2+ device's WiFi station with a static
-// IPv4 address (ipv4mode=static) instead of DHCP.
-func (s *Service) ConfigureWiFiStatic(ctx context.Context, address, ssid, password, ip, netmask, gateway, dns string) error {
-	return s.provider.WithConnection(ctx, address, func(conn *client.Client) error {
-		sta := map[string]any{
-			wifiKeySSID: ssid,
-			"pass":      password,
-			"enable":    true,
-			"ipv4mode":  "static",
-			"ip":        ip,
-			"netmask":   netmask,
-			"gw":        gateway,
-		}
-		if dns != "" {
-			sta["nameserver"] = dns
-		}
-		params := map[string]any{"config": map[string]any{wifiKeySta: sta}}
 		_, err := conn.Call(ctx, "WiFi.SetConfig", params)
 		return err
 	})

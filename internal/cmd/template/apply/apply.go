@@ -42,6 +42,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 The template configuration will be merged with the device's current
 settings. Use --dry-run to preview changes without applying them.
 
+WiFi stations in the template: a station's address (ip, netmask, gw,
+nameserver, ipv4mode) is never copied, since it belongs to the device the
+template was captured from. A station on the network the device is already on
+is not written. A station on another network is written with the password
+stored on this host for it; with no stored password it is left out with a
+warning, and the network can be set with 'shelly wifi set'. A device with a
+static address keeps that address on the new network, with a warning.
+--dry-run shows each station's planned write without its password.
+
 Note: Only devices of the same model/generation are fully compatible.`,
 		Example: `  # Apply a template to a device
   shelly template apply my-config bedroom
@@ -94,14 +103,17 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Handle dry run mode
 	if opts.DryRun {
-		var changes []string
+		var changes, warnings []string
 		err := cmdutil.RunWithSpinner(ctx, ios, "Comparing configurations...", func(ctx context.Context) error {
 			var dryRunErr error
-			changes, dryRunErr = svc.ApplyTemplate(ctx, opts.Device, tpl.Config, true)
+			changes, warnings, dryRunErr = svc.ApplyTemplate(ctx, opts.Device, tpl.Config, true)
 			return dryRunErr
 		})
 		if err != nil {
 			return err
+		}
+		for _, w := range warnings {
+			ios.Warning("%s", w)
 		}
 
 		if len(changes) == 0 {
@@ -129,10 +141,10 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Apply template
-	var changes []string
+	var changes, warnings []string
 	err = cmdutil.RunWithSpinner(ctx, ios, "Applying template...", func(ctx context.Context) error {
 		var applyErr error
-		changes, applyErr = svc.ApplyTemplate(ctx, opts.Device, tpl.Config, false)
+		changes, warnings, applyErr = svc.ApplyTemplate(ctx, opts.Device, tpl.Config, false)
 		return applyErr
 	})
 	if err != nil {
@@ -142,6 +154,9 @@ func run(ctx context.Context, opts *Options) error {
 	ios.Success("Template %q applied to %s", opts.Template, opts.Device)
 	for _, change := range changes {
 		ios.Printf("  %s\n", change)
+	}
+	for _, w := range warnings {
+		ios.Warning("%s", w)
 	}
 
 	return nil

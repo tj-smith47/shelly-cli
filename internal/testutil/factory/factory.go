@@ -91,8 +91,9 @@ func NewTestFactory(t *testing.T) *TestFactory {
 
 	// Create a simple shelly service without plugin support
 	// This prevents the factory from creating the plugins directory
-	// in the real config location during tests.
-	testService := shelly.New(shelly.NewConfigResolver())
+	// in the real config location during tests. The offline WiFi scanner keeps
+	// the factory access point flows from querying or switching the host's WiFi.
+	testService := shelly.New(shelly.NewConfigResolver(), shelly.WithWiFiScanner(shelly.OfflineWiFiScanner{}))
 
 	f := cmdutil.NewFactory().
 		SetIOStreams(testIO.IOStreams).

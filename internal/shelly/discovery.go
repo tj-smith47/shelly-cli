@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/netguard"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
@@ -86,24 +87,49 @@ func (s *Service) DiscoverDevices(ctx context.Context, opts DiscoveryOptions) ([
 	return enrichDiscoveredDevices(ctx, rawDevices), nil
 }
 
+// NewMDNSDiscoverer returns an mDNS discoverer. Under `go test` it returns
+// netguard.ErrBlocked: an mDNS query is LAN multicast, which no dialer guard
+// sees, so the refusal sits in the constructor every caller goes through.
+func NewMDNSDiscoverer() (*discovery.MDNSDiscoverer, error) {
+	if err := netguard.Refuse("mDNS multicast"); err != nil {
+		return nil, err
+	}
+	return discovery.NewMDNSDiscoverer(), nil
+}
+
+// NewCoIoTDiscoverer returns a CoIoT discoverer, refused under `go test` for
+// the same reason as NewMDNSDiscoverer.
+func NewCoIoTDiscoverer() (*discovery.CoIoTDiscoverer, error) {
+	if err := netguard.Refuse("CoIoT multicast"); err != nil {
+		return nil, err
+	}
+	return discovery.NewCoIoTDiscoverer(), nil
+}
+
 // DiscoverMDNSContext returns an mDNS discoverer plus a cleanup func so the
 // caller can drive discovery with its own context via DiscoverWithContext.
 // Threading the caller ctx into the scan is what lets Ctrl+C abort an
 // in-progress mDNS sweep promptly instead of blocking the full timeout.
-func DiscoverMDNSContext() (discoverer *discovery.MDNSDiscoverer, cleanup func()) {
-	d := discovery.NewMDNSDiscoverer()
+func DiscoverMDNSContext() (discoverer *discovery.MDNSDiscoverer, cleanup func(), err error) {
+	d, err := NewMDNSDiscoverer()
+	if err != nil {
+		return nil, nil, err
+	}
 	cleanup = func() {
 		if err := d.Stop(); err != nil {
 			iostreams.DebugErr("stopping mDNS discoverer", err)
 		}
 	}
-	return d, cleanup
+	return d, cleanup, nil
 }
 
 // DiscoverMDNS performs mDNS/Zeroconf discovery honoring ctx cancellation.
 // The timeout bounds the scan; ctx cancellation (Ctrl+C) aborts it sooner.
 func DiscoverMDNS(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
-	disc, cleanup := DiscoverMDNSContext()
+	disc, cleanup, err := DiscoverMDNSContext()
+	if err != nil {
+		return nil, err
+	}
 	defer cleanup()
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -150,20 +176,26 @@ func discoverHTTP(ctx context.Context, opts DiscoveryOptions) ([]discovery.Disco
 // caller can drive discovery with its own context via DiscoverWithContext.
 // Threading the caller ctx into the scan is what lets Ctrl+C abort an
 // in-progress CoIoT sweep promptly instead of blocking the full timeout.
-func DiscoverCoIoTContext() (discoverer *discovery.CoIoTDiscoverer, cleanup func()) {
-	d := discovery.NewCoIoTDiscoverer()
+func DiscoverCoIoTContext() (discoverer *discovery.CoIoTDiscoverer, cleanup func(), err error) {
+	d, err := NewCoIoTDiscoverer()
+	if err != nil {
+		return nil, nil, err
+	}
 	cleanup = func() {
 		if err := d.Stop(); err != nil {
 			iostreams.DebugErr("stopping CoIoT discoverer", err)
 		}
 	}
-	return d, cleanup
+	return d, cleanup, nil
 }
 
 // DiscoverCoIoT performs CoIoT/CoAP discovery honoring ctx cancellation.
 // The timeout bounds the scan; ctx cancellation (Ctrl+C) aborts it sooner.
 func DiscoverCoIoT(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
-	disc, cleanup := DiscoverCoIoTContext()
+	disc, cleanup, err := DiscoverCoIoTContext()
+	if err != nil {
+		return nil, err
+	}
 	defer cleanup()
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -320,7 +352,10 @@ func (s *Service) DiscoverByMAC(ctx context.Context, mac string) (string, error)
 
 	// Quick mDNS scan (2 seconds)
 	timeout := 2 * time.Second
-	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
+	mdnsDiscoverer, err := NewMDNSDiscoverer()
+	if err != nil {
+		return "", err
+	}
 	defer func() {
 		if err := mdnsDiscoverer.Stop(); err != nil {
 			iostreams.DebugErrCat(iostreams.CategoryDiscovery, "stopping mDNS discoverer", err)

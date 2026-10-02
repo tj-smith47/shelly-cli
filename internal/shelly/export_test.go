@@ -17,3 +17,9 @@ func SetNewFleetManager(fn func(client *integrator.Client) *integrator.FleetMana
 	newFleetManager = fn
 	return func() { newFleetManager = old }
 }
+
+// InjectedWiFiScanner returns the WiFi scanner a service was built with, nil
+// when none was given.
+func InjectedWiFiScanner(s *Service) any {
+	return s.wifiScanner
+}

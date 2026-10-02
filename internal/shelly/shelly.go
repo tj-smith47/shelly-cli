@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/tj-smith47/shelly-go/discovery"
 	libfirmware "github.com/tj-smith47/shelly-go/firmware"
 
 	"github.com/tj-smith47/shelly-cli/internal/cache"
@@ -53,6 +54,11 @@ type Service struct {
 	modbusService     *modbus.Service
 	provisionService  *provision.Service
 	monitoringService *monitoring.Service
+	// wifiScanner joins and leaves WiFi networks for the factory access point
+	// flows; nil uses the platform scanner.
+	wifiScanner discovery.WiFiScanner
+	// ap runs the factory access point flows; nil uses the reprovision package.
+	ap *apFlows
 }
 
 // DeviceResolver resolves device identifiers to device configurations.
@@ -702,16 +708,10 @@ func (s *Service) ScanWiFiNetworksFull(ctx context.Context, identifier string) (
 	return s.networkService.ScanNetworksFull(ctx, identifier)
 }
 
-// SetWiFiStation configures the primary WiFi station.
-// Delegates to the network service.
-func (s *Service) SetWiFiStation(ctx context.Context, identifier, ssid, password string, enable bool) error {
-	return s.networkService.SetStation(ctx, identifier, ssid, password, enable)
-}
-
 // SetWiFiAP configures the access point.
 // Delegates to the network service.
-func (s *Service) SetWiFiAP(ctx context.Context, identifier, ssid, password string, enable bool) error {
-	return s.networkService.SetAP(ctx, identifier, ssid, password, enable)
+func (s *Service) SetWiFiAP(ctx context.Context, identifier, ssid, password string, open, enable bool) error {
+	return s.networkService.SetAP(ctx, identifier, ssid, password, open, enable)
 }
 
 // ----- Device Service accessor and delegations -----
@@ -853,12 +853,12 @@ func (s *Service) GetEthernetConfig(ctx context.Context, identifier string) (map
 		return nil, err
 	}
 	return map[string]any{
-		fieldEnable:  cfg.Enable,
-		"ipv4mode":   cfg.IPv4Mode,
-		"ip":         cfg.IP,
-		"netmask":    cfg.Netmask,
-		"gw":         cfg.GW,
-		"nameserver": cfg.Nameserver,
+		fieldEnable:     cfg.Enable,
+		fieldIPv4Mode:   cfg.IPv4Mode,
+		"ip":            cfg.IP,
+		fieldNetmask:    cfg.Netmask,
+		"gw":            cfg.GW,
+		fieldNameserver: cfg.Nameserver,
 	}, nil
 }
 
@@ -936,15 +936,9 @@ func (s *Service) GetDeviceInfoByAddress(ctx context.Context, address string) (*
 	return s.provisionService.GetDeviceInfoByAddress(ctx, address)
 }
 
-// ConfigureWiFi delegates to the Provision service for convenience.
-func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password string) error {
-	return s.provisionService.ConfigureWiFi(ctx, address, ssid, password)
-}
-
-// ConfigureWiFiStatic delegates to the Provision service to configure a Gen2+
-// device's WiFi station with a static IPv4 address.
-func (s *Service) ConfigureWiFiStatic(ctx context.Context, address, ssid, password, ip, netmask, gateway, dns string) error {
-	return s.provisionService.ConfigureWiFiStatic(ctx, address, ssid, password, ip, netmask, gateway, dns)
+// ConfigureWiFi delegates to the Provision service; see provision.Service.ConfigureWiFi.
+func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password string, open bool) error {
+	return s.provisionService.ConfigureWiFi(ctx, address, ssid, password, open)
 }
 
 // GetBTHomeStatus delegates to the Provision service for convenience.

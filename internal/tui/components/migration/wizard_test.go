@@ -558,3 +558,21 @@ func newTestWizard() Wizard {
 	deps := Deps{Ctx: ctx, Svc: svc}
 	return New(deps)
 }
+
+func TestWizard_ApplyComplete_ShowsStationWarnings(t *testing.T) {
+	t.Parallel()
+	w := newTestWizard()
+	w.devices = []DeviceInfo{{Name: "source"}, {Name: "target"}}
+	w.targetIdx = 1
+	w.step = StepPreview
+
+	warning := "WiFi station sta (\"guest\") was not written; set it with `shelly wifi set`"
+	updated, _ := w.Update(ApplyCompleteMsg{Success: true, Warnings: []string{warning}})
+	if got := updated.renderComplete(); !strings.Contains(got, "shelly wifi set") {
+		t.Errorf("complete view does not show the warning:\n%s", got)
+	}
+	reset, _ := updated.reset()
+	if len(reset.warnings) != 0 {
+		t.Errorf("reset kept warnings %v", reset.warnings)
+	}
+}

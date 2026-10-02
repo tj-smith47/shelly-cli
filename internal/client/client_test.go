@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,8 +12,10 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
+	"github.com/tj-smith47/shelly-go/transport"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/netguard"
 )
 
 // Test constants to avoid magic strings.
@@ -8897,5 +8900,78 @@ func TestGen2Thermostat_SetConfig(t *testing.T) {
 
 	if !setConfigCalled {
 		t.Error("Thermostat.SetConfig was not called")
+	}
+}
+
+// TestDeviceHTTPClient_MatchesSDKDefault asserts the device client keeps the
+// settings transport.NewHTTP gives its default client, with only the dial
+// guarded under test.
+func TestDeviceHTTPClient_MatchesSDKDefault(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		url      string
+		wantSkip bool
+	}{{"http://10.0.0.5", false}, {"https://10.0.0.5", true}} {
+		c := deviceHTTPClient(tt.url)
+		tr, ok := c.Transport.(*http.Transport)
+		if !ok {
+			t.Fatalf("%s: transport = %T", tt.url, c.Transport)
+		}
+		if want := transport.NewHTTP(tt.url).GetTimeout(); c.Timeout != want {
+			t.Errorf("%s: timeout %v, want the SDK's %v", tt.url, c.Timeout, want)
+		}
+		// The SDK exposes no getter for its pool sizes or idle timeout, so these
+		// are compared with the values in shelly-go transport/http.go.
+		if tr.MaxIdleConns != 10 || tr.MaxIdleConnsPerHost != 10 || tr.IdleConnTimeout != 90*time.Second {
+			t.Errorf("%s: pool %d/%d, idle %v; want the SDK defaults", tt.url,
+				tr.MaxIdleConns, tr.MaxIdleConnsPerHost, tr.IdleConnTimeout)
+		}
+		gotSkip := tr.TLSClientConfig != nil && tr.TLSClientConfig.InsecureSkipVerify
+		if gotSkip != tt.wantSkip {
+			t.Errorf("%s: skip verify = %v, want %v", tt.url, gotSkip, tt.wantSkip)
+		}
+		if tr.DialContext == nil {
+			t.Errorf("%s: dial not guarded under test", tt.url)
+		} else if _, err := tr.DialContext(context.Background(), "tcp", "192.0.2.1:80"); !errors.Is(err, netguard.ErrBlocked) {
+			t.Errorf("%s: dial to 192.0.2.1 = %v, want netguard.ErrBlocked", tt.url, err)
+		}
+	}
+}
+
+// TestNewDeviceWebSocket_GuardedUnderTest asserts a device websocket to a LAN
+// address is refused before it can dial, and a loopback one is built.
+func TestNewDeviceWebSocket_GuardedUnderTest(t *testing.T) {
+	t.Parallel()
+	if ws, err := NewDeviceWebSocket("ws://192.168.1.100/rpc"); ws != nil || !errors.Is(err, netguard.ErrBlocked) {
+		t.Errorf("LAN address: ws %v, err %v; want netguard.ErrBlocked", ws, err)
+	}
+	if ws, err := NewDeviceWebSocket("ws://127.0.0.1:8080/rpc"); ws == nil || err != nil {
+		t.Errorf("loopback address: ws %v, err %v; want a websocket", ws, err)
+	}
+}
+
+// TestConnect_HTTPSSelfSigned asserts Connect reaches an https device with a
+// self-signed certificate through the guarded client.
+func TestConnect_HTTPSSelfSigned(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(`{"id":1,"result":{"id":"shellyplus1-aabbcc","mac":"AABBCCDDEEFF","gen":2,"model":"SNSW-001P16EU"}}`)); err != nil {
+			t.Logf("write: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	c, err := Connect(context.Background(), model.Device{Address: server.URL})
+	if err != nil {
+		t.Fatalf("Connect(https self-signed) error = %v", err)
+	}
+	defer func() {
+		if err := c.Close(); err != nil {
+			t.Logf("close: %v", err)
+		}
+	}()
+	if c.Info().MAC != "AABBCCDDEEFF" {
+		t.Errorf("MAC = %q, want AABBCCDDEEFF", c.Info().MAC)
 	}
 }

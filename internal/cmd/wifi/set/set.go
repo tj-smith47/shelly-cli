@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 )
 
 // Options holds the command options.
@@ -20,6 +21,7 @@ type Options struct {
 	Enable   bool
 	Gateway  string
 	Netmask  string
+	Open     bool
 	Password string
 	SSID     string
 	StaticIP string
@@ -36,13 +38,27 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Configure the WiFi station (client) connection for a device.
 
 Set the SSID and password to connect to a WiFi network. Optionally configure
-static IP settings instead of using DHCP.`,
+static IP settings instead of using DHCP.
+
+Without --password, a device that stays on the same network keeps the
+password it has. A different network takes the password this host has stored
+for it; with none, the command is refused. Use --open for a network that has
+no password.`,
 		Example: `  # Connect to a WiFi network
   shelly wifi set living-room --ssid "MyNetwork" --password "secret"
+
+  # Join a network this host knows, using its stored password
+  shelly wifi set living-room --ssid "MyNetwork"
+
+  # Join a network that has no password
+  shelly wifi set living-room --ssid "GuestNet" --open
 
   # Configure static IP
   shelly wifi set living-room --ssid "MyNetwork" --password "secret" \
     --static-ip "192.168.1.50" --gateway "192.168.1.1" --netmask "255.255.255.0"
+
+  # Change only the address; the gateway and netmask stay the device's
+  shelly wifi set living-room --ssid "MyNetwork" --static-ip "192.168.1.51"
 
   # Disable WiFi station mode
   shelly wifi set living-room --disable`,
@@ -55,13 +71,14 @@ static IP settings instead of using DHCP.`,
 	}
 
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "WiFi network name")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "WiFi password")
-	cmd.Flags().StringVar(&opts.StaticIP, "static-ip", "", "Static IP address (uses DHCP if not set)")
-	cmd.Flags().StringVar(&opts.Gateway, "gateway", "", "Gateway address (for static IP)")
-	cmd.Flags().StringVar(&opts.Netmask, "netmask", "", "Network mask (for static IP)")
-	cmd.Flags().StringVar(&opts.DNS, "dns", "", "DNS server address (for static IP)")
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
+	cmdutil.AddOpenFlag(cmd, &opts.Open)
+	cmdutil.AddStaticIPFlags(cmd, &opts.StaticIP, &opts.Gateway, &opts.Netmask, &opts.DNS,
+		"Static IPv4 address (DHCP when not set; --gateway, --netmask and --dns default to the device's current ones)",
+		"the device's current one")
 	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable WiFi station mode")
 	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable WiFi station mode")
+	cmd.MarkFlagsMutuallyExclusive("enable", "disable")
 
 	return cmd
 }
@@ -73,26 +90,42 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	// Determine enable state
-	var enable *bool
-	if opts.Enable {
-		t := true
-		enable = &t
-	} else if opts.Disable {
-		f := false
-		enable = &f
-	}
-
-	// Validate flags: configuring or enabling WiFi station mode needs an SSID;
-	// only --disable may omit it. (Without this, --enable with no --ssid would
-	// silently push an empty SSID to the device.)
+	// Configuring or enabling WiFi station mode needs an SSID; only --disable
+	// may omit it, so --enable alone never pushes an empty SSID.
 	if opts.SSID == "" && !opts.Disable {
 		return fmt.Errorf("--ssid is required (or use --disable to disable WiFi)")
 	}
+	flags := cmdutil.NetworkFlags{
+		SSID: opts.SSID, Password: opts.Password, Open: opts.Open,
+		StaticIP: opts.StaticIP, Gateway: opts.Gateway, Netmask: opts.Netmask, DNS: opts.DNS,
+	}
+	if err := flags.Validate(false); err != nil {
+		return err
+	}
 
-	err := cmdutil.RunWithSpinner(ctx, ios, "Configuring WiFi...", func(ctx context.Context) error {
-		if setErr := svc.SetWiFiConfig(ctx, opts.Device, opts.SSID, opts.Password, enable); setErr != nil {
+	write := network.StationWrite{
+		SSID:     opts.SSID,
+		Password: opts.Password,
+		Open:     opts.Open,
+		StaticIP: opts.StaticIP,
+		Gateway:  opts.Gateway,
+		Netmask:  opts.Netmask,
+		DNS:      opts.DNS,
+	}
+	switch {
+	case opts.Enable:
+		write.Enable = new(true)
+	case opts.Disable:
+		write.Enable = new(false)
+	}
+
+	return cmdutil.RunWithSpinner(ctx, ios, "Configuring WiFi...", func(ctx context.Context) error {
+		warnings, setErr := svc.SetWiFiConfig(ctx, opts.Device, write)
+		if setErr != nil {
 			return fmt.Errorf("failed to configure WiFi: %w", setErr)
+		}
+		for _, w := range warnings {
+			ios.Warning("%s", w)
 		}
 
 		if opts.Disable {
@@ -105,5 +138,4 @@ func run(ctx context.Context, opts *Options) error {
 		}
 		return nil
 	})
-	return err
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/netguard"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -250,6 +251,16 @@ func TestExecute_WebSocketConnectionFailure(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "connect") && !strings.Contains(err.Error(), "dial") {
 		t.Errorf("expected connection error, got: %v", err)
+	}
+
+	// The dial goes through netguard, so a test can never reach the real cloud.
+	cloudMgr := setupTestManagerWithCloud(t, "test-token", "https://shelly-13-eu.shelly.cloud")
+	config.SetDefaultManager(cloudMgr)
+	cloudCmd := NewCommand(cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(cloudMgr))
+	cloudCmd.SetContext(ctx)
+	cloudCmd.SetArgs([]string{})
+	if err := cloudCmd.Execute(); !errors.Is(err, netguard.ErrBlocked) {
+		t.Errorf("Execute() against the real cloud host = %v, want netguard.ErrBlocked", err)
 	}
 }
 

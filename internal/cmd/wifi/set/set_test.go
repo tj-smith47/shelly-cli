@@ -805,3 +805,35 @@ func TestRun_SSIDWithEnable(t *testing.T) {
 	err = run(context.Background(), opts)
 	t.Logf("run() with ssid and enable error: %v", err)
 }
+
+// TestExecute_RefusedBeforeAnyWrite covers flag combinations the command
+// refuses before it reaches the device; the address is never dialed.
+func TestExecute_RefusedBeforeAnyWrite(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "open with password", args: []string{"--ssid", "n", "--open", "--password", "p"}, want: "open"},
+		{name: "gateway without static ip", args: []string{"--ssid", "n", "--gateway", "10.0.0.1"}, want: "--static-ip"},
+		{name: "open without ssid", args: []string{"--open"}, want: "--ssid"},
+		{name: "static ip without ssid", args: []string{"--static-ip", "10.0.0.9"}, want: "--ssid"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tf := factory.NewTestFactory(t)
+			var buf bytes.Buffer
+			cmd := NewCommand(tf.Factory)
+			cmd.SetContext(context.Background())
+			cmd.SetArgs(append([]string{"127.0.0.1:1"}, tt.args...))
+			cmd.SetOut(&buf)
+			cmd.SetErr(&buf)
+			err := cmd.Execute()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("err = %v, want it to mention %q", err, tt.want)
+			}
+		})
+	}
+}

@@ -52,7 +52,16 @@ Config file format:
     - name: bedroom
       wifi:  # optional per-device WiFi override
         ssid: "OtherNetwork"
-        password: "other-secret"`,
+        password: "other-secret"
+    - name: porch
+      wifi:
+        ssid: "GuestNet"
+        open: true  # a network that has no password
+
+Without a password, a device that stays on the same network keeps the password
+it has, and a different network takes the password this host has stored for
+it; with none, that device is refused. Set open: true for a network that has
+no password.`,
 		Example: `  # Provision devices from config file
   shelly provision bulk devices.yaml
 

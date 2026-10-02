@@ -16,6 +16,10 @@ Specify key=value pairs to update. Only the specified keys will be modified.
 A key and its value may be separated with "=", ":", or a space — these are
 equivalent ("name=Light", "name:Light", and "name Light" all set name to Light).
 
+WiFi station keys (sta, sta1 and their fields, such as sta.ssid) are refused:
+a station write needs the network's password planned, so set stations with
+'shelly wifi set'. The other wifi keys (ap, roam) are accepted.
+
 ```
 shelly device config set <device> <component> <key>=<value>... [flags]
 ```

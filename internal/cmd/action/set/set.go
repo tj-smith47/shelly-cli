@@ -71,6 +71,7 @@ Gen2+ devices use webhooks instead. See 'shelly webhook create'.`,
 	cmd.Flags().IntVar(&opts.Index, "index", 0, "Action index (for multi-channel devices)")
 	cmd.Flags().BoolVar(&opts.Enabled, "enabled", true, "Enable the action")
 	cmd.Flags().BoolVar(&opts.Disabled, "disabled", false, "Disable the action (same as --enabled=false)")
+	cmd.MarkFlagsMutuallyExclusive("enabled", "disabled")
 
 	return cmd
 }

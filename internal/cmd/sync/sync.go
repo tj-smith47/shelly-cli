@@ -40,7 +40,14 @@ Operations:
   --pull  Download device configs to local storage
   --push  Upload local configs to devices
 
-Configurations are stored in the CLI config directory.`,
+Configurations are stored in the CLI config directory.
+
+WiFi stations on --push: each saved config goes back to the device it was
+pulled from, so a station keeps its saved address. A station on the network
+the device is already on is written without a password, and the device keeps
+its own. A station on another network is written with the password stored on
+this host for it; with no stored password it is left out with a warning, and
+the network can be set with 'shelly wifi set'.`,
 		Example: `  # Pull all device configs to local storage
   shelly sync --pull
 

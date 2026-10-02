@@ -25,6 +25,11 @@ BLE provisioning requires:
 .PP
 Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.
 
+.PP
+Without --password, the network's passphrase is read from this host's stored
+WiFi credentials, or asked for. A network is joined with no password only with
+--open, or when an empty answer at the prompt is confirmed.
+
 
 .SH OPTIONS
 \fB--cloud\fP[=false]
@@ -43,8 +48,12 @@ Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.
 	Disable Shelly Cloud
 
 .PP
+\fB--open\fP[=false]
+	Join a network that has no password
+
+.PP
 \fB--password\fP=""
-	WiFi password
+	WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
 
 .PP
 \fB--ssid\fP=""
@@ -129,6 +138,9 @@ Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.
 
   # Disable cloud during provisioning
   shelly provision ble ShellyPlus1-ABCD1234 --ssid "MyNetwork" --password "secret" --no-cloud
+
+  # Join a network that has no password
+  shelly provision ble ShellyPlus1-ABCD1234 --ssid "GuestWiFi" --open
 .EE
 
 

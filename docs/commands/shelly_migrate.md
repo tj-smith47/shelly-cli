@@ -16,6 +16,14 @@ Use --skip-network to keep both devices online with their current
 network settings, or --reset-source=false to skip the factory reset
 (warning: this may cause IP conflicts).
 
+The target's WiFi address: without --static-ip the target takes the source's
+addressing as the source has it. A source with a static address hands that
+address to the target; the source is then factory reset (the default), and
+with --reset-source=false both devices hold the same address. --static-ip
+gives the target its own address, with any of --gateway, --netmask and --dns
+left off taken from the source. The WiFi station line printed before the
+migration (and by --dry-run) names the address that will be written.
+
 Use --dry-run to preview what would change without applying.
 
 ```
@@ -40,6 +48,13 @@ shelly migrate <source-device> <target-device> [flags]
   # Force migration between different device types
   shelly migrate living-room bedroom --force --yes
 
+  # Give the target its own address; the gateway, netmask and DNS are the
+  # source's
+  shelly migrate master-bath-1 new-bulb --static-ip 10.23.47.221
+
+  # Migrate onto a target that joins a network with no password
+  shelly migrate guest-plug new-plug --ssid GuestWiFi --open
+
   # Clone config onto a new bulb with a distinct static IP (keeps both online,
   # source is not reset since there is no IP conflict)
   shelly migrate master-bath-1 new-bulb \
@@ -50,6 +65,9 @@ shelly migrate <source-device> <target-device> [flags]
   # the LAN, and the source is left untouched (target name = "fr")
   shelly migrate sr fr --to-ap ShellyBulbDuo-D0DCFF \
     --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1
+
+  # Preview that migration without hopping the host's WiFi
+  shelly migrate sr fr --to-ap ShellyBulbDuo-D0DCFF --dry-run
 ```
 
 ### Options
@@ -57,15 +75,16 @@ shelly migrate <source-device> <target-device> [flags]
 ```
       --allow-firmware-downgrade   Force the older-firmware config write instead of the automatic firmware update (Gen1; the target is updated to matched firmware by default when the source is newer — this skips that and accepts the reboot-loop risk)
       --ap-ip string               Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)
-      --dns string                 Static IPv4 nameserver (optional, with --static-ip)
+      --dns string                 Static IPv4 nameserver (with --static-ip; default: the source device's)
       --dry-run                    Show what would be changed without applying
       --firmware-url string        Firmware image for the automatic downgrade-recovery update (default: derived from the source device model)
       --force                      Force migration between different device types
-      --gateway string             Static IPv4 default gateway (with --static-ip)
+      --gateway string             Static IPv4 default gateway (with --static-ip; default: the source device's)
   -h, --help                       help for migrate
-      --name string                Override the target device name (defaults to the target identifier when it is a friendly alias)
-      --netmask string             Static IPv4 subnet mask (with --static-ip)
-      --password string            WiFi passphrase for the target network (optional: derived from this host's stored credentials when omitted; set to override or when derivation fails)
+      --name string                Set the target device name (default: the target's alias when the source is another device; a target migrated from its own backup keeps the name it recorded)
+      --netmask string             Static IPv4 subnet mask (with --static-ip; default: the source device's)
+      --open                       Join a network that has no password
+      --password string            WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
       --reset-source               Factory reset source device after migration (default true)
       --skip-auth                  Skip authentication configuration
       --skip-meters                Skip migrating meter/energy-meter configuration (e.g. overpower limits)
@@ -75,7 +94,7 @@ shelly migrate <source-device> <target-device> [flags]
       --skip-state                 Skip migrating live component state (color temperature, brightness); apply configuration only
       --skip-webhooks              Skip webhook migration
       --ssid string                Override the WiFi SSID the target joins (defaults to the source's network)
-      --static-ip string           Assign this static IPv4 to the target instead of copying the source's IP
+      --static-ip string           Assign this static IPv4 to the target instead of copying the source's IP (--gateway, --netmask and --dns default to the source device's)
       --to-ap string               Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)
   -y, --yes                        Skip confirmation prompt
 ```

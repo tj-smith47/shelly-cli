@@ -718,7 +718,7 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		if info == nil {
 			// Not cached - fetch from device
 			var err error
-			info, err = c.svc.DeviceInfoAuto(ctx, name)
+			info, err = c.svc.DeviceInfo(ctx, name)
 			if err != nil {
 				data.Error = err
 				data.Online = false

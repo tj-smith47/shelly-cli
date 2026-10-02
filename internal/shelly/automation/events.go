@@ -15,8 +15,10 @@ import (
 	"github.com/tj-smith47/shelly-go/rpc"
 	"github.com/tj-smith47/shelly-go/transport"
 
+	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/netguard"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
@@ -142,10 +144,16 @@ func (es *EventStream) connectDevice(name, address string) {
 
 	// Connect via WebSocket for Gen2+ devices
 	wsURL := fmt.Sprintf("ws://%s/rpc", address)
-	ws := transport.NewWebSocket(wsURL,
+	ws, err := client.NewDeviceWebSocket(wsURL,
 		transport.WithReconnect(true),
 		transport.WithPingInterval(30*time.Second),
 	)
+	if err != nil {
+		iostreams.DebugErrCat(iostreams.CategoryNetwork, fmt.Sprintf("connect websocket %s", name), err)
+		es.bus.Publish(events.NewDeviceOfflineEvent(name).WithReason(err.Error()))
+		cancel()
+		return
+	}
 
 	// Pre-register connection so state callback can find it
 	es.mu.Lock()
@@ -535,6 +543,10 @@ func closeWS(ws *transport.WebSocket) {
 // startCoIoTListener starts the CoIoT multicast listener for Gen1 devices.
 // CoIoT allows Gen1 devices to push status updates instead of polling.
 func (es *EventStream) startCoIoTListener() {
+	if err := netguard.Refuse("CoIoT multicast"); err != nil {
+		iostreams.DebugErrCat(iostreams.CategoryNetwork, "start coiot listener", err)
+		return
+	}
 	es.coiotListener = gen1.NewCoIoTListener()
 
 	es.coiotListener.OnStatus(func(deviceID string, status *gen1.CoIoTStatus) {

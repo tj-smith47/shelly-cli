@@ -17,6 +17,17 @@ Keys present in the file are applied to the device; keys absent from the file
 are left unchanged (the device merges the update — there is no whole-config
 replace primitive). Capture a file in this format with 'shelly device config export'.
 
+.PP
+WiFi stations in the file: when the file's sys.device.mac is the device's own,
+a station on the device's current network is written without a password (the
+device keeps its key), and a changed network takes the password stored on this
+host. A file from another device, or one with no MAC, never copies its station
+address (ip, netmask, gw, nameserver, ipv4mode), and its network is written
+only when the device is not already on it and this host has its password. A
+station that cannot be written that way is left out with a warning; set it
+with 'shelly wifi set'. --dry-run shows each station's planned write without
+its password.
+
 
 .SH OPTIONS
 \fB--dry-run\fP[=false]

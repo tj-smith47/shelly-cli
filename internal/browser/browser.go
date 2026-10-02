@@ -3,9 +3,11 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"runtime"
+	"testing"
 
 	"github.com/atotto/clipboard"
 )
@@ -31,6 +33,11 @@ func (e *ClipboardFallbackError) Error() string {
 	return fmt.Sprintf("URL copied to clipboard: %s", e.URL)
 }
 
+// ErrUnderTest is returned by the default Browser under `go test`: a launched
+// browser or clipboard helper is a real host process that loads the URL from
+// the network, which no test may do.
+var ErrUnderTest = errors.New("browser: not opened under go test")
+
 // browserImpl is the default implementation of Browser.
 type browserImpl struct{}
 
@@ -44,6 +51,9 @@ func New() Browser {
 // If the browser cannot be opened, it copies the URL to the clipboard
 // and returns a ClipboardFallbackError.
 func (b *browserImpl) Browse(ctx context.Context, url string) error {
+	if testing.Testing() {
+		return fmt.Errorf("%w: %s", ErrUnderTest, url)
+	}
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
@@ -82,5 +92,8 @@ func (b *browserImpl) OpenDeviceUI(ctx context.Context, deviceIP string) error {
 
 // CopyToClipboard copies a URL to the system clipboard.
 func (b *browserImpl) CopyToClipboard(url string) error {
+	if testing.Testing() {
+		return fmt.Errorf("%w: %s", ErrUnderTest, url)
+	}
 	return clipboard.WriteAll(url)
 }

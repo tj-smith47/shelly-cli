@@ -8,11 +8,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
+	"github.com/tj-smith47/shelly-go/transport"
+
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/netguard"
 )
 
 // Generation represents a Shelly device generation.
@@ -52,14 +56,10 @@ type DetectionResult struct {
 func DetectGeneration(ctx context.Context, address string, auth *model.Auth) (*DetectionResult, error) {
 	url := ensureHTTPScheme(address)
 
-	transport := cloneDefaultTransport()
-	if strings.HasPrefix(url, "https") {
-		// Shelly devices ship self-signed certs, matching the convention in
-		// client.go/gen1.go which skip verification for https:// endpoints.
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // Shelly devices use self-signed TLS certs; skipping verification is intentional
-	}
+	tr := cloneDefaultTransport()
+	skipDeviceTLSVerify(tr, url)
 
-	client := &http.Client{Timeout: 5 * time.Second, Transport: transport}
+	client := &http.Client{Timeout: 5 * time.Second, Transport: tr}
 
 	// Try the universal /shelly endpoint first — it identifies a Gen1 device on
 	// the first round-trip and never stalls on the Gen2-only /rpc probe.
@@ -208,6 +208,48 @@ func tryGen1Detection(ctx context.Context, client *http.Client, baseURL string, 
 		Firmware:   info.FW,
 		AuthEn:     info.Auth,
 	}, nil
+}
+
+// deviceRequestTimeout is the request timeout transport.NewHTTP gives the
+// client it builds by default.
+const deviceRequestTimeout = 30 * time.Second
+
+// deviceHTTPClient returns the client transport.NewHTTP would build for url
+// (its idle pool sizes, request timeout and https handling). It is built here
+// so that under `go test` the dial goes through netguard while every other
+// setting is the one production uses.
+func deviceHTTPClient(url string) *http.Client {
+	tr := &http.Transport{
+		MaxIdleConns:        10,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		DialContext:         netguard.NetDialContext(),
+	}
+	skipDeviceTLSVerify(tr, url)
+	return &http.Client{Timeout: deviceRequestTimeout, Transport: tr}
+}
+
+// NewDeviceWebSocket returns transport.NewWebSocket(url, opts...). The SDK
+// websocket takes no dialer, so under `go test` a url whose host is not a
+// loopback address is refused here with netguard.ErrBlocked before anything
+// dials.
+func NewDeviceWebSocket(url string, opts ...transport.Option) (*transport.WebSocket, error) {
+	u, err := neturl.Parse(url)
+	if err != nil {
+		return nil, fmt.Errorf("device websocket url %q: %w", url, err)
+	}
+	if err := netguard.RefuseAddr(u.Host); err != nil {
+		return nil, err
+	}
+	return transport.NewWebSocket(url, opts...), nil
+}
+
+// skipDeviceTLSVerify turns off certificate verification on tr when url is
+// https: Shelly devices ship self-signed certificates.
+func skipDeviceTLSVerify(tr *http.Transport, url string) {
+	if strings.HasPrefix(url, "https") {
+		tr.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: true} //nolint:gosec // Shelly devices use self-signed TLS certs; skipping verification is intentional
+	}
 }
 
 // cloneDefaultTransport returns a clone of http.DefaultTransport, falling back
