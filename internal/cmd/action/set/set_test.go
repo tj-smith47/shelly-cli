@@ -113,6 +113,11 @@ func TestNewCommand_Flags(t *testing.T) {
 			if flag.DefValue != tt.defValue {
 				t.Errorf("flag %q default = %q, want %q", tt.name, flag.DefValue, tt.defValue)
 			}
+			// A flag sharing its variable with another flag starts at the other
+			// flag's default, which is how --disabled once made every action disabled.
+			if got := flag.Value.String(); got != tt.defValue {
+				t.Errorf("flag %q starts at %q, want %q", tt.name, got, tt.defValue)
+			}
 		})
 	}
 }

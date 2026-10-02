@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"reflect"
 	"regexp"
 	"sync"
 	"testing"
@@ -388,6 +389,36 @@ func TestLocalFlagsDoNotShadowGlobals(t *testing.T) {
 	}
 }
 
+// TestFlagsSharingAVariableAgreeOnDefault stops two flags of one command from
+// being bound to the same variable with different defaults: each registration
+// writes its default to the variable, so the first flag silently starts at the
+// second flag's default.
+func TestFlagsSharingAVariableAgreeOnDefault(t *testing.T) {
+	t.Parallel()
+
+	rootCmdMu.Lock()
+	defer rootCmdMu.Unlock()
+
+	walkCommands(rootCmd, func(c *cobra.Command) {
+		bound := map[uintptr]*pflag.Flag{}
+		c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+			value := reflect.ValueOf(f.Value)
+			if value.Kind() != reflect.Pointer {
+				return
+			}
+			first, shared := bound[value.Pointer()]
+			if !shared {
+				bound[value.Pointer()] = f
+				return
+			}
+			if first.DefValue != f.DefValue {
+				t.Errorf("%s: --%s (default %s) and --%s (default %s) are bound to one variable; give each its own",
+					c.CommandPath(), first.Name, first.DefValue, f.Name, f.DefValue)
+			}
+		})
+	})
+}
+
 // TestApplyRawCapture_IgnoresLocalRawFlag asserts a command-local --raw does not
 // switch the command into global capture mode (which discarded its output and
 // printed "[]").
@@ -395,7 +426,9 @@ func TestApplyRawCapture_IgnoresLocalRawFlag(t *testing.T) {
 	t.Parallel()
 
 	rootCmdMu.Lock()
-	defer rootCmdMu.Unlock()
+	// Released as a cleanup so it outlives the flag reset below: cleanups run
+	// after deferred calls, and a deferred unlock would leave the reset unguarded.
+	t.Cleanup(rootCmdMu.Unlock)
 
 	apiCmd, _, err := rootCmd.Find([]string{"api"})
 	if err != nil {

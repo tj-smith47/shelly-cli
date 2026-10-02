@@ -81,10 +81,11 @@ func run(opts *Options) error {
 	ios.Printf("  Device:    %s (%s)\n", bkp.Device().ID, bkp.Device().Model)
 	ios.Printf("  Firmware:  %s\n", bkp.Device().FWVersion)
 	ios.Printf("  Created:   %s\n", bkp.CreatedAt.Format("2006-01-02 15:04:05"))
-	ios.Printf("  Config:    %d keys\n", len(bkp.Config))
+	ios.Printf("  Config:    %d keys\n", bkp.ConfigKeyCount())
 	ios.Printf("  Scripts:   %d\n", len(bkp.Scripts))
-	ios.Printf("  Schedules: %d\n", len(bkp.Schedules))
-	ios.Printf("  Webhooks:  %d\n", len(bkp.Webhooks))
+	ios.Printf("  Schedules: %d\n", bkp.ScheduleCount())
+	ios.Printf("  Webhooks:  %d\n", bkp.WebhookCount())
+	ios.Printf("  KVS:       %d\n", len(bkp.KVS))
 
 	return nil
 }

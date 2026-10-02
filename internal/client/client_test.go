@@ -8772,14 +8772,15 @@ func TestGen1Client_GetActions(t *testing.T) {
 			return standardGen1DeviceInfo(), http.StatusOK
 		}).
 		handle("/settings/actions", func(_ string) (any, int) {
-			// Return valid action settings format per shelly-go library expectations
+			// The shape a Gen1 device returns: entries listed per event name.
 			return map[string]any{
-				"actions": []any{
-					map[string]any{
-						"index":   0,
-						nameKey:   "relay_on_url",
-						"enabled": true,
-						"urls":    []string{"http://example.com"},
+				"actions": map[string]any{
+					"out_on_url": []any{
+						map[string]any{
+							"index":   0,
+							"enabled": true,
+							"urls":    []string{"http://example.com"},
+						},
 					},
 				},
 			}, http.StatusOK
@@ -8801,9 +8802,12 @@ func TestGen1Client_GetActions(t *testing.T) {
 		}
 	}()
 
-	_, err = client.GetActions(ctx)
+	actions, err := client.GetActions(ctx)
 	if err != nil {
 		t.Fatalf("GetActions() error = %v", err)
+	}
+	if len(actions.Actions) != 1 || actions.Actions[0].Event != "out_on_url" || !actions.Actions[0].Enabled {
+		t.Errorf("GetActions() = %+v, want one enabled out_on_url action", actions.Actions)
 	}
 }
 

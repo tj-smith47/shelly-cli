@@ -16,18 +16,21 @@ func DisplayBackupSummary(ios *iostreams.IOStreams, bkp *backup.DeviceBackup) {
 	ios.Println()
 	ios.Printf("  Device:     %s (%s, Gen%d)\n", bkp.Device().ID, bkp.Device().Model, bkp.Device().Generation)
 	ios.Printf("  Firmware:   %s\n", bkp.Device().FWVersion)
-	ios.Printf("  Config:     %d keys\n", len(bkp.Config))
+	ios.Printf("  Config:     %d keys\n", bkp.ConfigKeyCount())
 	if len(bkp.Components) > 0 {
 		ios.Printf("  Components: %d\n", len(bkp.Components))
 	}
 	if len(bkp.Scripts) > 0 {
 		ios.Printf("  Scripts:    %d\n", len(bkp.Scripts))
 	}
-	if len(bkp.Schedules) > 0 {
-		ios.Printf("  Schedules:  included\n")
+	if n := bkp.ScheduleCount(); n > 0 {
+		ios.Printf("  Schedules:  %d\n", n)
 	}
-	if len(bkp.Webhooks) > 0 {
-		ios.Printf("  Webhooks:   included\n")
+	if n := bkp.WebhookCount(); n > 0 {
+		ios.Printf("  Webhooks:   %d\n", n)
+	}
+	if len(bkp.KVS) > 0 {
+		ios.Printf("  KVS:        %d\n", len(bkp.KVS))
 	}
 	if bkp.Encrypted() {
 		ios.Printf("  Encrypted:  yes\n")
@@ -39,9 +42,10 @@ func DisplayRestorePreview(ios *iostreams.IOStreams, bkp *backup.DeviceBackup, o
 	DisplayBackupSource(ios, bkp)
 	ios.Printf("Will restore:\n")
 	displayConfigPreview(ios, bkp, opts)
-	displayScriptsPreview(ios, bkp, opts)
-	displaySchedulesPreview(ios, bkp, opts)
-	displayWebhooksPreview(ios, bkp, opts)
+	displayCountPreview(ios, "Scripts", len(bkp.Scripts), opts.SkipScripts)
+	displayCountPreview(ios, "Schedules", bkp.ScheduleCount(), opts.SkipSchedules)
+	displayCountPreview(ios, "Webhooks", bkp.WebhookCount(), opts.SkipWebhooks)
+	displayCountPreview(ios, "KVS", len(bkp.KVS), opts.SkipKVS)
 }
 
 // DisplayBackupSource prints information about the backup source device.
@@ -69,39 +73,21 @@ func displayConfigPreview(ios *iostreams.IOStreams, bkp *backup.DeviceBackup, op
 
 	switch len(excluded) {
 	case 0:
-		ios.Printf("  Config:    %d keys\n", len(bkp.Config))
+		ios.Printf("  Config:    %d keys\n", bkp.ConfigKeyCount())
 	default:
-		ios.Printf("  Config:    %d keys (%s excluded)\n", len(bkp.Config), strings.Join(excluded, ", "))
+		ios.Printf("  Config:    %d keys (%s excluded)\n", bkp.ConfigKeyCount(), strings.Join(excluded, ", "))
 	}
 }
 
-func displayScriptsPreview(ios *iostreams.IOStreams, bkp *backup.DeviceBackup, opts backup.RestoreOptions) {
-	if len(bkp.Scripts) > 0 {
-		if opts.SkipScripts {
-			ios.Printf("  Scripts:   %d (skipped)\n", len(bkp.Scripts))
-		} else {
-			ios.Printf("  Scripts:   %d\n", len(bkp.Scripts))
-		}
-	}
-}
-
-func displaySchedulesPreview(ios *iostreams.IOStreams, bkp *backup.DeviceBackup, opts backup.RestoreOptions) {
-	if len(bkp.Schedules) > 0 {
-		if opts.SkipSchedules {
-			ios.Printf("  Schedules: %d (skipped)\n", len(bkp.Schedules))
-		} else {
-			ios.Printf("  Schedules: %d\n", len(bkp.Schedules))
-		}
-	}
-}
-
-func displayWebhooksPreview(ios *iostreams.IOStreams, bkp *backup.DeviceBackup, opts backup.RestoreOptions) {
-	if len(bkp.Webhooks) > 0 {
-		if opts.SkipWebhooks {
-			ios.Printf("  Webhooks:  %d (skipped)\n", len(bkp.Webhooks))
-		} else {
-			ios.Printf("  Webhooks:  %d\n", len(bkp.Webhooks))
-		}
+// displayCountPreview prints one restore-preview line for a counted section,
+// and nothing when the backup holds none of it.
+func displayCountPreview(ios *iostreams.IOStreams, label string, count int, skipped bool) {
+	switch {
+	case count == 0:
+	case skipped:
+		ios.Printf("  %-10s %d (skipped)\n", label+":", count)
+	default:
+		ios.Printf("  %-10s %d\n", label+":", count)
 	}
 }
 

@@ -20,7 +20,10 @@ type Options struct {
 	URL     string
 	Index   int
 	Enabled bool
-	Factory *cmdutil.Factory
+	// Disabled is the --disabled flag. It has its own variable: two flags bound
+	// to one variable both write their default to it, and the last one wins.
+	Disabled bool
+	Factory  *cmdutil.Factory
 }
 
 // NewCommand creates the action set command.
@@ -60,13 +63,14 @@ Gen2+ devices use webhooks instead. See 'shelly webhook create'.`,
 			opts.Device = args[0]
 			opts.Event = args[1]
 			opts.URL = args[2]
+			opts.Enabled = opts.Enabled && !opts.Disabled
 			return run(cmd.Context(), opts)
 		},
 	}
 
 	cmd.Flags().IntVar(&opts.Index, "index", 0, "Action index (for multi-channel devices)")
 	cmd.Flags().BoolVar(&opts.Enabled, "enabled", true, "Enable the action")
-	cmd.Flags().BoolVar(&opts.Enabled, "disabled", false, "Disable the action (same as --enabled=false)")
+	cmd.Flags().BoolVar(&opts.Disabled, "disabled", false, "Disable the action (same as --enabled=false)")
 
 	return cmd
 }

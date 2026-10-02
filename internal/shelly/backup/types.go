@@ -45,6 +45,46 @@ func (b *DeviceBackup) Encrypted() bool {
 	return b.encrypted
 }
 
+// ConfigKeyCount returns the number of top-level keys in the backed-up device
+// configuration. Config holds the device's raw JSON, so its length is a byte
+// count and says nothing about how much configuration it carries.
+func (b *DeviceBackup) ConfigKeyCount() int {
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(b.Config, &keys); err != nil {
+		return 0
+	}
+	return len(keys)
+}
+
+// WebhookCount returns the number of webhooks in the backup: Gen1 action
+// entries, or Gen2 hooks. Webhooks holds the device's raw JSON, so its length
+// is a byte count.
+func (b *DeviceBackup) WebhookCount() int {
+	if b.Device().Generation == 1 {
+		return countGen1Actions(b.Backup)
+	}
+	return countListed(b.Webhooks, "hooks")
+}
+
+// ScheduleCount returns the number of schedule jobs in the backup.
+func (b *DeviceBackup) ScheduleCount() int {
+	return countListed(b.Schedules, "jobs")
+}
+
+// countListed returns the length of the list stored under field in a raw
+// device reply, or zero when the reply is absent or has another shape.
+func countListed(raw json.RawMessage, field string) int {
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return 0
+	}
+	var items []json.RawMessage
+	if err := json.Unmarshal(doc[field], &items); err != nil {
+		return 0
+	}
+	return len(items)
+}
+
 // DeviceInfo contains device identification from a backup.
 type DeviceInfo struct {
 	ID         string

@@ -998,7 +998,9 @@ func modernGen1Backup(fw string) *DeviceBackup {
 	return &DeviceBackup{Backup: &shellybackup.Backup{
 		DeviceInfo: &shellybackup.DeviceInfo{Model: "SHSW-1"},
 		Config:     json.RawMessage(`{"fw":"` + fw + `","name":"shelly1"}`),
-		Webhooks:   json.RawMessage(`{"actions":[{"index":0},{"index":1}]}`),
+		Webhooks: json.RawMessage(`{"actions":{
+			"out_on_url":[{"index":0,"urls":["http://localhost/on"],"enabled":true}],
+			"out_off_url":[{"index":0,"urls":[],"enabled":false}]}}`),
 	}}
 }
 
@@ -1177,5 +1179,41 @@ func TestRestoreResult_Err(t *testing.T) {
 				t.Errorf("Err() = %v, want substring %q", err, tt.wantErrSub)
 			}
 		})
+	}
+}
+
+// The summary counts come from the stored device replies, whose byte length
+// says nothing about how many items they hold.
+func TestDeviceBackup_Counts(t *testing.T) {
+	t.Parallel()
+	gen2 := &DeviceBackup{Backup: &shellybackup.Backup{
+		DeviceInfo: &shellybackup.DeviceInfo{Generation: 2},
+		Config:     json.RawMessage(`{"sys":{"device":{"name":"a"}},"switch:0":{},"switch:1":{}}`),
+		Webhooks:   json.RawMessage(`{"hooks":[{"id":1},{"id":2}],"rev":4}`),
+		Schedules:  json.RawMessage(`{"jobs":[{"id":1}],"rev":2}`),
+	}}
+	if got := gen2.ConfigKeyCount(); got != 3 {
+		t.Errorf("ConfigKeyCount = %d, want 3", got)
+	}
+	if got := gen2.WebhookCount(); got != 2 {
+		t.Errorf("WebhookCount = %d, want 2", got)
+	}
+	if got := gen2.ScheduleCount(); got != 1 {
+		t.Errorf("ScheduleCount = %d, want 1", got)
+	}
+
+	gen1 := &DeviceBackup{Backup: &shellybackup.Backup{
+		DeviceInfo: &shellybackup.DeviceInfo{Generation: 1},
+		Webhooks: json.RawMessage(`{"actions":{
+			"out_on_url":[{"index":0,"urls":["http://localhost/x"],"enabled":true}],
+			"out_off_url":[{"index":0,"urls":[],"enabled":false}]}}`),
+	}}
+	if got := gen1.WebhookCount(); got != 2 {
+		t.Errorf("Gen1 WebhookCount = %d, want 2", got)
+	}
+
+	empty := &DeviceBackup{Backup: &shellybackup.Backup{}}
+	if empty.ConfigKeyCount() != 0 || empty.WebhookCount() != 0 || empty.ScheduleCount() != 0 {
+		t.Error("an empty backup must count zero of everything")
 	}
 }
