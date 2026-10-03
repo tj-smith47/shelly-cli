@@ -9,10 +9,9 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
-	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // DefaultTimeout is the default discovery timeout.
@@ -57,7 +56,10 @@ multicast group 224.0.1.187:5683.
 Gen1-specific information displayed:
   - Device type and firmware
   - Number of relays and meters
-  - CoIoT status values`,
+  - CoIoT status values
+
+With -o json, -o yaml or -o template the devices are written to stdout as a
+list (empty when nothing is found).`,
 		Example: `  # Basic CoIoT discovery
   shelly discover coiot
 
@@ -71,7 +73,10 @@ Gen1-specific information displayed:
   shelly discover coiot --verbose
 
   # Auto-register discovered devices
-  shelly discover coiot --register`,
+  shelly discover coiot --register
+
+  # Machine-readable output
+  shelly discover coiot -o json`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), opts)
 		},
@@ -114,42 +119,31 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if len(devices) == 0 {
-		ios.NoResults("devices", "CoIoT works best with Gen1 devices. Try 'shelly discover mdns' for Gen2+")
-		return nil
-	}
+	noun, hint := "devices", "CoIoT works best with Gen1 devices. Try 'shelly discover mdns' for Gen2+"
 
 	// Filter and enhance with Gen1 info if requested
-	if opts.Gen1Only || opts.Verbose {
+	if len(devices) > 0 && (opts.Gen1Only || opts.Verbose) {
 		devices = shelly.FilterGen1Devices(ctx, devices, opts.Gen1Only)
+		noun, hint = "Gen1 devices", "No Gen1 devices found. Try without --gen1-only flag"
 	}
 
+	display := term.DisplayDiscoveredDevices
+	if opts.Verbose {
+		display = func(ios *iostreams.IOStreams, devices []discovery.DiscoveredDevice) {
+			term.DisplayGen1Details(ctx, ios, devices)
+		}
+	}
+	if err := cmdutil.PrintDiscovered(ios, devices, display, noun, hint); err != nil {
+		return err
+	}
 	if len(devices) == 0 {
-		ios.NoResults("Gen1 devices", "No Gen1 devices found. Try without --gen1-only flag")
 		return nil
 	}
 
-	if opts.Verbose {
-		term.DisplayGen1Details(ctx, ios, devices)
-	} else {
-		term.DisplayDiscoveredDevices(ios, devices)
-	}
-
-	// Save discovered addresses to completion cache
-	addresses := make([]string, 0, len(devices))
-	for _, d := range devices {
-		addresses = append(addresses, d.Address.String())
-	}
-	if err := completion.SaveDiscoveryCache(addresses); err != nil {
-		ios.DebugErr("saving discovery cache", err)
-	}
-
+	status := cmdutil.StatusStreams(ios)
+	added := cmdutil.CacheAndRegisterDevices(status, devices, opts.Register, opts.SkipExisting)
 	if opts.Register {
-		added, err := utils.RegisterDiscoveredDevices(devices, opts.SkipExisting)
-		if err != nil {
-			ios.Warning("Registration error: %v", err)
-		}
-		ios.Added("device", added)
+		status.Added("device", added)
 	}
 
 	return nil

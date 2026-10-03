@@ -4,12 +4,14 @@ package ble
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -800,4 +802,72 @@ func TestRun_CombinedFlags(t *testing.T) {
 	if mock.filterPrefix != "BTHome" {
 		t.Errorf("expected filterPrefix = 'BTHome', got: %q", mock.filterPrefix)
 	}
+}
+
+// TestRun_StructuredOutput checks that stdout holds only the BLE device list in
+// the requested format, with and without devices, and stays empty when BLE is
+// unavailable.
+//
+//nolint:paralleltest // Modifies global newBLEDiscoverer variable and the output format
+func TestRun_StructuredOutput(t *testing.T) {
+	viper.Set("output", "json")
+	t.Cleanup(func() { viper.Set("output", "") })
+	oldFactory := newBLEDiscoverer
+	t.Cleanup(func() { newBLEDiscoverer = oldFactory })
+
+	found := discovery.BLEDiscoveredDevice{
+		DiscoveredDevice: discovery.DiscoveredDevice{ID: "ShellyPlus1-AABBCC", Protocol: discovery.ProtocolBLE},
+		LocalName:        "ShellyPlus1-AABBCC",
+		RSSI:             -60,
+	}
+	tests := []struct {
+		name string
+		mock *mockBLEDiscoverer
+		want int
+	}{
+		{"devices", &mockBLEDiscoverer{
+			discoverDevices: []discovery.DiscoveredDevice{found.DiscoveredDevice},
+			bleDevices:      []discovery.BLEDiscoveredDevice{found},
+		}, 1},
+		{"none", &mockBLEDiscoverer{}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			newBLEDiscoverer = func() (Discoverer, error) { return tt.mock, nil }
+			tf := factory.NewTestFactory(t)
+			cmd := NewCommand(tf.Factory)
+			cmd.SetContext(t.Context())
+			cmd.SetArgs([]string{"--timeout", "1ms"})
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+
+			var got []map[string]any
+			if err := json.Unmarshal([]byte(tf.OutString()), &got); err != nil {
+				t.Fatalf("stdout is not a JSON list: %v\n%s", err, tf.OutString())
+			}
+			if len(got) != tt.want {
+				t.Fatalf("devices = %v, want %d", got, tt.want)
+			}
+			if tt.want == 1 && got[0]["local_name"] != "ShellyPlus1-AABBCC" {
+				t.Errorf("device = %v, want local_name ShellyPlus1-AABBCC", got[0])
+			}
+		})
+	}
+
+	t.Run("unavailable", func(t *testing.T) {
+		newBLEDiscoverer = func() (Discoverer, error) { return nil, discovery.ErrBLENotSupported }
+		tf := factory.NewTestFactory(t)
+		cmd := NewCommand(tf.Factory)
+		cmd.SetContext(t.Context())
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("Execute() error = %v", err)
+		}
+		if tf.OutString() != "" {
+			t.Errorf("stdout = %q, want nothing: the hints belong on stderr", tf.OutString())
+		}
+		if !strings.Contains(tf.ErrString(), "Bluetooth adapter") {
+			t.Errorf("stderr should carry the hints; got %q", tf.ErrString())
+		}
+	})
 }

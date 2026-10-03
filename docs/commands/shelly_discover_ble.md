@@ -14,6 +14,9 @@ Requirements:
   - Bluetooth must be enabled
   - May require elevated privileges on some systems
 
+With -o json, -o yaml or -o template the devices are written to stdout as a
+list (empty when nothing is found).
+
 ```
 shelly discover ble [flags]
 ```
@@ -32,6 +35,9 @@ shelly discover ble [flags]
 
   # Filter by device name prefix
   shelly discover ble --filter "Shelly"
+
+  # Machine-readable output
+  shelly discover ble -o json
 ```
 
 ### Options

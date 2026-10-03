@@ -28,6 +28,10 @@ Plugin-managed devices (e.g., Tasmota, ESPHome) can also be discovered
 if the corresponding plugin is installed. Use --skip-plugins to disable
 plugin detection, or --platform to filter by specific platform.
 
+.PP
+With -o json, -o yaml or -o template the discovered devices are written to
+stdout as a list (empty when nothing is found) and progress goes to stderr.
+
 
 .SH OPTIONS
 \fB--all-networks\fP[=false]
@@ -155,6 +159,9 @@ plugin detection, or --platform to filter by specific platform.
 
   # Discover only Tasmota devices
   shelly discover --platform tasmota
+
+  # Machine-readable output
+  shelly discover --method mdns -o json
 .EE
 
 

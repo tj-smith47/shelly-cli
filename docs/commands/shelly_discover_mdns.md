@@ -14,7 +14,8 @@ Note: mDNS requires multicast support on your network. If devices aren't
 found, try 'shelly discover scan' which probes addresses directly.
 
 Output is formatted as a table showing: ID, Address, Model, Generation,
-Protocol, and Auth status.
+Protocol, and Auth status. With -o json, -o yaml or -o template the devices
+are written to stdout as a list (empty when nothing is found).
 
 ```
 shelly discover mdns [flags]
@@ -37,6 +38,9 @@ shelly discover mdns [flags]
 
   # Force re-register all discovered devices
   shelly discover mdns --register --skip-existing=false
+
+  # Machine-readable output
+  shelly discover mdns -o json
 
   # Using aliases
   shelly discover zeroconf --timeout 20s

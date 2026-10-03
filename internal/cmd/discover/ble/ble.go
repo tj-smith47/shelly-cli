@@ -74,7 +74,10 @@ BLU devices broadcasting BTHome sensor data.
 Requirements:
   - Bluetooth adapter on the host machine
   - Bluetooth must be enabled
-  - May require elevated privileges on some systems`,
+  - May require elevated privileges on some systems
+
+With -o json, -o yaml or -o template the devices are written to stdout as a
+list (empty when nothing is found).`,
 		Example: `  # Basic BLE discovery
   shelly discover ble
 
@@ -85,7 +88,10 @@ Requirements:
   shelly discover ble --bthome
 
   # Filter by device name prefix
-  shelly discover ble --filter "Shelly"`,
+  shelly discover ble --filter "Shelly"
+
+  # Machine-readable output
+  shelly discover ble -o json`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), opts)
 		},
@@ -109,9 +115,10 @@ func run(ctx context.Context, opts *Options) error {
 	bleDiscoverer, err := newBLEDiscoverer()
 	if err != nil {
 		if wireless.IsBLENotSupportedError(err) {
-			ios.Error("BLE discovery is not available on this system")
-			ios.Hint("Ensure you have a Bluetooth adapter and it is enabled")
-			ios.Hint("On Linux, you may need to run with elevated privileges")
+			status := cmdutil.StatusStreams(ios)
+			status.Error("BLE discovery is not available on this system")
+			status.Hint("Ensure you have a Bluetooth adapter and it is enabled")
+			status.Hint("On Linux, you may need to run with elevated privileges")
 			return nil
 		}
 		return fmt.Errorf("failed to initialize BLE: %w", err)
@@ -140,16 +147,12 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("BLE discovery failed: %w", err)
 	}
 
-	if len(devices) == 0 {
-		ios.NoResults("BLE devices",
-			"Put devices in provisioning mode (AP mode) to discover via BLE",
-			"Ensure Bluetooth is enabled on this machine")
-		return nil
-	}
-
 	// Get detailed BLE information
-	bleDevices := bleDiscoverer.GetDiscoveredDevices()
-	term.DisplayBLEDevices(ios, bleDevices)
-
-	return nil
+	var bleDevices []discovery.BLEDiscoveredDevice
+	if len(devices) > 0 {
+		bleDevices = bleDiscoverer.GetDiscoveredDevices()
+	}
+	return cmdutil.PrintDiscovered(ios, bleDevices, term.DisplayBLEDevices, "BLE devices",
+		"Put devices in provisioning mode (AP mode) to discover via BLE",
+		"Ensure Bluetooth is enabled on this machine")
 }

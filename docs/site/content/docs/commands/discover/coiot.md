@@ -20,6 +20,9 @@ Gen1-specific information displayed:
   - Number of relays and meters
   - CoIoT status values
 
+With -o json, -o yaml or -o template the devices are written to stdout as a
+list (empty when nothing is found).
+
 ```
 shelly discover coiot [flags]
 ```
@@ -41,6 +44,9 @@ shelly discover coiot [flags]
 
   # Auto-register discovered devices
   shelly discover coiot --register
+
+  # Machine-readable output
+  shelly discover coiot -o json
 ```
 
 ### Options

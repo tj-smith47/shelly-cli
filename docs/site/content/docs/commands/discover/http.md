@@ -26,7 +26,9 @@ Use --skip-existing (enabled by default) to avoid re-registering
 devices that are already in your registry.
 
 Output is formatted as a table showing: ID, Address, Model, Generation,
-Protocol, and Auth status.
+Protocol, and Auth status. With -o json, -o yaml or -o template the devices
+are written to stdout as a list (empty when nothing is found) and scan
+progress goes to stderr.
 
 ```
 shelly discover http [subnet...] [flags]
@@ -55,6 +57,9 @@ shelly discover http [subnet...] [flags]
 
   # Auto-register discovered devices
   shelly discover http --register
+
+  # Machine-readable output
+  shelly discover http 192.168.1.0/24 -o json
 
   # Using 'scan' alias
   shelly discover scan --timeout 5m

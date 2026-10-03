@@ -5,10 +5,9 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 	"github.com/tj-smith47/shelly-go/types"
 
-	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/term"
-	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // RunDemoDiscovery returns mock discovery results from fixtures.
@@ -31,31 +30,22 @@ func RunDemoDiscovery(ios *iostreams.IOStreams, register, skipExisting bool) err
 		}
 	}
 
+	status := cmdutil.StatusStreams(ios)
+	if len(shellyDevices) > 0 {
+		status.Success("Discovered %d device(s) (demo mode)", len(shellyDevices))
+		status.Println()
+	}
+	if err := cmdutil.PrintDiscovered(ios, shellyDevices, term.DisplayDiscoveredDevices,
+		"devices", "No discovery fixtures defined in demo mode"); err != nil {
+		return err
+	}
 	if len(shellyDevices) == 0 {
-		ios.NoResults("devices", "No discovery fixtures defined in demo mode")
 		return nil
 	}
 
-	ios.Success("Discovered %d device(s) (demo mode)", len(shellyDevices))
-	ios.Println()
-	term.DisplayDiscoveredDevices(ios, shellyDevices)
-
-	// Save to completion cache
-	addresses := make([]string, len(shellyDevices))
-	for i, d := range shellyDevices {
-		addresses[i] = d.Address.String()
-	}
-	if err := completion.SaveDiscoveryCache(addresses); err != nil {
-		ios.DebugErr("saving discovery cache", err)
-	}
-
-	// Register devices if requested
+	added := cmdutil.CacheAndRegisterDevices(status, shellyDevices, register, skipExisting)
 	if register {
-		added, err := utils.RegisterDiscoveredDevices(shellyDevices, skipExisting)
-		if err != nil {
-			ios.Warning("Registration error: %v", err)
-		}
-		ios.Added("device", added)
+		status.Added("device", added)
 	}
 
 	return nil

@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/jq"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -38,6 +39,37 @@ type DiscoveryOptions struct {
 	SkipExisting bool
 	AllNetworks  bool
 	Timeout      time.Duration
+}
+
+// StatusStreams returns the streams a command writes its progress and summary
+// lines to. They are ios itself for human-readable output. When stdout carries
+// machine-readable data (-o json|yaml|template, --jq, --fields) they write to
+// stderr instead, so stdout holds nothing but the data.
+func StatusStreams(ios *iostreams.IOStreams) *iostreams.IOStreams {
+	if !structuredOutput() {
+		return ios
+	}
+	return ios.OnStderr()
+}
+
+func structuredOutput() bool {
+	return output.WantsStructured() || jq.HasFilter() || jq.HasFields()
+}
+
+// PrintDiscovered writes discovery results to stdout in the configured output
+// format. Human-readable output calls display, or prints the "no results"
+// message with hints when items is empty. Structured output always writes a
+// list, empty when nothing was found, so a consumer can parse every run.
+func PrintDiscovered[T any](ios *iostreams.IOStreams, items []T, display ListDisplay[T], noun string, hints ...string) error {
+	if len(items) == 0 {
+		if !structuredOutput() {
+			ios.NoResults(noun, hints...)
+			return nil
+		}
+		// A nil slice encodes as null, which is not a list.
+		items = []T{}
+	}
+	return PrintListResult(ios, items, display)
 }
 
 // ResolveSubnets determines which subnets to scan based on explicit flags
@@ -159,7 +191,8 @@ func CacheAndRegisterDevices(ios *iostreams.IOStreams, devices []discovery.Disco
 // RunPluginOnlyDiscovery runs discovery for a specific platform only.
 // Uses shelly.RunPluginPlatformDiscoveryWithProgress for the core logic.
 func RunPluginOnlyDiscovery(ctx context.Context, opts *DiscoveryOptions) error {
-	ios := opts.Factory.IOStreams()
+	out := opts.Factory.IOStreams()
+	ios := StatusStreams(out)
 
 	// Get plugin registry
 	registry, err := plugins.NewRegistry()
@@ -215,17 +248,13 @@ func RunPluginOnlyDiscovery(ctx context.Context, opts *DiscoveryOptions) error {
 			len(addresses), len(addresses), len(pluginDevices), opts.Platform))
 	mw.Finalize()
 
-	if len(pluginDevices) == 0 {
-		ios.NoResults(opts.Platform+" devices",
-			fmt.Sprintf("Ensure %s devices are powered on and accessible in %s", opts.Platform, subnetLabel))
-		return nil
+	termDevices := term.ConvertPluginDevices(pluginDevices)
+	if err := PrintDiscovered(out, termDevices, term.DisplayPluginDiscoveredDevices, opts.Platform+" devices",
+		fmt.Sprintf("Ensure %s devices are powered on and accessible in %s", opts.Platform, subnetLabel)); err != nil {
+		return err
 	}
 
-	// Convert to term display type
-	termDevices := term.ConvertPluginDevices(pluginDevices)
-	term.DisplayPluginDiscoveredDevices(ios, termDevices)
-
-	if opts.Register {
+	if opts.Register && len(termDevices) > 0 {
 		added := term.RegisterPluginDevices(termDevices, opts.SkipExisting)
 		ios.Added("device", added)
 	}

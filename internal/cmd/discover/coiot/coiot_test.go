@@ -4,12 +4,14 @@ package coiot
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -979,6 +981,53 @@ func TestNewCommand_FlagDefaults(t *testing.T) {
 			}
 			if flag.DefValue != tt.defValue {
 				t.Errorf("flag %q default = %q, want %q", tt.name, flag.DefValue, tt.defValue)
+			}
+		})
+	}
+}
+
+// TestExecute_StructuredOutput checks that stdout holds only the device list in
+// the requested format, with and without devices.
+//
+//nolint:paralleltest // modifies global newDiscoverer and the output format
+func TestExecute_StructuredOutput(t *testing.T) {
+	viper.Set("output", "json")
+	t.Cleanup(func() { viper.Set("output", "") })
+
+	tests := []struct {
+		name    string
+		devices []discovery.DiscoveredDevice
+		wantIDs []string
+	}{
+		{"devices", []discovery.DiscoveredDevice{
+			{ID: "shelly1-A1B2C3", Address: net.ParseIP("192.168.1.50"), Generation: 1, Protocol: discovery.ProtocolCoIoT},
+		}, []string{"shelly1-A1B2C3"}},
+		{"none", nil, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleanup := setMockDiscoverer(&mockDiscoverer{devices: tt.devices})
+			defer cleanup()
+
+			tf := factory.NewTestFactory(t)
+			cmd := NewCommand(tf.Factory)
+			cmd.SetContext(context.Background())
+			cmd.SetArgs([]string{"--timeout", "1ms"})
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+
+			var got []map[string]any
+			if err := json.Unmarshal([]byte(tf.OutString()), &got); err != nil {
+				t.Fatalf("stdout is not a JSON list: %v\n%s", err, tf.OutString())
+			}
+			if len(got) != len(tt.wantIDs) {
+				t.Fatalf("devices = %v, want %v", got, tt.wantIDs)
+			}
+			for i, id := range tt.wantIDs {
+				if got[i]["id"] != id {
+					t.Errorf("device %d id = %v, want %s", i, got[i]["id"], id)
+				}
 			}
 		})
 	}

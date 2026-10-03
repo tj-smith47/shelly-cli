@@ -4,12 +4,14 @@ package mdns
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -754,5 +756,61 @@ func TestAliasExecution(t *testing.T) {
 				t.Errorf("alias %q not found in command aliases", tt.alias)
 			}
 		})
+	}
+}
+
+// TestExecute_StructuredOutput checks that stdout holds only the device list in
+// the requested format and that the registration summary goes to stderr.
+//
+//nolint:paralleltest // modifies global discovererFactory, config.SetFs and the output format
+func TestExecute_StructuredOutput(t *testing.T) {
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
+	viper.Set("output", "json")
+	t.Cleanup(func() { viper.Set("output", "") })
+
+	cleanup := setMockDiscoverer(&mockDiscoverer{
+		devices: []discovery.DiscoveredDevice{
+			{ID: "shellyplus1pm-abc123", Address: net.ParseIP("192.168.1.100"), Generation: 2, Protocol: discovery.ProtocolMDNS},
+		},
+	})
+	defer cleanup()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"--timeout", "1ms", "--register"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	var got []map[string]any
+	if err := json.Unmarshal([]byte(tf.OutString()), &got); err != nil {
+		t.Fatalf("stdout is not a JSON list: %v\n%s", err, tf.OutString())
+	}
+	if len(got) != 1 || got[0]["id"] != "shellyplus1pm-abc123" || got[0]["address"] != "192.168.1.100" {
+		t.Errorf("devices = %v, want the one discovered device", got)
+	}
+	if !strings.Contains(tf.ErrString(), "Added 1 device") {
+		t.Errorf("registration summary should be on stderr; got %q", tf.ErrString())
+	}
+}
+
+//nolint:paralleltest // modifies global discovererFactory and the output format
+func TestExecute_StructuredOutput_NoDevices(t *testing.T) {
+	viper.Set("output", "json")
+	t.Cleanup(func() { viper.Set("output", "") })
+	cleanup := setMockDiscoverer(&mockDiscoverer{})
+	defer cleanup()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"--timeout", "1ms"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if got := strings.TrimSpace(tf.OutString()); got != "[]" {
+		t.Errorf("stdout = %q, want an empty JSON list", got)
 	}
 }

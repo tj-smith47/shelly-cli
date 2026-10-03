@@ -56,7 +56,9 @@ Use --skip-existing (enabled by default) to avoid re-registering
 devices that are already in your registry.
 
 Output is formatted as a table showing: ID, Address, Model, Generation,
-Protocol, and Auth status.`,
+Protocol, and Auth status. With -o json, -o yaml or -o template the devices
+are written to stdout as a list (empty when nothing is found) and scan
+progress goes to stderr.`,
 		Example: `  # Scan default network (auto-detect)
   shelly discover http
 
@@ -77,6 +79,9 @@ Protocol, and Auth status.`,
 
   # Auto-register discovered devices
   shelly discover http --register
+
+  # Machine-readable output
+  shelly discover http 192.168.1.0/24 -o json
 
   # Using 'scan' alias
   shelly discover scan --timeout 5m
@@ -106,8 +111,9 @@ Protocol, and Auth status.`,
 
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
+	status := cmdutil.StatusStreams(ios)
 
-	subnets, err := cmdutil.ResolveSubnets(ios, opts.Subnets, opts.AllNetworks)
+	subnets, err := cmdutil.ResolveSubnets(status, opts.Subnets, opts.AllNetworks)
 	if err != nil {
 		return err
 	}
@@ -115,21 +121,22 @@ func run(ctx context.Context, opts *Options) error {
 	// Delegate the address generation + subnet scan to the single canonical
 	// HTTP discovery helper so this command, the wizard, and onboard cannot
 	// drift apart on timeout, address-gen, or cancellation behavior.
-	devices, err := cmdutil.RunHTTPDiscovery(ctx, ios, opts.Timeout, subnets)
+	devices, err := cmdutil.RunHTTPDiscovery(ctx, status, opts.Timeout, subnets)
 	if err != nil {
 		return err
 	}
 
+	if err := cmdutil.PrintDiscovered(ios, devices, term.DisplayDiscoveredDevices,
+		"devices", "Ensure devices are powered on and accessible on the network"); err != nil {
+		return err
+	}
 	if len(devices) == 0 {
-		ios.NoResults("devices", "Ensure devices are powered on and accessible on the network")
 		return nil
 	}
 
-	term.DisplayDiscoveredDevices(ios, devices)
-
-	added := cmdutil.CacheAndRegisterDevices(ios, devices, opts.Register, opts.SkipExisting)
+	added := cmdutil.CacheAndRegisterDevices(status, devices, opts.Register, opts.SkipExisting)
 	if opts.Register {
-		ios.Added("device", added)
+		status.Added("device", added)
 	}
 
 	return nil

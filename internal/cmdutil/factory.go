@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
@@ -485,18 +486,18 @@ func (f *Factory) OutputFormat() string {
 
 // IsJSONOutput returns true if JSON output is requested.
 func (f *Factory) IsJSONOutput() bool {
-	return f.OutputFormat() == "json"
+	return f.OutputFormat() == string(output.FormatJSON)
 }
 
 // IsYAMLOutput returns true if YAML output is requested.
 func (f *Factory) IsYAMLOutput() bool {
-	return f.OutputFormat() == "yaml"
+	return f.OutputFormat() == string(output.FormatYAML)
 }
 
 // IsStructuredOutput returns true if JSON or YAML output is requested.
 func (f *Factory) IsStructuredOutput() bool {
 	format := f.OutputFormat()
-	return format == "json" || format == "yaml"
+	return format == string(output.FormatJSON) || format == string(output.FormatYAML)
 }
 
 // =============================================================================

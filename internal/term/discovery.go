@@ -188,20 +188,20 @@ func DisplayPluginDiscoveredDevices(ios *iostreams.IOStreams, devices []PluginDi
 // PluginDiscoveredDevice represents a device discovered by a plugin.
 // This is a display-oriented type used by term functions.
 type PluginDiscoveredDevice struct {
-	ID         string
-	Name       string
-	Model      string
-	Address    string
-	Platform   string
-	Firmware   string
-	Components []PluginComponentInfo
+	ID         string                `json:"id" yaml:"id"`
+	Name       string                `json:"name,omitempty" yaml:"name,omitempty"`
+	Model      string                `json:"model,omitempty" yaml:"model,omitempty"`
+	Address    string                `json:"address" yaml:"address"`
+	Platform   string                `json:"platform" yaml:"platform"`
+	Firmware   string                `json:"firmware,omitempty" yaml:"firmware,omitempty"`
+	Components []PluginComponentInfo `json:"components,omitempty" yaml:"components,omitempty"`
 }
 
 // PluginComponentInfo represents component info from plugin detection.
 type PluginComponentInfo struct {
-	Type string
-	ID   int
-	Name string
+	Type string `json:"type" yaml:"type"`
+	ID   int    `json:"id" yaml:"id"`
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
 
 // ConvertPluginDevice converts a shelly.PluginDiscoveredDevice to a display-oriented type.

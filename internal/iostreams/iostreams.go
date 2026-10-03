@@ -104,6 +104,24 @@ func Test(in io.Reader, out, errOut io.Writer) *IOStreams {
 	}
 }
 
+// OnStderr returns a copy of s whose stdout is s's stderr. A command that puts
+// machine-readable data on stdout writes its progress and summary lines through
+// the copy, so they stay visible without mixing into the data.
+func (s *IOStreams) OnStderr() *IOStreams {
+	return &IOStreams{
+		In:           s.In,
+		Out:          s.ErrOut,
+		ErrOut:       s.ErrOut,
+		isStdinTTY:   s.isStdinTTY,
+		isStdoutTTY:  s.isStderrTTY,
+		isStderrTTY:  s.isStderrTTY,
+		colorEnabled: s.colorEnabled,
+		colorForced:  s.colorForced,
+		quiet:        s.quiet,
+		plainMode:    s.plainMode,
+	}
+}
+
 // IsColorDisabled checks flags and environment variables for color disable settings.
 // Returns true if --no-color or --plain flag is set, or NO_COLOR, SHELLY_NO_COLOR,
 // or TERM=dumb env vars are set.

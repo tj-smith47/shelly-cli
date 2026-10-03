@@ -23,7 +23,8 @@ found, try 'shelly discover scan' which probes addresses directly.
 
 .PP
 Output is formatted as a table showing: ID, Address, Model, Generation,
-Protocol, and Auth status.
+Protocol, and Auth status. With -o json, -o yaml or -o template the devices
+are written to stdout as a list (empty when nothing is found).
 
 
 .SH OPTIONS
@@ -120,6 +121,9 @@ Protocol, and Auth status.
 
   # Force re-register all discovered devices
   shelly discover mdns --register --skip-existing=false
+
+  # Machine-readable output
+  shelly discover mdns -o json
 
   # Using aliases
   shelly discover zeroconf --timeout 20s

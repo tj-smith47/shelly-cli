@@ -9,11 +9,9 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
-	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // DefaultTimeout is the default mDNS discovery timeout.
@@ -63,7 +61,8 @@ Note: mDNS requires multicast support on your network. If devices aren't
 found, try 'shelly discover scan' which probes addresses directly.
 
 Output is formatted as a table showing: ID, Address, Model, Generation,
-Protocol, and Auth status.`,
+Protocol, and Auth status. With -o json, -o yaml or -o template the devices
+are written to stdout as a list (empty when nothing is found).`,
 		Example: `  # Basic mDNS discovery
   shelly discover mdns
 
@@ -78,6 +77,9 @@ Protocol, and Auth status.`,
 
   # Force re-register all discovered devices
   shelly discover mdns --register --skip-existing=false
+
+  # Machine-readable output
+  shelly discover mdns -o json
 
   # Using aliases
   shelly discover zeroconf --timeout 20s
@@ -122,28 +124,18 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
+	if err := cmdutil.PrintDiscovered(ios, devices, term.DisplayDiscoveredDevices,
+		"devices", "Ensure devices are powered on and on the same network"); err != nil {
+		return err
+	}
 	if len(devices) == 0 {
-		ios.NoResults("devices", "Ensure devices are powered on and on the same network")
 		return nil
 	}
 
-	term.DisplayDiscoveredDevices(ios, devices)
-
-	// Save discovered addresses to completion cache
-	addresses := make([]string, 0, len(devices))
-	for _, d := range devices {
-		addresses = append(addresses, d.Address.String())
-	}
-	if err := completion.SaveDiscoveryCache(addresses); err != nil {
-		ios.DebugErr("saving discovery cache", err)
-	}
-
+	status := cmdutil.StatusStreams(ios)
+	added := cmdutil.CacheAndRegisterDevices(status, devices, opts.Register, opts.SkipExisting)
 	if opts.Register {
-		added, err := utils.RegisterDiscoveredDevices(devices, opts.SkipExisting)
-		if err != nil {
-			ios.Warning("Registration error: %v", err)
-		}
-		ios.Added("device", added)
+		status.Added("device", added)
 	}
 
 	return nil

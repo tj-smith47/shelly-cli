@@ -16,13 +16,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/jq"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-)
-
-// Output format constants.
-const (
-	outputJSON = "json"
-	outputYAML = "yaml"
 )
 
 // logVerbose logs a message to stderr only if verbose mode is enabled.
@@ -280,7 +275,7 @@ func RunStatus[T any](
 	return PrintResult(ios, status, display)
 }
 
-// PrintResult outputs result data in the configured format (JSON, YAML, or human-readable).
+// PrintResult outputs result data in the configured format (JSON, YAML, template, or human-readable).
 // If --fields is set, prints available field names instead of data.
 // If --jq is set, the jq filter is applied to the data regardless of output format.
 func PrintResult[T any](ios *iostreams.IOStreams, data T, display StatusDisplay[T]) error {
@@ -291,14 +286,16 @@ func PrintResult[T any](ios *iostreams.IOStreams, data T, display StatusDisplay[
 		return jq.Apply(ios.Out, data, jq.GetFilter())
 	}
 
-	switch viper.GetString("output") {
-	case outputJSON:
+	switch output.GetFormat() {
+	case output.FormatJSON:
 		enc := json.NewEncoder(ios.Out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(data)
-	case outputYAML:
+	case output.FormatYAML:
 		enc := yaml.NewEncoder(ios.Out)
 		return enc.Encode(data)
+	case output.FormatTemplate:
+		return output.FormatOutput(ios.Out, data)
 	default:
 		display(ios, data)
 		return nil
@@ -362,7 +359,7 @@ func RunList[T any](
 	return PrintListResult(ios, items, display)
 }
 
-// PrintListResult outputs list data in the configured format (JSON, YAML, or human-readable).
+// PrintListResult outputs list data in the configured format (JSON, YAML, template, or human-readable).
 // If --fields is set, prints available field names instead of data.
 // If --jq is set, the jq filter is applied to the data regardless of output format.
 func PrintListResult[T any](ios *iostreams.IOStreams, items []T, display ListDisplay[T]) error {
@@ -373,14 +370,16 @@ func PrintListResult[T any](ios *iostreams.IOStreams, items []T, display ListDis
 		return jq.Apply(ios.Out, items, jq.GetFilter())
 	}
 
-	switch viper.GetString("output") {
-	case outputJSON:
+	switch output.GetFormat() {
+	case output.FormatJSON:
 		enc := json.NewEncoder(ios.Out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(items)
-	case outputYAML:
+	case output.FormatYAML:
 		enc := yaml.NewEncoder(ios.Out)
 		return enc.Encode(items)
+	case output.FormatTemplate:
+		return output.FormatOutput(ios.Out, items)
 	default:
 		display(ios, items)
 		return nil

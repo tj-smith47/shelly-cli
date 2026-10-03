@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -1176,5 +1178,33 @@ func TestRun_MultipleTimeouts(t *testing.T) {
 				t.Logf("run() with %v timeout: %v", timeout, err)
 			}
 		})
+	}
+}
+
+// TestRun_StructuredOutput checks that the scan's progress lines go to stderr
+// and stdout holds only the device list.
+//
+//nolint:paralleltest // sets the process-global output format
+func TestRun_StructuredOutput(t *testing.T) {
+	viper.Set("output", "json")
+	t.Cleanup(func() { viper.Set("output", "") })
+
+	tf := factory.NewTestFactory(t)
+	// TEST-NET-1 is reserved for documentation and the test binary refuses
+	// non-loopback connections, so the scan finds nothing.
+	opts := &Options{Factory: tf.Factory, Subnets: []string{"192.0.2.0/30"}, Timeout: time.Second, Register: true, SkipExisting: true}
+	if err := run(context.Background(), opts); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	var got []map[string]any
+	if err := json.Unmarshal([]byte(tf.OutString()), &got); err != nil {
+		t.Fatalf("stdout is not a JSON list: %v\n%s", err, tf.OutString())
+	}
+	if len(got) != 0 {
+		t.Errorf("devices = %v, want none", got)
+	}
+	if !strings.Contains(tf.ErrString(), "Scanning") {
+		t.Errorf("scan progress should be on stderr; got %q", tf.ErrString())
 	}
 }

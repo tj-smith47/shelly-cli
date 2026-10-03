@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/mdns"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -63,7 +64,10 @@ Available discovery methods (--method):
 
 Plugin-managed devices (e.g., Tasmota, ESPHome) can also be discovered
 if the corresponding plugin is installed. Use --skip-plugins to disable
-plugin detection, or --platform to filter by specific platform.`,
+plugin detection, or --platform to filter by specific platform.
+
+With -o json, -o yaml or -o template the discovered devices are written to
+stdout as a list (empty when nothing is found) and progress goes to stderr.`,
 		Example: `  # Discover devices via HTTP scan (default, auto-detects subnet)
   shelly discover
 
@@ -89,7 +93,10 @@ plugin detection, or --platform to filter by specific platform.`,
   shelly discover --skip-plugins
 
   # Discover only Tasmota devices
-  shelly discover --platform tasmota`,
+  shelly discover --platform tasmota
+
+  # Machine-readable output
+  shelly discover --method mdns -o json`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), opts)
 		},
@@ -119,6 +126,7 @@ plugin detection, or --platform to filter by specific platform.`,
 //nolint:gocyclo // Complexity from handling multiple discovery methods and plugin integration
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
+	status := cmdutil.StatusStreams(ios)
 
 	// Check for demo mode
 	if mock.IsDemoMode() && mock.HasDiscoveryFixtures() {
@@ -148,7 +156,7 @@ func run(ctx context.Context, opts *Options) error {
 	var subnets []string
 	if isHTTP {
 		var resolveErr error
-		subnets, resolveErr = cmdutil.ResolveSubnets(ios, opts.Subnets, opts.AllNetworks)
+		subnets, resolveErr = cmdutil.ResolveSubnets(status, opts.Subnets, opts.AllNetworks)
 		if resolveErr != nil {
 			return resolveErr
 		}
@@ -159,13 +167,13 @@ func run(ctx context.Context, opts *Options) error {
 
 	switch opts.Method {
 	case methodHTTP, "scan", "":
-		shellyDevices, err = cmdutil.RunHTTPDiscovery(ctx, ios, opts.Timeout, subnets)
+		shellyDevices, err = cmdutil.RunHTTPDiscovery(ctx, status, opts.Timeout, subnets)
 	case methodMDNS:
-		shellyDevices, err = cmdutil.RunMDNSDiscovery(ctx, ios, opts.Timeout)
+		shellyDevices, err = cmdutil.RunMDNSDiscovery(ctx, status, opts.Timeout)
 	case methodCoIoT:
-		shellyDevices, err = cmdutil.RunCoIoTDiscovery(ctx, ios, opts.Timeout)
+		shellyDevices, err = cmdutil.RunCoIoTDiscovery(ctx, status, opts.Timeout)
 	case methodBLE:
-		shellyDevices, err = cmdutil.RunBLEDiscovery(ctx, ios, opts.Timeout)
+		shellyDevices, err = cmdutil.RunBLEDiscovery(ctx, status, opts.Timeout)
 	default:
 		return fmt.Errorf("unknown discovery method: %s (valid: http, mdns, ble, coiot)", opts.Method)
 	}
@@ -184,29 +192,37 @@ func run(ctx context.Context, opts *Options) error {
 	// Run plugin detection if not skipped
 	var pluginDevices []term.PluginDiscoveredDevice
 	if !opts.SkipPlugins && isHTTP && subnets != nil {
-		pluginDevices = cmdutil.RunPluginDetection(ctx, ios, subnets)
+		pluginDevices = cmdutil.RunPluginDetection(ctx, status, subnets)
 	}
 
-	// Display results
-	totalDevices := len(shellyDevices) + len(pluginDevices)
-	if totalDevices == 0 {
-		ios.NoResults("devices", "Ensure devices are powered on and accessible on the network")
+	// Structured output is one list holding both kinds of device, so every
+	// discover command gives a consumer the same top-level shape.
+	found := make([]any, 0, len(shellyDevices)+len(pluginDevices))
+	for i := range shellyDevices {
+		found = append(found, shellyDevices[i])
+	}
+	for i := range pluginDevices {
+		found = append(found, pluginDevices[i])
+	}
+	display := func(ios *iostreams.IOStreams, _ []any) {
+		if len(shellyDevices) > 0 {
+			term.DisplayDiscoveredDevices(ios, shellyDevices)
+		}
+		if len(pluginDevices) > 0 {
+			term.DisplayPluginDiscoveredDevices(ios, pluginDevices)
+		}
+	}
+	if err := cmdutil.PrintDiscovered(ios, found, display,
+		"devices", "Ensure devices are powered on and accessible on the network"); err != nil {
+		return err
+	}
+	if len(found) == 0 {
 		return nil
-	}
-
-	// Display Shelly devices
-	if len(shellyDevices) > 0 {
-		term.DisplayDiscoveredDevices(ios, shellyDevices)
-	}
-
-	// Display plugin-discovered devices
-	if len(pluginDevices) > 0 {
-		term.DisplayPluginDiscoveredDevices(ios, pluginDevices)
 	}
 
 	// Cache + register the native Shelly devices via the shared helper so this
 	// command and `discover http` stay in lockstep on cache/register wording.
-	addedShelly := cmdutil.CacheAndRegisterDevices(ios, shellyDevices, opts.Register, opts.SkipExisting)
+	addedShelly := cmdutil.CacheAndRegisterDevices(status, shellyDevices, opts.Register, opts.SkipExisting)
 
 	// Plugin-discovered devices carry string addresses and a separate registry
 	// path, so their cache + registration stays here rather than in the helper.
@@ -224,7 +240,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	if opts.Register {
 		addedPlugin := term.RegisterPluginDevices(pluginDevices, opts.SkipExisting)
-		ios.Added("device", addedShelly+addedPlugin)
+		status.Added("device", addedShelly+addedPlugin)
 	}
 
 	return nil

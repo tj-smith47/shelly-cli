@@ -4,9 +4,16 @@ package discover
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -629,5 +636,81 @@ func TestRun_PlatformFilter(t *testing.T) {
 	err := run(ctx, opts)
 	if err != nil {
 		t.Logf("platform filter error (expected - no plugin for tasmota likely): %v", err)
+	}
+}
+
+// rawStdoutWrite matches a status line written straight to the command's
+// streams, which lands on stdout and breaks -o json for a consumer.
+var rawStdoutWrite = regexp.MustCompile(`\bios\.(Print|Printf|Println|Info|Success|Hint|Title|Subtitle|Plain|Count|NoResults|Added)\(`)
+
+// TestDiscoverCommands_HonourOutputFormat walks the discover command and every
+// subcommand's source. Each must print its results through
+// cmdutil.PrintDiscovered, which applies -o json|yaml|template, and must write
+// status lines through cmdutil.StatusStreams. A new discover subcommand that
+// prints its own table fails here.
+func TestDiscoverCommands_HonourOutputFormat(t *testing.T) {
+	t.Parallel()
+
+	var sources []string
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		src, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		if !strings.Contains(string(src), "func run(") {
+			return nil
+		}
+		sources = append(sources, path)
+		if !strings.Contains(string(src), "cmdutil.PrintDiscovered(") {
+			t.Errorf("%s: run does not print its results through cmdutil.PrintDiscovered, so it ignores -o json|yaml|template", path)
+		}
+		if m := rawStdoutWrite.FindString(string(src)); m != "" {
+			t.Errorf("%s: %s...) writes a status line to stdout; use cmdutil.StatusStreams(ios) so structured output stays parseable", path, m)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking the discover commands: %v", err)
+	}
+
+	root := NewCommand(cmdutil.NewFactory())
+	if want := 1 + len(root.Commands()); len(sources) != want {
+		t.Errorf("found %d command sources with a run function (%v), want %d: discover and its %d subcommands",
+			len(sources), sources, want, len(root.Commands()))
+	}
+}
+
+// TestRun_StructuredOutput checks that the top-level command writes one JSON
+// list to stdout and its progress to stderr.
+//
+//nolint:paralleltest // sets the process-global output format
+func TestRun_StructuredOutput(t *testing.T) {
+	viper.Set("output", "json")
+	t.Cleanup(func() { viper.Set("output", "") })
+
+	var stdout, stderr bytes.Buffer
+	f := cmdutil.NewWithIOStreams(iostreams.Test(nil, &stdout, &stderr))
+	// TEST-NET-1 is reserved for documentation and the test binary refuses
+	// non-loopback connections, so the scan finds nothing.
+	opts := &Options{Factory: f, Method: methodHTTP, Subnets: []string{"192.0.2.0/30"}, Timeout: time.Second, SkipPlugins: true, Register: true}
+	if err := run(context.Background(), opts); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	var got []map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("stdout is not a JSON list: %v\n%s", err, stdout.String())
+	}
+	if len(got) != 0 {
+		t.Errorf("devices = %v, want none", got)
+	}
+	if !strings.Contains(stderr.String(), "Scanning") {
+		t.Errorf("scan progress should be on stderr; got %q", stderr.String())
 	}
 }
