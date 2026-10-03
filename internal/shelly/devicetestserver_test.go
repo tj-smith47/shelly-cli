@@ -47,8 +47,9 @@ type apdevServer struct {
 
 	wifiReads atomic.Int32
 	mu        sync.Mutex
-	// writes records each station write: a Gen1 /settings/sta or /settings/sta1
-	// query, or a Gen2 WiFi.SetConfig / Shelly.SetConfig params object.
+	// writes records each settings write: a Gen1 /settings, /settings/sta,
+	// /settings/sta1 or /settings/cloud query, or a Gen2 WiFi.SetConfig,
+	// Shelly.SetConfig, Sys.SetConfig or Cloud.SetConfig params object.
 	writes []apdevWrite
 	// hits counts requests per URL path.
 	hits map[string]int
@@ -198,6 +199,11 @@ func (d *apdevServer) registerGen1(mux *http.ServeMux) {
 			writeJSON(w, map[string]any{"ok": true})
 			return
 		}
+		if r.URL.Query().Has("name") || r.URL.Query().Has("timezone") {
+			d.record(apdevWrite{method: "/settings", query: r.URL.Query()})
+			writeJSON(w, map[string]any{"ok": true})
+			return
+		}
 		d.wifiReads.Add(1)
 		if d.wifiReadFail {
 			http.Error(w, "settings unavailable", http.StatusInternalServerError)
@@ -212,7 +218,7 @@ func (d *apdevServer) registerGen1(mux *http.ServeMux) {
 		}
 		writeJSON(w, settings)
 	})
-	for _, path := range []string{"/settings/sta", "/settings/sta1"} {
+	for _, path := range []string{"/settings/sta", "/settings/sta1", "/settings/cloud"} {
 		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 			d.record(apdevWrite{method: path, query: r.URL.Query()})
 			writeJSON(w, map[string]any{"ok": true})
@@ -266,7 +272,7 @@ func (d *apdevServer) registerGen2(t *testing.T, mux *http.ServeMux) {
 			d.writeRPCResult(w, req.ID, map[string]any{
 				"sys": map[string]any{"device": map[string]any{"name": "apdev", "mac": "AABBCCDDEEFF"}}, "wifi": d.gen2WiFiConfig(),
 			})
-		case "WiFi.SetConfig", "Wifi.SetConfig", "Shelly.SetConfig":
+		case "WiFi.SetConfig", "Wifi.SetConfig", "Shelly.SetConfig", "Sys.SetConfig", "Cloud.SetConfig":
 			d.record(apdevWrite{method: req.Method, params: req.Params})
 			d.writeRPCResult(w, req.ID, map[string]any{"restart_required": false})
 		case "Shelly.Reboot":

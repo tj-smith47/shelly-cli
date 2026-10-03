@@ -441,6 +441,7 @@ func (o *Options) buildOnboardOptions() *shelly.OnboardOptions {
 		BLEOnly:    o.BLEOnly,
 		APOnly:     o.APOnly,
 		NoCloud:    o.NoCloud,
+		TargetAP:   o.TargetAP,
 	}
 	if o.SSID != "" {
 		onboardOpts.WiFi = o.buildWiFiConfig()

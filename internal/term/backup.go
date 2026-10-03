@@ -107,24 +107,25 @@ func DisplayRestoreResult(ios *iostreams.IOStreams, result *backup.RestoreResult
 		ios.Printf("  Webhooks:  %d restored\n", result.WebhooksRestored)
 	}
 
+	// The list follows its header onto stderr so a piped run keeps the block together.
 	if len(result.Warnings) > 0 {
-		ios.Println()
+		ios.Errorln()
 		ios.Warning("Warnings:")
 		for _, w := range result.Warnings {
-			ios.Printf("  - %s\n", w)
+			ios.Errorf("  - %s\n", w)
 		}
 	}
 
 	if len(result.Errors) > 0 {
-		ios.Println()
+		ios.Errorln()
 		ios.Error("Errors:")
 		for _, e := range result.Errors {
-			ios.Printf("  - %s\n", e)
+			ios.Errorf("  - %s\n", e)
 		}
 	}
 
 	if result.DestabilizedStep != "" {
-		ios.Println()
+		ios.Errorln()
 		ios.Error("Restore halted: the device entered a reboot loop after the %q step.", result.DestabilizedStep)
 	}
 }

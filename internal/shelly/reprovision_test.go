@@ -19,6 +19,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/netguard"
+	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
@@ -717,6 +718,99 @@ func TestOnboardViaAP_RegistersWithDeviceGeneration(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestOnboardViaAP_AppliesOptions checks that the name, timezone and cloud
+// choice reach the device over the LAN after the AP write, on both generations,
+// and that a device with no route from this host gets a note naming them.
+//
+//nolint:paralleltest // withIsolatedConfig swaps the process-global config
+func TestOnboardViaAP_AppliesOptions(t *testing.T) {
+	opts := &OnboardOptions{DeviceName: "guest bath", Timezone: "America/Los_Angeles", NoCloud: true}
+	for _, gen := range []int{1, 2} {
+		t.Run(fmt.Sprintf("gen%d", gen), func(t *testing.T) {
+			withIsolatedConfig(t)
+			d := newAPDevServer(t, gen)
+			svc := New(d.resolver(gen), WithRateLimiter(ratelimit.New(ratelimit.WithGen1MinInterval(0))))
+			svc.ap = &apFlows{onboard: func(context.Context, *reprovision.OnboardOptions) (*reprovision.OnboardResult, error) {
+				return &reprovision.OnboardResult{Address: d.addr(), Generation: gen, Reachable: true}, nil
+			}}
+			dev := &OnboardDevice{Name: "duo", SSID: testAPSSID, Generation: gen}
+
+			res := svc.OnboardViaAP(context.Background(), dev, &OnboardWiFiConfig{SSID: "iot", Password: "p"}, opts)
+
+			if res.Error != nil || res.Note != "" || !res.Registered {
+				t.Fatalf("result = %+v, want registered with no note", res)
+			}
+			var got []string
+			for _, w := range d.written() {
+				switch gen {
+				case 1:
+					got = append(got, w.method+"?"+w.query.Encode())
+				default:
+					b, err := json.Marshal(w.params)
+					if err != nil {
+						t.Fatal(err)
+					}
+					got = append(got, w.method+" "+string(b))
+				}
+			}
+			want := map[int][]string{
+				1: {
+					"/settings?name=guest+bath",
+					"/settings?timezone=America%2FLos_Angeles",
+					"/settings/cloud?enabled=false",
+				},
+				2: {
+					`Sys.SetConfig {"config":{"device":{"name":"guest bath"}}}`,
+					`Sys.SetConfig {"config":{"location":{"tz":"America/Los_Angeles"}}}`,
+					`Cloud.SetConfig {"config":{"enable":false}}`,
+				},
+			}[gen]
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("device writes =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+			}
+		})
+	}
+
+	t.Run("no route to the device", func(t *testing.T) {
+		withIsolatedConfig(t)
+		d := newAPDevServer(t, 2)
+		svc := New(d.resolver(2))
+		svc.ap = &apFlows{onboard: func(context.Context, *reprovision.OnboardOptions) (*reprovision.OnboardResult, error) {
+			return &reprovision.OnboardResult{Address: d.addr(), Generation: 2, Reachable: false, SeenVia: "mdns"}, nil
+		}}
+
+		res := svc.OnboardViaAP(context.Background(), &OnboardDevice{Name: "plug", SSID: "ShellyPlusPlugS-AABBCC"},
+			&OnboardWiFiConfig{SSID: "iot", Password: "p"}, opts)
+
+		want := "name, timezone, cloud not applied: the device announced itself but this host has no route to it"
+		if res.Error != nil || !res.Registered || res.Note != want {
+			t.Errorf("result = %+v, want registered with note %q", res, want)
+		}
+		if n := len(d.written()); n != 0 {
+			t.Errorf("%d writes reached a device this host cannot route to", n)
+		}
+	})
+
+	t.Run("nothing asked writes nothing", func(t *testing.T) {
+		withIsolatedConfig(t)
+		d := newAPDevServer(t, 1)
+		svc := New(d.resolver(1))
+		svc.ap = &apFlows{onboard: func(context.Context, *reprovision.OnboardOptions) (*reprovision.OnboardResult, error) {
+			return &reprovision.OnboardResult{Address: d.addr(), Generation: 1, Reachable: true}, nil
+		}}
+		for _, o := range []*OnboardOptions{nil, {}} {
+			res := svc.OnboardViaAP(context.Background(), &OnboardDevice{Name: "duo", SSID: testAPSSID},
+				&OnboardWiFiConfig{SSID: "iot", Password: "p"}, o)
+			if res.Error != nil || res.Note != "" {
+				t.Errorf("opts=%+v: result = %+v, want clean", o, res)
+			}
+		}
+		if n := len(d.written()); n != 0 {
+			t.Errorf("%d writes with nothing asked for", n)
+		}
+	})
 }
 
 // TestOnboardViaAP_OpenNetwork checks that a network is joined as an open one

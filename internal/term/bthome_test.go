@@ -187,16 +187,17 @@ func TestDisplayBTHomeComponentStatus_WithErrors(t *testing.T) {
 	}
 	DisplayBTHomeComponentStatus(ios, status)
 
-	// Error header goes to stderr
 	if !strings.Contains(errOut.String(), "Errors") {
 		t.Error("expected errors section")
 	}
-	// Error details go to stdout via Printf
-	if !strings.Contains(out.String(), "Connection timeout") {
-		t.Error("expected first error")
-	}
-	if !strings.Contains(out.String(), "Invalid data") {
-		t.Error("expected second error")
+	// The items share the header's stream; a split block tears apart under 2>&1 through a pipe.
+	for _, want := range []string{"Connection timeout", "Invalid data"} {
+		if !strings.Contains(errOut.String(), want) {
+			t.Errorf("expected %q on stderr with its header; stderr:\n%s", want, errOut.String())
+		}
+		if strings.Contains(out.String(), want) {
+			t.Errorf("%q must not go to stdout; stdout:\n%s", want, out.String())
+		}
 	}
 }
 
@@ -273,12 +274,13 @@ func TestDisplayBTHomeDeviceStatus_WithErrors(t *testing.T) {
 	}
 	DisplayBTHomeDeviceStatus(ios, status)
 
-	// Error header goes to stderr
 	if !strings.Contains(errOut.String(), "Errors") {
 		t.Error("expected errors section")
 	}
-	// Error details go to stdout via Printf
-	if !strings.Contains(out.String(), "Parse error") {
-		t.Error("expected first error")
+	if !strings.Contains(errOut.String(), "Parse error") {
+		t.Errorf("expected the error on stderr with its header; stderr:\n%s", errOut.String())
+	}
+	if strings.Contains(out.String(), "Parse error") {
+		t.Errorf("the error must not go to stdout; stdout:\n%s", out.String())
 	}
 }

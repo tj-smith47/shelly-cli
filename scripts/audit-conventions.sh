@@ -552,6 +552,28 @@ else
 fi
 
 # ==============================================================================
+# SECTION 8b: Output Stream Checks
+# ==============================================================================
+section "Output Stream Checks"
+
+# A list header printed with ios.Warning/ios.Error lands on stderr; the items
+# under it must follow it there (ios.Errorf/Errorln). Items on stdout split the
+# block when both streams are piped together, since stdout is block-buffered.
+SPLIT_BLOCKS=$(for f in $(grep -rlE 'ios\.(Warning|Error)\("[^"]*:"\)' --include='*.go' internal/ 2>/dev/null | grep -v '_test\.go'); do
+    awk -v file="$f" '
+        /ios\.(Warning|Error)\("[^"]*:"\)/ { header = NR; next }
+        header && NR <= header + 3 && /ios\.(Printf|Println)\(/ { print file ":" NR ": " $0; header = 0 }
+        header && NR > header + 3 { header = 0 }
+    ' "$f"
+done)
+if [[ -n "$SPLIT_BLOCKS" ]]; then
+    error "List items printed to stdout under a stderr header (use ios.Errorf/Errorln):"
+    show_results "$SPLIT_BLOCKS"
+else
+    success "Every stderr list header keeps its items on stderr"
+fi
+
+# ==============================================================================
 # SECTION 9: Build, Lint, Test, Docs
 # ==============================================================================
 if [[ $AUDIT_ONLY == "false" ]]; then

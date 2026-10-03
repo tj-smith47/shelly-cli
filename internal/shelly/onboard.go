@@ -86,6 +86,9 @@ type OnboardOptions struct {
 	BLEOnly    bool
 	APOnly     bool
 	NoCloud    bool
+	// TargetAP names the one WiFi AP wanted; discovery skips BLE and stops as
+	// soon as that AP is seen instead of running out the timeout.
+	TargetAP string
 }
 
 // OnboardResult holds the outcome of onboarding a single device.
@@ -140,7 +143,7 @@ func (s *Service) DiscoverForOnboard(
 	}
 
 	// BLE discovery (Gen2+ in provisioning mode)
-	if !opts.APOnly {
+	if !opts.APOnly && opts.TargetAP == "" {
 		wg.Go(func() {
 			report(string(OnboardSourceBLE), 0, false, nil)
 			found, bleErr := s.discoverBLEForOnboard(ctx)
@@ -155,7 +158,7 @@ func (s *Service) DiscoverForOnboard(
 	if !opts.BLEOnly {
 		wg.Go(func() {
 			report("WiFi AP", 0, false, nil)
-			found, err := s.discoverWiFiAPForOnboard(ctx)
+			found, err := s.discoverWiFiAPForOnboard(ctx, opts.TargetAP)
 			mu.Lock()
 			devices = append(devices, found...)
 			mu.Unlock()
@@ -240,13 +243,21 @@ func (s *Service) discoverBLEForOnboard(ctx context.Context) ([]OnboardDevice, e
 // WiFi scans are inherently unreliable — a single sweep may miss APs on
 // different channels or with weak signal. This function retries the scan
 // every 3 seconds until the context deadline, accumulating unique results.
-func (s *Service) discoverWiFiAPForOnboard(ctx context.Context) ([]OnboardDevice, error) {
+func (s *Service) discoverWiFiAPForOnboard(ctx context.Context, targetAP string) ([]OnboardDevice, error) {
 	wifiDisc := discovery.NewWiFiDiscovererWithScanner(s.scanner())
 	seen := make(map[string]OnboardDevice) // keyed by SSID
 
 	const scanInterval = 3 * time.Second
 	var lastErr error
 	firstAttempt := true
+
+	collected := func() []OnboardDevice {
+		result := make([]OnboardDevice, 0, len(seen))
+		for _, dev := range seen {
+			result = append(result, dev)
+		}
+		return result
+	}
 
 	for {
 		rawDevices, err := wifiDisc.DiscoverWithContext(ctx)
@@ -264,6 +275,11 @@ func (s *Service) discoverWiFiAPForOnboard(ctx context.Context) ([]OnboardDevice
 		firstAttempt = false
 
 		s.collectWiFiAPDevices(wifiDisc, rawDevices, seen)
+		if targetAP != "" {
+			if _, found := FindByAP(collected(), targetAP); found {
+				return collected(), nil
+			}
+		}
 
 		// Wait before next scan, or exit if context is done.
 		select {
@@ -272,11 +288,7 @@ func (s *Service) discoverWiFiAPForOnboard(ctx context.Context) ([]OnboardDevice
 			if len(seen) == 0 && lastErr != nil {
 				return nil, lastErr
 			}
-			result := make([]OnboardDevice, 0, len(seen))
-			for _, dev := range seen {
-				result = append(result, dev)
-			}
-			return result, nil
+			return collected(), nil
 		case <-time.After(scanInterval):
 			// Continue scanning.
 		}

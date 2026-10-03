@@ -155,13 +155,15 @@ func TestDisplayMigrationResult_Full(t *testing.T) {
 	if !strings.Contains(output, "Webhooks:  1") {
 		t.Error("expected webhooks count")
 	}
-	// Warning header goes to stderr
 	if !strings.Contains(errOut.String(), "Warnings") {
 		t.Error("expected warnings header")
 	}
-	// Warning details go to stdout via Printf
-	if !strings.Contains(output, "modified permissions") {
-		t.Error("expected warning message")
+	// The items share the header's stream; a split block tears apart under 2>&1 through a pipe.
+	if !strings.Contains(errOut.String(), "modified permissions") {
+		t.Errorf("expected warning message on stderr with its header; stderr:\n%s", errOut.String())
+	}
+	if strings.Contains(output, "modified permissions") {
+		t.Errorf("warning message must not go to stdout; stdout:\n%s", output)
 	}
 }
 

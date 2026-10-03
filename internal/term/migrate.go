@@ -26,11 +26,10 @@ func DisplayMigrationPreview(ios *iostreams.IOStreams, source, sourceType, targe
 
 // DisplayCompatibilityError displays a device type mismatch error.
 func DisplayCompatibilityError(ios *iostreams.IOStreams, err error) {
-	var compErr *backup.CompatibilityError
-	if errors.As(err, &compErr) {
+	if compErr, ok := errors.AsType[*backup.CompatibilityError](err); ok {
 		ios.Warning("Source and target are different device types:")
-		ios.Printf("  Source: %s\n", compErr.SourceModel)
-		ios.Printf("  Target: %s\n", compErr.TargetModel)
+		ios.Errorf("  Source: %s\n", compErr.SourceModel)
+		ios.Errorf("  Target: %s\n", compErr.TargetModel)
 		ios.Info("Use --force to migrate anyway")
 	}
 }
@@ -60,24 +59,25 @@ func DisplayMigrationResult(ios *iostreams.IOStreams, result *backup.RestoreResu
 		ios.Printf("  Webhooks:  %d migrated\n", result.WebhooksRestored)
 	}
 
+	// The list follows its header onto stderr so a piped run keeps the block together.
 	if len(result.Warnings) > 0 {
-		ios.Println()
+		ios.Errorln()
 		ios.Warning("Warnings:")
 		for _, w := range result.Warnings {
-			ios.Printf("  - %s\n", w)
+			ios.Errorf("  - %s\n", w)
 		}
 	}
 
 	if len(result.Errors) > 0 {
-		ios.Println()
+		ios.Errorln()
 		ios.Error("Errors:")
 		for _, e := range result.Errors {
-			ios.Printf("  - %s\n", e)
+			ios.Errorf("  - %s\n", e)
 		}
 	}
 
 	if result.DestabilizedStep != "" {
-		ios.Println()
+		ios.Errorln()
 		ios.Error("Migration halted: the device entered a reboot loop after the %q step.", result.DestabilizedStep)
 	}
 }

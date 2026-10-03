@@ -733,7 +733,7 @@ func TestDiscoverWiFiAPForOnboard_UsesInjectedScanner(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	devices, err := svc.discoverWiFiAPForOnboard(ctx)
+	devices, err := svc.discoverWiFiAPForOnboard(ctx, "")
 	if err != nil {
 		t.Fatalf("discoverWiFiAPForOnboard: %v", err)
 	}
@@ -743,6 +743,42 @@ func TestDiscoverWiFiAPForOnboard_UsesInjectedScanner(t *testing.T) {
 	for _, call := range scanner.called() {
 		if call != "scan" {
 			t.Errorf("discovery made a %s call", call)
+		}
+	}
+}
+
+// TestDiscoverForOnboard_TargetAPStopsAtFirstSighting checks that a named
+// target AP ends discovery on the scan that sees it, with BLE never started,
+// instead of running out the timeout.
+func TestDiscoverForOnboard_TargetAPStopsAtFirstSighting(t *testing.T) {
+	t.Parallel()
+
+	scanner := &recordingScanner{networks: []discovery.WiFiNetwork{
+		{SSID: "ShellyPlusWDUS-441793CCDAEC", Signal: -60},
+		{SSID: testAPSSID, Signal: -40},
+	}}
+	svc := New(NewConfigResolver(), WithWiFiScanner(scanner))
+	var methods []string
+	start := time.Now()
+
+	devices, err := svc.DiscoverForOnboard(context.Background(),
+		&OnboardOptions{Timeout: time.Minute, TargetAP: strings.ToLower(testAPSSID)},
+		func(p OnboardProgress) { methods = append(methods, p.Method) })
+	if err != nil {
+		t.Fatalf("DiscoverForOnboard: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("discovery took %v with the target seen on the first scan", elapsed)
+	}
+	if _, found := FindByAP(devices, testAPSSID); !found || len(devices) != 2 {
+		t.Errorf("devices = %+v, want both APs from the one scan", devices)
+	}
+	if calls := strings.Join(scanner.called(), ","); calls != "scan" {
+		t.Errorf("scanner calls = %s, want one scan", calls)
+	}
+	for _, m := range methods {
+		if m == string(OnboardSourceBLE) {
+			t.Error("BLE discovery ran for a WiFi AP target")
 		}
 	}
 }

@@ -148,9 +148,10 @@ func displayBTHomeErrors(ios *iostreams.IOStreams, errors []string) {
 		return
 	}
 
-	ios.Println()
+	// The list follows its header onto stderr so a piped run keeps the block together.
+	ios.Errorln()
 	ios.Error("Errors:")
 	for _, e := range errors {
-		ios.Printf("  - %s\n", e)
+		ios.Errorf("  - %s\n", e)
 	}
 }
