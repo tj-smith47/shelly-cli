@@ -60,6 +60,7 @@ type Options struct {
 	BLEOnly      bool
 	APOnly       bool
 	NoCloud      bool
+	DisableAP    bool
 	Yes          bool
 	DiscoverOnly bool
 
@@ -116,6 +117,13 @@ Gen2+ devices are provisioned via BLE (parallel, no network disruption).
 Gen1 devices are provisioned via their WiFi AP (sequential, requires temporary
 network switch to the device's AP).
 
+A Gen2+ device onboarded through its WiFi AP keeps that open access point on
+after it joins the network. Use --disable-ap to turn it off once the device
+answers on the LAN; a device that did not join keeps its access point, so it
+can still be reached there. Gen1 devices leave access point mode by themselves
+and BLE onboarding does not use the access point, so the flag changes nothing
+for them.
+
 Use the subcommands for targeted provisioning of specific devices:
   wifi   - Interactive WiFi provisioning for a single device
   ble    - BLE-based provisioning for a specific device
@@ -144,6 +152,9 @@ To register already-networked devices, use: shelly discover --register`,
   shelly provision --ap-only --target-ap shellycolorbulb-AABBCC --name master-bath \
     --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1 --yes
 
+  # Onboard a Gen2+ device at its AP and turn that AP off once it is on the LAN
+  shelly provision --ap-only --target-ap ShellyPlus1PM-AABBCC --disable-ap --yes
+
   # Only discover via BLE (Gen2+ devices)
   shelly provision --ble-only
 
@@ -170,6 +181,7 @@ To register already-networked devices, use: shelly discover --register`,
 	cmd.Flags().StringVar(&opts.FromDevice, "from-device", "", "Clone config from existing device")
 	cmd.Flags().StringVar(&opts.FromTemplate, "from-template", "", "Apply saved template after provisioning")
 	cmd.Flags().BoolVar(&opts.NoCloud, "no-cloud", false, "Disable cloud on provisioned devices")
+	cmd.Flags().BoolVar(&opts.DisableAP, "disable-ap", false, "Turn off a Gen2+ device's access point once it answers on the LAN (WiFi AP onboarding)")
 	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompts")
 	cmd.Flags().BoolVar(&opts.Yes, "all", false, "Provision all discovered devices (non-interactive)")
 	cmd.Flags().StringVar(&opts.StaticIP, "static-ip", "", "Assign a static IP to the device (requires --gateway and --netmask)")
@@ -180,6 +192,7 @@ To register already-networked devices, use: shelly discover --register`,
 	cmd.Flags().BoolVar(&opts.DiscoverOnly, "discover-only", false, "List discoverable unprovisioned devices as JSON and exit (no provisioning)")
 	cmdutil.AddOpenFlag(cmd, &opts.Open)
 	cmd.MarkFlagsMutuallyExclusive("from-device", "from-template")
+	cmd.MarkFlagsMutuallyExclusive("ble-only", "disable-ap")
 	cmd.MarkFlagsRequiredTogether("static-ip", "gateway", "netmask")
 
 	cmd.AddCommand(wifi.NewCommand(f))
@@ -442,6 +455,7 @@ func (o *Options) buildOnboardOptions() *shelly.OnboardOptions {
 		APOnly:     o.APOnly,
 		NoCloud:    o.NoCloud,
 		TargetAP:   o.TargetAP,
+		DisableAP:  o.DisableAP,
 	}
 	if o.SSID != "" {
 		onboardOpts.WiFi = o.buildWiFiConfig()

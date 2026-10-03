@@ -1090,3 +1090,38 @@ func TestDescribeAPRestoreName(t *testing.T) {
 		t.Errorf("another device's AP: %q", got)
 	}
 }
+
+// TestOnboardViaAP_DisableAP checks that DisableAP reaches the SDK onboard and
+// that the SDK's report of a turned-off access point reaches the result.
+func TestOnboardViaAP_DisableAP(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		opts *OnboardOptions
+		want bool
+	}{
+		{"asked", &OnboardOptions{DisableAP: true}, true},
+		{"not asked", &OnboardOptions{}, false},
+		{"nil options", nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var got *reprovision.OnboardOptions
+			svc := New(NewConfigResolver(), WithWiFiScanner(fakeScanner{}))
+			svc.ap = &apFlows{onboard: func(_ context.Context, o *reprovision.OnboardOptions) (*reprovision.OnboardResult, error) {
+				got = o
+				// No address, so the result is returned before any registry write.
+				return &reprovision.OnboardResult{APDisabled: o.DisableAP}, nil
+			}}
+
+			res := svc.OnboardViaAP(context.Background(), &OnboardDevice{Name: "plug", SSID: "ShellyPlusPlugS-AABBCC"},
+				&OnboardWiFiConfig{SSID: "iot", Password: "p"}, tt.opts)
+
+			if got.DisableAP != tt.want || res.APDisabled != tt.want {
+				t.Errorf("SDK DisableAP = %v, result APDisabled = %v, want both %v", got.DisableAP, res.APDisabled, tt.want)
+			}
+		})
+	}
+}

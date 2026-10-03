@@ -301,3 +301,20 @@ func TestSelectOnboardDevices_AutoConfirm_Empty(t *testing.T) {
 		t.Errorf("len(selected) = %d, want 0", len(selected))
 	}
 }
+
+func TestDisplayOnboardResults_APDisabledAndNote(t *testing.T) {
+	t.Parallel()
+
+	ios, out, errOut := testIOStreams()
+	DisplayOnboardResults(ios, []*shelly.OnboardResult{
+		{Device: &shelly.OnboardDevice{Name: "off"}, NewAddress: testIP50, APDisabled: true},
+		{Device: &shelly.OnboardDevice{Name: "still-on"}, NewAddress: testIP50, Note: "joined but its access point is still on: timeout"},
+	})
+
+	if got := strings.Count(out.String(), "access point turned off"); got != 1 {
+		t.Errorf("\"access point turned off\" printed %d times, want once; output:\n%s", got, out.String())
+	}
+	if !strings.Contains(errOut.String(), "joined but its access point is still on: timeout") {
+		t.Errorf("the note of a device that joined was not shown; stderr:\n%s", errOut.String())
+	}
+}

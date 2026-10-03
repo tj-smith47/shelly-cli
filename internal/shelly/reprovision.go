@@ -393,6 +393,7 @@ func (s *Service) OnboardViaAP(
 			Open:     wifi.Open,
 		},
 		Generation: device.Generation,
+		DisableAP:  opts != nil && opts.DisableAP,
 	})
 	if err != nil {
 		if errors.Is(err, reprovision.ErrNoPassphrase) {
@@ -404,6 +405,7 @@ func (s *Service) OnboardViaAP(
 
 	result.NewAddress = res.Address
 	result.Note = res.Note
+	result.APDisabled = res.APDisabled
 	if res.Address == "" {
 		return result
 	}

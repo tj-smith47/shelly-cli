@@ -3,6 +3,8 @@ package provision
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -661,5 +663,58 @@ func TestRun_APOnboardShowsSteps(t *testing.T) {
 	}
 	if want := "Onboarding bulb2 at AP shellycolorbulb-AABBCC (hopping host WiFi)..."; !strings.Contains(tf.TestIO.ErrString(), want) {
 		t.Errorf("progress line %q missing; stderr = %q", want, tf.TestIO.ErrString())
+	}
+}
+
+// TestRun_DisableAP checks that --disable-ap reaches the WiFi AP onboarding and
+// that the result names the access point that was turned off.
+func TestRun_DisableAP(t *testing.T) {
+	t.Parallel()
+	for _, disable := range []bool{true, false} {
+		t.Run(fmt.Sprintf("disable=%v", disable), func(t *testing.T) {
+			t.Parallel()
+			tf := factory.NewTestFactory(t)
+			var got *shelly.OnboardOptions
+			stub := &stubProvisionService{
+				discover: func(context.Context, *shelly.OnboardOptions, func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error) {
+					return []shelly.OnboardDevice{apDevice("plug", "ShellyPlusPlugS-AABBCC")}, nil
+				},
+				onboardAP: func(_ context.Context, device *shelly.OnboardDevice, _ *shelly.OnboardWiFiConfig, o *shelly.OnboardOptions) *shelly.OnboardResult {
+					got = o
+					return &shelly.OnboardResult{Device: device, NewAddress: "10.0.0.51", APDisabled: o.DisableAP}
+				},
+			}
+			cmd := NewCommand(tf.Factory)
+			opts := &Options{Factory: tf.Factory, SSID: testSSID, Password: "secret", Yes: true, DisableAP: disable, svc: stub}
+			if cmd.Flags().Lookup("disable-ap") == nil {
+				t.Fatal("--disable-ap flag is not defined")
+			}
+
+			if err := run(provisionTestCtx(t), opts); err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			if got == nil || got.DisableAP != disable {
+				t.Fatalf("onboard options = %+v, want DisableAP=%v", got, disable)
+			}
+			if shown := strings.Contains(tf.OutString(), "access point turned off"); shown != disable {
+				t.Errorf("\"access point turned off\" shown = %v, want %v; output:\n%s", shown, disable, tf.OutString())
+			}
+		})
+	}
+}
+
+// TestNewCommand_DisableAPExcludesBLEOnly checks that --disable-ap, which acts
+// only on WiFi AP onboarding, is refused together with --ble-only.
+func TestNewCommand_DisableAPExcludesBLEOnly(t *testing.T) {
+	t.Parallel()
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"--ble-only", "--disable-ap", "--discover-only"})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	err := cmd.ExecuteContext(provisionTestCtx(t))
+	if err == nil || !strings.Contains(err.Error(), "disable-ap") {
+		t.Fatalf("error = %v, want a mutually-exclusive error naming disable-ap", err)
 	}
 }

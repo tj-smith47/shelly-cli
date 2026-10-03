@@ -38,6 +38,13 @@ Gen2+ devices are provisioned via BLE (parallel, no network disruption).
 Gen1 devices are provisioned via their WiFi AP (sequential, requires temporary
 network switch to the device's AP).
 
+A Gen2+ device onboarded through its WiFi AP keeps that open access point on
+after it joins the network. Use --disable-ap to turn it off once the device
+answers on the LAN; a device that did not join keeps its access point, so it
+can still be reached there. Gen1 devices leave access point mode by themselves
+and BLE onboarding does not use the access point, so the flag changes nothing
+for them.
+
 Use the subcommands for targeted provisioning of specific devices:
   wifi   - Interactive WiFi provisioning for a single device
   ble    - BLE-based provisioning for a specific device
@@ -74,6 +81,9 @@ shelly provision [flags]
   shelly provision --ap-only --target-ap shellycolorbulb-AABBCC --name master-bath \
     --static-ip 10.23.47.227 --gateway 10.23.47.1 --netmask 255.255.254.0 --dns 10.23.47.1 --yes
 
+  # Onboard a Gen2+ device at its AP and turn that AP off once it is on the LAN
+  shelly provision --ap-only --target-ap ShellyPlus1PM-AABBCC --disable-ap --yes
+
   # Only discover via BLE (Gen2+ devices)
   shelly provision --ble-only
 
@@ -93,6 +103,7 @@ shelly provision [flags]
       --all                    Provision all discovered devices (non-interactive)
       --ap-only                Only discover via WiFi AP (Gen1 devices)
       --ble-only               Only discover via BLE (Gen2+ devices)
+      --disable-ap             Turn off a Gen2+ device's access point once it answers on the LAN (WiFi AP onboarding)
       --discover-only          List discoverable unprovisioned devices as JSON and exit (no provisioning)
       --dns string             DNS server for the static IP
       --from-device string     Clone config from existing device

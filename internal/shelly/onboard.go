@@ -89,6 +89,10 @@ type OnboardOptions struct {
 	// TargetAP names the one WiFi AP wanted; discovery skips BLE and stops as
 	// soon as that AP is seen instead of running out the timeout.
 	TargetAP string
+	// DisableAP turns off the access point of a Gen2+ device onboarded through
+	// its WiFi AP once the device answers on the LAN. Gen1 devices leave access
+	// point mode by themselves, and BLE onboarding never uses the access point.
+	DisableAP bool
 }
 
 // OnboardResult holds the outcome of onboarding a single device.
@@ -102,6 +106,9 @@ type OnboardResult struct {
 	// source config was not applied and it is not browsable yet.
 	Note       string
 	Registered bool
+	// APDisabled reports that OnboardOptions.DisableAP turned the device's
+	// access point off.
+	APDisabled bool
 	Method     string // "BLE", "WiFi AP", "register-only"
 }
 

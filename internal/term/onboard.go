@@ -90,6 +90,12 @@ func DisplayOnboardResults(ios *iostreams.IOStreams, results []*shelly.OnboardRe
 			msg += " [registered]"
 		}
 		ios.Success("  %s", msg)
+		if r.APDisabled {
+			ios.Info("    access point turned off")
+		}
+		if r.Note != "" {
+			ios.Warning("    %s", r.Note)
+		}
 	}
 }
 
