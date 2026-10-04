@@ -31,6 +31,10 @@ sections.
 	Password to decrypt backup
 
 .PP
+\fB--decrypt-stdin\fP[=false]
+	Read the password to decrypt the backup from stdin
+
+.PP
 \fB--dns\fP=""
 	Static IPv4 nameserver (with --static-ip; default: the backup's)
 
@@ -65,6 +69,10 @@ sections.
 .PP
 \fB--password\fP=""
 	WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
+
+.PP
+\fB--password-stdin\fP[=false]
+	Read the WiFi password from stdin
 
 .PP
 \fB--skip-auth\fP[=false]
@@ -184,6 +192,9 @@ sections.
 
   # Restore encrypted backup
   shelly backup restore living-room backup.json --decrypt mysecret
+
+  # Read the decryption password from stdin
+  shelly backup restore living-room backup.json --decrypt-stdin < ~/.shelly-backup-password
 
   # Skip scripts during restore
   shelly backup restore living-room backup.json --skip-scripts

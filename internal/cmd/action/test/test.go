@@ -40,7 +40,7 @@ will temporarily change the device state to trigger the action callback.
 For output actions (out_on_url, out_off_url), the device relay will be toggled.
 For button actions, the physical button press must be used.
 
-Gen2+ devices use webhooks. See 'shelly webhook test'.`,
+Gen2+ devices use webhooks, which have no test call. See 'shelly webhook list'.`,
 		Example: `  # Test output on action (turns relay on, triggering out_on_url)
   shelly action test living-room out_on_url
 
@@ -78,7 +78,7 @@ func run(ctx context.Context, opts *Options) error {
 	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
 		if !dev.IsGen1() {
 			ios.Warning("Device %s is not a Gen1 device", opts.Device)
-			ios.Info("Gen2+ devices use webhooks. Try: shelly webhook test %s", opts.Device)
+			ios.Info("Gen2+ devices use webhooks, which have no test call. See: shelly webhook list %s", opts.Device)
 			return fmt.Errorf("action test only available for Gen1 devices")
 		}
 

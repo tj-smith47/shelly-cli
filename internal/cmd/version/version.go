@@ -19,7 +19,6 @@ import (
 type Options struct {
 	Factory     *cmdutil.Factory
 	CheckUpdate bool
-	JSON        bool
 	Short       bool
 }
 
@@ -35,7 +34,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 By default, shows version, commit, and build date.
 Use --short for just the version number.
-Use --json for machine-readable output.
+Use -o json or -o yaml for machine-readable output.
 Use --check to also check for available updates.`,
 		Example: `  # Show version info
   shelly version
@@ -44,7 +43,10 @@ Use --check to also check for available updates.`,
   shelly version --short
 
   # JSON output
-  shelly version --json
+  shelly version -o json
+
+  # YAML output
+  shelly version -o yaml
 
   # Check for updates
   shelly version --check`,
@@ -54,7 +56,6 @@ Use --check to also check for available updates.`,
 	}
 
 	cmd.Flags().BoolVarP(&opts.Short, "short", "s", false, "Print only the version number")
-	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output version info as JSON")
 	cmd.Flags().BoolVarP(&opts.CheckUpdate, "check", "c", false, "Check for available updates")
 
 	return cmd
@@ -71,11 +72,10 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Printf("%s\n", info.Version)
 		return nil
 	}
-	if opts.JSON {
-		if err := version.WriteJSONOutput(ctx, ios.Out, info, opts.CheckUpdate, github.ReleaseFetcher(ios), version.IsNewerVersion); err != nil {
-			ios.DebugErr("encoding JSON", err)
-		}
-		return nil
+	if cmdutil.StructuredOutput() {
+		out := version.BuildOutput(ctx, info, opts.CheckUpdate, github.ReleaseFetcher(ios), version.IsNewerVersion)
+		// Structured output never reaches the text display.
+		return cmdutil.PrintResult(ios, out, func(*iostreams.IOStreams, *version.Output) {})
 	}
 
 	term.DisplayVersionInfo(ios, info.Version, info.Commit, info.Date, info.BuiltBy, info.GoVersion, info.OS, info.Arch)

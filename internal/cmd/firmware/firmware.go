@@ -47,7 +47,7 @@ Check for updates, update to the latest version, or rollback to a previous versi
   shelly firmware rollback living-room
 
   # Download firmware file
-  shelly firmware download ShellyPlus1PM 1.0.0 --output firmware.zip`,
+  shelly firmware download living-room --output firmware.zip`,
 	}
 
 	cmd.AddCommand(check.NewCommand(f))

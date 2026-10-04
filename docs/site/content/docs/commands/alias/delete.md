@@ -5,7 +5,7 @@ description: "shelly alias delete"
 
 ## shelly alias delete
 
-Delete a alias
+Delete an alias
 
 ### Synopsis
 
@@ -18,7 +18,7 @@ shelly alias delete <alias> [flags]
 ### Examples
 
 ```
-  # Delete a alias (with confirmation)
+  # Delete an alias (with confirmation)
   shelly alias delete my-alias
 
   # Delete without confirmation
@@ -32,6 +32,7 @@ shelly alias delete <alias> [flags]
 
 ```
   -h, --help   help for delete
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

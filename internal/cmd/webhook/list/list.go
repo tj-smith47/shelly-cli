@@ -75,7 +75,7 @@ func run(ctx context.Context, opts *Options) error {
 	return cmdutil.RunCachedList(ctx, opts.Factory, opts.Device,
 		cache.TypeWebhooks, cache.TTLAutomation,
 		"Getting webhooks...",
-		"No webhooks configured",
+		"webhooks",
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.WebhookInfo, error) {
 			return svc.ListWebhooks(ctx, device)
 		},

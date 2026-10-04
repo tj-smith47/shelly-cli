@@ -24,6 +24,9 @@ shelly wifi ap <device> [flags]
   # Enable access point with custom SSID
   shelly wifi ap living-room --enable --ssid "ShellyAP" --password "secret"
 
+  # Read the access point password from stdin
+  shelly wifi ap living-room --enable --ssid "ShellyAP" --password-stdin < ~/.shelly-ap-password
+
   # Disable access point
   shelly wifi ap living-room --disable
 
@@ -39,6 +42,7 @@ shelly wifi ap <device> [flags]
       --enable            Enable access point
   -h, --help              help for ap
       --password string   Access point password
+      --password-stdin    Read the access point password from stdin
       --ssid string       Access point SSID
 ```
 

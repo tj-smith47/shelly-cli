@@ -26,7 +26,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "diagram",
-		Aliases: []string{"wiring", "diag"},
+		Aliases: []string{"wiring"},
 		Short:   "Display ASCII wiring diagrams for Shelly devices",
 		Long: `Display ASCII wiring diagrams showing terminal connections and wiring
 layouts for Shelly device models. Useful for installation reference.

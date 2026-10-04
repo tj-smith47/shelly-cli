@@ -95,9 +95,8 @@ func TestNewCommand_Flags(t *testing.T) {
 		name     string
 		defValue string
 	}{
-		{"user", "admin"},
+		{"user", ""},
 		{flagPassword, ""},
-		{"realm", ""},
 	}
 
 	for _, tt := range tests {
@@ -176,7 +175,22 @@ func TestNewCommand_MissingPassword(t *testing.T) {
 		t.Fatal("expected error for missing password")
 	}
 
-	if !strings.Contains(err.Error(), "--password is required") {
-		t.Errorf("expected '--password is required' error, got: %v", err)
+	for _, way := range []string{"--password <value>", "--password-stdin"} {
+		if !strings.Contains(err.Error(), way) {
+			t.Errorf("missing-password error does not name %s: %v", way, err)
+		}
+	}
+}
+
+func TestNewCommand_PasswordAndStdinExclusive(t *testing.T) {
+	t.Parallel()
+
+	ios := iostreams.Test(nil, &bytes.Buffer{}, &bytes.Buffer{})
+	cmd := NewCommand(cmdutil.NewFactory().SetIOStreams(ios))
+	cmd.SetArgs([]string{"device", "--password", "x", "--password-stdin"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "none of the others can be") {
+		t.Fatalf("error = %v, want --password and --password-stdin rejected together", err)
 	}
 }

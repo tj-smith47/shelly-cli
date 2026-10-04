@@ -11,12 +11,19 @@ Test authentication credentials
 
 Test authentication credentials against a device.
 
-This command verifies that the provided credentials are valid
-by attempting to connect to the device.
+The device is asked for data it only returns to an authenticated caller
+(Sys.GetStatus on Gen2+ devices, /settings on Gen1 devices), so a wrong
+password fails the test. Without --password or --password-stdin the
+credentials stored for the device are tested; with one of them the given
+credentials are tested instead, and nothing is stored. The user defaults to
+admin.
+
+A device with authentication disabled accepts any credentials; the command
+says so instead of reporting the password as correct.
 
 Exit codes:
-  0 - Authentication successful
-  1 - Authentication failed or error
+  0 - The device accepted the credentials
+  1 - The device rejected the credentials, or could not be reached
 
 ```
 shelly auth test <device> [flags]
@@ -25,11 +32,14 @@ shelly auth test <device> [flags]
 ### Examples
 
 ```
-  # Test with provided credentials
+  # Test the credentials stored for the device
+  shelly auth test living-room
+
+  # Test other credentials
   shelly auth test living-room --user admin --password secret
 
-  # Test with configured credentials
-  shelly auth test living-room
+  # Read the password from stdin (prompts without echo on a terminal)
+  shelly auth test living-room --password-stdin < ~/.shelly-living-room-password
 
   # Quick test with short timeout
   shelly auth test living-room --timeout 5s
@@ -39,9 +49,10 @@ shelly auth test <device> [flags]
 
 ```
   -h, --help               help for test
-      --password string    Password to test
+      --password string    Password to test instead of the stored one
+      --password-stdin     Read the password to test from stdin
       --timeout duration   Connection timeout (default 10s)
-      --user string        Username to test
+      --user string        Username for --password or --password-stdin (default admin)
 ```
 
 ### Options inherited from parent commands

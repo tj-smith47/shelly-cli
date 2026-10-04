@@ -1505,18 +1505,17 @@ func TestRun_DirectWebSocketZeroDuration(t *testing.T) {
 	}
 }
 
-// TestRun_WebSocketAuth asserts the websocket carries the registered device's
-// credentials, and none for a device registered without them.
+// TestRun_WebSocketAuth asserts the websocket handshake never carries a basic
+// Authorization header: a Gen2+ device ignores it and authenticates request
+// frames instead (auth_test.go covers that exchange).
 //
 //nolint:paralleltest // config.SetFs swaps the process-global config
 func TestRun_WebSocketAuth(t *testing.T) {
 	tests := []struct {
 		name string
 		auth *model.Auth
-		want string
 	}{
-		{name: "device with auth", auth: &model.Auth{Username: "admin", Password: "secret"},
-			want: "Basic YWRtaW46c2VjcmV0"},
+		{name: "device with auth", auth: &model.Auth{Username: "admin", Password: "secret"}},
 		{name: "device without auth"},
 	}
 	for _, tt := range tests {
@@ -1562,8 +1561,8 @@ func TestRun_WebSocketAuth(t *testing.T) {
 			}
 			select {
 			case got := <-upgrades:
-				if got != tt.want {
-					t.Errorf("Authorization = %q, want %q", got, tt.want)
+				if got != "" {
+					t.Errorf("Authorization = %q, want none", got)
 				}
 			default:
 				t.Fatal("no websocket upgrade reached the device")

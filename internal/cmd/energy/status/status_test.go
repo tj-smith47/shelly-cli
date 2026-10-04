@@ -36,8 +36,8 @@ func TestNewCommand_Structure(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test Use
-	if cmd.Use != "status <device> [id]" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "status <device> [id]")
+	if cmd.Use != "status [device] [id]" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "status [device] [id]")
 	}
 
 	// Test Aliases
@@ -73,7 +73,9 @@ func TestNewCommand_Args(t *testing.T) {
 		args    []string
 		wantErr bool
 	}{
-		{"no args", []string{}, true},
+		// Zero args pass the arity check because --all takes none; RunE
+		// rejects zero args without --all (TestAll_ArgsAndFlagConflicts).
+		{"no args", []string{}, false},
 		{"one arg valid", []string{"device"}, false},
 		{"two args valid", []string{"device", "0"}, false},
 		{"three args", []string{"device", "0", "extra"}, true},

@@ -73,11 +73,15 @@ If your device has a password set:
 shelly device add kitchen 192.168.1.100 --user admin --password yourpassword
 ```
 
-**Security tip:** Avoid passwords in shell history by using a prompt:
+**Security tip:** Avoid passwords in shell history with `--password-stdin`. On a
+terminal it prompts for the password without echo; otherwise it reads it from stdin:
 
 ```bash
-shelly device add kitchen 192.168.1.100 --user admin --password-stdin <<< "yourpassword"
+shelly device add kitchen 192.168.1.100 --user admin --password-stdin
+shelly device add kitchen 192.168.1.100 --user admin --password-stdin < ~/.shelly-kitchen-password
 ```
+
+`--user` defaults to `admin`, the user Shelly devices use, so `--password` alone is enough.
 
 ### Registration with Generation Hint
 
@@ -146,9 +150,9 @@ devices:
   kitchen:
     address: 192.168.1.100
     generation: 2
-    model: SNSW-001X16EU
+    type: SNSW-001X16EU
     auth:
-      user: admin
+      username: admin
       password: yourpassword
 ```
 

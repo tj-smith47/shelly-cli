@@ -107,8 +107,8 @@ Cloud API device management (requires authentication):
   shelly cloud disable living-room
 
   # Cloud API authentication (3 methods via login command)
-  shelly cloud login                     # Interactive email/password
-  shelly cloud login --browser           # OAuth browser flow (recommended)
+  shelly cloud login                     # OAuth browser flow (default)
+  shelly cloud login --email <email> --password <password>  # Email and password
   shelly cloud login --key <key> --server <url>  # Auth key from Shelly App
   shelly cloud auth-status
   shelly cloud logout

@@ -154,17 +154,29 @@ func AddStaticIPFlags(cmd *cobra.Command, staticIP, gateway, netmask, dns *strin
 }
 
 // AddWiFiPasswordFlag registers --password, the WiFi passphrase of the network
-// the device joins, with the help text every such command shares.
-func AddWiFiPasswordFlag(cmd *cobra.Command, password *string) {
-	cmd.Flags().StringVar(password, "password", "",
-		"WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)")
+// the device joins, and --password-stdin, which reads it from stdin, with the
+// help text every such command shares.
+func AddWiFiPasswordFlag(cmd *cobra.Command, password *string, fromStdin *bool) {
+	AddSecretFlags(cmd, password, fromStdin, wifiPasswordFlag,
+		"WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)",
+		"Read the WiFi password from stdin")
 }
 
+// ReadWiFiPasswordStdin sets *password from stdin when the --password-stdin
+// flag AddWiFiPasswordFlag registers was given.
+func ReadWiFiPasswordStdin(ios *iostreams.IOStreams, password *string, fromStdin bool) error {
+	return ResolveSecret(ios, password, fromStdin, wifiPasswordFlag, "WiFi password")
+}
+
+// wifiPasswordFlag is the name of the WiFi password flag.
+const wifiPasswordFlag = "password"
+
 // AddOpenFlag registers --open, for joining a network that has no password, and
-// makes it exclusive with the command's --password flag.
+// makes it exclusive with the command's --password and --password-stdin flags.
 func AddOpenFlag(cmd *cobra.Command, open *bool) {
 	cmd.Flags().BoolVar(open, "open", false, "Join a network that has no password")
-	cmd.MarkFlagsMutuallyExclusive("open", "password")
+	cmd.MarkFlagsMutuallyExclusive("open", wifiPasswordFlag)
+	cmd.MarkFlagsMutuallyExclusive("open", wifiPasswordFlag+StdinFlagSuffix)
 }
 
 // WiFiPasswordPrompts holds the questions ResolveWiFiPassword may ask. A nil

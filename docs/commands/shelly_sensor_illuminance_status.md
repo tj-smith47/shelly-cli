@@ -4,7 +4,7 @@ Get illuminance sensor status
 
 ### Synopsis
 
-Get the current status of a illuminance sensor.
+Get the current status of an illuminance sensor.
 
 ```
 shelly sensor illuminance status <device> [flags]

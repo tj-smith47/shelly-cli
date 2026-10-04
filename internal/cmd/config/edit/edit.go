@@ -78,9 +78,9 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Execute editor
 	editorCmd := exec.CommandContext(ctx, editor, configPath) //nolint:gosec // User-specified editor is intentional
-	editorCmd.Stdin = os.Stdin
-	editorCmd.Stdout = os.Stdout
-	editorCmd.Stderr = os.Stderr
+	editorCmd.Stdin = ios.In
+	editorCmd.Stdout = ios.Out
+	editorCmd.Stderr = ios.ErrOut
 
 	if err := editorCmd.Run(); err != nil {
 		return fmt.Errorf("editor failed: %w", err)

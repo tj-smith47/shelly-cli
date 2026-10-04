@@ -20,11 +20,11 @@ SCRIPT_NAME="shelly-openhab"
 
 # Colors (respects SHELLY_NO_COLOR)
 if [[ -z "${SHELLY_NO_COLOR:-}" ]]; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[0;33m'
-    CYAN='\033[0;36m'
-    NC='\033[0m'
+    RED=$'\033[0;31m'
+    GREEN=$'\033[0;32m'
+    YELLOW=$'\033[0;33m'
+    CYAN=$'\033[0;36m'
+    NC=$'\033[0m'
 else
     RED=''
     GREEN=''
@@ -98,7 +98,7 @@ HEADER
         fi
 
         local thing_type=$(get_openhab_thing_type "$gen" "$type")
-        local thing_id=$(echo "$device" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]' '_')
+        local thing_id=$(printf "%s" "$device" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]' '_')
 
         cat >> "$output_file" <<EOF
 // $name${model:+ ($model)}
@@ -109,7 +109,7 @@ Thing shelly:${thing_type}:${thing_id} "$name" @ "Shelly" [
 ]
 
 EOF
-        ((count++))
+        count=$((count + 1))
     done < <(echo "$devices_json" | jq -r 'keys[]')
 
     echo -e "${GREEN}✓${NC} Generated $count device(s) to $output_file"
@@ -137,8 +137,8 @@ HEADER
     while IFS= read -r device; do
         local name=$(echo "$devices_json" | jq -r --arg d "$device" '.[$d].name // $d')
         local type=$(echo "$devices_json" | jq -r --arg d "$device" '.[$d].type // "switch"')
-        local thing_id=$(echo "$device" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]' '_')
-        local item_prefix=$(echo "$device" | tr '[:lower:]' '[:upper:]' | tr -c '[:alnum:]' '_')
+        local thing_id=$(printf "%s" "$device" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]' '_')
+        local item_prefix=$(printf "%s" "$device" | tr '[:lower:]' '[:upper:]' | tr -c '[:alnum:]' '_')
 
         cat >> "$output_file" <<EOF
 // $name
@@ -147,7 +147,7 @@ Number:Power ${item_prefix}_Power "$name Power [%.1f W]" <energy> (gShellyPower)
 Number:Energy ${item_prefix}_Energy "$name Energy [%.2f kWh]" <energy> (gShellyPower) {channel="shelly:*:${thing_id}:meter#totalKWH"}
 
 EOF
-        ((count++))
+        count=$((count + 1))
     done < <(echo "$devices_json" | jq -r 'keys[]')
 
     echo -e "${GREEN}✓${NC} Generated $count device(s) to $output_file"
@@ -184,7 +184,7 @@ list_devices() {
         local type=$(echo "$devices_json" | jq -r --arg d "$device" '.[$d].type // "switch"')
 
         printf "  %-20s %-15s Gen%s %-10s\n" "$name" "$ip" "$gen" "$type"
-        ((count++))
+        count=$((count + 1))
     done < <(echo "$devices_json" | jq -r 'keys[]')
 
     echo ""
@@ -266,8 +266,9 @@ main() {
         ;;
     all)
         shift
-        if [[ -n "${1:-}" && -d "$1" ]]; then
-            generate_all "$1/shelly.things" "$1/shelly.items"
+        if [[ -n "${1:-}" && (-d "$1" || "$1" == */) ]]; then
+            mkdir -p "$1"
+            generate_all "${1%/}/shelly.things" "${1%/}/shelly.items"
         else
             generate_all "${1:-shelly.things}" "${2:-shelly.items}"
         fi

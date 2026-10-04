@@ -6,7 +6,10 @@ Check for firmware updates
 
 Check if firmware updates are available for a device.
 
-Use --all to check all registered devices.
+Use --all to check all registered devices. With -o json each device is an
+object with name, current_version, new_version, beta_version,
+update_available, device_model, device_id, generation and platform, or name
+and error when the check failed.
 
 ```
 shelly firmware check [device] [flags]
@@ -20,6 +23,9 @@ shelly firmware check [device] [flags]
 
   # Check all registered devices
   shelly firmware check --all
+
+  # Names of the devices with an update available
+  shelly firmware check --all -o json | jq -r '.[] | select(.update_available == true) | .name'
 ```
 
 ### Options

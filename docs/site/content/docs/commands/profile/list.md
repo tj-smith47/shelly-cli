@@ -38,7 +38,6 @@ shelly profile list [flags]
 ```
       --gen string      Filter by generation (gen1, gen2, gen3, gen4)
   -h, --help            help for list
-  -o, --output string   Output format: table, json, yaml (default "table")
       --series string   Filter by series (classic, plus, pro, mini, blu, wave)
 ```
 
@@ -53,6 +52,7 @@ shelly profile list [flags]
       --no-color                Disable colored output
       --no-headers              Hide table headers in output
       --offline                 Only read from cache, error on cache miss
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
       --raw                     Print the exact device response(s) as a JSON array and suppress normal output

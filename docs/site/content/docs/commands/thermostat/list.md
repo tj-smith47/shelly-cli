@@ -18,7 +18,7 @@ an ID, enabled state, and target temperature.
 Use 'shelly thermostat status' for detailed readings including current
 temperature. Use 'shelly thermostat set' to adjust target temperature.
 
-Output is formatted as styled text by default. Use --json for
+Output is formatted as styled text by default. Use -o json for
 structured output suitable for scripting.
 
 ```
@@ -32,19 +32,19 @@ shelly thermostat list <device> [flags]
   shelly thermostat list gateway
 
   # Output as JSON
-  shelly thermostat list gateway --json
+  shelly thermostat list gateway -o json
 
   # Get enabled thermostats only
-  shelly thermostat list gateway --json | jq '.[] | select(.enabled == true)'
+  shelly thermostat list gateway -o json | jq '.[] | select(.enabled == true)'
 
   # Get target temperatures
-  shelly thermostat list gateway --json | jq '.[] | {id, target_c}'
+  shelly thermostat list gateway -o json | jq '.[] | {id, target_c}'
 
   # Find thermostats set above 22°C
-  shelly thermostat list gateway --json | jq '.[] | select(.target_c > 22)'
+  shelly thermostat list gateway -o json | jq '.[] | select(.target_c > 22)'
 
   # Count active thermostats
-  shelly thermostat list gateway --json | jq '[.[] | select(.enabled)] | length'
+  shelly thermostat list gateway -o json | jq '[.[] | select(.enabled)] | length'
 
   # Short form
   shelly thermostat ls gateway
@@ -53,7 +53,7 @@ shelly thermostat list <device> [flags]
 ### Options
 
 ```
-  -f, --format string   Output format: text, json (default "text")
+  -f, --format string   Output format: text, json, yaml (default "text")
   -h, --help            help for list
 ```
 

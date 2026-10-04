@@ -15,9 +15,9 @@ import (
 // Options holds command options.
 type Options struct {
 	flags.ComponentFlags
+	flags.OutputFlags
 	Factory *cmdutil.Factory
 	Device  string
-	JSON    bool
 }
 
 // NewCommand creates the lora status command.
@@ -39,7 +39,7 @@ information from the last received packet.`,
   shelly lora status living-room --id 100
 
   # Output as JSON
-  shelly lora status living-room --json`,
+  shelly lora status living-room -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -50,7 +50,7 @@ information from the last received packet.`,
 
 	flags.AddComponentFlags(cmd, &opts.ComponentFlags, "LoRa")
 	opts.ID = 100 // LoRa components start at ID 100
-	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output as JSON")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json", "yaml")
 
 	return cmd
 }
@@ -67,8 +67,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.JSON {
-		return term.OutputLoRaStatusJSON(ios, full)
+	if opts.Structured() {
+		return cmdutil.PrintStructured(ios, opts.Format, full)
 	}
 
 	term.DisplayLoRaStatus(ios, full)

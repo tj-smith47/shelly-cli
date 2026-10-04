@@ -150,6 +150,11 @@ func GetDevice(name string) (model.Device, bool) {
 	return getDefaultManager().GetDevice(name)
 }
 
+// SetDeviceAuth stores credentials for the registered device name.
+func SetDeviceAuth(name, username, password string) error {
+	return getDefaultManager().SetDeviceAuth(name, username, password)
+}
+
 // ListDevices returns all registered devices.
 func ListDevices() map[string]model.Device {
 	return getDefaultManager().ListDevices()

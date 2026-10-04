@@ -35,7 +35,7 @@ shelly light list <device> [flags]
   shelly light list kitchen -o json | jq '.[] | select(.brightness < 50)'
 
   # Calculate total light power consumption
-  shelly light list kitchen -o json | jq '[.[].apower // 0] | add'
+  shelly light list kitchen -o json | jq '[.[].power] | add'
 
   # Get all light IDs
   shelly light list kitchen -o json | jq -r '.[].id'

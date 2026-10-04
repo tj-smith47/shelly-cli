@@ -17,6 +17,10 @@ Show a quick status overview for a device or all registered devices.
 If no device is specified, shows a summary of all registered devices
 with their online/offline status and primary component state.
 
+Use -o json or -o yaml for structured output. The all-devices list has the
+fields name, model, online and link_state (set when an offline device is
+linked to a parent switch).
+
 ```
 shelly status [device] [flags]
 ```
@@ -29,6 +33,12 @@ shelly status [device] [flags]
 
   # Show status for all devices
   shelly status
+
+  # Online state of every device as JSON
+  shelly status -o json
+
+  # Names of the devices that are offline
+  shelly status -o json | jq -r '.[] | select(.online == false) | .name'
 ```
 
 ### Options

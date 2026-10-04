@@ -28,13 +28,13 @@ shelly matter status <device> [flags]
   shelly matter status living-room
 
   # Output as JSON
-  shelly matter status living-room --json
+  shelly matter status living-room -o json
 ```
 
 ### Options
 
 ```
-  -f, --format string   Output format: text, json (default "text")
+  -f, --format string   Output format: text, json, yaml (default "text")
   -h, --help            help for status
 ```
 

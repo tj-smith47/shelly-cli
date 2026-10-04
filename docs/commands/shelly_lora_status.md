@@ -23,15 +23,15 @@ shelly lora status <device> [flags]
   shelly lora status living-room --id 100
 
   # Output as JSON
-  shelly lora status living-room --json
+  shelly lora status living-room -o json
 ```
 
 ### Options
 
 ```
-  -h, --help     help for status
-  -i, --id int   LoRa component ID (default 0)
-      --json     Output as JSON
+  -f, --format string   Output format: text, json, yaml (default "text")
+  -h, --help            help for status
+  -i, --id int          LoRa component ID (default 0)
 ```
 
 ### Options inherited from parent commands

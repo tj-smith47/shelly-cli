@@ -9,7 +9,7 @@ Turn rgb off
 
 ### Synopsis
 
-Turn off a rgb component on the specified device.
+Turn off an rgb component on the specified device.
 
 ```
 shelly rgb off <device> [flags]

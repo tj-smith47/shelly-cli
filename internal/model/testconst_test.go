@@ -34,6 +34,4 @@ const (
 	testGenESPHome = "esphome"
 
 	testSwitch1 = "switch1"
-
-	testReportTypeInventory = "inventory"
 )

@@ -37,13 +37,13 @@ devices paired to Zigbee coordinators.`,
   shelly zigbee list
 
   # Output as JSON
-  shelly zigbee list --json`,
+  shelly zigbee list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), opts)
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json", "yaml")
 
 	return cmd
 }
@@ -60,8 +60,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.Format == "json" {
-		return term.OutputZigbeeDevicesJSON(ios, devices)
+	if opts.Structured() {
+		return cmdutil.PrintStructuredList(ios, opts.Format, devices)
 	}
 
 	term.DisplayZigbeeDevices(ios, devices)

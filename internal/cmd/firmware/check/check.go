@@ -10,7 +10,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -31,12 +33,18 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Check for firmware updates",
 		Long: `Check if firmware updates are available for a device.
 
-Use --all to check all registered devices.`,
+Use --all to check all registered devices. With -o json each device is an
+object with name, current_version, new_version, beta_version,
+update_available, device_model, device_id, generation and platform, or name
+and error when the check failed.`,
 		Example: `  # Check a specific device
   shelly firmware check living-room
 
   # Check all registered devices
-  shelly firmware check --all`,
+  shelly firmware check --all
+
+  # Names of the devices with an update available
+  shelly firmware check --all -o json | jq -r '.[] | select(.update_available == true) | .name'`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Devices = args
@@ -60,14 +68,16 @@ func run(ctx context.Context, opts *Options) error {
 		}
 
 		if len(cfg.Devices) == 0 {
-			ios.Warning("No devices registered. Use 'shelly device add' to add devices.")
-			return nil
+			return cmdutil.PrintList(ios, []firmware.CheckEntry(nil), nil, func() {
+				ios.Warning("No devices registered. Use 'shelly device add' to add devices.")
+			})
 		}
 
 		// Use platform-aware checking that includes plugin-managed devices
-		results := svc.CheckFirmwareAllPlatforms(ctx, ios, cfg.Devices)
-		term.DisplayFirmwareCheckAll(ios, results)
-		return nil
+		results := svc.CheckFirmwareAllPlatforms(ctx, cmdutil.StatusStreams(ios), cfg.Devices)
+		return cmdutil.PrintListResult(ios, firmware.CheckEntries(results), func(ios *iostreams.IOStreams, _ []firmware.CheckEntry) {
+			term.DisplayFirmwareCheckAll(ios, results)
+		})
 	}
 
 	if len(opts.Devices) == 0 {

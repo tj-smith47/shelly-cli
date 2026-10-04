@@ -24,13 +24,13 @@ shelly zigbee status <device> [flags]
   shelly zigbee status living-room
 
   # Output as JSON
-  shelly zigbee status living-room --json
+  shelly zigbee status living-room -o json
 ```
 
 ### Options
 
 ```
-  -f, --format string   Output format: text, json (default "text")
+  -f, --format string   Output format: text, json, yaml (default "text")
   -h, --help            help for status
 ```
 

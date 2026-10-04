@@ -2,6 +2,7 @@ package yamlfmt
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -114,12 +115,29 @@ func TestFormatter_Format_Error(t *testing.T) {
 	f.Highlight = false
 
 	var buf bytes.Buffer
-	// Functions cannot be marshaled to YAML - yaml.v3 panics on this
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Format() should panic for unmarshalable type (function)")
-		}
-	}()
-	//nolint:errcheck // Intentionally ignoring error - testing panic behavior
-	f.Format(&buf, func() {})
+	if err := f.Format(&buf, func() {}); err == nil {
+		t.Errorf("Format(func) = nil error, output %q; want an error", buf.String())
+	}
+}
+
+func TestFormatter_Format_UsesJSONKeys(t *testing.T) {
+	t.Parallel()
+
+	type row struct {
+		DeviceName string          `json:"device_name"`
+		Skipped    string          `json:"-"`
+		Empty      string          `json:"empty,omitempty"`
+		Version    string          `json:"version"`
+		Raw        json.RawMessage `json:"raw"`
+		Notes      string          `json:"notes"`
+	}
+	var buf bytes.Buffer
+	err := (&Formatter{}).Format(&buf, []row{{DeviceName: "kitchen", Skipped: "x", Version: "1.0", Raw: json.RawMessage(`{"on":true}`), Notes: "a\nb"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "- device_name: kitchen\n  version: \"1.0\"\n  raw:\n    \"on\": true\n  notes: |-\n    a\n    b\n"
+	if buf.String() != want {
+		t.Errorf("Format() =\n%s\nwant\n%s", buf.String(), want)
+	}
 }

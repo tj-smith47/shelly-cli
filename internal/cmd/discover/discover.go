@@ -20,6 +20,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/term"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // Discovery method identifiers selectable via the --method flag.
@@ -72,10 +73,10 @@ stdout as a list (empty when nothing is found) and progress goes to stderr.`,
   shelly discover
 
   # Specify subnet for HTTP scan
-  shelly discover --subnet 192.168.1.0/24
+  shelly discover --network 192.168.1.0/24
 
   # Scan multiple subnets
-  shelly discover --subnet 192.168.1.0/24 --subnet 10.0.0.0/24
+  shelly discover --network 192.168.1.0/24 --network 10.0.0.0/24
 
   # Scan all detected subnets without prompting
   shelly discover --all-networks
@@ -106,7 +107,11 @@ stdout as a list (empty when nothing is found) and progress goes to stderr.`,
 	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", cmdutil.DefaultScanTimeout, "Discovery timeout")
 	cmd.Flags().BoolVar(&opts.Register, "register", false, "Auto-register discovered devices")
 	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", true, "Skip devices already registered")
-	cmd.Flags().StringArrayVar(&opts.Subnets, "subnet", nil, "Subnet(s) to scan (repeatable, auto-detected if not specified)")
+	cmd.Flags().StringArrayVar(&opts.Subnets, "network", nil, "Subnet(s) to scan (repeatable, auto-detected if not specified)")
+	// --subnet was this command's original name for --network; `discover http`
+	// and `init` always used --network. It keeps working for existing scripts.
+	cmd.Flags().StringArrayVar(&opts.Subnets, "subnet", nil, "Subnet(s) to scan (same as --network)")
+	utils.Must(cmd.Flags().MarkHidden("subnet"))
 	cmd.Flags().BoolVar(&opts.AllNetworks, "all-networks", false, "Scan all detected subnets without prompting")
 	cmd.Flags().StringVarP(&opts.Method, "method", "m", methodHTTP, "Discovery method: http, mdns, ble, coiot")
 	cmd.Flags().BoolVar(&opts.SkipPlugins, "skip-plugins", false, "Skip plugin detection (Shelly-only discovery)")

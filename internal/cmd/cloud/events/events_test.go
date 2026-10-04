@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/spf13/afero"
+	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
@@ -21,6 +23,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/netguard"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -1697,5 +1700,67 @@ func TestOptions_CopyValues(t *testing.T) {
 	}
 	if copied.Raw != original.Raw {
 		t.Error("Raw not copied correctly")
+	}
+}
+
+// TestEventPrinter_OneDocumentPerEvent streams two events through the printer
+// and decodes stdout document by document, as a consumer of the stream would.
+func TestEventPrinter_OneDocumentPerEvent(t *testing.T) {
+	t.Parallel()
+
+	online := 1
+	events := []model.CloudEvent{
+		{Event: testEventOnline, DeviceID: testDevice1, Online: &online},
+		{Event: testEventStatusOnChange, DeviceID: "device2", Status: json.RawMessage(`{"switch:0":{"output":true}}`)},
+	}
+	for _, format := range []string{formatJSON, formatYAML} {
+		t.Run(format, func(t *testing.T) {
+			t.Parallel()
+			srv := newTestWSServer(events)
+			defer srv.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			tf := factory.NewTestFactory(t)
+			opts := &Options{Factory: tf.Factory, OutputFlags: flags.OutputFlags{Format: format}}
+			conn := dialTestWS(t, ctx, srv.URL())
+			if err := network.StreamCloudEvents(ctx, conn, network.CloudEventStreamOptions{}, term.CloudEventPrinter(tf.IOStreams(), opts.Format, false)); err != nil {
+				t.Fatalf("StreamCloudEvents: %v", err)
+			}
+
+			docs := decodeDocuments(t, format, tf.OutString())
+			if len(docs) != len(events) {
+				t.Fatalf("%d documents, want %d:\n%s", len(docs), len(events), tf.OutString())
+			}
+			if docs[0]["event"] != testEventOnline || docs[1]["device_id"] != "device2" || docs[1]["status"] == nil {
+				t.Errorf("documents do not carry the events' snake_case keys: %v", docs)
+			}
+		})
+	}
+}
+
+// decodeDocuments decodes a stream of JSON or YAML documents, failing on any
+// document that does not parse.
+func decodeDocuments(t *testing.T, format, stream string) []map[string]any {
+	t.Helper()
+	type decoder interface{ Decode(v any) error }
+	var dec decoder = yaml.NewDecoder(strings.NewReader(stream))
+	if format == formatJSON {
+		if lines := strings.Count(strings.TrimSpace(stream), "\n") + 1; lines != 2 {
+			t.Errorf("%d lines, want one per event:\n%s", lines, stream)
+		}
+		dec = json.NewDecoder(strings.NewReader(stream))
+	}
+	var docs []map[string]any
+	for {
+		var doc map[string]any
+		err := dec.Decode(&doc)
+		if errors.Is(err, io.EOF) {
+			return docs
+		}
+		if err != nil {
+			t.Fatalf("decode: %v\n%s", err, stream)
+		}
+		docs = append(docs, doc)
 	}
 }

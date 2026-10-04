@@ -36,7 +36,7 @@ Columns: ID, Name, State (ON/OFF), Color (R:G:B), White, Brightness (%), Power`,
   shelly rgbw list living-room -o json | jq '.[] | select(.output == true)'
 
   # Get current color and white values
-  shelly rgbw list living-room -o json | jq '.[] | {id, r: .rgb.r, g: .rgb.g, b: .rgb.b, white}'
+  shelly rgbw list living-room -o json | jq '.[] | {id, red, green, blue, white}'
 
   # Find lights with white channel active
   shelly rgbw list living-room -o json | jq '.[] | select(.white > 0)'

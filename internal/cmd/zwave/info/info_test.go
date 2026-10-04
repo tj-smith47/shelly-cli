@@ -58,36 +58,6 @@ func TestNewCommand_Aliases(t *testing.T) {
 	}
 }
 
-func TestNewCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	tests := []struct {
-		name      string
-		shorthand string
-		defValue  string
-	}{
-		{name: "output", shorthand: "o", defValue: "table"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			flag := cmd.Flags().Lookup(tt.name)
-			if flag == nil {
-				t.Fatalf("%s flag not found", tt.name)
-			}
-			if tt.shorthand != "" && flag.Shorthand != tt.shorthand {
-				t.Errorf("%s shorthand = %q, want %q", tt.name, flag.Shorthand, tt.shorthand)
-			}
-			if flag.DefValue != tt.defValue {
-				t.Errorf("%s default = %q, want %q", tt.name, flag.DefValue, tt.defValue)
-			}
-		})
-	}
-}
-
 func TestNewCommand_Args(t *testing.T) {
 	t.Parallel()
 

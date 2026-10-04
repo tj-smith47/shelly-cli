@@ -16,10 +16,10 @@ import (
 
 // SwitchInfo holds switch information for list operations.
 type SwitchInfo struct {
-	ID     int
-	Name   string
-	Output bool
-	Power  float64
+	ID     int     `json:"id" yaml:"id"`
+	Name   string  `json:"name" yaml:"name"`
+	Output bool    `json:"output" yaml:"output"`
+	Power  float64 `json:"power" yaml:"power"`
 }
 
 // ListHeaders returns the column headers for the table.
@@ -140,10 +140,29 @@ func (s *Service) SwitchStatus(ctx context.Context, identifier string, switchID 
 }
 
 // SwitchList lists all switch components on a device with their status.
-// Note: Gen1 devices don't have a component enumeration API, so this only works for Gen2+.
+// Gen2+ devices enumerate their components; a Gen1 device lists its relays
+// from /settings.
 func (s *Service) SwitchList(ctx context.Context, identifier string) ([]SwitchInfo, error) {
 	var result []SwitchInfo
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.withGenAwareAction(ctx, identifier, func(conn *client.Gen1Client) error {
+		names, err := gen1ComponentNames(ctx, conn, model.ComponentSwitch)
+		if err != nil {
+			return err
+		}
+		result = make([]SwitchInfo, 0, len(names))
+		for id, name := range names {
+			relay, err := conn.Relay(id)
+			if err != nil {
+				continue
+			}
+			status, err := relay.GetStatus(ctx)
+			if err != nil {
+				continue
+			}
+			result = append(result, switchInfo(id, name, gen1RelayStatusToSwitch(id, status)))
+		}
+		return nil
+	}, func(conn *client.Client) error {
 		components, err := conn.FilterComponents(ctx, model.ComponentSwitch)
 		if err != nil {
 			return err
@@ -151,28 +170,30 @@ func (s *Service) SwitchList(ctx context.Context, identifier string) ([]SwitchIn
 
 		result = make([]SwitchInfo, 0, len(components))
 		for _, comp := range components {
-			info := SwitchInfo{ID: comp.ID}
-
 			status, err := conn.Switch(comp.ID).GetStatus(ctx)
 			if err != nil {
 				continue
 			}
-			info.Output = status.Output
-			if status.Power != nil {
-				info.Power = *status.Power
-			}
-
+			name := ""
 			config, err := conn.Switch(comp.ID).GetConfig(ctx)
 			if err == nil && config.Name != nil {
-				info.Name = *config.Name
+				name = *config.Name
 			}
-
-			result = append(result, info)
+			result = append(result, switchInfo(comp.ID, name, status))
 		}
 
 		return nil
 	})
 	return result, err
+}
+
+// switchInfo builds a list row from a switch status.
+func switchInfo(id int, name string, status *model.SwitchStatus) SwitchInfo {
+	info := SwitchInfo{ID: id, Name: name, Output: status.Output}
+	if status.Power != nil {
+		info.Power = *status.Power
+	}
+	return info
 }
 
 // gen1RelayStatusToSwitch converts Gen1 relay status to model.SwitchStatus.

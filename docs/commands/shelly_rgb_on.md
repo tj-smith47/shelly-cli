@@ -4,7 +4,7 @@ Turn rgb on
 
 ### Synopsis
 
-Turn on a rgb component on the specified device.
+Turn on an rgb component on the specified device.
 
 ```
 shelly rgb on <device> [flags]

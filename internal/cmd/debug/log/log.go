@@ -39,8 +39,8 @@ and other device behavior.`,
 		Example: `  # Get debug log from a Gen1 device
   shelly debug log living-room-gen1
 
-  # For Gen2+ devices, use RPC instead
-  shelly debug rpc living-room Sys.GetStatus`,
+  # For Gen2+ devices, call the RPC API instead
+  shelly api living-room Sys.GetStatus`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -64,7 +64,7 @@ func run(ctx context.Context, opts *Options) error {
 		if !dev.IsGen1() {
 			ios.Warning("Device %s is not a Gen1 device", opts.Device)
 			ios.Info("Gen2+ devices use WebSocket/RPC for logging.")
-			ios.Info("Try: shelly debug rpc %s Sys.GetStatus", opts.Device)
+			ios.Info("Try: shelly api %s Sys.GetStatus", opts.Device)
 			return fmt.Errorf("debug log only available for Gen1 devices")
 		}
 

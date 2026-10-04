@@ -9,18 +9,24 @@ Create a device backup
 
 ### Synopsis
 
-Create a complete backup of a Shelly device.
+Create a complete backup of a Shelly device, or of every registered
+device with --all.
 
 The backup includes configuration, scripts, schedules, and webhooks.
 Backups are written as JSON. If no file is specified, the backup is saved
-to ~/.config/shelly/backups/ with a name based on the device and date. Use
-"-" as the file to write to stdout.
+to ~/.config/shelly/backups/ (or --dir) with a name based on the device,
+its MAC address and the date. Use "-" as the file to write to stdout.
+
+With --all, every registered device is backed up to its own auto-named
+file. A device that fails does not stop the others; each device's result
+and a summary are printed, and the command exits non-zero when any device
+failed. --encrypt and the --skip-* flags apply to every device.
 
 Use --encrypt to AES-encrypt the backup with a password; restore the file
-with 'shelly backup restore --decrypt <password>'.
+with 'shelly backup restore <device> <file> --decrypt <password>'.
 
 ```
-shelly backup create <device> [file] [flags]
+shelly backup create [device] [file] [flags]
 ```
 
 ### Examples
@@ -32,11 +38,23 @@ shelly backup create <device> [file] [flags]
   # Create backup to specific file
   shelly backup create living-room backup.json
 
+  # Create auto-named backup in a directory
+  shelly backup create living-room --dir ./backups
+
+  # Back up every registered device
+  shelly backup create --all
+
+  # Back up every registered device into a dated directory, quietly
+  shelly backup create --all --dir ./backups/$(date +%Y-%m-%d) -q
+
   # Create backup to stdout
   shelly backup create living-room -
 
   # Create encrypted backup
   shelly backup create living-room backup.json --encrypt mysecret
+
+  # Read the encryption password from stdin, keeping it out of shell history
+  shelly backup create living-room backup.json --encrypt-stdin < ~/.shelly-backup-password
 
   # Skip scripts in backup
   shelly backup create living-room backup.json --skip-scripts
@@ -45,7 +63,10 @@ shelly backup create <device> [file] [flags]
 ### Options
 
 ```
+  -a, --all              Target all registered devices
+      --dir string       Directory for auto-named backups (default ~/.config/shelly/backups/, created if missing)
   -e, --encrypt string   Password to AES-encrypt the backup
+      --encrypt-stdin    Read the password to AES-encrypt the backup from stdin
   -h, --help             help for create
       --skip-schedules   Exclude schedules from backup
       --skip-scripts     Exclude scripts from backup

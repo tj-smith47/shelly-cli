@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"sort"
@@ -29,8 +30,8 @@ const (
 
 // NamedAlias combines an alias name with its definition for listing/display.
 type NamedAlias struct {
-	Name string
-	Alias
+	Name  string `json:"name" yaml:"name"`
+	Alias `yaml:",inline"`
 }
 
 // ReservedCommands are built-in commands that cannot be aliased.
@@ -193,11 +194,12 @@ func ExpandAliasArgs(args []string) (expandedArgs []string, isShell bool) {
 	return expandedArgs, false
 }
 
-// ExecuteShellAlias runs a shell alias command.
-// Returns the exit code from the shell command.
-func ExecuteShellAlias(ctx context.Context, args []string) int {
+// ExecuteShellAlias runs a shell alias command with the given standard
+// streams. It returns the shell's exit code, or 1 and the error when the
+// shell could not be run.
+func ExecuteShellAlias(ctx context.Context, in io.Reader, out, errOut io.Writer, args []string) (int, error) {
 	if len(args) == 0 {
-		return 0
+		return 0, nil
 	}
 
 	// Execute via shell
@@ -208,20 +210,19 @@ func ExecuteShellAlias(ctx context.Context, args []string) int {
 
 	//nolint:gosec // G204: args are from user-defined aliases in their own config
 	cmd := exec.CommandContext(ctx, shell, "-c", args[0])
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdin = in
+	cmd.Stdout = out
+	cmd.Stderr = errOut
 
 	if err := cmd.Run(); err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			return exitErr.ExitCode()
+			return exitErr.ExitCode(), nil
 		}
-		fmt.Fprintf(os.Stderr, "Error executing shell alias: %v\n", err)
-		return 1
+		return 1, fmt.Errorf("executing shell alias: %w", err)
 	}
 
-	return 0
+	return 0, nil
 }
 
 // =============================================================================

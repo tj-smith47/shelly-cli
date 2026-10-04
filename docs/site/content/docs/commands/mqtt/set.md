@@ -24,6 +24,9 @@ shelly mqtt set <device> [flags]
   # Configure MQTT with server and credentials
   shelly mqtt set living-room --server "mqtt://broker:1883" --user user --password pass
 
+  # Read the MQTT password from stdin, keeping it out of shell history
+  shelly mqtt set living-room --server "mqtt://broker:1883" --user user --password-stdin < ~/.mqtt-password
+
   # Configure with custom topic prefix
   shelly mqtt set living-room --server "mqtt://broker:1883" --topic-prefix "home/shelly"
 
@@ -37,6 +40,7 @@ shelly mqtt set <device> [flags]
       --enable                Enable MQTT
   -h, --help                  help for set
       --password string       MQTT password
+      --password-stdin        Read the MQTT password from stdin
       --server string         MQTT broker URL (e.g., mqtt://broker:1883)
       --topic-prefix string   MQTT topic prefix
       --user string           MQTT username

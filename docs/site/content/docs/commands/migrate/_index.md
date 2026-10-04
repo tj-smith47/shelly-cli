@@ -93,6 +93,7 @@ shelly migrate <source-device> <target-device> [flags]
       --netmask string             Static IPv4 subnet mask (with --static-ip; default: the source device's)
       --open                       Join a network that has no password
       --password string            WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
+      --password-stdin             Read the WiFi password from stdin
       --reset-source               Factory reset source device after migration (default true)
       --skip-auth                  Skip authentication configuration
       --skip-meters                Skip migrating meter/energy-meter configuration (e.g. overpower limits)

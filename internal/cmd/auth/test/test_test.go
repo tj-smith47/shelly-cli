@@ -3,12 +3,17 @@ package test
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
+	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -99,6 +104,7 @@ func TestNewCommand_Flags(t *testing.T) {
 	}{
 		{"user", ""},
 		{"password", ""},
+		{"password-stdin", "false"},
 		{"timeout", "10s"},
 	}
 
@@ -161,67 +167,194 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
-func TestOptions(t *testing.T) {
-	t.Parallel()
+const (
+	rightPassword = "r1ght-pass"
+	wrongPassword = "wr0ng-pass"
+	lockedDevice  = "locked"
+	openDevice    = "open"
+)
 
-	opts := &Options{
-		User:     "testuser",
-		Password: "testpass",
-		Timeout:  30 * time.Second,
-	}
+var macCounter atomic.Int32
 
-	if opts.User != "testuser" {
-		t.Errorf("User = %q, want %q", opts.User, "testuser")
+// startDevices serves a password-protected and an open mock device of the
+// given generation. The registry stores storedPassword for the protected one.
+func startDevices(t *testing.T, generation int, storedPassword string) (*factory.TestFactory, *mock.Demo) {
+	t.Helper()
+	deviceType := "SNSW-001P16EU"
+	if generation == 1 {
+		deviceType = "SHSW-1"
 	}
-	if opts.Password != "testpass" {
-		t.Errorf("Password = %q, want %q", opts.Password, "testpass")
-	}
-	if opts.Timeout != 30*time.Second {
-		t.Errorf("Timeout = %v, want %v", opts.Timeout, 30*time.Second)
-	}
-}
-
-func TestRun_WithMock(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
+	// A probe refreshes the registry entry with the probed MAC in the
+	// process-wide default registry, which a parallel test may have installed.
+	// MACs unique to each call keep one test from rewriting another's device.
+	n := macCounter.Add(1)
+	lockedMAC := fmt.Sprintf("AA:BB:CC:%02X:%02X:01", generation, n)
+	openMAC := fmt.Sprintf("AA:BB:CC:%02X:%02X:02", generation, n)
+	demo, err := mock.StartWithFixtures(&mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
 			Devices: []mock.DeviceFixture{
 				{
-					Name:       "test-device",
-					Address:    "192.168.1.100",
-					MAC:        "AA:BB:CC:DD:EE:FF",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
+					Name: lockedDevice, MAC: lockedMAC, Type: deviceType, Model: deviceType,
+					Generation: generation, AuthEnabled: true, AuthUser: "admin", AuthPass: rightPassword,
+				},
+				{
+					Name: openDevice, MAC: openMAC, Type: deviceType, Model: deviceType,
+					Generation: generation,
 				},
 			},
 		},
-		DeviceStates: map[string]mock.DeviceState{
-			"test-device": {"switch:0": map[string]any{"output": true}},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
+	})
 	if err != nil {
 		t.Fatalf("StartWithFixtures: %v", err)
 	}
-	defer demo.Cleanup()
+	t.Cleanup(demo.Cleanup)
+
+	if err := demo.ConfigMgr.SetDeviceAuth(lockedDevice, "admin", storedPassword); err != nil {
+		t.Fatalf("SetDeviceAuth: %v", err)
+	}
 
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
+	return tf, demo
+}
 
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-		Timeout: 5 * time.Second,
+func execute(t *testing.T, tf *factory.TestFactory, args ...string) error {
+	t.Helper()
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs(args)
+	cmd.SetOut(tf.TestIO.Out)
+	cmd.SetErr(tf.TestIO.ErrOut)
+	return cmd.Execute()
+}
+
+func assertNoPasswordInOutput(t *testing.T, tf *factory.TestFactory) {
+	t.Helper()
+	out := tf.OutString() + tf.ErrString()
+	if strings.Contains(out, rightPassword) || strings.Contains(out, wrongPassword) {
+		t.Error("the password was printed")
 	}
+}
 
-	err = run(context.Background(), opts)
-	// May fail due to mock limitations
-	if err != nil {
-		t.Logf("run() error = %v (expected for mock)", err)
+func TestRun_StoredPassword(t *testing.T) {
+	t.Parallel()
+
+	for _, generation := range []int{1, 2} {
+		t.Run(fmt.Sprintf("gen%d right", generation), func(t *testing.T) {
+			t.Parallel()
+			tf, _ := startDevices(t, generation, rightPassword)
+
+			if err := execute(t, tf, lockedDevice); err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if out := tf.OutString(); !strings.Contains(out, "accepted the password for user admin") {
+				t.Errorf("output = %q, want the accepted message", out)
+			}
+			assertNoPasswordInOutput(t, tf)
+		})
+
+		t.Run(fmt.Sprintf("gen%d wrong", generation), func(t *testing.T) {
+			t.Parallel()
+			tf, _ := startDevices(t, generation, wrongPassword)
+
+			err := execute(t, tf, lockedDevice)
+			if !errors.Is(err, shelly.ErrCredentialsRejected) {
+				t.Fatalf("Execute() error = %v, want ErrCredentialsRejected", err)
+			}
+			if !strings.Contains(err.Error(), "device rejected the password for user admin") {
+				t.Errorf("error = %q, want it to name the rejected user", err)
+			}
+			if strings.Contains(tf.OutString(), "accepted") {
+				t.Errorf("output = %q, want no success message", tf.OutString())
+			}
+			assertNoPasswordInOutput(t, tf)
+		})
+	}
+}
+
+func TestRun_GivenPassword(t *testing.T) {
+	t.Parallel()
+
+	for _, generation := range []int{1, 2} {
+		t.Run(fmt.Sprintf("gen%d right overrides a wrong stored one", generation), func(t *testing.T) {
+			t.Parallel()
+			tf, demo := startDevices(t, generation, wrongPassword)
+
+			if err := execute(t, tf, lockedDevice, "--password", rightPassword); err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if dev, ok := demo.ConfigMgr.GetDevice(lockedDevice); !ok || dev.Auth == nil || dev.Auth.Password != wrongPassword {
+				t.Error("the tested password was stored; auth test must not change the registry")
+			}
+			assertNoPasswordInOutput(t, tf)
+		})
+
+		t.Run(fmt.Sprintf("gen%d wrong overrides a right stored one", generation), func(t *testing.T) {
+			t.Parallel()
+			tf, _ := startDevices(t, generation, rightPassword)
+
+			err := execute(t, tf, lockedDevice, "--user", "admin", "--password", wrongPassword)
+			if !errors.Is(err, shelly.ErrCredentialsRejected) {
+				t.Fatalf("Execute() error = %v, want ErrCredentialsRejected", err)
+			}
+			assertNoPasswordInOutput(t, tf)
+		})
+
+		t.Run(fmt.Sprintf("gen%d from stdin", generation), func(t *testing.T) {
+			t.Parallel()
+			tf, _ := startDevices(t, generation, wrongPassword)
+			tf.TestIO.In.WriteString(rightPassword + "\n")
+
+			if err := execute(t, tf, lockedDevice, "--password-stdin"); err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			assertNoPasswordInOutput(t, tf)
+		})
+	}
+}
+
+func TestRun_NoCredentialsForProtectedDevice(t *testing.T) {
+	t.Parallel()
+
+	for _, generation := range []int{1, 2} {
+		t.Run(fmt.Sprintf("gen%d", generation), func(t *testing.T) {
+			t.Parallel()
+			tf, _ := startDevices(t, generation, "")
+
+			if err := execute(t, tf, lockedDevice); !errors.Is(err, model.ErrAuthRequired) {
+				t.Fatalf("Execute() error = %v, want ErrAuthRequired", err)
+			}
+		})
+	}
+}
+
+func TestRun_AuthDisabledIsNotReportedAsCorrect(t *testing.T) {
+	t.Parallel()
+
+	for _, generation := range []int{1, 2} {
+		t.Run(fmt.Sprintf("gen%d", generation), func(t *testing.T) {
+			t.Parallel()
+			tf, _ := startDevices(t, generation, rightPassword)
+
+			if err := execute(t, tf, openDevice, "--password", wrongPassword); err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			out := tf.OutString() + tf.ErrString()
+			if !strings.Contains(out, "Authentication is not enabled") || strings.Contains(out, "accepted the password") {
+				t.Errorf("output = %q, want the not-enabled warning and no accepted message", out)
+			}
+			assertNoPasswordInOutput(t, tf)
+		})
+	}
+}
+
+func TestRun_UserWithoutPassword(t *testing.T) {
+	t.Parallel()
+
+	tf, _ := startDevices(t, 2, rightPassword)
+	if err := execute(t, tf, lockedDevice, "--user", "admin"); err == nil {
+		t.Fatal("expected an error for --user without a password")
 	}
 }
 
@@ -242,7 +375,7 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Device:  "nonexistent-device",
-		Timeout: 5 * time.Second,
+		Timeout: 500 * time.Millisecond,
 	}
 
 	err = run(context.Background(), opts)

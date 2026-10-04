@@ -14,7 +14,9 @@ func TestDisplayDeviceAliases_NoAliases(t *testing.T) {
 	var stdin, stdout, stderr bytes.Buffer
 	ios := iostreams.Test(&stdin, &stdout, &stderr)
 
-	DisplayDeviceAliases(ios, "test-device", nil)
+	if err := DisplayDeviceAliases(ios, "test-device", nil); err != nil {
+		t.Fatal(err)
+	}
 
 	output := stdout.String()
 	if output == "" {
@@ -31,7 +33,9 @@ func TestDisplayDeviceAliases_WithAliases(t *testing.T) {
 	var stdin, stdout, stderr bytes.Buffer
 	ios := iostreams.Test(&stdin, &stdout, &stderr)
 
-	DisplayDeviceAliases(ios, "test-device", []string{"alias1", "alias2"})
+	if err := DisplayDeviceAliases(ios, "test-device", []string{"alias1", "alias2"}); err != nil {
+		t.Fatal(err)
+	}
 
 	output := stdout.String()
 	if output == "" {

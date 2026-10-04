@@ -25,7 +25,7 @@ shelly group delete <group> [flags]
   shelly group delete my-group --yes
 
   # Using alias
-  shelly group rm my-group
+  shelly group del my-group
 ```
 
 ### Options

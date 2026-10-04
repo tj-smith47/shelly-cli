@@ -17,6 +17,7 @@ type Options struct {
 	DeviceAddress string
 	SSID          string
 	Password      string
+	PasswordStdin bool
 	Open          bool
 	DeviceName    string
 	Timezone      string
@@ -73,7 +74,7 @@ WiFi credentials, or asked for. A network is joined with no password only with
 	}
 
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "WiFi network name (required)")
-	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password, &opts.PasswordStdin)
 	cmd.Flags().StringVar(&opts.DeviceName, "name", "", "Device name to set")
 	cmd.Flags().StringVar(&opts.Timezone, "timezone", "", "Timezone (e.g., America/New_York)")
 	cmd.Flags().BoolVar(&opts.EnableCloud, "cloud", false, "Enable Shelly Cloud")
@@ -87,6 +88,9 @@ WiFi credentials, or asked for. A network is joined with no password only with
 
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
+	if err := cmdutil.ReadWiFiPasswordStdin(ios, &opts.Password, opts.PasswordStdin); err != nil {
+		return err
+	}
 
 	// Validate required options
 	if opts.SSID == "" {

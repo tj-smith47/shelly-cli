@@ -28,23 +28,23 @@ const (
 
 // Info contains firmware update information.
 type Info struct {
-	Current     string
-	Available   string
-	Beta        string
-	HasUpdate   bool
-	DeviceModel string
-	DeviceID    string
-	Generation  int
-	Platform    string // "shelly", "tasmota", etc.
+	Current     string `json:"current_version" yaml:"current_version"`
+	Available   string `json:"new_version" yaml:"new_version"`
+	Beta        string `json:"beta_version" yaml:"beta_version"`
+	HasUpdate   bool   `json:"update_available" yaml:"update_available"`
+	DeviceModel string `json:"device_model" yaml:"device_model"`
+	DeviceID    string `json:"device_id" yaml:"device_id"`
+	Generation  int    `json:"generation" yaml:"generation"`
+	Platform    string `json:"platform" yaml:"platform"` // "shelly", "tasmota", etc.
 }
 
 // Status contains the current firmware status.
 type Status struct {
-	Status      string
-	HasUpdate   bool
-	NewVersion  string
-	Progress    int
-	CanRollback bool
+	Status      string `json:"status" yaml:"status"`
+	HasUpdate   bool   `json:"update_available" yaml:"update_available"`
+	NewVersion  string `json:"new_version" yaml:"new_version"`
+	Progress    int    `json:"progress" yaml:"progress"`
+	CanRollback bool   `json:"can_rollback" yaml:"can_rollback"`
 }
 
 // CheckResult holds the result of a firmware check for a single device.
@@ -52,6 +52,31 @@ type CheckResult struct {
 	Name string
 	Info *Info
 	Err  error
+}
+
+// CheckEntry is one device's row in the structured output of a firmware check
+// across devices: the device name with its firmware fields beside it, or the
+// error that stopped the check.
+type CheckEntry struct {
+	Name  string `json:"name" yaml:"name"`
+	Info  `yaml:",inline"`
+	Error string `json:"error,omitempty" yaml:"error,omitempty"`
+}
+
+// CheckEntries converts check results to their structured output rows.
+func CheckEntries(results []CheckResult) []CheckEntry {
+	entries := make([]CheckEntry, 0, len(results))
+	for _, r := range results {
+		entry := CheckEntry{Name: r.Name}
+		if r.Info != nil {
+			entry.Info = *r.Info
+		}
+		if r.Err != nil {
+			entry.Error = r.Err.Error()
+		}
+		entries = append(entries, entry)
+	}
+	return entries
 }
 
 // DeviceUpdateStatus holds the status of a device for update operations.

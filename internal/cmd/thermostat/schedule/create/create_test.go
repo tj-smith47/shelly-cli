@@ -887,3 +887,45 @@ func TestNewCommand_ExecuteWithModeAndTime(t *testing.T) {
 		t.Logf("Execute error = %v", err)
 	}
 }
+
+// The command's own example creates a schedule with --disabled.
+func TestNewCommand_DisabledFlagCreatesDisabledSchedule(t *testing.T) {
+	t.Parallel()
+
+	demo, err := mock.StartWithFixtures(&mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{{
+				Name: "thermostat-device", Address: "192.168.1.100", MAC: "AA:BB:CC:DD:EE:01",
+				Type: "SNSN-0043X", Model: "Shelly Wall Display", Generation: 2,
+			}},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"thermostat-device": {"thermostat:0": map[string]any{"id": float64(0), "enable": true}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"thermostat-device", "--target", "20", "--time", "0 0 9 * *", "--disabled"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if out := tf.OutString() + tf.ErrString(); !strings.Contains(out, "Schedule is disabled") {
+		t.Errorf("output should say the schedule is disabled, got: %s", out)
+	}
+
+	both := NewCommand(tf.Factory)
+	both.SetContext(context.Background())
+	both.SetArgs([]string{"thermostat-device", "--target", "20", "--time", "0 0 9 * *", "--disabled", "--enabled"})
+	if err := both.Execute(); err == nil {
+		t.Error("--enabled and --disabled together should be rejected")
+	}
+}

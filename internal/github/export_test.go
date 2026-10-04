@@ -1,7 +1,6 @@
 package github
 
 import (
-	"context"
 	"io"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -56,13 +55,6 @@ func SetEvalSymlinks(fn func(string) (string, error)) func() {
 	old := evalSymlinks
 	evalSymlinks = fn
 	return func() { evalSymlinks = old }
-}
-
-// SetExecCommandStart sets the execCommandStart function for testing.
-func SetExecCommandStart(fn func(ctx context.Context, path string, args []string) error) func() {
-	old := execCommandStart
-	execCommandStart = fn
-	return func() { execCommandStart = old }
 }
 
 // SetRuntimeGOOS sets the runtimeGOOS variable for testing.

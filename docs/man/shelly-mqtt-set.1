@@ -30,6 +30,10 @@ integration with home automation systems.
 	MQTT password
 
 .PP
+\fB--password-stdin\fP[=false]
+	Read the MQTT password from stdin
+
+.PP
 \fB--server\fP=""
 	MQTT broker URL (e.g., mqtt://broker:1883)
 
@@ -107,6 +111,9 @@ integration with home automation systems.
 .EX
   # Configure MQTT with server and credentials
   shelly mqtt set living-room --server "mqtt://broker:1883" --user user --password pass
+
+  # Read the MQTT password from stdin, keeping it out of shell history
+  shelly mqtt set living-room --server "mqtt://broker:1883" --user user --password-stdin < ~/.mqtt-password
 
   # Configure with custom topic prefix
   shelly mqtt set living-room --server "mqtt://broker:1883" --topic-prefix "home/shelly"

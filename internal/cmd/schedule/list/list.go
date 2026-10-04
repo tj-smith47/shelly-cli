@@ -88,10 +88,5 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if len(result.Data) == 0 {
-		ios.NoResults("schedules")
-		return nil
-	}
-
-	return cmdutil.PrintListResult(ios, result.Data, term.DisplayScheduleList)
+	return cmdutil.PrintList(ios, result.Data, term.DisplayScheduleList, func() { ios.NoResults("schedules") })
 }

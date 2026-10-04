@@ -20,10 +20,6 @@ The key format is "type:id", for example "boolean:200" or "number:201".
 \fB-h\fP, \fB--help\fP[=false]
 	help for get
 
-.PP
-\fB-o\fP, \fB--output\fP="table"
-	Output format: table, json, yaml
-
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -56,6 +52,10 @@ The key format is "type:id", for example "boolean:200" or "number:201".
 .PP
 \fB--offline\fP[=false]
 	Only read from cache, error on cache miss
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
 
 .PP
 \fB--plain\fP[=false]

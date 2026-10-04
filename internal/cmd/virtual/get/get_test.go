@@ -88,21 +88,6 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 }
 
-func TestNewCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// AddOutputFlags adds "output" flag
-	flag := cmd.Flags().Lookup("output")
-	if flag == nil {
-		t.Fatal("--output flag not found")
-	}
-	if flag.Shorthand != "o" {
-		t.Errorf("--output shorthand = %q, want %q", flag.Shorthand, "o")
-	}
-}
-
 func TestNewCommand_Help(t *testing.T) {
 	t.Parallel()
 
@@ -167,12 +152,6 @@ func TestOptions(t *testing.T) {
 
 	if opts.Factory == nil {
 		t.Error("Factory is nil")
-	}
-
-	// Test OutputFlags
-	opts.Format = "json"
-	if opts.Format != "json" {
-		t.Errorf("Format = %q, want %q", opts.Format, "json")
 	}
 }
 
@@ -299,53 +278,6 @@ func TestExecute_WithMock_NumberComponent(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
 	cmd.SetArgs([]string{"kitchen", "number:201"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err != nil {
-		t.Logf("Execute() error = %v (expected for mock)", err)
-	}
-}
-
-func TestExecute_WithMock_JSONOutput(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "test-device",
-					Address:    "192.168.1.100",
-					MAC:        "AA:BB:CC:DD:EE:FF",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"test-device": {
-				"switch:0":    map[string]any{"output": false},
-				"boolean:200": map[string]any{"value": true},
-			},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-device", "boolean:200", "-o", "json"})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -623,52 +555,5 @@ func TestExecute_WithMock_AllComponentTypes(t *testing.T) {
 				t.Logf("Execute() for %s error = %v (expected for mock)", key, err)
 			}
 		})
-	}
-}
-
-func TestExecute_YAMLOutput(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "test-device",
-					Address:    "192.168.1.100",
-					MAC:        "AA:BB:CC:DD:EE:FF",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"test-device": {
-				"switch:0":   map[string]any{"output": false},
-				"number:201": map[string]any{"value": 42.5},
-			},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-device", "number:201", "-o", "yaml"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err != nil {
-		t.Logf("Execute() error = %v (expected for mock)", err)
 	}
 }

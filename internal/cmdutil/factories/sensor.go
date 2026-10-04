@@ -131,7 +131,7 @@ func runSensorList[T any](ctx context.Context, f *cmdutil.Factory, opts SensorOp
 	svc := f.ShellyService()
 
 	spinnerMsg := fmt.Sprintf("Fetching %s sensors...", opts.Name)
-	emptyMsg := fmt.Sprintf("No %s sensors found on this device.", opts.Name)
+	emptyMsg := opts.Name + " sensors"
 
 	fetcher := func(ctx context.Context, svc *shelly.Service, device string) ([]T, error) {
 		return fetchSensorList[T](ctx, svc, device, opts.Prefix, ios)
@@ -185,7 +185,7 @@ func newSensorStatusCommand[T any](f *cmdutil.Factory, opts SensorOpts[T]) *cobr
 		Use:     "status <device>",
 		Aliases: []string{"st", "get"},
 		Short:   fmt.Sprintf("Get %s sensor status", opts.Name),
-		Long:    fmt.Sprintf("Get the current status of a %s sensor.", opts.Name),
+		Long:    fmt.Sprintf("Get the current status of %s sensor.", withArticle(opts.Name)),
 		Example: fmt.Sprintf(`  # Get %s status
   shelly sensor %s status <device>
 

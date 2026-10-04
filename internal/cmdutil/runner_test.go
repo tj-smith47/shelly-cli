@@ -989,3 +989,51 @@ func TestRunBatchWithResults_ZeroConcurrencyNoDeadlock(t *testing.T) {
 		t.Fatalf("RunBatchWithResults() returned %d results, want 2", len(results))
 	}
 }
+
+func TestPrintList_EmptyTableOutputCallsOnEmpty(t *testing.T) {
+	t.Parallel()
+	ios, out, _ := testIOStreams()
+	emptyCalled := false
+
+	err := cmdutil.PrintList(ios, []TestItem(nil),
+		func(*iostreams.IOStreams, []TestItem) { t.Error("display called for an empty list") },
+		func() { emptyCalled = true })
+	if err != nil {
+		t.Fatalf("PrintList() error = %v", err)
+	}
+	if !emptyCalled {
+		t.Error("onEmpty was not called")
+	}
+	if out.Len() != 0 {
+		t.Errorf("stdout = %q, want nothing", out.String())
+	}
+}
+
+func TestPrintStructuredList_NilPrintsEmptyList(t *testing.T) {
+	t.Parallel()
+
+	for format, want := range map[string]string{"json": "[]\n", "yaml": "[]\n"} {
+		ios, out, _ := testIOStreams()
+		if err := cmdutil.PrintStructuredList(ios, format, []TestItem(nil)); err != nil {
+			t.Fatalf("PrintStructuredList(%s) error = %v", format, err)
+		}
+		if got := out.String(); got != want {
+			t.Errorf("%s: stdout = %q, want %q", format, got, want)
+		}
+	}
+}
+
+func TestPrintStructured_YAMLUsesJSONKeys(t *testing.T) {
+	t.Parallel()
+	ios, out, _ := testIOStreams()
+
+	data := struct {
+		DeviceName string `json:"device_name"`
+	}{DeviceName: "kitchen"}
+	if err := cmdutil.PrintStructured(ios, "yaml", data); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); got != "device_name: kitchen\n" {
+		t.Errorf("stdout = %q, want device_name: kitchen", got)
+	}
+}

@@ -3,7 +3,6 @@ package status
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -19,9 +18,9 @@ import (
 // Options holds command options.
 type Options struct {
 	flags.ComponentFlags
+	flags.OutputFlags
 	Factory *cmdutil.Factory
 	Device  string
-	JSON    bool
 }
 
 // NewCommand creates the thermostat status command.
@@ -48,7 +47,7 @@ Displays:
   shelly thermostat status gateway --id 1
 
   # Output as JSON
-  shelly thermostat status gateway --json`,
+  shelly thermostat status gateway -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -58,7 +57,7 @@ Displays:
 	}
 
 	flags.AddComponentFlags(cmd, &opts.ComponentFlags, "Thermostat")
-	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output as JSON")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json", "yaml")
 
 	return cmd
 }
@@ -85,13 +84,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.JSON {
-		jsonBytes, jsonErr := json.MarshalIndent(status, "", "  ")
-		if jsonErr != nil {
-			return fmt.Errorf("failed to format JSON: %w", jsonErr)
-		}
-		ios.Println(string(jsonBytes))
-		return nil
+	if opts.Structured() {
+		return cmdutil.PrintStructured(ios, opts.Format, status)
 	}
 
 	term.DisplayThermostatStatus(ios, status, opts.ID)

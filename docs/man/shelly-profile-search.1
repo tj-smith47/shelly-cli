@@ -25,10 +25,6 @@ Search by text query, or filter by capability or protocol.
 	help for search
 
 .PP
-\fB-o\fP, \fB--output\fP="table"
-	Output format: table, json, yaml
-
-.PP
 \fB--protocol\fP=""
 	Filter by protocol (e.g., mqtt, ble, zwave, matter)
 
@@ -64,6 +60,10 @@ Search by text query, or filter by capability or protocol.
 .PP
 \fB--offline\fP[=false]
 	Only read from cache, error on cache miss
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
 
 .PP
 \fB--plain\fP[=false]
@@ -103,6 +103,9 @@ Search by text query, or filter by capability or protocol.
 
   # Combine filters
   shelly profile search --capability power_metering --protocol mqtt
+
+  # JSON output
+  shelly profile search plug -o json
 .EE
 
 

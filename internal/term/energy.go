@@ -273,3 +273,24 @@ func DisplayEM1Status(ios *iostreams.IOStreams, status *model.EM1Status) {
 		ios.Printf("\nErrors: %v\n", status.Errors)
 	}
 }
+
+// DisplayEnergyStatusList shows one row per energy monitor component across
+// devices. A 3-phase EM row has no single voltage, so its Voltage cell is "-".
+func DisplayEnergyStatusList(ios *iostreams.IOStreams, entries []model.EnergyStatusEntry) {
+	builder := table.NewBuilder("Device", "Component", "Voltage", "Current", "Power")
+	for _, e := range entries {
+		switch {
+		case e.EM != nil:
+			builder.AddRow(e.Name, fmt.Sprintf("EM #%d", e.ID), "-",
+				fmt.Sprintf("%.2f A", e.EM.TotalCurrent), output.FormatPower(e.Power))
+		case e.EM1 != nil:
+			builder.AddRow(e.Name, fmt.Sprintf("EM1 #%d", e.ID), fmt.Sprintf("%.2f V", e.EM1.Voltage),
+				fmt.Sprintf("%.2f A", e.EM1.Current), output.FormatPower(e.Power))
+		}
+	}
+
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print energy status table", err)
+	}
+}

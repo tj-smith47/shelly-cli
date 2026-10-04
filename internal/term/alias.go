@@ -8,34 +8,25 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
-// DisplayDeviceAliases displays aliases for a device.
-// If aliases is empty, shows an info message.
-func DisplayDeviceAliases(ios *iostreams.IOStreams, deviceName string, aliases []string) {
+// DisplayDeviceAliases displays aliases for a device. Under -o json, yaml
+// or template it prints {"device", "aliases"} to ios.Out, with an empty
+// aliases list when there are none; otherwise it prints one line.
+func DisplayDeviceAliases(ios *iostreams.IOStreams, deviceName string, aliases []string) error {
+	if output.WantsStructured() {
+		if aliases == nil {
+			aliases = []string{}
+		}
+		return output.FormatOutput(ios.Out, map[string]any{
+			"device":  deviceName,
+			"aliases": aliases,
+		})
+	}
 	if len(aliases) == 0 {
 		ios.Info("No aliases defined for %s", deviceName)
-		return
+		return nil
 	}
-
-	if output.WantsJSON() {
-		if err := output.PrintJSON(map[string]any{
-			"device":  deviceName,
-			"aliases": aliases,
-		}); err != nil {
-			ios.DebugErr("print JSON", err)
-		}
-		return
-	}
-	if output.WantsYAML() {
-		if err := output.PrintYAML(map[string]any{
-			"device":  deviceName,
-			"aliases": aliases,
-		}); err != nil {
-			ios.DebugErr("print YAML", err)
-		}
-		return
-	}
-
 	ios.Printf("Aliases for %s: %s\n", deviceName, strings.Join(aliases, ", "))
+	return nil
 }
 
 // DisplayAliasAdded shows success message for alias addition.

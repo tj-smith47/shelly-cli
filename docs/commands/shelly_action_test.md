@@ -15,7 +15,7 @@ will temporarily change the device state to trigger the action callback.
 For output actions (out_on_url, out_off_url), the device relay will be toggled.
 For button actions, the physical button press must be used.
 
-Gen2+ devices use webhooks. See 'shelly webhook test'.
+Gen2+ devices use webhooks, which have no test call. See 'shelly webhook list'.
 
 ```
 shelly action test <device> <event> [flags]

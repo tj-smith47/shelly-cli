@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // ConfigDeleteOpts configures a config-based delete command.
@@ -32,8 +31,9 @@ type ConfigDeleteOpts struct {
 	// Example: "Delete scene \"movie-night\" with 5 action(s)?"
 	InfoFunc func(resource any, name string) string
 
-	// SkipConfirmation if true, deletes without asking (e.g., alias delete).
-	SkipConfirmation bool
+	// Aliases replaces the default aliases (rm, del, remove). Set it when the
+	// parent command has a sibling that already answers to one of those words.
+	Aliases []string
 }
 
 // NewConfigDeleteCommand creates a config-based delete command.
@@ -41,22 +41,27 @@ func NewConfigDeleteCommand(f *cmdutil.Factory, opts ConfigDeleteOpts) *cobra.Co
 	var yesFlag bool
 
 	use := fmt.Sprintf("delete <%s>", opts.Resource)
-	short := fmt.Sprintf("Delete a %s", opts.Resource)
+	short := "Delete " + withArticle(opts.Resource)
 	long := fmt.Sprintf("Delete a saved %s permanently.", opts.Resource)
 
-	examples := fmt.Sprintf(`  # Delete a %s (with confirmation)
+	aliases := opts.Aliases
+	if len(aliases) == 0 {
+		aliases = []string{"rm", "del", "remove"}
+	}
+
+	examples := fmt.Sprintf(`  # Delete %s (with confirmation)
   shelly %s delete my-%s
 
   # Delete without confirmation
   shelly %s delete my-%s --yes
 
   # Using alias
-  shelly %s rm my-%s`, opts.Resource, opts.Resource, opts.Resource,
-		opts.Resource, opts.Resource, opts.Resource, opts.Resource)
+  shelly %s %s my-%s`, withArticle(opts.Resource), opts.Resource, opts.Resource,
+		opts.Resource, opts.Resource, opts.Resource, aliases[0], opts.Resource)
 
 	cmd := &cobra.Command{
 		Use:     use,
-		Aliases: []string{"rm", "del", "remove"},
+		Aliases: aliases,
 		Short:   short,
 		Long:    long,
 		Example: examples,
@@ -70,9 +75,7 @@ func NewConfigDeleteCommand(f *cmdutil.Factory, opts ConfigDeleteOpts) *cobra.Co
 		cmd.ValidArgsFunction = opts.ValidArgsFunc
 	}
 
-	if !opts.SkipConfirmation {
-		cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
-	}
+	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
 
 	return cmd
 }
@@ -86,21 +89,18 @@ func runConfigDelete(f *cmdutil.Factory, opts ConfigDeleteOpts, name string, ski
 		return fmt.Errorf("%s %q not found", opts.Resource, name)
 	}
 
-	// Confirm unless skipped
-	if !opts.SkipConfirmation {
-		msg := fmt.Sprintf("Delete %s %q?", opts.Resource, name)
-		if opts.InfoFunc != nil {
-			msg = opts.InfoFunc(resource, name)
-		}
+	msg := fmt.Sprintf("Delete %s %q?", opts.Resource, name)
+	if opts.InfoFunc != nil {
+		msg = opts.InfoFunc(resource, name)
+	}
 
-		confirmed, err := f.ConfirmAction(msg, skipConfirm)
-		if err != nil {
-			return fmt.Errorf("confirmation failed: %w", err)
-		}
-		if !confirmed {
-			ios.Info("Deletion cancelled")
-			return nil
-		}
+	confirmed, err := f.ConfirmAction(msg, skipConfirm)
+	if err != nil {
+		return fmt.Errorf("confirmation failed: %w", err)
+	}
+	if !confirmed {
+		ios.Info("Deletion cancelled")
+		return nil
 	}
 
 	if err := opts.DeleteFunc(name); err != nil {
@@ -132,20 +132,21 @@ type ConfigListOpts[T any] struct {
 
 // NewConfigListCommand creates a config-based list command.
 func NewConfigListCommand[T any](f *cmdutil.Factory, opts ConfigListOpts[T]) *cobra.Command {
-	short := fmt.Sprintf("List %ss", opts.Resource)
-	long := fmt.Sprintf(`List all configured %ss.
+	plural := pluralize(opts.Resource)
+	short := "List " + plural
+	long := fmt.Sprintf(`List all configured %s.
 
 Output is formatted as a table by default. Use -o json or -o yaml for
-structured output suitable for scripting.`, opts.Resource)
+structured output suitable for scripting.`, plural)
 
-	examples := fmt.Sprintf(`  # List all %ss
+	examples := fmt.Sprintf(`  # List all %s
   shelly %s list
 
   # Output as JSON
   shelly %s list -o json
 
   # Output as YAML
-  shelly %s list -o yaml`, opts.Resource, opts.Resource, opts.Resource, opts.Resource)
+  shelly %s list -o yaml`, plural, opts.Resource, opts.Resource, opts.Resource)
 
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -166,26 +167,16 @@ func runConfigList[T any](f *cmdutil.Factory, opts ConfigListOpts[T]) error {
 	ios := f.IOStreams()
 	items := opts.FetchFunc()
 
-	if len(items) == 0 {
+	return cmdutil.PrintList(ios, items, opts.DisplayFunc, func() {
 		msg := opts.EmptyMsg
 		if msg == "" {
-			msg = fmt.Sprintf("No %ss configured", opts.Resource)
+			msg = fmt.Sprintf("No %s configured", pluralize(opts.Resource))
 		}
 		ios.Info("%s", msg)
 		if opts.HintMsg != "" {
 			ios.Info("%s", opts.HintMsg)
 		}
-		return nil
-	}
-
-	// Handle structured output (JSON/YAML/template)
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, items)
-	}
-
-	// Table output
-	opts.DisplayFunc(ios, items)
-	return nil
+	})
 }
 
 // capitalize returns the string with first letter capitalized.

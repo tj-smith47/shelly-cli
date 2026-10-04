@@ -13,7 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -63,9 +62,10 @@ func run(ctx context.Context, opts *Options) error {
 
 	links := config.ListLinks()
 	if len(links) == 0 {
-		ios.Info("No links defined")
-		ios.Info("Use 'shelly link set <child> <parent>' to create a link")
-		return nil
+		return cmdutil.PrintList(ios, []model.LinkStatus(nil), term.DisplayLinkStatuses, func() {
+			ios.Info("No links defined")
+			ios.Info("Use 'shelly link set <child> <parent>' to create a link")
+		})
 	}
 
 	// Filter to single device if specified
@@ -132,10 +132,5 @@ func run(ctx context.Context, opts *Options) error {
 		return statuses[i].ChildDevice < statuses[j].ChildDevice
 	})
 
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, statuses)
-	}
-
-	term.DisplayLinkStatuses(ios, statuses)
-	return nil
+	return cmdutil.PrintListResult(ios, statuses, term.DisplayLinkStatuses)
 }

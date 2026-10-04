@@ -21,10 +21,32 @@ The name is used as a friendly identifier for the device in other commands.
 Names with spaces will be normalized to dashes (e.g., "Master Bathroom"
 becomes "master-bathroom" as the key).
 
+.PP
+Credentials for a password-protected device are stored with the device and
+used by every command run after it. Give them as --password (the user
+defaults to admin, the user Shelly devices use), as --password-stdin to keep
+the password out of the shell history, or as --auth user:pass. When the device
+has authentication enabled the credentials are checked against it first, and
+a device that rejects them is not added. --no-verify skips that check.
+
+.PP
+A name that is already registered is refused unless --force is given, which
+replaces the registration (address, credentials, platform, model). Aliases
+of the replaced device are kept.
+
+.PP
+--platform registers a device managed by a plugin, such as tasmota for the
+shelly-tasmota plugin. The plugin's detect hook verifies the device instead
+of the Shelly API.
+
 
 .SH OPTIONS
 \fB--auth\fP=""
 	Authentication credentials (user:pass)
+
+.PP
+\fB-f\fP, \fB--force\fP[=false]
+	Replace an existing device of the same name
 
 .PP
 \fB-g\fP, \fB--generation\fP=0
@@ -36,7 +58,23 @@ becomes "master-bathroom" as the key).
 
 .PP
 \fB--no-verify\fP[=false]
-	Skip connectivity check and auto-detection
+	Skip the connectivity check, auto-detection and the credentials check
+
+.PP
+\fB--password\fP=""
+	Device password
+
+.PP
+\fB--password-stdin\fP[=false]
+	Read the device password from stdin
+
+.PP
+\fB--platform\fP=""
+	Device platform managed by a plugin (e.g. tasmota); default shelly
+
+.PP
+\fB--user\fP=""
+	Username for --password or --password-stdin (default admin)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -105,8 +143,17 @@ becomes "master-bathroom" as the key).
   # Add a device (auto-detects generation and model)
   shelly device add kitchen 192.168.1.100
 
-  # Add with authentication
-  shelly device add secure-device 192.168.1.101 --auth admin:secret
+  # Add a password-protected device
+  shelly device add kitchen 192.168.1.100 --user admin --password secret
+
+  # Read the password from stdin (prompts without echo on a terminal)
+  shelly device add kitchen 192.168.1.100 --password-stdin < ~/.shelly-kitchen-password
+
+  # Replace an existing registration with a new address or password
+  shelly device add kitchen 192.168.1.110 --force --password-stdin
+
+  # Add a Tasmota device through the shelly-tasmota plugin
+  shelly device add garage-plug 192.168.1.50 --platform tasmota
 
   # Add without verification (offline)
   shelly device add offline-device 192.168.1.102 --no-verify --generation 2

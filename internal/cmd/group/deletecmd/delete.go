@@ -15,7 +15,9 @@ import (
 // NewCommand creates the group delete command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
-		Resource:      "group",
+		Resource: "group",
+		// "rm" and "remove" belong to `group remove`, which takes a device out of a group.
+		Aliases:       []string{"del"},
 		ValidArgsFunc: completion.GroupNames(),
 		ExistsFunc: func(name string) (any, bool) {
 			return config.GetGroup(name)

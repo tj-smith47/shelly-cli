@@ -16,6 +16,7 @@ import (
 // Mock RPC method names, JSON keys, and fixture values reused across handlers.
 const (
 	mockMethodSwitchSet = "Switch.Set"
+	endpointRPC         = "/rpc"
 
 	keyDevice          = "device"
 	keyWasOn           = "was_on"
@@ -27,6 +28,7 @@ const (
 	keyIsOpen          = "is_open"
 	keyDHCP            = "dhcp"
 	keyAuth            = "auth"
+	keyStatus          = "status"
 	keyConnected       = "connected"
 	keyServer          = "server"
 	keyEnabled         = "enabled"
@@ -39,6 +41,9 @@ const (
 	keyData            = "data"
 	keyFreq            = "freq"
 	keyValue           = "value"
+	keyKey             = "key"
+	keyRev             = "rev"
+	keyEtag            = "etag"
 	keyIPv4Mode        = "ipv4mode"
 	keyBSSID           = "bssid"
 	keyMAC             = "mac"
@@ -61,13 +66,23 @@ type DeviceServer struct {
 	mu       sync.RWMutex
 	state    map[string]DeviceState
 	upgrader websocket.Upgrader
+	// authHA1 holds the HA1 a Gen2+ device was given through Shelly.SetAuth,
+	// keyed by device name; "" means authentication was turned off. A device
+	// with no entry uses its fixture's AuthEnabled and AuthPass.
+	authHA1 map[string]string
+	// gen1Login holds the login a Gen1 device was given through
+	// /settings/login, keyed by device name. A device with no entry uses its
+	// fixture's AuthEnabled, AuthUser and AuthPass.
+	gen1Login map[string]gen1Login
 }
 
 // NewDeviceServer creates a mock HTTP server for device requests.
 func NewDeviceServer(fixtures *Fixtures) *DeviceServer {
 	ds := &DeviceServer{
-		fixtures: fixtures,
-		state:    make(map[string]DeviceState),
+		fixtures:  fixtures,
+		state:     make(map[string]DeviceState),
+		authHA1:   make(map[string]string),
+		gen1Login: make(map[string]gen1Login),
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
@@ -122,6 +137,10 @@ func (ds *DeviceServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 		state = make(DeviceState)
 	}
 
+	if !ds.authorized(w, r, device, endpoint) {
+		return
+	}
+
 	if device.Generation == 2 || device.Generation == 0 {
 		ds.handleGen2(w, r, endpoint, state, device)
 	} else {
@@ -155,7 +174,7 @@ type rpcResponse struct {
 
 func (ds *DeviceServer) handleGen2(w http.ResponseWriter, r *http.Request, endpoint string, state DeviceState, device *DeviceFixture) {
 	// Handle WebSocket upgrade on /rpc endpoint
-	if endpoint == "/rpc" && websocket.IsWebSocketUpgrade(r) {
+	if endpoint == endpointRPC && websocket.IsWebSocketUpgrade(r) {
 		ds.handleWebSocketRPC(w, r, state, device)
 		return
 	}
@@ -163,7 +182,7 @@ func (ds *DeviceServer) handleGen2(w http.ResponseWriter, r *http.Request, endpo
 	w.Header().Set("Content-Type", "application/json")
 
 	// Handle JSON-RPC endpoint
-	if endpoint == "/rpc" {
+	if endpoint == endpointRPC {
 		ds.handleGen2RPC(w, r, state, device)
 		return
 	}
@@ -375,7 +394,17 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		result = map[string]any{}
 
 	case "Shelly.SetAuth":
-		// Mock auth enable/disable - return success
+		if req.Params["user"] != gen2AuthUser || req.Params["realm"] != gen2DeviceID(device) {
+			ds.writeRPCError(w, req.ID, fmt.Sprintf("invalid argument: user must be %q and realm %q", gen2AuthUser, gen2DeviceID(device)))
+			return
+		}
+		var ha1 string
+		if s, ok := req.Params["ha1"].(string); ok {
+			ha1 = s
+		}
+		ds.mu.Lock()
+		ds.authHA1[device.Name] = ha1
+		ds.mu.Unlock()
 		result = map[string]any{}
 
 	case "Zigbee.SetConfig":
@@ -403,7 +432,7 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		// Return mock WiFi status
 		result = map[string]any{
 			"sta_ip":          "192.168.1.100",
-			"status":          "got ip",
+			keyStatus:         "got ip",
 			keySSID:           valSSIDHomeNetwork,
 			keyRSSI:           float64(-45),
 			"ap_client_count": float64(0),
@@ -604,8 +633,11 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		result = map[string]any{keyRestartRequired: false}
 
 	case "EM.GetStatus":
-		// Return EM component status from device state
 		id := ds.getIDFromParams(req.Params)
+		if _, ok := state[fmt.Sprintf("em:%d", id)]; !ok {
+			ds.writeRPCError(w, req.ID, "component not found")
+			return
+		}
 		result = ds.getEMStatus(state, id)
 
 	case "EM.ResetCounters":
@@ -613,9 +645,21 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		result = map[string]any{}
 
 	case "EM1.GetStatus":
-		// Return EM1 component status from device state
 		id := ds.getIDFromParams(req.Params)
+		if _, ok := state[fmt.Sprintf("em1:%d", id)]; !ok {
+			ds.writeRPCError(w, req.ID, "component not found")
+			return
+		}
 		result = ds.getEM1Status(state, id)
+
+	case "PM.GetStatus", "PM1.GetStatus":
+		kind := strings.ToLower(strings.TrimSuffix(req.Method, ".GetStatus"))
+		status, ok := state[fmt.Sprintf("%s:%d", kind, ds.getIDFromParams(req.Params))]
+		if !ok {
+			ds.writeRPCError(w, req.ID, "component not found")
+			return
+		}
+		result = status
 
 	case "EMData.GetRecords":
 		// Return EMData records from device state or default
@@ -662,7 +706,7 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 
 	case "BTHome.AddDevice":
 		// Return success for BTHome device add
-		result = map[string]any{"key": "mock-key-12345"}
+		result = map[string]any{keyKey: "mock-key-12345"}
 
 	case "BTHome.DeleteDevice":
 		// Return success for BTHome device delete
@@ -849,6 +893,56 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		// Return success for virtual button trigger
 		result = map[string]any{}
 
+	case "Webhook.List":
+		hooks, ok := state["webhooks"].([]any)
+		if !ok {
+			hooks = []any{}
+		}
+		result = map[string]any{"hooks": hooks, keyRev: 1}
+
+	case "KVS.List":
+		keys := map[string]any{}
+		for key := range ds.kvsState(state) {
+			keys[key] = map[string]any{keyEtag: mockKVSEtag}
+		}
+		result = map[string]any{"keys": keys, keyRev: 1}
+
+	case "KVS.GetMany":
+		store := ds.kvsState(state)
+		names := make([]string, 0, len(store))
+		for key := range store {
+			names = append(names, key)
+		}
+		sort.Strings(names)
+		items := make([]map[string]any, 0, len(names))
+		for _, key := range names {
+			items = append(items, map[string]any{keyKey: key, keyEtag: mockKVSEtag, keyValue: store[key]})
+		}
+		result = map[string]any{"items": items}
+
+	case "KVS.Get":
+		key, ok := req.Params[keyKey].(string)
+		value, found := ds.kvsState(state)[key]
+		if !ok || !found {
+			ds.writeRPCError(w, req.ID, "key not found")
+			return
+		}
+		result = map[string]any{keyEtag: mockKVSEtag, keyValue: value}
+
+	case "SensorAddon.GetPeripherals":
+		peripherals, ok := state["sensoraddon"].(map[string]any)
+		if !ok {
+			peripherals = map[string]any{}
+		}
+		result = peripherals
+
+	case "SensorAddon.OneWireScan":
+		devices, ok := state["onewire"].([]any)
+		if !ok {
+			devices = []any{}
+		}
+		result = map[string]any{"devices": devices}
+
 	default:
 		ds.writeRPCError(w, req.ID, "method not found")
 		return
@@ -857,17 +951,35 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 	ds.writeRPCResult(w, req.ID, result)
 }
 
+// mockKVSEtag is the etag the mock reports for every stored key.
+const mockKVSEtag = "0DWty8HwCB"
+
+// kvsState returns the key-value store of a device: the "kvs" entry of its state.
+func (ds *DeviceServer) kvsState(state DeviceState) map[string]any {
+	store, ok := state["kvs"].(map[string]any)
+	if !ok {
+		return map[string]any{}
+	}
+	return store
+}
+
+// gen2DeviceID is the device id a Gen2+ mock reports, which is also its
+// authentication realm.
+func gen2DeviceID(device *DeviceFixture) string {
+	return "shelly" + strings.ToLower(strings.ReplaceAll(device.Model, " ", "")) + "-" + strings.ReplaceAll(device.MAC, ":", "")
+}
+
 func (ds *DeviceServer) gen2DeviceInfo(device *DeviceFixture) map[string]any {
-	mac := strings.ReplaceAll(device.MAC, ":", "")
 	return map[string]any{
-		"id":     "shelly" + strings.ToLower(strings.ReplaceAll(device.Model, " ", "")) + "-" + mac,
-		keyMAC:   device.MAC,
-		keyModel: device.Model,
-		"gen":    device.Generation,
-		keyFwID:  valFirmwareID,
-		"ver":    valFirmwareVer,
-		"app":    device.Type,
-		keyName:  device.Name,
+		"id":      gen2DeviceID(device),
+		keyMAC:    device.MAC,
+		keyModel:  device.Model,
+		"gen":     device.Generation,
+		keyFwID:   valFirmwareID,
+		"ver":     valFirmwareVer,
+		"app":     device.Type,
+		keyName:   device.Name,
+		"auth_en": ds.gen2AuthHA1(device) != "",
 	}
 }
 
@@ -911,7 +1023,7 @@ func (ds *DeviceServer) getComponents(state DeviceState, params map[string]any) 
 	// Build component list for this page
 	comps := make([]map[string]string, 0, end-offset)
 	for i := offset; i < end; i++ {
-		comps = append(comps, map[string]string{"key": allKeys[i]})
+		comps = append(comps, map[string]string{keyKey: allKeys[i]})
 	}
 
 	return map[string]any{
@@ -961,13 +1073,24 @@ func (ds *DeviceServer) handleGen1(w http.ResponseWriter, r *http.Request, endpo
 		ds.writeJSON(w, map[string]any{
 			keyType: device.Type,
 			keyMAC:  strings.ReplaceAll(device.MAC, ":", ""),
+			keyAuth: ds.gen1LoginFor(device).enabled,
 		})
+
+	case endpoint == "/settings/login":
+		ds.handleGen1Login(w, r, device)
+
+	case endpoint == "/ota/check":
+		if ota, ok := state["ota"].(map[string]any); ok {
+			ds.writeJSON(w, ota)
+		} else {
+			ds.writeJSON(w, map[string]any{keyStatus: "idle", "has_update": false})
+		}
 
 	case endpoint == "/status":
 		ds.writeJSON(w, state)
 
 	case endpoint == "/settings":
-		ds.writeJSON(w, map[string]any{
+		settings := map[string]any{
 			keyDevice: map[string]any{
 				keyType: device.Type,
 				keyMAC:  strings.ReplaceAll(device.MAC, ":", ""),
@@ -978,7 +1101,21 @@ func (ds *DeviceServer) handleGen1(w http.ResponseWriter, r *http.Request, endpo
 				"peer":          "",
 				"update_period": 15,
 			},
-		})
+		}
+		// A real Gen1 light lists one settings entry per channel; commands
+		// that enumerate lights read the channel count from here.
+		if lights, ok := state["lights"].([]any); ok {
+			settings["lights"] = lights
+		}
+		for _, key := range []string{"relays", "rollers"} {
+			if entries, ok := state[key].([]any); ok {
+				settings[key] = entries
+			}
+		}
+		if mode, ok := state["mode"].(string); ok {
+			settings["mode"] = mode
+		}
+		ds.writeJSON(w, settings)
 
 	case strings.HasPrefix(endpoint, "/relay/"):
 		ds.handleGen1Relay(w, r, endpoint, state, device)
@@ -995,17 +1132,7 @@ func (ds *DeviceServer) handleGen1(w http.ResponseWriter, r *http.Request, endpo
 }
 
 func (ds *DeviceServer) writeGen2DeviceInfo(w http.ResponseWriter, device *DeviceFixture) {
-	mac := strings.ReplaceAll(device.MAC, ":", "")
-	ds.writeJSON(w, map[string]any{
-		"id":     "shelly" + strings.ToLower(strings.ReplaceAll(device.Model, " ", "")) + "-" + mac,
-		keyMAC:   device.MAC,
-		keyModel: device.Model,
-		"gen":    device.Generation,
-		keyFwID:  valFirmwareID,
-		"ver":    valFirmwareVer,
-		"app":    device.Type,
-		keyName:  device.Name,
-	})
+	ds.writeJSON(w, ds.gen2DeviceInfo(device))
 }
 
 func (ds *DeviceServer) writeComponents(w http.ResponseWriter, r *http.Request, state DeviceState) {
@@ -1124,17 +1251,36 @@ func (ds *DeviceServer) handleGen1Relay(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
-func (ds *DeviceServer) handleGen1Light(w http.ResponseWriter, _ *http.Request, _ string, state DeviceState, _ *DeviceFixture) {
-	if lights, ok := state["lights"].([]any); ok && len(lights) > 0 {
-		ds.writeJSON(w, lights[0])
-	} else {
-		ds.writeJSON(w, map[string]any{keyIsOn: false})
+func (ds *DeviceServer) handleGen1Light(w http.ResponseWriter, r *http.Request, endpoint string, _ DeviceState, device *DeviceFixture) {
+	id, err := strconv.Atoi(strings.TrimPrefix(endpoint, "/light/"))
+	if err != nil {
+		id = 0
 	}
+
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	lights, ok := ds.state[device.Name]["lights"].([]any)
+	if !ok || id >= len(lights) {
+		ds.writeJSON(w, map[string]any{keyIsOn: false})
+		return
+	}
+	light, ok := lights[id].(map[string]any)
+	if !ok {
+		ds.writeJSON(w, lights[id])
+		return
+	}
+	q := r.URL.Query()
+	if turn := q.Get("turn"); turn != "" {
+		light[keyIsOn] = turn == "on"
+	}
+	if b, err := strconv.Atoi(q.Get(keyBrightness)); err == nil {
+		light[keyBrightness] = b
+	}
+	ds.writeJSON(w, light)
 }
 
 // handleGen1Actions handles Gen1 /settings/actions endpoint for action URL management.
 func (ds *DeviceServer) handleGen1Actions(w http.ResponseWriter, r *http.Request, device *DeviceFixture) {
-	// Parse query parameters
 	index := r.URL.Query().Get("index")
 	name := r.URL.Query().Get(keyName)
 	enabled := r.URL.Query().Get(keyEnabled)
@@ -1143,34 +1289,34 @@ func (ds *DeviceServer) handleGen1Actions(w http.ResponseWriter, r *http.Request
 	if ds.state[device.Name] == nil {
 		ds.state[device.Name] = make(DeviceState)
 	}
-	if ds.state[device.Name]["actions"] == nil {
-		ds.state[device.Name]["actions"] = make(map[string]any)
-	}
-
-	// Store the action state
-	actionKey := index + "_" + name
 	actions, ok := ds.state[device.Name]["actions"].(map[string]any)
 	if !ok {
 		actions = make(map[string]any)
+		ds.state[device.Name]["actions"] = actions
 	}
-	actions[actionKey] = map[string]any{
-		"index":    index,
-		keyName:    name,
-		keyEnabled: enabled == strTrue,
+	if name != "" {
+		actions[name] = []map[string]any{{
+			"index":    ds.parseIndex(index),
+			keyEnabled: enabled == strTrue,
+			"urls":     r.URL.Query()["urls[]"],
+		}}
+	}
+	// A device keys its actions by name, each holding one entry per index.
+	reply := make(map[string]any, len(actions))
+	for k, v := range actions {
+		reply[k] = v
 	}
 	ds.mu.Unlock()
 
-	// Return success response (Gen1 actions endpoint returns the action settings)
-	ds.writeJSON(w, map[string]any{
-		"actions": []map[string]any{
-			{
-				"index":    index,
-				keyName:    name,
-				keyEnabled: enabled == strTrue,
-				"urls":     []string{},
-			},
-		},
-	})
+	ds.writeJSON(w, map[string]any{"actions": reply})
+}
+
+func (ds *DeviceServer) parseIndex(index string) int {
+	n, err := strconv.Atoi(index)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 func (ds *DeviceServer) parseIDParam(r *http.Request) int {
@@ -1742,7 +1888,7 @@ func (ds *DeviceServer) updateSchedule(params map[string]any, deviceName string)
 	}
 
 	ds.state[deviceName][key] = sched
-	return map[string]any{"rev": 1}
+	return map[string]any{keyRev: 1}
 }
 
 // deleteSchedule deletes a mock schedule.

@@ -17,6 +17,25 @@ type DashboardData struct {
 	CostPerKwh    float64                `json:"cost_per_kwh,omitempty"`
 }
 
+// EnergyStatusEntry is the status of one energy monitor component (EM or EM1)
+// on a registered device. Power is the component's total active power in watts;
+// the full reading is in EM or EM1, whichever matches Type.
+type EnergyStatusEntry struct {
+	Name  string     `json:"name"`
+	Type  string     `json:"type"`
+	ID    int        `json:"id"`
+	Power float64    `json:"power"`
+	EM    *EMStatus  `json:"em,omitempty"`
+	EM1   *EM1Status `json:"em1,omitempty"`
+}
+
+// EnergyStatusSkip names a device, or one of its components, whose energy
+// status could not be read, and why.
+type EnergyStatusSkip struct {
+	Device string `json:"device"`
+	Reason string `json:"reason"`
+}
+
 // DashboardDeviceEntry represents energy status for a single device in the dashboard.
 type DashboardDeviceEntry struct {
 	Device      string           `json:"device"`

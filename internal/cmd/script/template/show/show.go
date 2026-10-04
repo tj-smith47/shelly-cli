@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
@@ -16,7 +15,6 @@ import (
 
 // Options holds command options.
 type Options struct {
-	flags.OutputFlags
 	Name    string
 	Code    bool
 	Factory *cmdutil.Factory
@@ -51,7 +49,6 @@ JavaScript source code.`,
 	}
 
 	cmd.Flags().BoolVar(&opts.Code, "code", false, "Show only the code (for piping)")
-	flags.AddOutputFlags(cmd, &opts.OutputFlags)
 
 	return cmd
 }

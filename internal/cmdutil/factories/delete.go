@@ -66,16 +66,16 @@ func NewDeviceDeleteCommand(f *cmdutil.Factory, opts DeviceDeleteOpts) *cobra.Co
 
 	long := opts.Long
 	if long == "" {
-		long = fmt.Sprintf("Delete a %s from a device.", opts.Resource)
+		long = fmt.Sprintf("Delete %s from a device.", withArticle(opts.Resource))
 	}
 
-	short := fmt.Sprintf("Delete a %s", opts.Resource)
+	short := "Delete " + withArticle(opts.Resource)
 
-	examples := fmt.Sprintf(`  # Delete a %s
+	examples := fmt.Sprintf(`  # Delete %s
   shelly %s delete <device> 1
 
   # Delete without confirmation
-  shelly %s delete <device> 1 --yes`, opts.Resource, opts.Resource, opts.Resource)
+  shelly %s delete <device> 1 --yes`, withArticle(opts.Resource), opts.Resource, opts.Resource)
 
 	cmd := &cobra.Command{
 		Use:     use,

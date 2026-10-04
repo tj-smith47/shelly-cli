@@ -12,11 +12,11 @@ import (
 
 // LightInfo holds light information for list operations.
 type LightInfo struct {
-	ID         int
-	Name       string
-	Output     bool
-	Brightness int
-	Power      float64
+	ID         int     `json:"id" yaml:"id"`
+	Name       string  `json:"name" yaml:"name"`
+	Output     bool    `json:"output" yaml:"output"`
+	Brightness int     `json:"brightness" yaml:"brightness"`
+	Power      float64 `json:"power" yaml:"power"`
 }
 
 // LightOn turns on a light component.

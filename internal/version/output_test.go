@@ -1,7 +1,6 @@
 package version
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -84,65 +83,33 @@ func TestSetUpdateInfo_NoUpdate(t *testing.T) {
 	}
 }
 
-func TestWriteJSON(t *testing.T) {
+// keyVersion is the JSON key of the version number.
+const keyVersion = "version"
+
+func TestOutput_JSONKeys(t *testing.T) {
 	t.Parallel()
 
-	output := &Output{
-		Version:   "1.2.3",
-		Commit:    "def456",
-		Date:      "2024-06-01",
-		BuiltBy:   "goreleaser",
-		GoVersion: "go1.22.0",
-		OS:        "darwin",
-		Arch:      "arm64",
-	}
-
-	var buf bytes.Buffer
-	err := output.WriteJSON(&buf)
-	if err != nil {
-		t.Fatalf("WriteJSON() error = %v", err)
-	}
-
-	// Verify the output is valid JSON
-	var decoded Output
-	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
-		t.Fatalf("output is not valid JSON: %v", err)
-	}
-
-	if decoded.Version != output.Version {
-		t.Errorf("decoded.Version = %q, want %q", decoded.Version, output.Version)
-	}
-}
-
-func TestWriteJSON_WithUpdateInfo(t *testing.T) {
-	t.Parallel()
-
-	output := &Output{
-		Version: testVersion1,
-	}
+	output := &Output{Version: testVersion1}
 	output.SetUpdateInfo(testVersion2, true)
-
-	var buf bytes.Buffer
-	err := output.WriteJSON(&buf)
+	data, err := json.Marshal(output)
 	if err != nil {
-		t.Fatalf("WriteJSON() error = %v", err)
+		t.Fatalf("Marshal() error = %v", err)
 	}
-
-	// Verify the output is valid JSON with update info
 	var decoded map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
+	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("output is not valid JSON: %v", err)
 	}
-
-	if decoded["update_available"] != availabilityYes {
-		t.Errorf("update_available = %v, want %q", decoded["update_available"], availabilityYes)
+	for _, key := range []string{keyVersion, "commit", "date", "built_by", "go_version", "os", "arch"} {
+		if _, ok := decoded[key]; !ok {
+			t.Errorf("JSON has no %q key: %s", key, data)
+		}
 	}
-	if decoded["latest_version"] != testVersion2 {
-		t.Errorf("latest_version = %v, want %q", decoded["latest_version"], testVersion2)
+	if decoded["update_available"] != availabilityYes || decoded["latest_version"] != testVersion2 {
+		t.Errorf("update keys = %v, %v; want %q, %q", decoded["update_available"], decoded["latest_version"], availabilityYes, testVersion2)
 	}
 }
 
-func TestWriteJSONOutput_NoUpdateCheck(t *testing.T) {
+func TestBuildOutput_NoUpdateCheck(t *testing.T) {
 	t.Parallel()
 
 	info := Info{
@@ -155,27 +122,18 @@ func TestWriteJSONOutput_NoUpdateCheck(t *testing.T) {
 		Arch:      testArch,
 	}
 
-	var buf bytes.Buffer
-	err := WriteJSONOutput(context.Background(), &buf, info, false, nil, nil)
-	if err != nil {
-		t.Fatalf("WriteJSONOutput() error = %v", err)
-	}
+	out := BuildOutput(context.Background(), info, false, nil, nil)
 
-	var decoded map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
-		t.Fatalf("output is not valid JSON: %v", err)
-	}
-
-	if decoded["version"] != testVersion1 {
-		t.Errorf("version = %v, want %q", decoded["version"], testVersion1)
+	if out.Version != testVersion1 {
+		t.Errorf("Version = %q, want %q", out.Version, testVersion1)
 	}
 	// Should not have update info
-	if _, exists := decoded["update_available"]; exists {
+	if out.UpdateAvail != nil {
 		t.Error("update_available should not be present when checkUpdate is false")
 	}
 }
 
-func TestWriteJSONOutput_WithUpdateCheck(t *testing.T) {
+func TestBuildOutput_WithUpdateCheck(t *testing.T) {
 	// Use memory filesystem to prevent writes to real cache
 	config.SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { config.SetFs(nil) })
@@ -201,23 +159,14 @@ func TestWriteJSONOutput_WithUpdateCheck(t *testing.T) {
 		return latest > current
 	}
 
-	var buf bytes.Buffer
-	err := WriteJSONOutput(context.Background(), &buf, info, true, fetcher, isNewer)
-	if err != nil {
-		t.Fatalf("WriteJSONOutput() error = %v", err)
-	}
+	out := BuildOutput(context.Background(), info, true, fetcher, isNewer)
 
-	var decoded map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
-		t.Fatalf("output is not valid JSON: %v", err)
-	}
-
-	if decoded["update_available"] != availabilityYes {
-		t.Errorf("update_available = %v, want %q", decoded["update_available"], availabilityYes)
+	if out.UpdateAvail == nil || *out.UpdateAvail != availabilityYes {
+		t.Errorf("UpdateAvail = %v, want %q", out.UpdateAvail, availabilityYes)
 	}
 }
 
-func TestWriteJSONOutput_FetcherError(t *testing.T) {
+func TestBuildOutput_FetcherError(t *testing.T) {
 	t.Parallel()
 
 	info := Info{
@@ -235,25 +184,16 @@ func TestWriteJSONOutput_FetcherError(t *testing.T) {
 		return "", errors.New("network error")
 	}
 
-	var buf bytes.Buffer
 	// Should still succeed, just without update info
-	err := WriteJSONOutput(context.Background(), &buf, info, true, fetcher, nil)
-	if err != nil {
-		t.Fatalf("WriteJSONOutput() error = %v", err)
-	}
-
-	var decoded map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
-		t.Fatalf("output is not valid JSON: %v", err)
-	}
+	out := BuildOutput(context.Background(), info, true, fetcher, nil)
 
 	// Should not have update info when fetcher fails
-	if _, exists := decoded["update_available"]; exists {
+	if out.UpdateAvail != nil {
 		t.Error("update_available should not be present when fetcher fails")
 	}
 }
 
-func TestWriteJSONOutput_DevBuild(t *testing.T) {
+func TestBuildOutput_DevBuild(t *testing.T) {
 	t.Parallel()
 
 	info := Info{
@@ -271,19 +211,10 @@ func TestWriteJSONOutput_DevBuild(t *testing.T) {
 		return testVersion2, nil
 	}
 
-	var buf bytes.Buffer
-	err := WriteJSONOutput(context.Background(), &buf, info, true, fetcher, nil)
-	if err != nil {
-		t.Fatalf("WriteJSONOutput() error = %v", err)
-	}
-
-	var decoded map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
-		t.Fatalf("output is not valid JSON: %v", err)
-	}
+	out := BuildOutput(context.Background(), info, true, fetcher, nil)
 
 	// Should not have update info for dev builds
-	if _, exists := decoded["update_available"]; exists {
+	if out.UpdateAvail != nil {
 		t.Error("update_available should not be present for dev builds")
 	}
 }

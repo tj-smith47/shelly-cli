@@ -23,14 +23,14 @@ Opens your web browser to the Shelly Cloud login page. After you log in,
 the authorization code is automatically captured. This is the most secure
 method as your password is never stored locally.
 .IP "  2." 5
-Auth Key (--key, --server):
+Auth Key (--key or --key-stdin, --server):
 Use the authorization key from the Shelly mobile app. Find it in:
 User Settings → Authorization cloud key. You must also provide the
 server URL shown with the key.
 .IP "  3." 5
-Email/Password (--email, --password):
-Provide your Shelly Cloud email and password via flags or environment
-variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD).
+Email/Password (--email, --password or --password-stdin):
+Provide your Shelly Cloud email and password via flags, stdin or
+environment variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD).
 
 
 .SH OPTIONS
@@ -46,12 +46,20 @@ variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD).
 	Authorization key from Shelly App
 
 .PP
+\fB--key-stdin\fP[=false]
+	Read the authorization key from stdin
+
+.PP
 \fB--no-browser\fP[=false]
 	Don't auto-open browser, just print the URL
 
 .PP
 \fB--password\fP=""
 	Shelly Cloud password
+
+.PP
+\fB--password-stdin\fP[=false]
+	Read the Shelly Cloud password from stdin
 
 .PP
 \fB--port\fP=0
@@ -140,6 +148,9 @@ variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD).
 
   # Email/password login
   shelly cloud login --email user@example.com --password mypassword
+
+  # Email login with the password read from stdin
+  shelly cloud login --email user@example.com --password-stdin < ~/.shelly-cloud-password
 .EE
 
 

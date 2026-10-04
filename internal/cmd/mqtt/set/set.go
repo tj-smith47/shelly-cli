@@ -13,13 +13,15 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Factory     *cmdutil.Factory
-	Device      string
-	Enable      bool
-	Password    string
-	Server      string
-	TopicPrefix string
-	User        string
+	Factory  *cmdutil.Factory
+	Device   string
+	Enable   bool
+	Password string
+	// PasswordStdin reads Password from stdin.
+	PasswordStdin bool
+	Server        string
+	TopicPrefix   string
+	User          string
 }
 
 // NewCommand creates the mqtt set command.
@@ -37,6 +39,9 @@ integration with home automation systems.`,
 		Example: `  # Configure MQTT with server and credentials
   shelly mqtt set living-room --server "mqtt://broker:1883" --user user --password pass
 
+  # Read the MQTT password from stdin, keeping it out of shell history
+  shelly mqtt set living-room --server "mqtt://broker:1883" --user user --password-stdin < ~/.mqtt-password
+
   # Configure with custom topic prefix
   shelly mqtt set living-room --server "mqtt://broker:1883" --topic-prefix "home/shelly"
 
@@ -52,7 +57,8 @@ integration with home automation systems.`,
 
 	cmd.Flags().StringVar(&opts.Server, "server", "", "MQTT broker URL (e.g., mqtt://broker:1883)")
 	cmd.Flags().StringVar(&opts.User, "user", "", "MQTT username")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "MQTT password")
+	cmdutil.AddSecretFlags(cmd, &opts.Password, &opts.PasswordStdin, "password",
+		"MQTT password", "Read the MQTT password from stdin")
 	cmd.Flags().StringVar(&opts.TopicPrefix, "topic-prefix", "", "MQTT topic prefix")
 	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable MQTT")
 
@@ -60,15 +66,17 @@ integration with home automation systems.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	// Validate - need at least one option
+	ios := opts.Factory.IOStreams()
+	if err := cmdutil.ResolveSecret(ios, &opts.Password, opts.PasswordStdin, "password", "MQTT password"); err != nil {
+		return err
+	}
 	if opts.Server == "" && opts.User == "" && opts.Password == "" && opts.TopicPrefix == "" && !opts.Enable {
-		return fmt.Errorf("specify at least one configuration option (--server, --user, --password, --topic-prefix) or --enable")
+		return fmt.Errorf("specify at least one configuration option (--server, --user, --password, --password-stdin, --topic-prefix) or --enable")
 	}
 
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
 	// Determine enable state

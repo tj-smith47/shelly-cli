@@ -3,7 +3,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -17,8 +16,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/netguard"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -27,7 +26,9 @@ const (
 	// commandUse is the cobra Use string for the cloud events command.
 	commandUse = "events"
 	// formatJSON is the JSON output format value.
-	formatJSON = "json"
+	formatJSON = string(output.FormatJSON)
+	// formatYAML is the YAML output format value.
+	formatYAML = string(output.FormatYAML)
 )
 
 // Options holds command options.
@@ -68,8 +69,11 @@ Event types:
   # Output raw JSON
   shelly cloud events --raw
 
-  # Output in JSON format
-  shelly cloud events --format json`,
+  # One JSON document per line, one per event
+  shelly cloud events -o json
+
+  # One YAML document per event, separated by ---
+  shelly cloud events -o yaml`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), opts)
 		},
@@ -77,7 +81,7 @@ Event types:
 
 	cmd.Flags().StringVar(&opts.DeviceFilter, "device", "", "Filter by device ID")
 	cmd.Flags().StringVar(&opts.EventFilter, "event", "", "Filter by event type")
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", formatJSON)
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", formatJSON, formatYAML)
 	cmd.Flags().BoolVar(&opts.Raw, "raw", false, "Output raw JSON messages")
 
 	return cmd
@@ -148,30 +152,7 @@ func run(ctx context.Context, opts *Options) error {
 		Raw:          opts.Raw,
 	}
 
-	// Event handler callback
-	eventHandler := func(event *model.CloudEvent, raw []byte) error {
-		// Raw output mode
-		if opts.Raw {
-			ios.Println(string(raw))
-			return nil
-		}
-
-		// Output based on format
-		switch opts.Format {
-		case formatJSON:
-			formatted, jsonErr := json.Marshal(event)
-			if jsonErr != nil {
-				return jsonErr
-			}
-			ios.Println(string(formatted))
-		default:
-			term.DisplayCloudEvent(ios, event)
-		}
-
-		return nil
-	}
-
-	err = network.StreamCloudEvents(ctx, conn, streamOpts, eventHandler)
+	err = network.StreamCloudEvents(ctx, conn, streamOpts, term.CloudEventPrinter(ios, opts.Format, opts.Raw))
 
 	if err != nil {
 		return err

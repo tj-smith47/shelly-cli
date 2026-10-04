@@ -66,6 +66,9 @@ shelly init [flags]
 
   # With cloud credentials
   shelly init --defaults --cloud-email user@example.com --cloud-password secret
+
+  # With the cloud password read from stdin
+  shelly init --defaults --cloud-email user@example.com --cloud-password-stdin < ~/.shelly-cloud-password
 ```
 
 ### Options
@@ -77,6 +80,7 @@ shelly init [flags]
       --check                       Verify current setup without making changes
       --cloud-email string          Shelly Cloud email (enables cloud setup)
       --cloud-password string       Shelly Cloud password (enables cloud setup)
+      --cloud-password-stdin        Read the Shelly Cloud password from stdin (enables cloud setup)
       --completions string          Install completions for shells: bash,zsh,fish,powershell (comma-separated)
       --defaults                    Use sensible defaults for all prompts (no interactive questions)
       --device stringArray          Device spec: name=ip[:user:pass] (repeatable)

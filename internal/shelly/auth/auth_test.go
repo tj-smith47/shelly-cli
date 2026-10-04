@@ -21,6 +21,10 @@ func (m *mockConnectionProvider) WithConnection(ctx context.Context, identifier 
 	return nil
 }
 
+func (m *mockConnectionProvider) WithGen1Connection(context.Context, string, func(*client.Gen1Client) error) error {
+	return nil
+}
+
 // mockDeviceInfoProvider is a test double for DeviceInfoProvider.
 type mockDeviceInfoProvider struct {
 	authEnabled bool
@@ -120,24 +124,24 @@ func TestCalculateHA1(t *testing.T) {
 			user:     DefaultUser,
 			realm:    "shelly",
 			password: "password123",
-			// expected MD5 hash of "admin:shelly:password123"
-			want: "8386ad5c6ab610543249f7bf6f473b6b",
+			// SHA-256 of "admin:shelly:password123"
+			want: "517ec270b36ca59e99d5d0a2ec926151176cbbb6e12c18e8629714cf59c6823b",
 		},
 		{
 			name:     "empty password",
 			user:     DefaultUser,
 			realm:    "shelly",
 			password: "",
-			// expected MD5 hash of "admin:shelly:"
-			want: "487b4339838b81b198dff6b7b51eaf5d",
+			// SHA-256 of "admin:shelly:"
+			want: "0a24e34f1b156fb73da4ba13fefe4577c17c86af78e7d1e649e66a0b8a9922f2",
 		},
 		{
 			name:     "empty realm",
 			user:     DefaultUser,
 			realm:    "",
 			password: "test",
-			// expected MD5 hash of "admin::test"
-			want: "cccc6eec4dc231745b048270554760a5",
+			// SHA-256 of "admin::test"
+			want: "828881b3a0c927154a60bf439710c5d35c577ddcef89640b604d9b2367dd30dc",
 		},
 	}
 

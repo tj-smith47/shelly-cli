@@ -25,12 +25,14 @@ type Options struct {
 	Factory *cmdutil.Factory
 
 	// Auth key method
-	Key    string
-	Server string
+	Key      string
+	KeyStdin bool
+	Server   string
 
 	// Email/password method
-	Email    string
-	Password string
+	Email         string
+	Password      string
+	PasswordStdin bool
 
 	// Browser OAuth method (default)
 	Port      int
@@ -57,14 +59,14 @@ Three authentication methods are available:
    the authorization code is automatically captured. This is the most secure
    method as your password is never stored locally.
 
-2. Auth Key (--key, --server):
+2. Auth Key (--key or --key-stdin, --server):
    Use the authorization key from the Shelly mobile app. Find it in:
    User Settings → Authorization cloud key. You must also provide the
    server URL shown with the key.
 
-3. Email/Password (--email, --password):
-   Provide your Shelly Cloud email and password via flags or environment
-   variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD).`,
+3. Email/Password (--email, --password or --password-stdin):
+   Provide your Shelly Cloud email and password via flags, stdin or
+   environment variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD).`,
 		Example: `  # OAuth browser flow (default, most secure)
   shelly cloud login
 
@@ -75,19 +77,24 @@ Three authentication methods are available:
   shelly cloud login --key MTZkZGM3dWlk... --server shelly-59-eu.shelly.cloud
 
   # Email/password login
-  shelly cloud login --email user@example.com --password mypassword`,
+  shelly cloud login --email user@example.com --password mypassword
+
+  # Email login with the password read from stdin
+  shelly cloud login --email user@example.com --password-stdin < ~/.shelly-cloud-password`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), opts)
 		},
 	}
 
 	// Auth key flags
-	cmd.Flags().StringVar(&opts.Key, "key", "", "Authorization key from Shelly App")
+	cmdutil.AddSecretFlags(cmd, &opts.Key, &opts.KeyStdin, "key",
+		"Authorization key from Shelly App", "Read the authorization key from stdin")
 	cmd.Flags().StringVar(&opts.Server, "server", "", "Server URL for auth key (e.g., shelly-59-eu.shelly.cloud)")
 
 	// Email/password flags
 	cmd.Flags().StringVar(&opts.Email, "email", "", "Shelly Cloud email")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "Shelly Cloud password")
+	cmdutil.AddSecretFlags(cmd, &opts.Password, &opts.PasswordStdin, "password",
+		"Shelly Cloud password", "Read the Shelly Cloud password from stdin")
 
 	// Browser OAuth flags (default method, these modify behavior)
 	cmd.Flags().IntVar(&opts.Port, "port", 0, "Port for OAuth callback server (default: auto-select)")
@@ -100,6 +107,12 @@ Three authentication methods are available:
 //nolint:gocyclo // Login command handles three distinct auth methods in one function
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
+	if err := cmdutil.ResolveSecret(ios, &opts.Key, opts.KeyStdin, "key", "Authorization Key"); err != nil {
+		return err
+	}
+	if err := cmdutil.ResolveSecret(ios, &opts.Password, opts.PasswordStdin, "password", "Password"); err != nil {
+		return err
+	}
 
 	// Determine which method to use based on flags
 	hasKeyFlags := opts.Key != "" || opts.Server != "" ||
@@ -125,7 +138,7 @@ func run(ctx context.Context, opts *Options) error {
 		}
 		if authKey == "" {
 			if !ios.CanPrompt() {
-				return errors.New("auth key required (use --key flag or SHELLY_CLOUD_AUTH_KEY env var)")
+				return errors.New("auth key required (use --key, --key-stdin or the SHELLY_CLOUD_AUTH_KEY env var)")
 			}
 			var err error
 			authKey, err = iostreams.Password("Authorization Key")
@@ -201,7 +214,7 @@ func run(ctx context.Context, opts *Options) error {
 		}
 		if password == "" {
 			if !ios.CanPrompt() {
-				return errors.New("password required (use --password flag or SHELLY_CLOUD_PASSWORD env var)")
+				return errors.New("password required (use --password, --password-stdin or the SHELLY_CLOUD_PASSWORD env var)")
 			}
 			var err error
 			password, err = iostreams.Password("Password")

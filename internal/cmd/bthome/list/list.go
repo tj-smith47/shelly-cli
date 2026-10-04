@@ -9,7 +9,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -43,27 +42,27 @@ Shows configured BTHomeDevice components with their current status,
 signal strength (RSSI), battery level, and last update time.
 
 Use 'shelly bthome add' to discover and pair new devices.
-Use 'shelly bthome sensors' to view sensor readings.
+Use 'shelly bthome status <device> <id>' to view the readings of one device.
 
-Output is formatted as styled text by default. Use --json for
+Output is formatted as styled text by default. Use -o json for
 structured output suitable for scripting.`,
 		Example: `  # List all BTHome devices
   shelly bthome list living-room
 
   # Output as JSON
-  shelly bthome list living-room --json
+  shelly bthome list living-room -o json
 
   # Get devices with low battery
-  shelly bthome list living-room --json | jq '.[] | select(.battery != null and .battery < 20)'
+  shelly bthome list living-room -o json | jq '.[] | select(.battery != null and .battery < 20)'
 
   # Find devices with weak signal
-  shelly bthome list living-room --json | jq '.[] | select(.rssi != null and .rssi < -80)'
+  shelly bthome list living-room -o json | jq '.[] | select(.rssi != null and .rssi < -80)'
 
   # Get device addresses (MAC)
-  shelly bthome list living-room --json | jq -r '.[].addr'
+  shelly bthome list living-room -o json | jq -r '.[].addr'
 
   # List device names and IDs
-  shelly bthome list living-room --json | jq '.[] | {name, id}'
+  shelly bthome list living-room -o json | jq '.[] | {name, id}'
 
   # Short form
   shelly bthome ls living-room`,
@@ -75,7 +74,7 @@ structured output suitable for scripting.`,
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, formatText, formatText, formatJSON)
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, formatText, formatText, formatJSON, "yaml")
 
 	return cmd
 }
@@ -92,8 +91,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.Format == formatJSON {
-		return output.JSON(ios.Out, devices)
+	if opts.Structured() {
+		return cmdutil.PrintStructuredList(ios, opts.Format, devices)
 	}
 
 	term.DisplayBTHomeDevices(ios, devices, opts.Device)

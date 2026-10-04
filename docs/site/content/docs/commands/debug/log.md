@@ -27,8 +27,8 @@ shelly debug log <device> [flags]
   # Get debug log from a Gen1 device
   shelly debug log living-room-gen1
 
-  # For Gen2+ devices, use RPC instead
-  shelly debug rpc living-room Sys.GetStatus
+  # For Gen2+ devices, call the RPC API instead
+  shelly api living-room Sys.GetStatus
 ```
 
 ### Options

@@ -60,13 +60,14 @@ func run(opts *Options) error {
 		return fmt.Errorf("scene %q not found", opts.Name)
 	}
 
+	ios := opts.Factory.IOStreams()
 	switch opts.Format {
 	case string(output.FormatJSON):
-		return output.PrintJSON(scene)
+		return output.JSON(ios.Out, scene)
 	case string(output.FormatYAML):
-		return output.PrintYAML(scene)
+		return output.YAML(ios.Out, scene)
 	default:
-		term.DisplaySceneDetails(opts.Factory.IOStreams(), scene)
+		term.DisplaySceneDetails(ios, scene)
 		return nil
 	}
 }

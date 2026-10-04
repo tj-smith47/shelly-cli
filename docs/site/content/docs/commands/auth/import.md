@@ -11,7 +11,9 @@ Import device credentials
 
 Import device authentication credentials from a file.
 
-Imports credentials that were previously exported with auth export.
+Imports credentials that were previously exported with auth export into
+the config of the devices named in the file. No device is contacted, so the
+credentials are not checked; use auth test to check them.
 
 ```
 shelly auth import <file> [flags]

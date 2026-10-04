@@ -4,6 +4,7 @@ package shelly
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -886,14 +887,58 @@ func (s *Service) GetAuthStatus(ctx context.Context, identifier string) (*auth.S
 	return s.authService.GetStatus(ctx, identifier)
 }
 
-// SetAuth delegates to the Auth service for convenience.
-func (s *Service) SetAuth(ctx context.Context, identifier, user, realm, password string) error {
-	return s.authService.Set(ctx, identifier, user, realm, password)
+// SetAuth turns on authentication on the device identifier with user and
+// password: on Gen1 through /settings/login with any user name, on Gen2+
+// through Shelly.SetAuth, where the user must be admin (see auth.Service.Set).
+// An empty user means admin on Gen2+, and on Gen1 the user stored for the
+// device (admin when none is stored), so changing a Gen1 password keeps its
+// user; setUser reports the user the device was given.
+// Once the device has taken the new password every request to it needs that
+// password, so when identifier names a registered device the new credentials
+// are stored, and stored reports that. The device is then asked an
+// authenticated request with the new password: a device that refuses it
+// returns an error (errors.Is ErrCredentialsRejected) although the password
+// was set and stored.
+func (s *Service) SetAuth(ctx context.Context, identifier, user, password string) (setUser string, stored bool, err error) {
+	if password == "" {
+		return "", false, errors.New("a password is required; use DisableAuth to turn authentication off")
+	}
+	dev, err := s.ResolveWithGeneration(ctx, identifier)
+	if err != nil {
+		return "", false, err
+	}
+	gen1 := dev.Generation == 1
+	if user == "" {
+		user = auth.DefaultUser
+		if gen1 && dev.Auth != nil && dev.Auth.Username != "" {
+			user = dev.Auth.Username
+		}
+	}
+	if err := s.authService.Set(ctx, identifier, gen1, user, password); err != nil {
+		return "", false, err
+	}
+	dev.Auth = &model.Auth{Username: user, Password: password}
+	if _, registered := config.GetDevice(identifier); registered {
+		if err := config.SetDeviceAuth(identifier, user, password); err != nil {
+			return user, false, fmt.Errorf("the device now requires the new password, but storing it failed: %w", err)
+		}
+		stored = true
+	}
+	if err := s.VerifyCredentials(ctx, dev); err != nil {
+		return user, stored, fmt.Errorf("the new password was set, but the device did not accept it: %w", err)
+	}
+	return user, stored, nil
 }
 
-// DisableAuth delegates to the Auth service for convenience.
+// DisableAuth turns authentication off on the device identifier, on Gen1
+// through /settings/login and on Gen2+ through Shelly.SetAuth. Stored
+// credentials are kept: a device without authentication ignores them.
 func (s *Service) DisableAuth(ctx context.Context, identifier string) error {
-	return s.authService.Disable(ctx, identifier)
+	dev, err := s.ResolveWithGeneration(ctx, identifier)
+	if err != nil {
+		return err
+	}
+	return s.authService.Disable(ctx, identifier, dev.Generation == 1)
 }
 
 // ----- Modbus Service accessor and delegations -----

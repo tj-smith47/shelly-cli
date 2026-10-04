@@ -8,7 +8,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
-	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -91,9 +92,10 @@ func run(ctx context.Context, opts *Options) error {
 	devices := mgr.ListDevices()
 
 	if len(devices) == 0 {
-		ios.Info("No devices registered")
-		ios.Info("Use 'shelly discover' to find devices or 'shelly device add' to register one")
-		return nil
+		return cmdutil.PrintList(ios, []model.DeviceListItem(nil), nil, func() {
+			ios.Info("No devices registered")
+			ios.Info("Use 'shelly discover' to find devices or 'shelly device add' to register one")
+		})
 	}
 
 	// Force refresh metadata from hardware if requested
@@ -113,8 +115,9 @@ func run(ctx context.Context, opts *Options) error {
 	filtered, platforms := shelly.FilterDeviceList(devices, filterOpts)
 
 	if len(filtered) == 0 {
-		ios.Info("No devices match the specified filters")
-		return nil
+		return cmdutil.PrintList(ios, filtered, nil, func() {
+			ios.Info("No devices match the specified filters")
+		})
 	}
 
 	// Populate firmware info if version display or updates-first sorting is requested
@@ -126,14 +129,8 @@ func run(ctx context.Context, opts *Options) error {
 	// Sort: updates first if requested, then by name
 	shelly.SortDeviceList(filtered, opts.UpdatesFirst)
 
-	// Handle structured output (JSON/YAML)
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, filtered)
-	}
-
-	// Show Platform column only when there are multiple platforms
-	showPlatform := len(platforms) > 1
-	term.DisplayDeviceList(ios, filtered, showPlatform, opts.ShowVersion)
-
-	return nil
+	return cmdutil.PrintListResult(ios, filtered, func(ios *iostreams.IOStreams, items []model.DeviceListItem) {
+		// Show Platform column only when there are multiple platforms
+		term.DisplayDeviceList(ios, items, len(platforms) > 1, opts.ShowVersion)
+	})
 }

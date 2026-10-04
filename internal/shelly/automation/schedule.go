@@ -14,16 +14,16 @@ import (
 
 // ScheduleJob contains schedule information.
 type ScheduleJob struct {
-	ID       int
-	Enable   bool
-	Timespec string
-	Calls    []ScheduleCall
+	ID       int            `json:"id" yaml:"id"`
+	Enable   bool           `json:"enable" yaml:"enable"`
+	Timespec string         `json:"timespec" yaml:"timespec"`
+	Calls    []ScheduleCall `json:"calls" yaml:"calls"`
 }
 
 // ScheduleCall represents an RPC call in a schedule.
 type ScheduleCall struct {
-	Method string
-	Params map[string]any
+	Method string         `json:"method" yaml:"method"`
+	Params map[string]any `json:"params,omitempty" yaml:"params,omitempty"`
 }
 
 // ListSchedules lists all schedules on a device.

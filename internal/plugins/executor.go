@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
@@ -22,18 +23,14 @@ func NewExecutor() *Executor {
 	return &Executor{}
 }
 
-// Execute runs a plugin with the given arguments.
-func (e *Executor) Execute(plugin *Plugin, args []string) error {
-	return e.ExecuteContext(context.Background(), plugin, args)
-}
-
-// ExecuteContext runs a plugin with context for cancellation support.
-func (e *Executor) ExecuteContext(ctx context.Context, plugin *Plugin, args []string) error {
+// ExecuteContext runs a plugin with context for cancellation support. The
+// plugin reads ios.In and writes to ios.Out and ios.ErrOut.
+func (e *Executor) ExecuteContext(ctx context.Context, ios *iostreams.IOStreams, plugin *Plugin, args []string) error {
 	//nolint:gosec // G204: Plugin path is validated by loader, not arbitrary user input
 	cmd := exec.CommandContext(ctx, plugin.Path, args...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdin = ios.In
+	cmd.Stdout = ios.Out
+	cmd.Stderr = ios.ErrOut
 
 	// Set up environment
 	cmd.Env = e.buildEnvironment(plugin)
@@ -94,8 +91,8 @@ func (e *Executor) buildEnvironment(plugin *Plugin) []string {
 	// SHELLY_DEVICES_JSON: JSON of registered devices
 	devicesJSON, err := json.Marshal(cfg.Devices)
 	if err != nil {
-		// Log warning but continue - plugins can still work without device list
-		fmt.Fprintf(os.Stderr, "Warning: failed to marshal devices for plugin: %v\n", err)
+		// Plugins can still work without the device list.
+		iostreams.DebugErr("marshal devices for plugin", err)
 	} else {
 		env = append(env, "SHELLY_DEVICES_JSON="+string(devicesJSON))
 	}
@@ -111,8 +108,8 @@ func (e *Executor) buildEnvironment(plugin *Plugin) []string {
 	return env
 }
 
-// RunPlugin is a convenience function to find and execute a plugin with context.
-func RunPlugin(ctx context.Context, name string, args []string) error {
+// RunPlugin finds the named plugin and runs it with ios as its standard streams.
+func RunPlugin(ctx context.Context, ios *iostreams.IOStreams, name string, args []string) error {
 	loader := NewLoader()
 	plugin, err := loader.Find(name)
 	if err != nil {
@@ -123,5 +120,5 @@ func RunPlugin(ctx context.Context, name string, args []string) error {
 	}
 
 	executor := NewExecutor()
-	return executor.ExecuteContext(ctx, plugin, args)
+	return executor.ExecuteContext(ctx, ios, plugin, args)
 }

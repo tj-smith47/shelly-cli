@@ -10,10 +10,10 @@ import (
 
 // InputInfo holds input information for list operations.
 type InputInfo struct {
-	ID    int
-	Name  string
-	Type  string
-	State bool
+	ID    int    `json:"id" yaml:"id"`
+	Name  string `json:"name" yaml:"name"`
+	Type  string `json:"type" yaml:"type"`
+	State bool   `json:"state" yaml:"state"`
 }
 
 // InputStatus gets the status of an input component.

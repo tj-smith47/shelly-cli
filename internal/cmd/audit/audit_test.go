@@ -2,12 +2,16 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -72,6 +76,9 @@ func TestNewCommand_Flags(t *testing.T) {
 		defValue  string
 	}{
 		{name: "all", shorthand: "", defValue: "false"},
+		{name: "check-auth", shorthand: "", defValue: "false"},
+		{name: "check-cloud", shorthand: "", defValue: "false"},
+		{name: "check-firmware", shorthand: "", defValue: "false"},
 	}
 
 	for _, tt := range tests {
@@ -87,64 +94,6 @@ func TestNewCommand_Flags(t *testing.T) {
 			}
 			if flag.DefValue != tt.defValue {
 				t.Errorf("%s default = %q, want %q", tt.name, flag.DefValue, tt.defValue)
-			}
-		})
-	}
-}
-
-func TestNewCommand_RunE_NoArgs(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-	cmd.SetArgs([]string{})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error when no args and no --all flag")
-	} else if err.Error() != "specify device(s) or use --all" {
-		t.Errorf("error = %q, want %q", err.Error(), "specify device(s) or use --all")
-	}
-}
-
-func TestNewCommand_RunE_Validation(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		args        []string
-		allFlag     bool
-		wantError   bool
-		errorString string
-	}{
-		{
-			name:        "no args and no --all flag",
-			args:        []string{},
-			allFlag:     false,
-			wantError:   true,
-			errorString: "specify device(s) or use --all",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			cmd := NewCommand(cmdutil.NewFactory())
-			cmd.SetArgs(tt.args)
-
-			if tt.allFlag {
-				if err := cmd.Flags().Set("all", "true"); err != nil {
-					t.Fatalf("failed to set --all flag: %v", err)
-				}
-			}
-
-			err := cmd.Execute()
-			if tt.wantError {
-				if err == nil {
-					t.Error("expected error but got none")
-				} else if tt.errorString != "" && err.Error() != tt.errorString {
-					t.Errorf("error = %q, want %q", err.Error(), tt.errorString)
-				}
 			}
 		})
 	}
@@ -179,7 +128,7 @@ func TestNewCommand_Example(t *testing.T) {
 	checks := []string{
 		"shelly audit kitchen-light",
 		"shelly audit light-1 switch-2",
-		"shelly audit --all",
+		"shelly audit --check-firmware --check-auth -o json",
 	}
 
 	for _, check := range checks {
@@ -260,22 +209,13 @@ func TestNewCommand_CommandName(t *testing.T) {
 func TestNewCommand_WithDeviceArg(t *testing.T) {
 	t.Parallel()
 
-	tf := factory.NewTestFactory(t)
-
-	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"test-device"})
-
-	// Execute - will attempt to audit the device
-	// The test factory's ShellyService will handle the request
-	err := cmd.Execute()
-	if err != nil {
-		t.Logf("Expected error from device audit: %v", err)
+	tf := runAudit(t, twoAuditDevices, "kitchen")
+	out := tf.OutString()
+	if !strings.Contains(out, "Security Audit") || !strings.Contains(out, "kitchen") {
+		t.Errorf("expected the audit header and kitchen in output, got: %q", out)
 	}
-
-	// Verify output contains the audit header
-	output := tf.OutString()
-	if !strings.Contains(output, "Security Audit") {
-		t.Errorf("expected Security Audit header in output, got: %q", output)
+	if strings.Contains(out, "porch") {
+		t.Errorf("only the named device should be audited, got: %q", out)
 	}
 }
 
@@ -401,5 +341,146 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 				t.Errorf("ParseFlags() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// runAudit executes the audit command against two registered Gen2 mock devices.
+func runAudit(t *testing.T, devices []mock.DeviceFixture, args ...string) *factory.TestFactory {
+	t.Helper()
+	demo, err := mock.StartWithFixtures(&mock.Fixtures{
+		Version:      "1",
+		Config:       mock.ConfigFixture{Devices: devices},
+		DeviceStates: map[string]mock.DeviceState{},
+	})
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	t.Cleanup(demo.Cleanup)
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs(args)
+	cmd.SetContext(t.Context())
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute(%v) error = %v", args, err)
+	}
+	return tf
+}
+
+var twoAuditDevices = []mock.DeviceFixture{
+	{Name: "kitchen", Address: "192.168.1.10", MAC: "AA:BB:CC:DD:EE:01", Type: "SNSW-001P16EU", Model: "Shelly Plus 1PM", Generation: 2},
+	{Name: "porch", Address: "192.168.1.11", MAC: "AA:BB:CC:DD:EE:02", Type: "SNSW-001P16EU", Model: "Shelly Plus 1PM", Generation: 2},
+}
+
+func decodeAudit(t *testing.T, out string) []model.AuditResult {
+	t.Helper()
+	var results []model.AuditResult
+	if err := json.Unmarshal([]byte(out), &results); err != nil {
+		t.Fatalf("output is not a JSON audit list: %v\n%s", err, out)
+	}
+	return results
+}
+
+// The advertised alias "audit --check-firmware --check-auth -o json" names no
+// device; it must audit every registered device and print only the selected
+// checks as JSON.
+//
+//nolint:paralleltest // Uses viper global state
+func TestRun_NoDeviceSelectedChecksJSON(t *testing.T) {
+	viper.Set("output", "json")
+	t.Cleanup(viper.Reset)
+
+	tf := runAudit(t, twoAuditDevices, "--check-firmware", "--check-auth")
+	results := decodeAudit(t, tf.OutString())
+
+	if len(results) != 2 || results[0].Device != "kitchen" || results[1].Device != "porch" {
+		t.Fatalf("results = %+v, want kitchen and porch", results)
+	}
+	for _, r := range results {
+		if !r.Reachable {
+			t.Errorf("%s: Reachable = false", r.Device)
+		}
+		if r.AuthStatus == nil {
+			t.Errorf("%s: auth check missing", r.Device)
+		}
+		if r.FWAudit == nil {
+			t.Errorf("%s: firmware check missing", r.Device)
+		}
+		if r.CloudAudit != nil {
+			t.Errorf("%s: cloud check ran but was not selected", r.Device)
+		}
+	}
+	if strings.Contains(tf.OutString(), "Security Audit") {
+		t.Error("JSON output must not include the table header")
+	}
+}
+
+//nolint:paralleltest // Uses viper global state
+func TestRun_NoCheckFlagsRunsEveryCheck(t *testing.T) {
+	viper.Set("output", "json")
+	t.Cleanup(viper.Reset)
+
+	tf := runAudit(t, twoAuditDevices[:1], "kitchen")
+	results := decodeAudit(t, tf.OutString())
+
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1", len(results))
+	}
+	r := results[0]
+	if r.AuthStatus == nil || r.CloudAudit == nil || r.FWAudit == nil {
+		t.Errorf("every check should run by default, got auth=%v cloud=%v firmware=%v",
+			r.AuthStatus, r.CloudAudit, r.FWAudit)
+	}
+}
+
+//nolint:paralleltest // Uses viper global state
+func TestRun_OnlyCloudCheck(t *testing.T) {
+	viper.Set("output", "json")
+	t.Cleanup(viper.Reset)
+
+	tf := runAudit(t, twoAuditDevices[:1], "kitchen", "--check-cloud")
+	results := decodeAudit(t, tf.OutString())
+
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1", len(results))
+	}
+	r := results[0]
+	if r.CloudAudit == nil || r.AuthStatus != nil || r.FWAudit != nil {
+		t.Errorf("only cloud should run, got auth=%v cloud=%v firmware=%v",
+			r.AuthStatus, r.CloudAudit, r.FWAudit)
+	}
+}
+
+//nolint:paralleltest // Uses viper global state
+func TestRun_NoRegisteredDevicesJSONIsEmptyList(t *testing.T) {
+	viper.Set("output", "json")
+	t.Cleanup(viper.Reset)
+
+	tf := runAudit(t, nil)
+	if got := strings.TrimSpace(tf.OutString()); got != "[]" {
+		t.Errorf("output = %q, want []", got)
+	}
+}
+
+func TestRun_NoDeviceTableAuditsAllRegistered(t *testing.T) {
+	t.Parallel()
+
+	tf := runAudit(t, twoAuditDevices)
+	out := tf.OutString()
+	for _, want := range []string{"Security Audit", "kitchen", "porch"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRun_NoRegisteredDevicesTableWarns(t *testing.T) {
+	t.Parallel()
+
+	tf := runAudit(t, nil)
+	if !strings.Contains(tf.OutString()+tf.ErrString(), "No devices registered") {
+		t.Errorf("expected a 'No devices registered' warning, got out=%q err=%q", tf.OutString(), tf.ErrString())
 	}
 }

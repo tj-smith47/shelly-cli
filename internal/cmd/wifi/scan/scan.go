@@ -65,7 +65,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	return cmdutil.RunList(ctx, ios, svc, opts.Device,
 		"Scanning for WiFi networks...",
-		"No WiFi networks found",
+		"WiFi networks",
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.WiFiScanResult, error) {
 			results, err := svc.ScanWiFi(ctx, device)
 			if err != nil {

@@ -3,7 +3,9 @@ package shelly
 
 import (
 	"context"
-	"sync"
+	"maps"
+	"path/filepath"
+	"slices"
 
 	"golang.org/x/sync/errgroup"
 
@@ -21,6 +23,11 @@ type BackupExportOptions struct {
 	Parallel int
 	// BackupOpts are passed to the underlying CreateBackup call.
 	BackupOpts backup.Options
+	// Encrypt, when set, is the password each backup file is AES-encrypted with.
+	Encrypt string
+	// AutoName names each file like `backup create` does
+	// ({device}-{mac}-{date}.json) instead of {device}.json.
+	AutoName bool
 }
 
 // BackupResult represents the result of a single device backup.
@@ -43,37 +50,28 @@ func NewBackupExporter(svc *Service) *BackupExporter {
 }
 
 // ExportAll exports backups for all provided devices concurrently.
-// It returns results for each device, including failures.
+// It returns one result per device, sorted by device name, including failures.
 func (e *BackupExporter) ExportAll(ctx context.Context, devices map[string]model.Device, opts BackupExportOptions) []BackupResult {
 	// Cap parallelism to global rate limit (silently, no ios available) and
 	// floor to 1 — SetLimit(0) deadlocks errgroup permanently.
 	globalMax := config.GetGlobalMaxConcurrent()
 	parallelism := min(max(opts.Parallel, 1), globalMax)
 
-	var (
-		mu      sync.Mutex
-		results []BackupResult
-	)
+	names := slices.Sorted(maps.Keys(devices))
+	results := make([]BackupResult, len(names))
 
-	g, ctx := errgroup.WithContext(ctx)
+	var g errgroup.Group
 	g.SetLimit(parallelism)
 
-	for name, device := range devices {
-		deviceName := name
-		deviceAddr := device.Address
-
+	for i, name := range names {
 		g.Go(func() error {
-			result := e.exportDevice(ctx, deviceName, deviceAddr, opts)
-			mu.Lock()
-			results = append(results, result)
-			mu.Unlock()
+			results[i] = e.exportDevice(ctx, name, devices[name].Address, opts)
 			return nil
 		})
 	}
 
-	// Wait for all goroutines; errors are tracked in results, not returned
+	// Every goroutine returns nil; failures are carried in results.
 	if err := g.Wait(); err != nil {
-		// Goroutines always return nil, so this is defensive only
 		return results
 	}
 
@@ -87,17 +85,29 @@ func (e *BackupExporter) exportDevice(ctx context.Context, name, addr string, op
 		Address:    addr,
 	}
 
-	bkp, err := e.svc.CreateBackup(ctx, addr, opts.BackupOpts)
+	// Each device gets the same budget a single `backup create` has, so one
+	// slow device cannot use up the time of the devices queued behind it.
+	ctx, cancel := context.WithTimeout(ctx, DefaultTimeout*3)
+	defer cancel()
+
+	// Resolve by registry name, as `backup create <device>` does, so the
+	// device's stored auth applies.
+	bkp, err := e.svc.CreateBackup(ctx, name, opts.BackupOpts)
 	if err != nil {
 		result.Error = err
 		return result
 	}
 
-	// Write backup file (backups are JSON-only)
-	filename := export.SanitizeFilename(name) + ".json"
-	filePath := opts.Directory + "/" + filename
+	filePath := filepath.Join(opts.Directory, export.SanitizeFilename(name)+".json")
+	if opts.AutoName {
+		filePath, err = backup.AutoSavePathIn(opts.Directory, name, bkp, "json")
+		if err != nil {
+			result.Error = err
+			return result
+		}
+	}
 
-	if err := export.WriteBackupFile(bkp, filePath); err != nil {
+	if err := export.WriteBackupFile(bkp, filePath, opts.Encrypt); err != nil {
 		result.Error = err
 		return result
 	}

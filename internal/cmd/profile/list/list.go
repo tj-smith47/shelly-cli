@@ -2,6 +2,7 @@
 package list
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/spf13/cobra"
@@ -9,7 +10,6 @@ import (
 	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -17,7 +17,6 @@ import (
 
 // Options holds command options.
 type Options struct {
-	flags.OutputFlags
 	Generation string
 	Series     string
 	Factory    *cmdutil.Factory
@@ -50,7 +49,6 @@ Optionally filter by generation or series.`,
 		},
 	}
 
-	flags.AddOutputFlags(cmd, &opts.OutputFlags)
 	cmd.Flags().StringVar(&opts.Generation, "gen", "", "Filter by generation (gen1, gen2, gen3, gen4)")
 	cmd.Flags().StringVar(&opts.Series, "series", "", "Filter by series (classic, plus, pro, mini, blu, wave)")
 
@@ -66,15 +64,13 @@ func run(opts *Options) error {
 	case opts.Generation != "":
 		gen := term.ParseProfileGeneration(opts.Generation)
 		if gen == types.GenerationUnknown {
-			ios.Warning("Unknown generation: %s", opts.Generation)
-			return nil
+			return fmt.Errorf("unknown generation %q (use gen1, gen2, gen3 or gen4)", opts.Generation)
 		}
 		result = profiles.ListByGeneration(gen)
 	case opts.Series != "":
 		series := term.ParseProfileSeries(opts.Series)
 		if series == "" {
-			ios.Warning("Unknown series: %s", opts.Series)
-			return nil
+			return fmt.Errorf("unknown series %q (use classic, plus, pro, mini, blu or wave)", opts.Series)
 		}
 		result = profiles.ListBySeries(series)
 	default:

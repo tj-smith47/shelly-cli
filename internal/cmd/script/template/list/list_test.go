@@ -197,18 +197,6 @@ func TestRun_TableOutput(t *testing.T) {
 	}
 }
 
-func TestNewCommand_OutputFlag(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Check -o flag exists
-	flag := cmd.Flags().Lookup("output")
-	if flag == nil {
-		t.Fatal("--output flag not found")
-	}
-}
-
 func TestNewCommand_Execute(t *testing.T) {
 	t.Parallel()
 

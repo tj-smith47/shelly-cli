@@ -22,7 +22,7 @@ func TestNewCommand(t *testing.T) {
 	if cmd.Use != "members <group>" {
 		t.Errorf("Use = %q, want \"members <group>\"", cmd.Use)
 	}
-	aliases := []string{"show", "ls"}
+	aliases := []string{"show"}
 	if len(cmd.Aliases) != len(aliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, aliases)
 	}
@@ -56,23 +56,6 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 	if err := cmd.Args(cmd, []string{keyGroup, "extra"}); err == nil {
 		t.Error("expected error with 2 args")
-	}
-}
-
-func TestNewCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	outputFlag := cmd.Flags().Lookup("output")
-	if outputFlag == nil {
-		t.Fatal("output flag not found")
-	}
-	if outputFlag.Shorthand != "o" {
-		t.Errorf("output shorthand = %q, want o", outputFlag.Shorthand)
-	}
-	if outputFlag.DefValue != "table" {
-		t.Errorf("output default = %q, want table", outputFlag.DefValue)
 	}
 }
 
@@ -214,7 +197,7 @@ func TestExecute_JSONOutput(t *testing.T) {
 	cmd.SetContext(context.Background())
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
-	cmd.SetArgs([]string{"office", "-o", "json"})
+	cmd.SetArgs([]string{"office"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -260,7 +243,7 @@ func TestExecute_YAMLOutput(t *testing.T) {
 	cmd.SetContext(context.Background())
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
-	cmd.SetArgs([]string{"bedroom", "-o", "yaml"})
+	cmd.SetArgs([]string{"bedroom"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -501,7 +484,7 @@ func TestRun_TableOutput(t *testing.T) {
 	cmd.SetContext(context.Background())
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
-	cmd.SetArgs([]string{"kitchen", "-o", "table"})
+	cmd.SetArgs([]string{"kitchen"})
 
 	err := cmd.Execute()
 	if err != nil {

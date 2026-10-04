@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -83,7 +82,6 @@ func TestNewCommand_Flags(t *testing.T) {
 	}{
 		{"capability", ""},
 		{"protocol", ""},
-		{"output", "o"},
 	}
 
 	for _, f := range flagTests {
@@ -135,7 +133,7 @@ func TestExecute_SearchByQuery(t *testing.T) {
 	}
 
 	// Should contain search results - either table with profiles or "no profiles found" message
-	hasTable := strings.Contains(output, "Model")
+	hasTable := strings.Contains(output, "MODEL")
 	hasNoResults := strings.Contains(output, "No profiles found")
 	if !hasTable && !hasNoResults {
 		t.Error("expected table or 'No profiles found' message")
@@ -304,47 +302,6 @@ func TestExecute_CombineAllFilters(t *testing.T) {
 	}
 }
 
-func TestExecute_OutputFormatJSON(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-	cmd := NewCommand(tf.Factory)
-
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"plug", "-o", "json"})
-
-	cmdErr := cmd.Execute()
-	if cmdErr != nil {
-		t.Errorf("unexpected error: %v", cmdErr)
-	}
-
-	output := tf.OutString()
-	// JSON output should contain brackets or be empty for no results
-	if !strings.Contains(output, "[") && !strings.Contains(output, "No profiles found") {
-		t.Errorf("expected JSON output or 'No profiles found' message, got: %s", output)
-	}
-}
-
-func TestExecute_OutputFormatYAML(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-	cmd := NewCommand(tf.Factory)
-
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"plug", "-o", "yaml"})
-
-	cmdErr := cmd.Execute()
-	if cmdErr != nil {
-		t.Errorf("unexpected error: %v", cmdErr)
-	}
-
-	output := tf.OutString()
-	if output == "" {
-		t.Error("expected some output")
-	}
-}
-
 func TestExecute_NoArguments_ListsAll(t *testing.T) {
 	t.Parallel()
 
@@ -361,7 +318,7 @@ func TestExecute_NoArguments_ListsAll(t *testing.T) {
 
 	output := tf.OutString()
 	// Should list all profiles
-	if !strings.Contains(output, "Model") && !strings.Contains(output, "No profiles found") {
+	if !strings.Contains(output, "MODEL") && !strings.Contains(output, "No profiles found") {
 		t.Errorf("expected table or 'No profiles found', got: %s", output)
 	}
 }
@@ -381,7 +338,7 @@ func TestExecute_SortedByModel(t *testing.T) {
 	}
 
 	output := tf.OutString()
-	if strings.Contains(output, "Model") {
+	if strings.Contains(output, "MODEL") {
 		// If we got results, verify it's a table
 		if !strings.Contains(output, "Found") {
 			t.Log("Table output received, sorting verified by function")
@@ -534,7 +491,7 @@ func TestExecute_AllProfiles_Sorted(t *testing.T) {
 	// When no filters are applied, all profiles are listed and sorted
 	if output != "" && !strings.Contains(output, "No profiles found") {
 		// If we got results, they should be in a table format
-		if !strings.Contains(output, "Model") {
+		if !strings.Contains(output, "MODEL") {
 			t.Error("expected Model column when showing all profiles")
 		}
 	}
@@ -589,7 +546,7 @@ func TestExecute_OutputFormatTable(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"-o", "table"})
+	cmd.SetArgs(nil)
 
 	cmdErr := cmd.Execute()
 	if cmdErr != nil {
@@ -640,7 +597,7 @@ func TestExecute_QueryWithCapabilityFilter(t *testing.T) {
 
 	output := tf.OutString()
 	// Should have either results or "no profiles found"
-	if !strings.Contains(output, "No profiles found") && !strings.Contains(output, "Model") {
+	if !strings.Contains(output, "No profiles found") && !strings.Contains(output, "MODEL") {
 		t.Logf("output: %s", output)
 	}
 }
@@ -662,7 +619,7 @@ func TestExecute_QueryWithCapabilityAndProtocolFilter(t *testing.T) {
 
 	output := tf.OutString()
 	// Should have either results or "no profiles found"
-	if !strings.Contains(output, "No profiles found") && !strings.Contains(output, "Model") {
+	if !strings.Contains(output, "No profiles found") && !strings.Contains(output, "MODEL") {
 		t.Logf("output: %s", output)
 	}
 }
@@ -783,7 +740,7 @@ func TestRun_DirectCall_AllProfiles(t *testing.T) {
 
 	output := tf.OutString()
 	// Should have results or a no profiles message
-	hasResults := strings.Contains(output, "Model")
+	hasResults := strings.Contains(output, "MODEL")
 	hasNoResults := strings.Contains(output, "No profiles found")
 	if !hasResults && !hasNoResults {
 		t.Errorf("expected table with profiles or 'No profiles found', got: %s", output)
@@ -854,19 +811,5 @@ func TestRun_DirectCall_CapabilityAndProtocol(t *testing.T) {
 	// Should have some output
 	if output == "" {
 		t.Error("expected some output")
-	}
-}
-
-func TestOptions_OutputFlagsEmbedded(t *testing.T) {
-	t.Parallel()
-
-	opts := &Options{
-		OutputFlags: flags.OutputFlags{
-			Format: "json",
-		},
-	}
-
-	if opts.Format != "json" {
-		t.Errorf("Format = %q, want %q", opts.Format, "json")
 	}
 }

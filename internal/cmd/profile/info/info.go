@@ -8,14 +8,12 @@ import (
 	"github.com/tj-smith47/shelly-go/profiles"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
 type Options struct {
-	flags.OutputFlags
 	Model   string
 	Factory *cmdutil.Factory
 }
@@ -43,8 +41,6 @@ and resource limits for the specified device model.`,
 			return run(opts)
 		},
 	}
-
-	flags.AddOutputFlags(cmd, &opts.OutputFlags)
 
 	return cmd
 }

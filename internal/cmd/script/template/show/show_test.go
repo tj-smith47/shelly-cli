@@ -101,12 +101,6 @@ func TestNewCommand_Flags(t *testing.T) {
 	if codeFlag.DefValue != "false" {
 		t.Errorf("--code default = %q, want %q", codeFlag.DefValue, "false")
 	}
-
-	// Test output flag
-	outputFlag := cmd.Flags().Lookup("output")
-	if outputFlag == nil {
-		t.Fatal("--output flag not found")
-	}
 }
 
 func TestNewCommand_Help(t *testing.T) {

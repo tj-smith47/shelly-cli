@@ -15,7 +15,7 @@ Print the version of shelly CLI.
 .PP
 By default, shows version, commit, and build date.
 Use --short for just the version number.
-Use --json for machine-readable output.
+Use -o json or -o yaml for machine-readable output.
 Use --check to also check for available updates.
 
 
@@ -26,10 +26,6 @@ Use --check to also check for available updates.
 .PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for version
-
-.PP
-\fB--json\fP[=false]
-	Output version info as JSON
 
 .PP
 \fB-s\fP, \fB--short\fP[=false]
@@ -106,7 +102,10 @@ Use --check to also check for available updates.
   shelly version --short
 
   # JSON output
-  shelly version --json
+  shelly version -o json
+
+  # YAML output
+  shelly version -o yaml
 
   # Check for updates
   shelly version --check

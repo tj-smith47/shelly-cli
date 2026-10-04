@@ -11,8 +11,8 @@ import (
 // ShowUpdateNotification displays a cached update notification if available.
 // This is non-blocking and only reads from the cache file.
 // It skips notification for certain commands (version, update, completion, help)
-// and respects SHELLY_NO_UPDATE_CHECK env var.
-func ShowUpdateNotification() {
+// and respects SHELLY_NO_UPDATE_CHECK env var. It writes to ios.ErrOut.
+func ShowUpdateNotification(ios *iostreams.IOStreams) {
 	// Skip if update check is disabled
 	if os.Getenv("SHELLY_NO_UPDATE_CHECK") != "" {
 		return
@@ -41,6 +41,6 @@ func ShowUpdateNotification() {
 
 	// Use proper semver comparison
 	if IsNewerVersion(currentVersion, latestVersion) {
-		iostreams.UpdateNotification(currentVersion, latestVersion)
+		ios.UpdateNotification(currentVersion, latestVersion)
 	}
 }

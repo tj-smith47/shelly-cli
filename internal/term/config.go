@@ -25,7 +25,7 @@ type configRow struct {
 func DisplayConfigTable(ios *iostreams.IOStreams, configData any) error {
 	configMap, ok := configData.(map[string]any)
 	if !ok {
-		return output.PrintJSON(configData)
+		return output.JSON(ios.Out, configData)
 	}
 
 	// Collect all rows with their full key paths

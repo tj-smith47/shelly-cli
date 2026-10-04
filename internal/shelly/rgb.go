@@ -16,14 +16,14 @@ import (
 
 // RGBInfo holds RGB information for list operations.
 type RGBInfo struct {
-	ID         int
-	Name       string
-	Output     bool
-	Brightness int
-	Red        int
-	Green      int
-	Blue       int
-	Power      float64
+	ID         int     `json:"id" yaml:"id"`
+	Name       string  `json:"name" yaml:"name"`
+	Output     bool    `json:"output" yaml:"output"`
+	Brightness int     `json:"brightness" yaml:"brightness"`
+	Red        int     `json:"red" yaml:"red"`
+	Green      int     `json:"green" yaml:"green"`
+	Blue       int     `json:"blue" yaml:"blue"`
+	Power      float64 `json:"power" yaml:"power"`
 }
 
 // ListHeaders returns the column headers for the table.
@@ -249,10 +249,29 @@ func (s *Service) RGBSet(ctx context.Context, identifier string, rgbID int, para
 }
 
 // RGBList lists all RGB components on a device with their status.
-// Note: Gen1 devices don't have a component enumeration API, so this only works for Gen2+.
+// Gen2+ devices enumerate their components; a Gen1 device in color mode lists
+// its color channels from /settings.
 func (s *Service) RGBList(ctx context.Context, identifier string) ([]RGBInfo, error) {
 	var result []RGBInfo
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.withGenAwareAction(ctx, identifier, func(conn *client.Gen1Client) error {
+		names, err := gen1ComponentNames(ctx, conn, model.ComponentRGB)
+		if err != nil {
+			return err
+		}
+		result = make([]RGBInfo, 0, len(names))
+		for id, name := range names {
+			color, err := conn.Color(id)
+			if err != nil {
+				continue
+			}
+			status, err := color.GetStatus(ctx)
+			if err != nil {
+				continue
+			}
+			result = append(result, rgbInfo(id, name, gen1ColorStatusToRGB(id, status)))
+		}
+		return nil
+	}, func(conn *client.Client) error {
 		components, err := conn.FilterComponents(ctx, model.ComponentRGB)
 		if err != nil {
 			return err
@@ -260,36 +279,39 @@ func (s *Service) RGBList(ctx context.Context, identifier string) ([]RGBInfo, er
 
 		result = make([]RGBInfo, 0, len(components))
 		for _, comp := range components {
-			info := RGBInfo{ID: comp.ID, Brightness: -1}
-
 			status, err := conn.RGB(comp.ID).GetStatus(ctx)
 			if err != nil {
 				continue
 			}
-			info.Output = status.Output
-			if status.Brightness != nil {
-				info.Brightness = *status.Brightness
-			}
-			if status.RGB != nil {
-				info.Red = status.RGB.Red
-				info.Green = status.RGB.Green
-				info.Blue = status.RGB.Blue
-			}
-			if status.Power != nil {
-				info.Power = *status.Power
-			}
-
+			name := ""
 			config, err := conn.RGB(comp.ID).GetConfig(ctx)
 			if err == nil && config.Name != nil {
-				info.Name = *config.Name
+				name = *config.Name
 			}
-
-			result = append(result, info)
+			result = append(result, rgbInfo(comp.ID, name, status))
 		}
 
 		return nil
 	})
 	return result, err
+}
+
+// rgbInfo builds a list row from an RGB status. Brightness is -1 when the
+// device does not report one.
+func rgbInfo(id int, name string, status *model.RGBStatus) RGBInfo {
+	info := RGBInfo{ID: id, Name: name, Output: status.Output, Brightness: -1}
+	if status.Brightness != nil {
+		info.Brightness = *status.Brightness
+	}
+	if status.RGB != nil {
+		info.Red = status.RGB.Red
+		info.Green = status.RGB.Green
+		info.Blue = status.RGB.Blue
+	}
+	if status.Power != nil {
+		info.Power = *status.Power
+	}
+	return info
 }
 
 // gen1ColorStatusToRGB converts Gen1 color status to model.RGBStatus.

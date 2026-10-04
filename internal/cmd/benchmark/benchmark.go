@@ -50,7 +50,7 @@ Results include min, max, average, and percentile statistics (P50, P95, P99).`,
   shelly benchmark kitchen-light --iterations 50
 
   # JSON output for logging
-  shelly benchmark kitchen-light --json`,
+  shelly benchmark kitchen-light -o json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
@@ -68,9 +68,11 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	ios.Info("Benchmarking %s (%d iterations + %d warmup)...",
+	// Progress lines move to stderr when stdout carries the result document.
+	status := cmdutil.StatusStreams(ios)
+	status.Info("Benchmarking %s (%d iterations + %d warmup)...",
 		opts.Device, opts.Iterations, opts.Warmup)
-	ios.Println("")
+	status.Println("")
 
 	var result model.BenchmarkResult
 
@@ -83,7 +85,7 @@ func run(ctx context.Context, opts *Options) error {
 
 		// Warmup
 		if opts.Warmup > 0 {
-			ios.Info("Warming up...")
+			status.Info("Warming up...")
 			for range opts.Warmup {
 				if _, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil); err != nil {
 					ios.DebugErr("warmup call", err)
@@ -92,7 +94,7 @@ func run(ctx context.Context, opts *Options) error {
 		}
 
 		// Benchmark RPC calls
-		ios.Info("Running RPC benchmark...")
+		status.Info("Running RPC benchmark...")
 		rpcLatencies := make([]time.Duration, 0, opts.Iterations)
 		rpcErrors := 0
 
@@ -109,13 +111,13 @@ func run(ctx context.Context, opts *Options) error {
 			}
 
 			// Show progress (only in table mode)
-			if !output.WantsStructured() && (i+1)%5 == 0 {
-				ios.Printf("  Progress: %d/%d\n", i+1, opts.Iterations)
+			if (i+1)%5 == 0 {
+				status.Printf("  Progress: %d/%d\n", i+1, opts.Iterations)
 			}
 		}
 
 		// Benchmark ping-style calls (lighter weight)
-		ios.Info("Running ping benchmark...")
+		status.Info("Running ping benchmark...")
 		pingLatencies := make([]time.Duration, 0, opts.Iterations)
 		pingErrors := 0
 

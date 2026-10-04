@@ -57,6 +57,7 @@ shelly provision ble <device-address> [flags]
       --no-cloud          Disable Shelly Cloud
       --open              Join a network that has no password
       --password string   WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
+      --password-stdin    Read the WiFi password from stdin
       --ssid string       WiFi network name (required)
       --timezone string   Timezone (e.g., America/New_York)
 ```

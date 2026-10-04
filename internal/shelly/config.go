@@ -438,29 +438,14 @@ func DedupeWiFiNetworks(results []WiFiScanResult) []WiFiScanResult {
 func (s *Service) ScanWiFi(ctx context.Context, identifier string) ([]WiFiScanResult, error) {
 	var results []WiFiScanResult
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		wifi := components.NewWiFi(conn.RPCClient())
-		scanResults, err := wifi.Scan(ctx)
+		networks, err := network.ScanNetworks(ctx, conn)
 		if err != nil {
 			return err
 		}
-		for _, r := range scanResults.Results {
-			result := WiFiScanResult{}
-			if r.SSID != nil {
-				result.SSID = *r.SSID
-			}
-			if r.BSSID != nil {
-				result.BSSID = *r.BSSID
-			}
-			if r.RSSI != nil {
-				result.RSSI = int(*r.RSSI)
-			}
-			if r.Channel != nil {
-				result.Channel = *r.Channel
-			}
-			if r.Auth != nil {
-				result.Auth = *r.Auth
-			}
-			results = append(results, result)
+		for _, n := range networks {
+			results = append(results, WiFiScanResult{
+				SSID: n.SSID, BSSID: n.BSSID, RSSI: int(n.RSSI), Channel: n.Channel, Auth: n.Auth,
+			})
 		}
 		return nil
 	})
@@ -472,10 +457,29 @@ type CloudStatus struct {
 	Connected bool `json:"connected"`
 }
 
-// GetCloudStatus returns the cloud connection status.
+// GetCloudStatus returns the cloud connection status: Cloud.GetStatus on a
+// Gen2+ device, the cloud section of /status on a Gen1 device.
 func (s *Service) GetCloudStatus(ctx context.Context, identifier string) (*CloudStatus, error) {
+	isGen1, _, err := s.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
 	var result *CloudStatus
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	if isGen1 {
+		err = s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+			status, err := conn.GetStatus(ctx)
+			if err != nil {
+				return err
+			}
+			if status.Cloud == nil {
+				return fmt.Errorf("device status has no cloud section")
+			}
+			result = &CloudStatus{Connected: status.Cloud.Connected}
+			return nil
+		})
+		return result, err
+	}
+	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		cloud := components.NewCloud(conn.RPCClient())
 		status, err := cloud.GetStatus(ctx)
 		if err != nil {
@@ -542,7 +546,7 @@ func (s *Service) GetWebSocketInfo(ctx context.Context, identifier string) (*Web
 func getWebSocketConfig(ctx context.Context, conn *client.Client) map[string]any {
 	// Try direct Ws.GetConfig first
 	if result, err := conn.Call(ctx, "Ws.GetConfig", nil); err == nil {
-		if m, ok := result.(map[string]any); ok {
+		if m, ok := client.AsObject(result); ok {
 			return m
 		}
 	}
@@ -552,7 +556,7 @@ func getWebSocketConfig(ctx context.Context, conn *client.Client) map[string]any
 	if err != nil {
 		return nil
 	}
-	sysMap, ok := sysResult.(map[string]any)
+	sysMap, ok := client.AsObject(sysResult)
 	if !ok {
 		return nil
 	}
@@ -569,7 +573,7 @@ func getWebSocketStatus(ctx context.Context, conn *client.Client) map[string]any
 	if err != nil {
 		return nil
 	}
-	m, ok := result.(map[string]any)
+	m, ok := client.AsObject(result)
 	if !ok {
 		return nil
 	}

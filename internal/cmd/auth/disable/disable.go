@@ -29,8 +29,10 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Disable authentication",
 		Long: `Disable authentication for a device.
 
-This removes the password requirement for accessing the device locally.
-Use with caution in production environments.`,
+This removes the password requirement for accessing the device locally,
+on Gen1 and Gen2+ devices. The credentials saved for the device are kept;
+a device without authentication ignores them. Use with caution in
+production environments.`,
 		Example: `  # Disable authentication
   shelly auth disable living-room
 

@@ -171,13 +171,24 @@ shelly firmware update garage-plug --url http://example.com/custom-tasmota.bin.g
 
 ## Authentication
 
-For password-protected Tasmota devices, use the auth flags:
+For a password-protected Tasmota device, store the credentials when you
+register it. The CLI hands them to the plugin on every call, so later commands
+need no credential flags:
 
 ```bash
-shelly device status garage-plug --auth-user admin --auth-pass secret
+shelly device add garage-plug 192.168.1.50 --platform tasmota --user admin --password secret
+shelly device status garage-plug
 ```
 
-Or configure in `~/.config/shelly-cli/config.yaml`:
+`--password-stdin` reads the password from stdin (or prompts for it without
+echo) to keep it out of your shell history. To change the stored credentials of
+a registered device, add it again with `--force`:
+
+```bash
+shelly device add garage-plug 192.168.1.50 --platform tasmota --force --password-stdin
+```
+
+The credentials are stored in `~/.config/shelly/config.yaml`:
 
 ```yaml
 devices:

@@ -14,12 +14,18 @@ Turn device on after a delay
 
 Turn a device on after a specified delay.
 
+With --simulate sunrise, the device's lights turn on at 1% brightness when the
+delay ends and rise to 100% over --duration (default 15m). Sunrise needs a
+device with a dimmable light component (a dimmer, bulb, or light in white
+mode); a device with only switches or relays is rejected with an error.
+
 Useful for:
   - Waking up to lights
   - Scheduling devices to turn on
   - "Good morning" automation
 
-Press Ctrl+C to cancel before the delay expires.
+Press Ctrl+C to cancel before the delay expires, or to stop a sunrise at its
+current brightness.
 
 ```
 shelly wake <device> [flags]
@@ -36,13 +42,18 @@ shelly wake <device> [flags]
 
   # Turn on in 30 seconds
   shelly wake kitchen --delay 30s
+
+  # In 7 hours, fade the bedroom light up from 1% to 100% over 15 minutes
+  shelly wake bedroom-light -d 7h --simulate sunrise --duration 15m
 ```
 
 ### Options
 
 ```
-  -d, --delay duration   Delay before turning on (default 5m0s)
-  -h, --help             help for wake
+  -d, --delay duration      Delay before turning on (default 5m0s)
+      --duration duration   How long a --simulate ramp takes to reach full brightness (default 15m0s)
+  -h, --help                help for wake
+      --simulate string     Fade the light in instead of switching it on (supported: sunrise)
 ```
 
 ### Options inherited from parent commands

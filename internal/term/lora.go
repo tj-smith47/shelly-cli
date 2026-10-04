@@ -2,9 +2,6 @@
 package term
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -30,14 +27,4 @@ func DisplayLoRaStatus(ios *iostreams.IOStreams, full model.LoRaFullStatus) {
 		ios.Printf("    RSSI: %d dBm\n", full.Status.RSSI)
 		ios.Printf("    SNR: %.1f dB\n", full.Status.SNR)
 	}
-}
-
-// OutputLoRaStatusJSON outputs LoRa status as JSON.
-func OutputLoRaStatusJSON(ios *iostreams.IOStreams, full model.LoRaFullStatus) error {
-	output, err := json.MarshalIndent(full, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to format JSON: %w", err)
-	}
-	ios.Println(string(output))
-	return nil
 }

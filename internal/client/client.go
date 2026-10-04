@@ -53,7 +53,9 @@ func Connect(ctx context.Context, device model.Device) (*Client, error) {
 
 	var opts []transport.Option
 	if device.HasAuth() {
-		opts = append(opts, transport.WithAuth(device.Auth.Username, device.Auth.Password))
+		// Gen2+ devices accept only HTTP digest authentication; they answer a
+		// basic Authorization header with 401 even when the password is right.
+		opts = append(opts, transport.WithDigestAuth(device.Auth.Username, device.Auth.Password))
 	}
 	opts = append(opts, transport.WithClient(deviceHTTPClient(url)))
 
@@ -106,6 +108,24 @@ func (c *Client) Info() *DeviceInfo {
 // Call makes a raw RPC call to the device.
 func (c *Client) Call(ctx context.Context, method string, params map[string]any) (any, error) {
 	return c.rpcClient.Call(ctx, method, params)
+}
+
+// AsObject returns the result of Call as a JSON object. Call hands back the
+// raw result bytes of the RPC response, so a plain type assertion to a map
+// never succeeds; this decodes them. ok is false when the result is not a
+// JSON object.
+func AsObject(result any) (obj map[string]any, ok bool) {
+	switch v := result.(type) {
+	case map[string]any:
+		return v, true
+	case json.RawMessage:
+		if err := json.Unmarshal(v, &obj); err != nil {
+			return nil, false
+		}
+		return obj, obj != nil
+	default:
+		return nil, false
+	}
 }
 
 // Switch returns a switch component accessor.

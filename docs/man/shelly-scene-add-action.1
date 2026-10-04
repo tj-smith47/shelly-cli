@@ -1,0 +1,108 @@
+.nh
+.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-scene-add-action - Add a device action to a scene
+
+
+.SH SYNOPSIS
+\fBshelly scene add-action    [params] [flags]\fP
+
+
+.SH DESCRIPTION
+Add a device action to a scene.
+
+.PP
+An action is one RPC call that 'shelly scene activate' sends to a device.
+The method is the RPC method name, and params is its parameters as a JSON
+object. Actions run in the order they were added.
+
+.PP
+The device does not have to be reachable when the action is added: nothing is
+sent until the scene is activated.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for add-action
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB-F\fP, \fB--fields\fP[=false]
+	Print available field names for use with --jq and --template
+
+.PP
+\fB-Q\fP, \fB--jq\fP=[]
+	Apply jq expression to filter output (repeatable, joined with |)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB--offline\fP[=false]
+	Only read from cache, error on cache miss
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--raw\fP[=false]
+	Print the exact device response(s) as a JSON array and suppress normal output
+
+.PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Turn a switch on when the scene is activated
+  shelly scene add-action movie-night living-room Switch.Set '{"id":0,"on":true}'
+
+  # Dim a light
+  shelly scene add-action movie-night lamp Light.Set '{"id":0,"on":true,"brightness":20}'
+
+  # A method that takes no parameters
+  shelly scene add-action bedtime hallway Shelly.Reboot
+
+  # Using alias
+  shelly scene add movie-night tv-plug Switch.Set '{"id":0,"on":false}'
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-scene(1)\fP

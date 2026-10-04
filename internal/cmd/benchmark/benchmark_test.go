@@ -188,7 +188,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	patterns := []string{
 		"shelly benchmark",
 		"--iterations",
-		"--json",
+		"-o json",
 	}
 
 	for _, pattern := range patterns {

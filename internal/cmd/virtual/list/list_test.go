@@ -88,20 +88,6 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 }
 
-func TestNewCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	flag := cmd.Flags().Lookup("output")
-	if flag == nil {
-		t.Fatal("--output flag not found")
-	}
-	if flag.Shorthand != "o" {
-		t.Errorf("--output shorthand = %q, want %q", flag.Shorthand, "o")
-	}
-}
-
 func TestNewCommand_Help(t *testing.T) {
 	t.Parallel()
 
@@ -262,11 +248,6 @@ func TestOptions(t *testing.T) {
 
 	if opts.Factory == nil {
 		t.Error("Factory is nil")
-	}
-
-	opts.Format = "json"
-	if opts.Format != "json" {
-		t.Errorf("Format = %q, want %q", opts.Format, "json")
 	}
 }
 

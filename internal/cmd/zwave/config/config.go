@@ -8,8 +8,8 @@ import (
 	"github.com/tj-smith47/shelly-go/zwave"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -18,7 +18,6 @@ const commandName = "config"
 
 // Options holds command options.
 type Options struct {
-	flags.OutputFlags
 	Factory *cmdutil.Factory
 }
 
@@ -45,17 +44,15 @@ configuration interface. Actual parameters vary by device model.`,
 		},
 	}
 
-	flags.AddOutputFlags(cmd, &opts.OutputFlags)
-
 	return cmd
 }
 
 func run(opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
-	params := zwave.CommonConfigParameters()
+	params := shelly.ZWaveConfigParameters(zwave.CommonConfigParameters())
 
-	return cmdutil.PrintListResult(ios, params, func(ios *iostreams.IOStreams, items []zwave.ConfigurationParameter) {
+	return cmdutil.PrintListResult(ios, params, func(ios *iostreams.IOStreams, items []shelly.ZWaveConfigParameter) {
 		ios.Title("Common Z-Wave Configuration Parameters")
 		ios.Println()
 

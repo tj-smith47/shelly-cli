@@ -95,7 +95,7 @@ func (s *Service) MatterGetSetupCode(ctx context.Context, identifier string) (st
 			return fmt.Errorf("failed to get Matter status: %w", err)
 		}
 
-		status, ok := result.(map[string]any)
+		status, ok := client.AsObject(result)
 		if !ok {
 			return fmt.Errorf("unexpected response type")
 		}
@@ -118,7 +118,7 @@ func (s *Service) MatterGetStatus(ctx context.Context, identifier string) (map[s
 		}
 
 		var ok bool
-		status, ok = result.(map[string]any)
+		status, ok = client.AsObject(result)
 		if !ok {
 			return fmt.Errorf("unexpected response type")
 		}
@@ -136,7 +136,7 @@ func (s *Service) MatterGetConfig(ctx context.Context, identifier string) (Matte
 			return fmt.Errorf("failed to get Matter config: %w", err)
 		}
 
-		resultMap, ok := result.(map[string]any)
+		resultMap, ok := client.AsObject(result)
 		if !ok {
 			return fmt.Errorf("unexpected response type")
 		}
@@ -158,7 +158,7 @@ func (s *Service) MatterGetCommissioningCode(ctx context.Context, identifier str
 			return fmt.Errorf("failed to get Matter commissioning code: %w", err)
 		}
 
-		resultMap, ok := result.(map[string]any)
+		resultMap, ok := client.AsObject(result)
 		if !ok {
 			return fmt.Errorf("unexpected response type")
 		}

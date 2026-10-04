@@ -26,6 +26,9 @@ Each scene contains one or more actions that are executed when the scene is acti
   # Create a new scene
   shelly scene create movie-night
 
+  # Add an action to it
+  shelly scene add-action movie-night lamp Light.Set '{"id":0,"on":true,"brightness":20}'
+
   # Show scene details
   shelly scene show movie-night
 
@@ -72,6 +75,7 @@ Each scene contains one or more actions that are executed when the scene is acti
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
 * [shelly scene activate](shelly_scene_activate.md)	 - Activate a scene
+* [shelly scene add-action](shelly_scene_add-action.md)	 - Add a device action to a scene
 * [shelly scene create](shelly_scene_create.md)	 - Create a new scene
 * [shelly scene delete](shelly_scene_delete.md)	 - Delete a scene
 * [shelly scene export](shelly_scene_export.md)	 - Export a scene to file

@@ -3,7 +3,6 @@ package coiot
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -88,7 +87,7 @@ CoIoT status broadcasts from all Gen1 devices on the network.`,
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", formatJSON)
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", formatJSON, "yaml")
 	cmd.Flags().BoolVarP(&opts.Listen, "listen", "l", false, "Listen for CoIoT multicast updates from all Gen1 devices")
 	cmd.Flags().BoolVarP(&opts.Stream, "stream", "s", false, "Stream indefinitely (until Ctrl+C)")
 	cmd.Flags().DurationVar(&opts.Duration, "duration", 30*time.Second, "Listen duration (ignored if --stream)")
@@ -157,13 +156,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.Format == formatJSON {
-		jsonOutput, err := json.MarshalIndent(coiotStatus, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
-		}
-		ios.Println(string(jsonOutput))
-		return nil
+	if opts.Structured() {
+		return cmdutil.PrintStructured(ios, opts.Format, coiotStatus)
 	}
 
 	// Pretty print

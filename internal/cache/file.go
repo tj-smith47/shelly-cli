@@ -21,7 +21,7 @@ import (
 
 // CurrentVersion is the cache format version.
 // Increment this when the cache format changes to invalidate old caches.
-const CurrentVersion = 1
+const CurrentVersion = 2
 
 // Common data type constants for cache keys.
 const (

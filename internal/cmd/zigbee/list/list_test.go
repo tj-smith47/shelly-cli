@@ -104,7 +104,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 
 	wantPatterns := []string{
 		"shelly zigbee list",
-		"--json",
+		"-o json",
 	}
 
 	for _, pattern := range wantPatterns {

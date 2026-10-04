@@ -22,21 +22,50 @@ type PluginQuickResult struct {
 	Success bool
 }
 
-// dispatchToPlugin executes a control action through a plugin.
-// This is called when a device is plugin-managed (device.IsPluginManaged() returns true).
-func (s *Service) dispatchToPlugin(ctx context.Context, device model.Device, action, component string, id *int) (*PluginQuickResult, error) {
-	// Check if plugin registry is configured
+// platformPlugin returns the installed plugin that manages platform, or a
+// PluginNotFoundError when there is none.
+func (s *Service) platformPlugin(platform string) (*plugins.Plugin, error) {
 	if s.pluginRegistry == nil {
-		return nil, NewPluginNotFoundError(device.Platform)
+		return nil, NewPluginNotFoundError(platform)
 	}
-
-	// Find the plugin for this platform
-	plugin, err := s.pluginRegistry.FindByPlatform(device.Platform)
+	plugin, err := s.pluginRegistry.FindByPlatform(platform)
 	if err != nil {
 		return nil, err
 	}
 	if plugin == nil {
-		return nil, NewPluginNotFoundError(device.Platform)
+		return nil, NewPluginNotFoundError(platform)
+	}
+	return plugin, nil
+}
+
+// DetectPluginDevice asks the plugin that manages platform whether the device
+// at address belongs to it, passing auth to the plugin's detect hook. It fails
+// when no plugin manages the platform, when the plugin has no detect hook, or
+// when the plugin does not recognise the device.
+func (s *Service) DetectPluginDevice(ctx context.Context, platform, address string, auth *model.Auth) (*plugins.DeviceDetectionResult, error) {
+	plugin, err := s.platformPlugin(platform)
+	if err != nil {
+		return nil, err
+	}
+	if plugin.Manifest == nil || plugin.Manifest.Hooks == nil || plugin.Manifest.Hooks.Detect == "" {
+		return nil, NewPluginHookMissingError(plugin.Name, "detect")
+	}
+	result, err := plugins.NewHookExecutor(plugin).ExecuteDetect(ctx, address, auth)
+	if err != nil {
+		return nil, fmt.Errorf("%s detect hook: %w", plugin.Name, err)
+	}
+	if !result.Detected {
+		return nil, fmt.Errorf("the %s plugin does not recognise a %s device at %s", plugin.Name, platform, address)
+	}
+	return result, nil
+}
+
+// dispatchToPlugin executes a control action through a plugin.
+// This is called when a device is plugin-managed (device.IsPluginManaged() returns true).
+func (s *Service) dispatchToPlugin(ctx context.Context, device model.Device, action, component string, id *int) (*PluginQuickResult, error) {
+	plugin, err := s.platformPlugin(device.Platform)
+	if err != nil {
+		return nil, err
 	}
 
 	// Check if plugin has control hook
@@ -67,18 +96,9 @@ func (s *Service) dispatchToPlugin(ctx context.Context, device model.Device, act
 
 // GetPluginDeviceStatus retrieves status from a plugin-managed device.
 func (s *Service) GetPluginDeviceStatus(ctx context.Context, device model.Device) (*plugins.DeviceStatusResult, error) {
-	// Check if plugin registry is configured
-	if s.pluginRegistry == nil {
-		return nil, NewPluginNotFoundError(device.Platform)
-	}
-
-	// Find the plugin for this platform
-	plugin, err := s.pluginRegistry.FindByPlatform(device.Platform)
+	plugin, err := s.platformPlugin(device.Platform)
 	if err != nil {
 		return nil, err
-	}
-	if plugin == nil {
-		return nil, NewPluginNotFoundError(device.Platform)
 	}
 
 	// Check if plugin has status hook
@@ -117,16 +137,9 @@ func (s *Service) SupportsPluginCommand(device model.Device, command string) err
 
 	// For plugin-managed devices, command support is checked at dispatch time
 	// via hook availability. This function provides an early check.
-	if s.pluginRegistry == nil {
-		return NewPluginNotFoundError(device.Platform)
-	}
-
-	plugin, err := s.pluginRegistry.FindByPlatform(device.Platform)
+	plugin, err := s.platformPlugin(device.Platform)
 	if err != nil {
 		return err
-	}
-	if plugin == nil {
-		return NewPluginNotFoundError(device.Platform)
 	}
 
 	// Check if the plugin has the required hook for this command type

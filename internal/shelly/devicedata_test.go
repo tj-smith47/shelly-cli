@@ -6,6 +6,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+const testApp = "Plus1PM"
+
 func TestDeviceData_Fields(t *testing.T) {
 	t.Parallel()
 

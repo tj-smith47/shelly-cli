@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
@@ -30,7 +31,10 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "List mock devices",
 		Long:    `List all configured mock devices.`,
 		Example: `  # List mock devices
-  shelly mock list`,
+  shelly mock list
+
+  # Output as JSON
+  shelly mock list -o json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), opts)
@@ -53,14 +57,7 @@ func run(_ context.Context, opts *Options) error {
 		return err
 	}
 
-	if len(entries) == 0 {
-		ios.Info("No mock devices configured")
-		ios.Info("Create one with: shelly mock create <name>")
-		return nil
-	}
-
-	ios.Printf("Mock Devices:\n\n")
-
+	devices := make([]mock.Device, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
 			continue
@@ -69,18 +66,27 @@ func run(_ context.Context, opts *Options) error {
 		filename := filepath.Join(mockDir, entry.Name())
 		data, err := afero.ReadFile(fs, filename)
 		if err != nil {
+			ios.DebugErr("read mock device "+filename, err)
 			continue
 		}
 
 		var device mock.Device
 		if err := json.Unmarshal(data, &device); err != nil {
+			ios.DebugErr("parse mock device "+filename, err)
 			continue
 		}
-
-		ios.Printf("  %s\n", device.Name)
-		ios.Printf("    Model: %s, Firmware: %s\n", device.Model, device.Firmware)
-		ios.Printf("    MAC: %s\n", model.NormalizeMAC(device.MAC))
+		devices = append(devices, device)
 	}
 
-	return nil
+	return cmdutil.PrintList(ios, devices, func(ios *iostreams.IOStreams, devices []mock.Device) {
+		ios.Printf("Mock Devices:\n\n")
+		for _, device := range devices {
+			ios.Printf("  %s\n", device.Name)
+			ios.Printf("    Model: %s, Firmware: %s\n", device.Model, device.Firmware)
+			ios.Printf("    MAC: %s\n", model.NormalizeMAC(device.MAC))
+		}
+	}, func() {
+		ios.Info("No mock devices configured")
+		ios.Info("Create one with: shelly mock create <name>")
+	})
 }

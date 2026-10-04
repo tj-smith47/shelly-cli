@@ -23,16 +23,16 @@ signal strength (RSSI), battery level, and last update time.
 
 .PP
 Use 'shelly bthome add' to discover and pair new devices.
-Use 'shelly bthome sensors' to view sensor readings.
+Use 'shelly bthome status  \&' to view the readings of one device.
 
 .PP
-Output is formatted as styled text by default. Use --json for
+Output is formatted as styled text by default. Use -o json for
 structured output suitable for scripting.
 
 
 .SH OPTIONS
 \fB-f\fP, \fB--format\fP="text"
-	Output format: text, json
+	Output format: text, json, yaml
 
 .PP
 \fB-h\fP, \fB--help\fP[=false]
@@ -106,19 +106,19 @@ structured output suitable for scripting.
   shelly bthome list living-room
 
   # Output as JSON
-  shelly bthome list living-room --json
+  shelly bthome list living-room -o json
 
   # Get devices with low battery
-  shelly bthome list living-room --json | jq '.[] | select(.battery != null and .battery < 20)'
+  shelly bthome list living-room -o json | jq '.[] | select(.battery != null and .battery < 20)'
 
   # Find devices with weak signal
-  shelly bthome list living-room --json | jq '.[] | select(.rssi != null and .rssi < -80)'
+  shelly bthome list living-room -o json | jq '.[] | select(.rssi != null and .rssi < -80)'
 
   # Get device addresses (MAC)
-  shelly bthome list living-room --json | jq -r '.[].addr'
+  shelly bthome list living-room -o json | jq -r '.[].addr'
 
   # List device names and IDs
-  shelly bthome list living-room --json | jq '.[] | {name, id}'
+  shelly bthome list living-room -o json | jq '.[] | {name, id}'
 
   # Short form
   shelly bthome ls living-room

@@ -102,13 +102,7 @@ func run(ctx context.Context, opts *Options) error {
 		})
 	}
 
-	if len(components) == 0 {
-		ios.NoResults("power meter components")
-		return nil
-	}
-
-	// Output results
-	return cmdutil.PrintListResult(ios, components, func(ios *iostreams.IOStreams, items []model.ComponentListItem) {
+	return cmdutil.PrintList(ios, components, func(ios *iostreams.IOStreams, items []model.ComponentListItem) {
 		builder := table.NewBuilder("ID", "Type")
 		for _, comp := range items {
 			builder.AddRow(fmt.Sprintf("%d", comp.ID), comp.Type)
@@ -117,5 +111,5 @@ func run(ctx context.Context, opts *Options) error {
 		if err := tbl.PrintTo(ios.Out); err != nil {
 			ios.DebugErr("print table", err)
 		}
-	})
+	}, func() { ios.NoResults("power meter components") })
 }

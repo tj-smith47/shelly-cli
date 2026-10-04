@@ -32,13 +32,13 @@ shelly sensor status <device> [flags]
   shelly sensor status living-room
 
   # Output as JSON
-  shelly sensor status living-room --json
+  shelly sensor status living-room -o json
 ```
 
 ### Options
 
 ```
-  -f, --format string   Output format: text, json (default "text")
+  -f, --format string   Output format: text, json, yaml (default "text")
   -h, --help            help for status
 ```
 

@@ -34,7 +34,7 @@ shelly benchmark <device> [flags]
   shelly benchmark kitchen-light --iterations 50
 
   # JSON output for logging
-  shelly benchmark kitchen-light --json
+  shelly benchmark kitchen-light -o json
 ```
 
 ### Options

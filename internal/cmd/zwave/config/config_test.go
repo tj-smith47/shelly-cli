@@ -132,24 +132,6 @@ func TestNewCommand_RunE(t *testing.T) {
 	}
 }
 
-func TestNewCommand_OutputFlag(t *testing.T) {
-	t.Parallel()
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	outputFlag := cmd.Flags().Lookup("output")
-	if outputFlag == nil {
-		t.Fatal("output flag not found")
-	}
-
-	if outputFlag.Shorthand != "o" {
-		t.Errorf("output shorthand = %q, want \"o\"", outputFlag.Shorthand)
-	}
-
-	if outputFlag.DefValue != "table" {
-		t.Errorf("output default = %q, want \"table\"", outputFlag.DefValue)
-	}
-}
-
 func TestNewCommand_CanBeAddedToParent(t *testing.T) {
 	t.Parallel()
 
@@ -265,7 +247,7 @@ func TestExecute_OutputTable(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"-o", "table"})
+	cmd.SetArgs(nil)
 
 	err := cmd.Execute()
 	if err != nil {
@@ -279,56 +261,6 @@ func TestExecute_OutputTable(t *testing.T) {
 
 	if !strings.Contains(output, "Parameter") {
 		t.Error("table output should contain parameter information")
-	}
-}
-
-func TestExecute_OutputJSON(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"-o", "json"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("expected no error, got: %v", err)
-	}
-
-	output := tf.OutString()
-	if output == "" {
-		t.Error("expected output, got empty string")
-	}
-
-	// JSON output should contain brackets
-	if !strings.Contains(output, "[") || !strings.Contains(output, "]") {
-		t.Error("JSON output should contain array brackets")
-	}
-}
-
-func TestExecute_OutputYAML(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"-o", "yaml"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("expected no error, got: %v", err)
-	}
-
-	output := tf.OutString()
-	if output == "" {
-		t.Error("expected output, got empty string")
-	}
-
-	// YAML output should contain some structure
-	if len(output) < 10 {
-		t.Error("YAML output seems too short")
 	}
 }
 

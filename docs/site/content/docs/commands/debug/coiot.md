@@ -54,7 +54,7 @@ shelly debug coiot [device] [flags]
 
 ```
       --duration duration   Listen duration (ignored if --stream) (default 30s)
-  -f, --format string       Output format: text, json (default "text")
+  -f, --format string       Output format: text, json, yaml (default "text")
   -h, --help                help for coiot
   -l, --listen              Listen for CoIoT multicast updates from all Gen1 devices
       --raw                 Output raw JSON events

@@ -74,9 +74,9 @@ Shell command aliases are prefixed with ! and execute in your shell.
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly alias delete](shelly_alias_delete.md)	 - Delete a alias
+* [shelly alias delete](shelly_alias_delete.md)	 - Delete an alias
 * [shelly alias export](shelly_alias_export.md)	 - Export aliases to a YAML file
 * [shelly alias import](shelly_alias_import.md)	 - Import aliases from a YAML file
-* [shelly alias list](shelly_alias_list.md)	 - List aliass
+* [shelly alias list](shelly_alias_list.md)	 - List aliases
 * [shelly alias set](shelly_alias_set.md)	 - Create or update a command alias
 

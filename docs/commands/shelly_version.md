@@ -8,7 +8,7 @@ Print the version of shelly CLI.
 
 By default, shows version, commit, and build date.
 Use --short for just the version number.
-Use --json for machine-readable output.
+Use -o json or -o yaml for machine-readable output.
 Use --check to also check for available updates.
 
 ```
@@ -25,7 +25,10 @@ shelly version [flags]
   shelly version --short
 
   # JSON output
-  shelly version --json
+  shelly version -o json
+
+  # YAML output
+  shelly version -o yaml
 
   # Check for updates
   shelly version --check
@@ -36,7 +39,6 @@ shelly version [flags]
 ```
   -c, --check   Check for available updates
   -h, --help    help for version
-      --json    Output version info as JSON
   -s, --short   Print only the version number
 ```
 

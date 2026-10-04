@@ -73,7 +73,7 @@ func (s *Service) ZigbeeGetStatus(ctx context.Context, identifier string) (map[s
 		}
 
 		var ok bool
-		status, ok = result.(map[string]any)
+		status, ok = client.AsObject(result)
 		if !ok {
 			return fmt.Errorf("unexpected response type")
 		}
@@ -92,7 +92,7 @@ func (s *Service) ZigbeeGetConfig(ctx context.Context, identifier string) (map[s
 		}
 
 		var ok bool
-		cfg, ok = result.(map[string]any)
+		cfg, ok = client.AsObject(result)
 		if !ok {
 			return fmt.Errorf("unexpected response type")
 		}

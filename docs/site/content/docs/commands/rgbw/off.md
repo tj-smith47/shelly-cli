@@ -9,7 +9,7 @@ Turn rgbw off
 
 ### Synopsis
 
-Turn off a rgbw component on the specified device.
+Turn off an rgbw component on the specified device.
 
 ```
 shelly rgbw off <device> [flags]

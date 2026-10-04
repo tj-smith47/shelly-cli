@@ -3,9 +3,11 @@ package auth
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec // Required for Shelly digest auth (HA1 hash)
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
@@ -30,6 +32,7 @@ type Status struct {
 // ConnectionProvider allows executing operations with a device connection.
 type ConnectionProvider interface {
 	WithConnection(ctx context.Context, identifier string, fn func(*client.Client) error) error
+	WithGen1Connection(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error
 }
 
 // DeviceInfoProvider provides device info access.
@@ -62,44 +65,56 @@ func (s *Service) GetStatus(ctx context.Context, identifier string) (*Status, er
 	}, nil
 }
 
-// Set configures device authentication.
-// If password is empty, authentication is disabled.
-func (s *Service) Set(ctx context.Context, identifier, user, realm, password string) error {
+// Set turns on authentication on a device with the given user and password,
+// or turns it off when password is empty. gen1 selects the protocol.
+//
+// A Gen1 device takes any user name (empty means "admin") through
+// /settings/login. A Gen2+ device has a single user, admin, and a single
+// realm, its device ID, which is read from the device; any other user is an
+// error (errors.Is ErrInvalidAuthParams), since the device would store a hash
+// no request can match.
+func (s *Service) Set(ctx context.Context, identifier string, gen1 bool, user, password string) error {
+	if user == "" {
+		user = DefaultUser
+	}
+	if gen1 {
+		return s.provider.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+			if password == "" {
+				return conn.Device().SetAuth(ctx, false, "", "")
+			}
+			return conn.Device().SetAuth(ctx, true, user, password)
+		})
+	}
+	if user != DefaultUser {
+		return fmt.Errorf("%w: user %q", ErrInvalidAuthParams, user)
+	}
 	return s.provider.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		params := map[string]any{
-			"user":  user,
-			"realm": realm,
-		}
-		if password != "" {
-			// Calculate HA1 = MD5(user:realm:password)
-			ha1 := CalculateHA1(user, realm, password)
-			params["ha1"] = ha1
-		}
-		_, err := conn.Call(ctx, "Shelly.SetAuth", params)
-		return err
-	})
-}
-
-// Disable disables device authentication.
-func (s *Service) Disable(ctx context.Context, identifier string) error {
-	return s.provider.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		// Setting ha1 to null disables authentication
+		id := conn.Info().ID
 		params := map[string]any{
 			"user":  DefaultUser,
-			"realm": "",
+			"realm": id,
 			"ha1":   nil,
+		}
+		if password != "" {
+			params["ha1"] = CalculateHA1(DefaultUser, id, password)
 		}
 		_, err := conn.Call(ctx, "Shelly.SetAuth", params)
 		return err
 	})
 }
 
-// CalculateHA1 calculates the HA1 hash for digest authentication.
-// MD5 is required by the Shelly device protocol - not a security concern since
-// this is a password hash transmitted over a local network to the device.
+// Disable turns authentication off on a device; gen1 selects the protocol.
+func (s *Service) Disable(ctx context.Context, identifier string, gen1 bool) error {
+	return s.Set(ctx, identifier, gen1, "", "")
+}
+
+// ErrInvalidAuthParams reports a user a Gen2+ device cannot have.
+var ErrInvalidAuthParams = errors.New("invalid user: Gen2+ devices have a single user, admin")
+
+// CalculateHA1 returns the HA1 a Gen2+ device stores through Shelly.SetAuth:
+// the hex SHA-256 of "user:realm:password".
 func CalculateHA1(user, realm, password string) string {
-	data := user + ":" + realm + ":" + password
-	hash := md5.Sum([]byte(data)) //nolint:gosec // Required by Shelly digest auth protocol
+	hash := sha256.Sum256([]byte(user + ":" + realm + ":" + password))
 	return hex.EncodeToString(hash[:])
 }
 

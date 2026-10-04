@@ -12,16 +12,32 @@ Generate reports
 
 ### Synopsis
 
-Generate reports about devices, energy usage, or security audits.
+Generate a report about every registered device: an inventory, the current
+power draw, or a security audit. All devices are queried at the same time, Gen1
+and Gen2+ alike, and each device has one row, sorted by name.
 
 Report types:
-  devices  - Device inventory and status
-  energy   - Energy consumption summary
-  audit    - Security audit report
+  devices  - name, ip, model, generation, firmware, mac and online for each
+             device; summary: total, online, offline
+  energy   - online, reporting (the device has a power meter) and power_w for
+             each device; summary: total, online, offline, devices_reporting,
+             total_power_w
+  audit    - the checks of 'shelly audit': reachable, auth_enabled,
+             cloud_connected, firmware_current, firmware_available,
+             firmware_outdated, issues and warnings for each device; summary:
+             devices_scanned, reachable, unreachable, auth_enabled,
+             auth_disabled, cloud_connected, outdated_firmware, issues, warnings
 
-Output formats:
-  json   - JSON format (default)
-  text   - Human-readable text
+A value the device did not report (it is offline, or the check failed) is
+null in the audit rows. The document has timestamp, report_type, devices and
+summary.
+
+Output formats (--format, or the global -o):
+  json   - JSON (default)
+  yaml   - YAML
+  text   - human-readable table (-o table is the same)
+
+Progress messages go to stderr, so stdout carries only the report.
 
 ```
 shelly report [flags]
@@ -30,23 +46,32 @@ shelly report [flags]
 ### Examples
 
 ```
-  # Generate device report
-  shelly report --type devices
+  # Device inventory as JSON
+  shelly report --type devices -o json
 
-  # Save report to file
-  shelly report --type devices -o report.json
+  # Names of the devices that are offline
+  shelly report --type devices -o json | jq -r '.devices[] | select(.online == false) | .name'
 
-  # Generate energy report
-  shelly report --type energy
+  # Current power draw of every device, as a table
+  shelly report --type energy -o text
 
-  # Text format report
-  shelly report --type devices --format text
+  # Total power in watts
+  shelly report --type energy -o json | jq '.summary.total_power_w'
+
+  # Security audit as YAML
+  shelly report --type audit -o yaml
+
+  # Devices with a firmware update available
+  shelly report --type audit -o json | jq -r '.devices[] | select(.firmware_outdated == true) | .name'
+
+  # Save a report to a file
+  shelly report --type devices --output-file report.json
 ```
 
 ### Options
 
 ```
-  -f, --format string        Output format: json, text (default "json")
+  -f, --format string        Output format: json, yaml, text, table (default "json")
   -h, --help                 help for report
       --output-file string   Output file path
   -t, --type string          Report type: devices, energy, audit (default "devices")

@@ -12,11 +12,11 @@ import (
 
 // CoverInfo holds cover information for list operations.
 type CoverInfo struct {
-	ID       int
-	Name     string
-	State    string
-	Position int
-	Power    float64
+	ID       int     `json:"id" yaml:"id"`
+	Name     string  `json:"name" yaml:"name"`
+	State    string  `json:"state" yaml:"state"`
+	Position int     `json:"current_pos" yaml:"current_pos"`
+	Power    float64 `json:"power" yaml:"power"`
 }
 
 // CoverOpen opens a cover component with optional duration in seconds.

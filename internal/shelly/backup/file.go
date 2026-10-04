@@ -76,17 +76,14 @@ func GenerateFilename(deviceName, deviceID string, encrypted bool) string {
 	return fmt.Sprintf("backup-%s-%s%s", safeName, timestamp, suffix)
 }
 
-// AutoSavePath returns the auto-generated file path for a backup.
+// AutoSavePathIn returns the auto-generated file path for a backup inside dir.
+// An empty dir means the backups directory; the directory is created if needed.
 // Format: {identifier}-{mac}-{date}.{format} (e.g. fl-C82B961166C0-2026-02-11.json).
 // The identifier is the config name the user used (e.g. "fl", "back-porch").
-// It creates the backups directory if needed.
-func AutoSavePath(identifier string, bkp *DeviceBackup, format string) (string, error) {
-	dir, err := config.BackupsDir()
+func AutoSavePathIn(dir, identifier string, bkp *DeviceBackup, format string) (string, error) {
+	dir, err := EnsureDir(dir)
 	if err != nil {
-		return "", fmt.Errorf("failed to determine backups directory: %w", err)
-	}
-	if err := config.Fs().MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("failed to create backups directory: %w", err)
+		return "", err
 	}
 
 	name := strings.ToLower(identifier)
@@ -108,6 +105,21 @@ func AutoSavePath(identifier string, bkp *DeviceBackup, format string) (string, 
 	}
 
 	return filepath.Join(dir, filename), nil
+}
+
+// EnsureDir creates dir, or the backups directory when dir is empty, and
+// returns the directory used.
+func EnsureDir(dir string) (string, error) {
+	if dir == "" {
+		var err error
+		if dir, err = config.BackupsDir(); err != nil {
+			return "", fmt.Errorf("failed to determine backups directory: %w", err)
+		}
+	}
+	if err := config.Fs().MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create backups directory: %w", err)
+	}
+	return dir, nil
 }
 
 // ResolveFilePath resolves a backup file path. If the path exists as-is, it's

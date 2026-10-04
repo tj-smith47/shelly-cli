@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	shellyexport "github.com/tj-smith47/shelly-cli/internal/shelly/export"
@@ -871,7 +872,7 @@ func TestRun_InvalidFormat(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeEM,
-		Format:        "xml",
+		OutputFlags:   flags.OutputFlags{Format: "xml"},
 	}
 
 	err := run(context.Background(), opts)
@@ -892,7 +893,7 @@ func TestRun_InvalidPeriod(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeEM,
-		Format:        shellyexport.FormatCSV,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatCSV},
 		Period:        "invalid-period",
 	}
 
@@ -914,7 +915,7 @@ func TestRun_InvalidFromTime(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeEM,
-		Format:        shellyexport.FormatCSV,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatCSV},
 		From:          "not-a-date",
 	}
 
@@ -936,7 +937,7 @@ func TestRun_InvalidToTime(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeEM,
-		Format:        shellyexport.FormatCSV,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatCSV},
 		To:            "not-a-date",
 	}
 
@@ -985,7 +986,7 @@ func TestRun_UnknownComponentType(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: "unknown-type",
-		Format:        shellyexport.FormatCSV,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatCSV},
 	}
 
 	err = run(context.Background(), opts)
@@ -1033,7 +1034,7 @@ func TestRun_WithExplicitTypeEM(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeEM,
-		Format:        shellyexport.FormatCSV,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatCSV},
 	}
 
 	// Explicit type should skip auto-detection
@@ -1080,7 +1081,7 @@ func TestRun_WithExplicitTypeEM1(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeEM1,
-		Format:        shellyexport.FormatCSV,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatCSV},
 	}
 
 	// Explicit type should skip auto-detection
@@ -1127,7 +1128,7 @@ func TestRun_WithOutputFile(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeEM,
-		Format:        shellyexport.FormatCSV,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatCSV},
 		OutputFile:    "/tmp/test-export.csv",
 	}
 
@@ -1174,7 +1175,7 @@ func TestRun_WithValidTimeRange(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeEM,
-		Format:        shellyexport.FormatCSV,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatCSV},
 		From:          "2025-01-01",
 		To:            "2025-01-07",
 	}
@@ -1222,7 +1223,7 @@ func TestRun_WithAutoDetection(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeAuto,
-		Format:        shellyexport.FormatCSV,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatCSV},
 	}
 
 	// Auto detection mode
@@ -1269,7 +1270,7 @@ func TestRun_JSONFormat(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeEM,
-		Format:        shellyexport.FormatJSON,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatJSON},
 	}
 
 	err = run(context.Background(), opts)
@@ -1314,7 +1315,7 @@ func TestRun_YAMLFormat(t *testing.T) {
 		Device:        "test-device",
 		ComponentID:   0,
 		ComponentType: shelly.ComponentTypeEM1,
-		Format:        shellyexport.FormatYAML,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatYAML},
 	}
 
 	err = run(context.Background(), opts)

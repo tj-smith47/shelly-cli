@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	shellyexport "github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
@@ -18,11 +19,11 @@ type Options struct {
 	Device        string
 	ComponentID   int
 	ComponentType string
-	Format        string
-	OutputFile    string
-	Period        string
-	From          string
-	To            string
+	flags.OutputFlags
+	OutputFile string
+	Period     string
+	From       string
+	To         string
 }
 
 // NewCommand creates the energy export command.
@@ -30,7 +31,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
 		Factory:       f,
 		ComponentType: shelly.ComponentTypeAuto,
-		Format:        shellyexport.FormatCSV,
+		OutputFlags:   flags.OutputFlags{Format: shellyexport.FormatCSV},
 	}
 
 	cmd := &cobra.Command{
@@ -67,7 +68,7 @@ measurements for the specified time range.`,
 	}
 
 	cmd.Flags().StringVar(&opts.ComponentType, "type", shelly.ComponentTypeAuto, "Component type (auto, em, em1)")
-	cmd.Flags().StringVarP(&opts.Format, "format", "f", shellyexport.FormatCSV, "Output format (csv, json, yaml)")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, shellyexport.FormatCSV, shellyexport.FormatCSV, shellyexport.FormatJSON, shellyexport.FormatYAML)
 	cmd.Flags().StringVarP(&opts.OutputFile, "output", "o", "", "Output file (default: stdout)")
 	cmd.Flags().StringVarP(&opts.Period, "period", "p", "", "Time period (hour, day, week, month)")
 	cmd.Flags().StringVar(&opts.From, "from", "", "Start time (RFC3339 or YYYY-MM-DD)")

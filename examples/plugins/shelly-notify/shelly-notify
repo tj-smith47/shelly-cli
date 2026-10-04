@@ -22,11 +22,11 @@ SCRIPT_NAME="shelly-notify"
 
 # Colors (respects SHELLY_NO_COLOR)
 if [[ -z "${SHELLY_NO_COLOR:-}" ]]; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[0;33m'
-    CYAN='\033[0;36m'
-    NC='\033[0m'
+    RED=$'\033[0;31m'
+    GREEN=$'\033[0;32m'
+    YELLOW=$'\033[0;33m'
+    CYAN=$'\033[0;36m'
+    NC=$'\033[0m'
 else
     RED=''
     GREEN=''
@@ -84,7 +84,7 @@ get_device_ip() {
     fi
 
     local ip
-    ip=$(echo "$devices_json" | jq -r --arg d "$device" '.[$d].ip // .[$d].host // empty')
+    ip=$(echo "$devices_json" | jq -r --arg d "$device" '.[$d].address // .[$d].ip // .[$d].host // empty')
 
     if [[ -z "$ip" ]]; then
         echo -e "${RED}Error:${NC} Device '$device' not found in registry" >&2

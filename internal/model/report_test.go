@@ -1,8 +1,9 @@
 package model
 
 import (
+	"encoding/json"
+	"reflect"
 	"testing"
-	"time"
 )
 
 const (
@@ -10,132 +11,86 @@ const (
 	testReportMAC = "AA:BB:CC:DD:EE:FF"
 )
 
-func TestNewDeviceReport(t *testing.T) {
+func TestNewAuditReportRow(t *testing.T) {
 	t.Parallel()
 
-	before := time.Now()
-	report := NewDeviceReport("status")
-	after := time.Now()
+	result := &AuditResult{
+		Device:     "kitchen",
+		Address:    testReportIP,
+		Reachable:  true,
+		Issues:     []string{"Authentication is DISABLED - device is unprotected"},
+		Warnings:   []string{},
+		AuthStatus: &AuthAudit{AuthEnabled: false},
+		CloudAudit: &CloudAudit{Connected: true},
+		FWAudit:    &FirmwareAudit{Current: "1.4.4", Available: "1.5.0", HasUpdate: true},
+	}
+	row := NewAuditReportRow(result)
 
-	if report.ReportType != "status" {
-		t.Errorf("ReportType = %q, want %q", report.ReportType, "status")
+	if row.Name != "kitchen" || row.IP != testReportIP || !row.Reachable {
+		t.Errorf("row = %+v", row)
 	}
-	if report.Timestamp.Before(before) || report.Timestamp.After(after) {
-		t.Errorf("Timestamp %v not in expected range [%v, %v]", report.Timestamp, before, after)
+	if row.AuthEnabled == nil || *row.AuthEnabled {
+		t.Errorf("AuthEnabled = %v, want false", row.AuthEnabled)
 	}
-	if report.Devices == nil {
-		t.Error("Devices should not be nil")
+	if row.CloudConnected == nil || !*row.CloudConnected {
+		t.Errorf("CloudConnected = %v, want true", row.CloudConnected)
 	}
-	if len(report.Devices) != 0 {
-		t.Errorf("Devices len = %d, want 0", len(report.Devices))
+	if row.FirmwareCurrent != "1.4.4" || row.FirmwareAvailable != "1.5.0" || row.FirmwareOutdated == nil || !*row.FirmwareOutdated {
+		t.Errorf("firmware = %+v", row)
 	}
-	if report.Summary == nil {
-		t.Error("Summary should not be nil")
-	}
-	if len(report.Summary) != 0 {
-		t.Errorf("Summary len = %d, want 0", len(report.Summary))
+	if !reflect.DeepEqual(row.Issues, result.Issues) {
+		t.Errorf("Issues = %v, want %v", row.Issues, result.Issues)
 	}
 }
 
-func TestNewDeviceReport_DifferentTypes(t *testing.T) {
+func TestNewAuditReportRow_UnreachableLeavesChecksNull(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name       string
-		reportType string
-	}{
-		{"status report", "status"},
-		{"inventory report", testReportTypeInventory},
-		{"firmware report", "firmware"},
-		{"empty type", ""},
+	row := NewAuditReportRow(&AuditResult{Device: "attic", Issues: []string{"Device unreachable"}})
+	data, err := json.Marshal(row)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			report := NewDeviceReport(tt.reportType)
-			if report.ReportType != tt.reportType {
-				t.Errorf("ReportType = %q, want %q", report.ReportType, tt.reportType)
-			}
-		})
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"auth_enabled", "cloud_connected", "firmware_outdated"} {
+		v, ok := doc[key]
+		if !ok || v != nil {
+			t.Errorf("%s = %v (present %v), want null", key, v, ok)
+		}
 	}
 }
 
-func TestDeviceReport_Fields(t *testing.T) {
+func TestReport_JSONKeys(t *testing.T) {
 	t.Parallel()
 
-	now := time.Now()
-	report := DeviceReport{
-		Timestamp:  now,
-		ReportType: testReportTypeInventory,
-		Devices: []DeviceReportInfo{
-			{Name: "Device1", IP: "192.168.1.1", Online: true},
-			{Name: "Device2", IP: "192.168.1.2", Online: false},
-		},
-		Summary: map[string]interface{}{
-			"total":          2,
-			testStatusOnline: 1,
-		},
+	report := DevicesReport{
+		ReportType: ReportTypeDevices,
+		Devices:    []DeviceReportRow{{Name: "kitchen", IP: testReportIP, MAC: testReportMAC, Online: true}},
+		Summary:    DevicesReportSummary{Total: 1, Online: 1},
 	}
-
-	if report.Timestamp != now {
-		t.Errorf("Timestamp = %v, want %v", report.Timestamp, now)
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if report.ReportType != testReportTypeInventory {
-		t.Errorf("ReportType = %q, want %q", report.ReportType, testReportTypeInventory)
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
 	}
-	if len(report.Devices) != 2 {
-		t.Errorf("Devices len = %d, want 2", len(report.Devices))
+	for _, key := range []string{"timestamp", "report_type", "devices", "summary"} {
+		if _, ok := doc[key]; !ok {
+			t.Errorf("missing key %q in %s", key, data)
+		}
 	}
-	if total, ok := report.Summary["total"].(int); !ok || total != 2 {
-		t.Errorf("Summary[total] = %v, want 2", report.Summary["total"])
+	row, ok := doc["devices"].([]any)[0].(map[string]any)
+	if !ok {
+		t.Fatalf("devices[0] is not an object: %s", data)
 	}
-}
-
-func TestDeviceReportInfo(t *testing.T) {
-	t.Parallel()
-
-	info := DeviceReportInfo{
-		Name:     testLivingRoomSwitch,
-		IP:       testReportIP,
-		Model:    testShellyPlus1PM,
-		Firmware: "1.0.0-stable",
-		Online:   true,
-		MAC:      testReportMAC,
-	}
-
-	if info.Name != testLivingRoomSwitch {
-		t.Errorf("Name = %q, want %q", info.Name, testLivingRoomSwitch)
-	}
-	if info.IP != testReportIP {
-		t.Errorf("IP = %q, want %q", info.IP, testReportIP)
-	}
-	if info.Model != testShellyPlus1PM {
-		t.Errorf("Model = %q, want %q", info.Model, testShellyPlus1PM)
-	}
-	if info.Firmware != "1.0.0-stable" {
-		t.Errorf("Firmware = %q, want %q", info.Firmware, "1.0.0-stable")
-	}
-	if !info.Online {
-		t.Error("Online = false, want true")
-	}
-	if info.MAC != testReportMAC {
-		t.Errorf("MAC = %q, want %q", info.MAC, testReportMAC)
-	}
-}
-
-func TestDeviceReportInfo_Empty(t *testing.T) {
-	t.Parallel()
-
-	info := DeviceReportInfo{}
-
-	if info.Name != "" {
-		t.Errorf("Name = %q, want empty", info.Name)
-	}
-	if info.IP != "" {
-		t.Errorf("IP = %q, want empty", info.IP)
-	}
-	if info.Online {
-		t.Error("Online = true, want false")
+	for _, key := range []string{"name", "ip", "model", "generation", "firmware", "mac", "online"} {
+		if _, ok := row[key]; !ok {
+			t.Errorf("missing row key %q in %s", key, data)
+		}
 	}
 }

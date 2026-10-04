@@ -105,7 +105,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 
 	wantPatterns := []string{
 		"shelly thermostat schedule list",
-		"--json",
+		"-o json",
 		"--all",
 		"--thermostat-id",
 	}

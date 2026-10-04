@@ -28,7 +28,7 @@ func TestNewCommand(t *testing.T) {
 	if cmd.Use != "delete <group>" {
 		t.Errorf("Use = %q, want \"delete <group>\"", cmd.Use)
 	}
-	aliases := []string{"rm", "del", "remove"}
+	aliases := []string{"del"}
 	if len(cmd.Aliases) != len(aliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, aliases)
 	}

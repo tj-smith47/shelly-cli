@@ -1,7 +1,9 @@
 package config
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"strings"
 	"testing"
 
@@ -378,34 +380,34 @@ func TestExecuteShellAlias(t *testing.T) {
 
 	t.Run("empty args returns 0", func(t *testing.T) {
 		t.Parallel()
-		code := ExecuteShellAlias(ctx, []string{})
-		if code != 0 {
-			t.Errorf("ExecuteShellAlias([]) = %d, want 0", code)
+		code, err := ExecuteShellAlias(ctx, nil, io.Discard, io.Discard, []string{})
+		if code != 0 || err != nil {
+			t.Errorf("ExecuteShellAlias([]) = %d, %v; want 0", code, err)
 		}
 	})
 
 	t.Run("successful command returns 0", func(t *testing.T) {
 		t.Parallel()
-		code := ExecuteShellAlias(ctx, []string{"true"})
-		if code != 0 {
-			t.Errorf("ExecuteShellAlias([true]) = %d, want 0", code)
+		code, err := ExecuteShellAlias(ctx, nil, io.Discard, io.Discard, []string{"true"})
+		if code != 0 || err != nil {
+			t.Errorf("ExecuteShellAlias([true]) = %d, %v; want 0", code, err)
 		}
 	})
 
 	t.Run("failing command returns exit code", func(t *testing.T) {
 		t.Parallel()
-		code := ExecuteShellAlias(ctx, []string{"exit 42"})
-		if code != 42 {
-			t.Errorf("ExecuteShellAlias([exit 42]) = %d, want 42", code)
+		code, err := ExecuteShellAlias(ctx, nil, io.Discard, io.Discard, []string{"exit 42"})
+		if code != 42 || err != nil {
+			t.Errorf("ExecuteShellAlias([exit 42]) = %d, %v; want 42", code, err)
 		}
 	})
 
 	t.Run("command not found returns 1", func(t *testing.T) {
 		t.Parallel()
-		code := ExecuteShellAlias(ctx, []string{"nonexistent_command_12345"})
-		// Should return non-zero (typically 127 or 1)
-		if code == 0 {
-			t.Error("ExecuteShellAlias([nonexistent]) = 0, want non-zero")
+		code, err := ExecuteShellAlias(ctx, nil, io.Discard, io.Discard, []string{"nonexistent_command_12345"})
+		// The shell runs and exits 127, which is an exit code, not an error.
+		if code == 0 || err != nil {
+			t.Errorf("ExecuteShellAlias([nonexistent]) = %d, %v; want a non-zero exit code", code, err)
 		}
 	})
 
@@ -413,12 +415,21 @@ func TestExecuteShellAlias(t *testing.T) {
 		t.Parallel()
 		canceledCtx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
-		code := ExecuteShellAlias(canceledCtx, []string{"sleep 10"})
-		// Should return 1 for context error (not an exit error)
-		if code == 0 {
-			t.Error("ExecuteShellAlias with canceled context = 0, want non-zero")
+		code, err := ExecuteShellAlias(canceledCtx, nil, io.Discard, io.Discard, []string{"sleep 10"})
+		if code != 1 || err == nil {
+			t.Errorf("ExecuteShellAlias with canceled context = %d, %v; want 1 and the error", code, err)
 		}
 	})
+}
+
+func TestExecuteShellAlias_UsesGivenStreams(t *testing.T) {
+	t.Parallel()
+
+	var stdout, stderr bytes.Buffer
+	code, err := ExecuteShellAlias(context.Background(), strings.NewReader("in"), &stdout, &stderr, []string{"cat; echo err >&2"})
+	if err != nil || code != 0 || stdout.String() != "in" || stderr.String() != "err\n" {
+		t.Errorf("code %d, stdout %q, stderr %q; want the alias on the given streams", code, stdout.String(), stderr.String())
+	}
 }
 
 func TestExecuteShellAlias_NoShell(t *testing.T) {
@@ -427,9 +438,9 @@ func TestExecuteShellAlias_NoShell(t *testing.T) {
 	t.Setenv("SHELL", "") // Clear SHELL to trigger fallback
 
 	ctx := context.Background()
-	code := ExecuteShellAlias(ctx, []string{"true"})
-	if code != 0 {
-		t.Errorf("ExecuteShellAlias with no SHELL = %d, want 0", code)
+	code, err := ExecuteShellAlias(ctx, nil, io.Discard, io.Discard, []string{"true"})
+	if code != 0 || err != nil {
+		t.Errorf("ExecuteShellAlias with no SHELL = %d, %v; want 0", code, err)
 	}
 }
 

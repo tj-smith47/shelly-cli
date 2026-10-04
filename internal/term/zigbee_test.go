@@ -64,27 +64,6 @@ func TestDisplayZigbeeDevices_WithDevices(t *testing.T) {
 	}
 }
 
-func TestOutputZigbeeDevicesJSON(t *testing.T) {
-	t.Parallel()
-
-	ios, out, _ := testIOStreams()
-	devices := []model.ZigbeeDevice{
-		{Name: testValueTest, Address: "192.168.1.1", Enabled: true},
-	}
-	err := OutputZigbeeDevicesJSON(ios, devices)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	output := out.String()
-	if !strings.Contains(output, testValueTest) {
-		t.Error("expected device name in JSON")
-	}
-	if !strings.Contains(output, "192.168.1.1") {
-		t.Error("expected address in JSON")
-	}
-}
-
 func TestDisplayZigbeeStatus_Joined(t *testing.T) {
 	t.Parallel()
 
@@ -156,29 +135,5 @@ func TestDisplayZigbeeStatus_Disabled(t *testing.T) {
 	output := out.String()
 	if !strings.Contains(output, "Zigbee Status") {
 		t.Error("expected header")
-	}
-}
-
-func TestOutputZigbeeStatusJSON(t *testing.T) {
-	t.Parallel()
-
-	ios, out, _ := testIOStreams()
-	status := model.ZigbeeStatus{
-		Enabled:      true,
-		NetworkState: zigbeeStateJoined,
-		PANID:        0xABCD,
-		Channel:      20,
-	}
-	err := OutputZigbeeStatusJSON(ios, status)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	output := out.String()
-	if !strings.Contains(output, "enabled") {
-		t.Error("expected enabled field in JSON")
-	}
-	if !strings.Contains(output, zigbeeStateJoined) {
-		t.Error("expected network_state in JSON")
 	}
 }

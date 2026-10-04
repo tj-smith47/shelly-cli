@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/sensoraddon"
@@ -16,7 +15,6 @@ import (
 
 // Options holds command options.
 type Options struct {
-	flags.OutputFlags
 	Device  string
 	Factory *cmdutil.Factory
 }
@@ -47,8 +45,6 @@ the same GPIOs as the OneWire bus.`,
 			return run(cmd.Context(), opts)
 		},
 	}
-
-	flags.AddOutputFlags(cmd, &opts.OutputFlags)
 
 	return cmd
 }

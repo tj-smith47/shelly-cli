@@ -28,15 +28,15 @@ shelly thermostat status <device> [flags]
   shelly thermostat status gateway --id 1
 
   # Output as JSON
-  shelly thermostat status gateway --json
+  shelly thermostat status gateway -o json
 ```
 
 ### Options
 
 ```
-  -h, --help     help for status
-  -i, --id int   Thermostat component ID (default 0)
-      --json     Output as JSON
+  -f, --format string   Output format: text, json, yaml (default "text")
+  -h, --help            help for status
+  -i, --id int          Thermostat component ID (default 0)
 ```
 
 ### Options inherited from parent commands

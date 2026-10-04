@@ -335,7 +335,8 @@ func (m EditModel) save() (EditModel, tea.Cmd) {
 
 	device := m.Device
 	cmd := m.SaveCmd(func(ctx context.Context) error {
-		return m.Svc.SetAuth(ctx, device, "admin", device, password)
+		_, _, err := m.Svc.SetAuth(ctx, device, "", password)
+		return err
 	})
 	return m, cmd
 }

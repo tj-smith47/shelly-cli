@@ -43,7 +43,7 @@ func TestNewCommand_Structure(t *testing.T) {
 	for _, alias := range cmd.Aliases {
 		aliasMap[alias] = true
 	}
-	for _, expected := range []string{"wiring", "diag"} {
+	for _, expected := range []string{"wiring"} {
 		if !aliasMap[expected] {
 			t.Errorf("expected alias %q not found", expected)
 		}

@@ -1,11 +1,7 @@
 // Package version provides build-time version information for the CLI.
 package version
 
-import (
-	"context"
-	"encoding/json"
-	"io"
-)
+import "context"
 
 const availabilityYes = "yes"
 
@@ -47,21 +43,15 @@ func (o *Output) SetUpdateInfo(latestVersion string, updateAvailable bool) {
 	}
 }
 
-// WriteJSON writes the version output as indented JSON.
-func (o *Output) WriteJSON(w io.Writer) error {
-	encoder := json.NewEncoder(w)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(o)
-}
-
-// WriteJSONOutput writes version info as JSON, optionally including update check results.
-// The isNewer function compares current and latest versions to determine if an update is available.
-func WriteJSONOutput(ctx context.Context, w io.Writer, info Info, checkUpdate bool, fetcher ReleaseFetcher, isNewer func(current, latest string) bool) error {
+// BuildOutput returns info as an Output, with the update check result added
+// when checkUpdate is set and the check succeeds. The isNewer function compares
+// the current and latest versions to decide whether an update is available.
+func BuildOutput(ctx context.Context, info Info, checkUpdate bool, fetcher ReleaseFetcher, isNewer func(current, latest string) bool) *Output {
 	output := NewOutput(info)
 	if checkUpdate {
 		if result, err := CheckForUpdates(ctx, info.Version, fetcher, isNewer); err == nil && !result.SkippedDevBuild {
 			output.SetUpdateInfo(result.LatestVersion, result.UpdateAvailable)
 		}
 	}
-	return output.WriteJSON(w)
+	return output
 }

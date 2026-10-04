@@ -89,13 +89,16 @@ func TestNewCommand_Help(t *testing.T) {
 	}
 }
 
-func TestRun_AliasNotFound(t *testing.T) {
-	t.Parallel()
-
-	cfg := &config.Config{
-		Aliases: map[string]config.Alias{},
-	}
-	mgr := config.NewTestManager(cfg)
+// newAliasDeleteTest returns an alias delete command backed by an in-memory
+// config holding the "lights" alias, with that config installed as the default
+// manager so the test never reads or writes the live config.
+func newAliasDeleteTest(t *testing.T, args ...string) (*config.Manager, *bytes.Buffer, error) {
+	t.Helper()
+	mgr := config.NewTestManager(&config.Config{
+		Aliases: map[string]config.Alias{"lights": {Command: "batch on living-room"}},
+	})
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -103,17 +106,78 @@ func TestRun_AliasNotFound(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{"nonexistent"})
+	cmd.SetArgs(args)
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
+	return mgr, out, cmd.Execute()
+}
 
-	err := cmd.Execute()
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_AliasNotFound(t *testing.T) {
+	_, _, err := newAliasDeleteTest(t, "nonexistent", "--yes")
 	if err == nil {
 		t.Fatal("expected error for non-existent alias")
 	}
-
 	if !strings.Contains(err.Error(), "not found") {
 		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_YesDeletesWithoutPrompt(t *testing.T) {
+	mgr, out, err := newAliasDeleteTest(t, "lights", "--yes")
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if mgr.IsAlias("lights") {
+		t.Error("alias should have been deleted")
+	}
+	if !strings.Contains(out.String(), "deleted") {
+		t.Errorf("expected 'deleted' in output, got: %s", out.String())
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_ShortYesFlag(t *testing.T) {
+	mgr, _, err := newAliasDeleteTest(t, "lights", "-y")
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if mgr.IsAlias("lights") {
+		t.Error("alias should have been deleted")
+	}
+}
+
+// Without --yes the command asks first; a non-interactive terminal answers
+// with the prompt's default (no), so nothing is deleted.
+//
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_WithoutYesConfirmsFirst(t *testing.T) {
+	mgr, out, err := newAliasDeleteTest(t, "lights")
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if !mgr.IsAlias("lights") {
+		t.Error("alias must not be deleted without confirmation")
+	}
+	if !strings.Contains(out.String(), "cancelled") {
+		t.Errorf("expected 'cancelled' in output, got: %s", out.String())
+	}
+}
+
+func TestNewCommand_YesFlag(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	flag := cmd.Flags().Lookup("yes")
+	if flag == nil {
+		t.Fatal("--yes flag not found")
+	}
+	if flag.Shorthand != "y" {
+		t.Errorf("--yes shorthand = %q, want y", flag.Shorthand)
+	}
+	if !strings.Contains(cmd.Example, "--yes") {
+		t.Error("Example should show --yes")
 	}
 }
 

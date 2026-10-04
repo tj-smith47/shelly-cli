@@ -134,8 +134,10 @@ func run(ctx context.Context, targets []string, method string, params map[string
 	// Cap concurrency to global rate limit
 	concurrent := cmdutil.CapConcurrency(ios, opts.Concurrent)
 
-	// Create MultiWriter for progress tracking
-	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
+	// stdout carries the results document, so progress and the summary go to
+	// stderr and `batch command ... | jq` reads nothing but JSON.
+	status := ios.OnStderr()
+	mw := iostreams.NewMultiWriter(status.Out, status.IsStdoutTTY())
 
 	// Add all lines upfront
 	for _, target := range targets {
@@ -185,18 +187,18 @@ func run(ctx context.Context, targets []string, method string, params map[string
 	mw.Finalize()
 
 	// For TTY, add a blank line before JSON/YAML output for clarity
-	if ios.IsStdoutTTY() {
-		ios.Printf("\n")
+	if status.IsStdoutTTY() {
+		status.Printf("\n")
 	}
 
 	// Output results
 	switch opts.Format {
 	case formatYAML:
-		if err := output.PrintYAML(results); err != nil {
+		if err := output.YAML(ios.Out, results); err != nil {
 			return err
 		}
 	default:
-		if err := output.PrintJSON(results); err != nil {
+		if err := output.JSON(ios.Out, results); err != nil {
 			return err
 		}
 	}
@@ -204,9 +206,9 @@ func run(ctx context.Context, targets []string, method string, params map[string
 	// Print summary
 	success, failed, _ := mw.Summary()
 	if failed > 0 {
-		ios.Warning("%d/%d devices failed", failed, len(targets))
+		status.Warning("%d/%d devices failed", failed, len(targets))
 		return fmt.Errorf("%d/%d devices failed", failed, len(targets))
 	}
-	ios.Info("Command sent to %d device(s)", success)
+	status.Info("Command sent to %d device(s)", success)
 	return nil
 }

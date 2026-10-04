@@ -29,7 +29,7 @@ shelly device config export <device> <file> [flags]
 ### Options
 
 ```
-  -f, --format string   Output format (json, yaml) (default "json")
+  -f, --format string   Output format: json, yaml, yml (default "json")
   -h, --help            help for export
 ```
 

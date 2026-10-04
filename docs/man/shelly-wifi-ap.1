@@ -38,6 +38,10 @@ can connect to. Use --clients to list connected clients.
 	Access point password
 
 .PP
+\fB--password-stdin\fP[=false]
+	Read the access point password from stdin
+
+.PP
 \fB--ssid\fP=""
 	Access point SSID
 
@@ -107,6 +111,9 @@ can connect to. Use --clients to list connected clients.
 .EX
   # Enable access point with custom SSID
   shelly wifi ap living-room --enable --ssid "ShellyAP" --password "secret"
+
+  # Read the access point password from stdin
+  shelly wifi ap living-room --enable --ssid "ShellyAP" --password-stdin < ~/.shelly-ap-password
 
   # Disable access point
   shelly wifi ap living-room --disable

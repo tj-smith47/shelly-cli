@@ -52,7 +52,7 @@ Use --all to show all device schedules.`,
   shelly thermostat schedule list gateway --all
 
   # Output as JSON
-  shelly thermostat schedule list gateway --json`,
+  shelly thermostat schedule list gateway -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -63,7 +63,7 @@ Use --all to show all device schedules.`,
 
 	cmd.Flags().IntVar(&opts.ThermostatID, "thermostat-id", 0, "Filter by thermostat component ID")
 	cmd.Flags().BoolVar(&opts.All, "all", false, "Show all device schedules")
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", formatJSON)
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", formatJSON, "yaml")
 
 	return cmd
 }
@@ -107,13 +107,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.Format == formatJSON {
-		jsonBytes, jsonErr := json.MarshalIndent(thermostatSchedules, "", "  ")
-		if jsonErr != nil {
-			return fmt.Errorf("failed to format JSON: %w", jsonErr)
-		}
-		ios.Println(string(jsonBytes))
-		return nil
+	if opts.Structured() {
+		return cmdutil.PrintStructuredList(ios, opts.Format, thermostatSchedules)
 	}
 
 	term.DisplayThermostatSchedules(ios, thermostatSchedules, opts.Device, opts.All)

@@ -10,7 +10,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -43,7 +42,7 @@ label or web UI at http://<device-ip>/matter for the QR code.`,
   shelly matter code living-room
 
   # Output as JSON
-  shelly matter code living-room --json`,
+  shelly matter code living-room -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,7 +51,7 @@ label or web UI at http://<device-ip>/matter for the QR code.`,
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json", "yaml")
 
 	return cmd
 }
@@ -77,11 +76,15 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if !commissionable {
+		if opts.Structured() {
+			// stdout carries the JSON document, so the hint goes to stderr.
+			hints := ios.OnStderr()
+			hints.Warning("Device is not commissionable.")
+			hints.Info("Enable Matter first: shelly matter enable %s", opts.Device)
+			return cmdutil.PrintStructured(ios, opts.Format, model.CommissioningInfo{Available: false})
+		}
 		ios.Warning("Device is not commissionable.")
 		ios.Info("Enable Matter first: shelly matter enable %s", opts.Device)
-		if opts.Format == string(output.FormatJSON) {
-			return output.JSON(ios.Out, model.CommissioningInfo{Available: false})
-		}
 		return nil
 	}
 
@@ -90,15 +93,15 @@ func run(ctx context.Context, opts *Options) error {
 	if err != nil {
 		ios.Debug("failed to get commissioning code: %v", err)
 		// Code not available via API, show instructions
-		if opts.Format == string(output.FormatJSON) {
-			return output.JSON(ios.Out, model.CommissioningInfo{Available: false})
+		if opts.Structured() {
+			return cmdutil.PrintStructured(ios, opts.Format, model.CommissioningInfo{Available: false})
 		}
 		term.DisplayNotAvailable(ios, deviceIP)
 		return nil
 	}
 
-	if opts.Format == string(output.FormatJSON) {
-		return output.JSON(ios.Out, info)
+	if opts.Structured() {
+		return cmdutil.PrintStructured(ios, opts.Format, info)
 	}
 
 	term.DisplayCommissioningInfo(ios, info, deviceIP)

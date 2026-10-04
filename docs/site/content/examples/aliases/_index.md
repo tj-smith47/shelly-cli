@@ -56,14 +56,14 @@ aliases:
   home: "scene activate home"
 
   # Energy logging (shell mode for file output)
-  log-power: "!shelly energy status --all -o csv >> ~/shelly-power.csv"
+  log-power: "!shelly energy status --all -o json | jq -r '.[] | [(now | todate), .name, .power] | @csv' >> ~/shelly-power.csv"
 
   # Health checks for monitoring
-  check-all: "!shelly device list -o json | jq -e 'all(.online)' > /dev/null && echo OK || echo FAIL"
-  check-offline: "!shelly device list -o json | jq -r '.[] | select(.online == false) | .name'"
+  check-all: "!shelly status -o json | jq -e 'all(.online)' > /dev/null && echo OK || echo FAIL"
+  check-offline: "!shelly status -o json | jq -r '.[] | select(.online == false) | .name'"
 
   # Webhook testing
-  hook-test: "webhook server --port 8080 --log"
+  hook-test: "webhook server --port 8080 --log-json"
 
   # Backup automation
   backup-daily: "!shelly backup create --all --dir ~/shelly-backups/$(date +%Y-%m-%d)"
@@ -76,15 +76,15 @@ aliases:
   alert-snooze: "alert snooze"
 
   # Report generation
-  report-daily: "!shelly report energy --format json > ~/shelly-reports/energy-$(date +%Y-%m-%d).json"
+  report-daily: "!shelly report --type energy --format json > ~/shelly-reports/energy-$(date +%Y-%m-%d).json"
   report-audit: "audit --check-firmware --check-auth -o json"
 
   # Prometheus metrics export
-  metrics: "metrics export prometheus"
+  metrics: "metrics prometheus"
 
   # Party and fun
   party-mode: "party --duration 5m"
-  sleep-mode: "sleep --duration 30m"
+  sleep-mode: "sleep --delay 30m"
   wake-mode: "wake --duration 15m --simulate sunrise"
 
   # Conditional operations (shell mode with proper bash syntax)
@@ -128,8 +128,8 @@ aliases:
   all-off: "batch off --all"
 
   # Configuration export shortcuts
-  cfgx: "config export -o yaml"
-  cfgj: "config export -o json"
+  cfgx: "config show -o yaml"
+  cfgj: "config show -o json"
 
   # Firmware check all devices at once
   fw-check: "firmware check --all"
@@ -141,24 +141,23 @@ aliases:
   pwr-hist: "energy history"
 
   # Quick debug/diagnostics
-  methods: "debug methods"
-  rpc: "debug rpc"
+  methods: "api methods"
 
   # Backup shortcuts
   bk: "backup create"
   bk-all: "backup create --all"
 
   # TUI dashboard access
-  ui: "tui dash"
+  ui: "dash"
 
   # Open device web interface
   web: "device ui"
 
   # Shell aliases for JSON filtering (requires jq)
   # List only online devices
-  online: "!shelly device list -o json | jq -r '.[] | select(.online == true) | .name'"
+  online: "!shelly status -o json | jq -r '.[] | select(.online == true) | .name'"
   # List only offline devices
-  offline: "!shelly device list -o json | jq -r '.[] | select(.online == false) | .name'"
+  offline: "!shelly status -o json | jq -r '.[] | select(.online == false) | .name'"
   # Power summary for all devices
   pwr-summary: "!shelly energy status --all -o json | jq -r '.[] | \"\\(.name): \\(.power // 0)W\"'"
 ```

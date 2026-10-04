@@ -26,14 +26,14 @@ shelly api methods <device> [flags]
   shelly api methods living-room --filter Switch
 
   # Output as JSON
-  shelly api methods living-room --json
+  shelly api methods living-room -o json
 ```
 
 ### Options
 
 ```
       --filter string   Filter methods by name (case-insensitive)
-  -f, --format string   Output format: text, json (default "text")
+  -f, --format string   Output format: text, json, yaml (default "text")
   -h, --help            help for methods
 ```
 

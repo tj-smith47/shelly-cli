@@ -13,10 +13,10 @@ import (
 
 // InputInfo holds input information for list operations.
 type InputInfo struct {
-	ID    int
-	Name  string
-	Type  string
-	State bool
+	ID    int    `json:"id" yaml:"id"`
+	Name  string `json:"name" yaml:"name"`
+	Type  string `json:"type" yaml:"type"`
+	State bool   `json:"state" yaml:"state"`
 }
 
 // ListHeaders returns the column headers for the table.
@@ -87,7 +87,11 @@ func (s *Service) InputSetConfig(ctx context.Context, identifier string, inputID
 // InputList lists all input components on a device with their status.
 func (s *Service) InputList(ctx context.Context, identifier string) ([]InputInfo, error) {
 	var result []InputInfo
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.withGenAwareAction(ctx, identifier, func(conn *client.Gen1Client) error {
+		var err error
+		result, err = gen1InputList(ctx, conn)
+		return err
+	}, func(conn *client.Client) error {
 		components, err := conn.FilterComponents(ctx, model.ComponentInput)
 		if err != nil {
 			return err

@@ -21,7 +21,9 @@ type Options struct {
 	Disable  bool
 	Enable   bool
 	Password string
-	SSID     string
+	// PasswordStdin reads Password from stdin.
+	PasswordStdin bool
+	SSID          string
 }
 
 // NewCommand creates the wifi ap command.
@@ -39,6 +41,9 @@ can connect to. Use --clients to list connected clients.`,
 		Example: `  # Enable access point with custom SSID
   shelly wifi ap living-room --enable --ssid "ShellyAP" --password "secret"
 
+  # Read the access point password from stdin
+  shelly wifi ap living-room --enable --ssid "ShellyAP" --password-stdin < ~/.shelly-ap-password
+
   # Disable access point
   shelly wifi ap living-room --disable
 
@@ -53,7 +58,8 @@ can connect to. Use --clients to list connected clients.`,
 	}
 
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Access point SSID")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "Access point password")
+	cmdutil.AddSecretFlags(cmd, &opts.Password, &opts.PasswordStdin, "password",
+		"Access point password", "Read the access point password from stdin")
 	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable access point")
 	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable access point")
 	cmd.MarkFlagsMutuallyExclusive("enable", "disable")
@@ -67,6 +73,9 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
+	if err := cmdutil.ResolveSecret(ios, &opts.Password, opts.PasswordStdin, "password", "Access point password"); err != nil {
+		return err
+	}
 	svc := opts.Factory.ShellyService()
 
 	// If --clients flag, list connected clients

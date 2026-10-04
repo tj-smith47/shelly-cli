@@ -35,7 +35,7 @@ func TestNewCommand_Structure(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "export <name> [file]")
 	}
 
-	wantAliases := []string{"save", "dump"}
+	wantAliases := []string{"dump"}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
 	}

@@ -13,7 +13,7 @@ import (
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "mcp",
-		Aliases: []string{"rpc"},
+		Aliases: []string{"mcp-server"},
 		Short:   "MCP server for AI assistant integration",
 		Long: `MCP (Model Context Protocol) server for AI assistant integration.
 

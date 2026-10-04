@@ -23,16 +23,16 @@ Displays:
 
 
 .SH OPTIONS
+\fB-f\fP, \fB--format\fP="text"
+	Output format: text, json, yaml
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for status
 
 .PP
 \fB-i\fP, \fB--id\fP=0
 	Thermostat component ID (default 0)
-
-.PP
-\fB--json\fP[=false]
-	Output as JSON
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -105,7 +105,7 @@ Displays:
   shelly thermostat status gateway --id 1
 
   # Output as JSON
-  shelly thermostat status gateway --json
+  shelly thermostat status gateway -o json
 .EE
 
 

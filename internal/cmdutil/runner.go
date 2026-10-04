@@ -5,27 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
-	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/jq"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/yamlfmt"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
-
-// logVerbose logs a message to stderr only if verbose mode is enabled.
-func logVerbose(format string, args ...any) {
-	if viper.GetBool("verbose") {
-		fmt.Fprintf(os.Stderr, "debug: "+format+"\n", args...)
-	}
-}
 
 // CapConcurrency caps the requested concurrency to the global rate limit.
 // If the requested value exceeds the global limit, it prints a warning and returns the capped value.
@@ -187,7 +178,7 @@ func RunBatchWithResults(ctx context.Context, svc *shelly.Service, targets []str
 	// Wait for all goroutines and collect results
 	go func() {
 		if err := g.Wait(); err != nil {
-			logVerbose("batch wait error: %v", err)
+			iostreams.DebugErr("batch wait", err)
 		}
 		close(resultChan)
 	}()
@@ -292,8 +283,7 @@ func PrintResult[T any](ios *iostreams.IOStreams, data T, display StatusDisplay[
 		enc.SetIndent("", "  ")
 		return enc.Encode(data)
 	case output.FormatYAML:
-		enc := yaml.NewEncoder(ios.Out)
-		return enc.Encode(data)
+		return (&yamlfmt.Formatter{}).Format(ios.Out, data)
 	case output.FormatTemplate:
 		return output.FormatOutput(ios.Out, data)
 	default:
@@ -333,7 +323,7 @@ type ListFetcher[T any] func(ctx context.Context, svc *shelly.Service, device st
 type ListDisplay[T any] func(ios *iostreams.IOStreams, items []T)
 
 // RunList executes a list fetch with spinner and handles output formatting.
-// Returns early with a message if the list is empty.
+// An empty list prints emptyMsg in human-readable output and [] in structured output.
 func RunList[T any](
 	ctx context.Context,
 	ios *iostreams.IOStreams,
@@ -351,18 +341,49 @@ func RunList[T any](
 		return err
 	}
 
-	if len(items) == 0 {
-		ios.NoResults(emptyMsg)
+	return PrintList(ios, items, display, func() { ios.NoResults(emptyMsg) })
+}
+
+// PrintList outputs list data in the configured format and handles the empty
+// case for every list command. Structured output (-o json, yaml or template,
+// --jq, --fields) always writes a list, empty when there are no items, so a
+// script can parse every run. Human-readable output calls onEmpty when there
+// are no items and display otherwise.
+func PrintList[T any](ios *iostreams.IOStreams, items []T, display ListDisplay[T], onEmpty func()) error {
+	if len(items) == 0 && !StructuredOutput() {
+		onEmpty()
 		return nil
 	}
-
 	return PrintListResult(ios, items, display)
+}
+
+// PrintStructured writes data as YAML when format is "yaml" and as JSON
+// otherwise, for commands that choose their format with a local --format flag
+// (see flags.OutputFlags.Structured).
+func PrintStructured(ios *iostreams.IOStreams, format string, data any) error {
+	if format == string(output.FormatYAML) {
+		return output.YAML(ios.Out, data)
+	}
+	return output.JSON(ios.Out, data)
+}
+
+// PrintStructuredList is PrintStructured for a list: no items prints [], so
+// the output is always a list.
+func PrintStructuredList[T any](ios *iostreams.IOStreams, format string, items []T) error {
+	if items == nil {
+		items = []T{}
+	}
+	return PrintStructured(ios, format, items)
 }
 
 // PrintListResult outputs list data in the configured format (JSON, YAML, template, or human-readable).
 // If --fields is set, prints available field names instead of data.
 // If --jq is set, the jq filter is applied to the data regardless of output format.
 func PrintListResult[T any](ios *iostreams.IOStreams, items []T, display ListDisplay[T]) error {
+	if items == nil {
+		// A nil slice encodes as null, which is not a list.
+		items = []T{}
+	}
 	if jq.HasFields() {
 		return jq.PrintFields(ios.Out, items)
 	}
@@ -376,8 +397,7 @@ func PrintListResult[T any](ios *iostreams.IOStreams, items []T, display ListDis
 		enc.SetIndent("", "  ")
 		return enc.Encode(items)
 	case output.FormatYAML:
-		enc := yaml.NewEncoder(ios.Out)
-		return enc.Encode(items)
+		return (&yamlfmt.Formatter{}).Format(ios.Out, items)
 	case output.FormatTemplate:
 		return output.FormatOutput(ios.Out, items)
 	default:
@@ -452,12 +472,7 @@ func RunCachedList[T any](
 		return err
 	}
 
-	if len(result.Data) == 0 {
-		ios.NoResults(emptyMsg)
-		return nil
-	}
-
-	return PrintListResult(ios, result.Data, display)
+	return PrintList(ios, result.Data, display, func() { ios.NoResults(emptyMsg) })
 }
 
 // RunCachedStatus executes a component status fetch with cache integration.

@@ -4,7 +4,7 @@ Turn rgbw on
 
 ### Synopsis
 
-Turn on a rgbw component on the specified device.
+Turn on an rgbw component on the specified device.
 
 ```
 shelly rgbw on <device> [flags]

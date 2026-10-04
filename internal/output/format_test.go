@@ -1029,46 +1029,6 @@ func TestShouldHighlight_TTY(t *testing.T) {
 	})
 }
 
-//nolint:paralleltest // Writes to shared stdout
-func TestPrint_ToStdout(t *testing.T) {
-	// Test that Print doesn't panic and writes to stdout
-	data := map[string]string{"key": "value"}
-	err := Print(data)
-	if err != nil {
-		t.Errorf("Print() returned error: %v", err)
-	}
-}
-
-//nolint:paralleltest // Writes to shared stdout
-func TestPrintJSON_ToStdout(t *testing.T) {
-	// Test that PrintJSON doesn't panic and writes to stdout
-	data := map[string]string{"key": "value"}
-	err := PrintJSON(data)
-	if err != nil {
-		t.Errorf("PrintJSON() returned error: %v", err)
-	}
-}
-
-//nolint:paralleltest // Writes to shared stdout
-func TestPrintYAML_ToStdout(t *testing.T) {
-	// Test that PrintYAML doesn't panic and writes to stdout
-	data := map[string]string{"key": "value"}
-	err := PrintYAML(data)
-	if err != nil {
-		t.Errorf("PrintYAML() returned error: %v", err)
-	}
-}
-
-//nolint:paralleltest // Writes to shared stdout
-func TestPrintTemplate_ToStdout(t *testing.T) {
-	// Test that PrintTemplate doesn't panic and writes to stdout
-	data := map[string]string{"key": "value"}
-	err := PrintTemplate("{{.key}}", data)
-	if err != nil {
-		t.Errorf("PrintTemplate() returned error: %v", err)
-	}
-}
-
 func TestNewJSONFormatter_WithTTY(t *testing.T) {
 	// Save and restore isTTY
 	oldIsTTY := synfmt.IsTTY

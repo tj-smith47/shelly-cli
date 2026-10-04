@@ -10,7 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -81,36 +81,23 @@ func run(opts *Options) error {
 		dir = filepath.Join(configDir, "backups")
 	}
 
-	// Validate directory exists
+	var backups []model.BackupFileInfo
+	emptyMsg := fmt.Sprintf("No backup files found in %s", dir)
 	info, err := config.Fs().Stat(dir)
-	if os.IsNotExist(err) {
-		ios.Info("No backups directory found at %s", dir)
-		return nil
-	}
-	if err != nil {
+	switch {
+	case os.IsNotExist(err):
+		emptyMsg = fmt.Sprintf("No backups directory found at %s", dir)
+	case err != nil:
 		return fmt.Errorf("failed to access directory: %w", err)
-	}
-	if !info.IsDir() {
+	case !info.IsDir():
 		return fmt.Errorf("%s is not a directory", dir)
+	default:
+		if backups, err = export.ScanBackupFiles(dir); err != nil {
+			return err
+		}
 	}
 
-	// Scan for backup files
-	backups, err := export.ScanBackupFiles(dir)
-	if err != nil {
-		return err
-	}
-
-	if len(backups) == 0 {
-		ios.Info("No backup files found in %s", dir)
-		return nil
-	}
-
-	// Handle structured output (JSON/YAML) via global -o flag
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, backups)
-	}
-
-	// Default table output
-	term.DisplayBackupsTable(ios, backups)
-	return nil
+	return cmdutil.PrintList(ios, backups, term.DisplayBackupsTable, func() {
+		ios.Info("%s", emptyMsg)
+	})
 }

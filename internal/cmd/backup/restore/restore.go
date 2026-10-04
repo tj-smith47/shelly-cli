@@ -32,6 +32,7 @@ type restoreService interface {
 type Options struct {
 	Factory                *cmdutil.Factory
 	Decrypt                string
+	DecryptStdin           bool
 	Device                 string
 	DryRun                 bool
 	FilePath               string
@@ -51,6 +52,7 @@ type Options struct {
 	APIP                   string
 	SSID                   string
 	Password               string
+	PasswordStdin          bool
 	Open                   bool
 	AllowFirmwareDowngrade bool
 	FirmwareURL            string
@@ -98,6 +100,9 @@ sections.`,
   # Restore encrypted backup
   shelly backup restore living-room backup.json --decrypt mysecret
 
+  # Read the decryption password from stdin
+  shelly backup restore living-room backup.json --decrypt-stdin < ~/.shelly-backup-password
+
   # Skip scripts during restore
   shelly backup restore living-room backup.json --skip-scripts
 
@@ -143,7 +148,8 @@ sections.`,
 	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Skip webhook restoration")
 	cmd.Flags().BoolVar(&opts.SkipState, "skip-state", false, "Skip restoring live component state (color temperature, brightness); apply configuration only")
 	cmd.Flags().BoolVar(&opts.SkipMeters, "skip-meters", false, "Skip restoring meter/energy-meter configuration (e.g. overpower limits)")
-	cmd.Flags().StringVarP(&opts.Decrypt, "decrypt", "d", "", "Password to decrypt backup")
+	cmdutil.AddSecretFlagsP(cmd, &opts.Decrypt, &opts.DecryptStdin, "decrypt", "d",
+		"Password to decrypt backup", "Read the password to decrypt the backup from stdin")
 	cmdutil.AddStaticIPFlags(cmd, &opts.StaticIP, &opts.Gateway, &opts.Netmask, &opts.DNS,
 		"Override the backup's WiFi with this static IPv4 address (--gateway, --netmask and --dns default to the backup's)",
 		"the backup's")
@@ -151,7 +157,7 @@ sections.`,
 	cmd.Flags().StringVar(&opts.ToAP, "to-ap", "", "Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)")
 	cmd.Flags().StringVar(&opts.APIP, "ap-ip", "", "Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)")
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the device joins (defaults to the backup's network)")
-	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password, &opts.PasswordStdin)
 	cmdutil.AddOpenFlag(cmd, &opts.Open)
 	cmd.Flags().BoolVar(&opts.AllowFirmwareDowngrade, "allow-firmware-downgrade", false, "Force the older-firmware config write instead of the automatic firmware update (Gen1; the device is updated to matched firmware by default when the backup is newer — this skips that and accepts the reboot-loop risk)")
 	cmd.Flags().StringVar(&opts.FirmwareURL, "firmware-url", "", "Firmware image for the automatic downgrade-recovery update (default: derived from the backup's device model)")
@@ -248,6 +254,12 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
+	if err := cmdutil.ReadWiFiPasswordStdin(ios, &opts.Password, opts.PasswordStdin); err != nil {
+		return err
+	}
+	if err := cmdutil.ResolveSecret(ios, &opts.Decrypt, opts.DecryptStdin, "decrypt", "Backup password"); err != nil {
+		return err
+	}
 
 	// Resolve file path (check backups dir if not found as-is)
 	opts.FilePath = backup.ResolveFilePath(opts.FilePath)
@@ -259,11 +271,11 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Load the backup, transparently decrypting an encrypted envelope when
-	// --decrypt supplies the password.
+	// --decrypt or --decrypt-stdin supplies the password.
 	bkp, err := backup.Load(data, opts.Decrypt)
 	if err != nil {
 		if errors.Is(err, backup.ErrEncryptedNeedsPassword) {
-			return fmt.Errorf("backup is encrypted, use --decrypt to provide the password")
+			return errors.New("backup is encrypted: give its password with --decrypt <value>, or read it from stdin with --decrypt-stdin")
 		}
 		return fmt.Errorf("invalid backup file: %w", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/activate"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/addaction"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/create"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/deletecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/export"
@@ -30,6 +31,9 @@ Each scene contains one or more actions that are executed when the scene is acti
   # Create a new scene
   shelly scene create movie-night
 
+  # Add an action to it
+  shelly scene add-action movie-night lamp Light.Set '{"id":0,"on":true,"brightness":20}'
+
   # Show scene details
   shelly scene show movie-night
 
@@ -48,6 +52,7 @@ Each scene contains one or more actions that are executed when the scene is acti
 
 	cmd.AddCommand(list.NewCommand(f))
 	cmd.AddCommand(create.NewCommand(f))
+	cmd.AddCommand(addaction.NewCommand(f))
 	cmd.AddCommand(deletecmd.NewCommand(f))
 	cmd.AddCommand(activate.NewCommand(f))
 	cmd.AddCommand(show.NewCommand(f))

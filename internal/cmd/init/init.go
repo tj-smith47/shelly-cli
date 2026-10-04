@@ -12,10 +12,12 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Factory     *cmdutil.Factory
-	WizardOpts  *wizard.Options
-	Check       bool
-	RootCommand *cobra.Command // Needed for wizard.Run
+	Factory    *cmdutil.Factory
+	WizardOpts *wizard.Options
+	Check      bool
+	// CloudPasswordStdin reads WizardOpts.CloudPassword from stdin.
+	CloudPasswordStdin bool
+	RootCommand        *cobra.Command // Needed for wizard.Run
 }
 
 // NewCommand creates the init command.
@@ -80,7 +82,10 @@ Use --check to verify your current setup without making changes.`,
     --no-color
 
   # With cloud credentials
-  shelly init --defaults --cloud-email user@example.com --cloud-password secret`,
+  shelly init --defaults --cloud-email user@example.com --cloud-password secret
+
+  # With the cloud password read from stdin
+  shelly init --defaults --cloud-email user@example.com --cloud-password-stdin < ~/.shelly-cloud-password`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			opts.RootCommand = cmd.Root()
 			return run(cmd.Context(), opts)
@@ -110,7 +115,8 @@ Use --check to verify your current setup without making changes.`,
 
 	// Cloud flags
 	cmd.Flags().StringVar(&wizardOpts.CloudEmail, "cloud-email", "", "Shelly Cloud email (enables cloud setup)")
-	cmd.Flags().StringVar(&wizardOpts.CloudPassword, "cloud-password", "", "Shelly Cloud password (enables cloud setup)")
+	cmdutil.AddSecretFlags(cmd, &wizardOpts.CloudPassword, &opts.CloudPasswordStdin, "cloud-password",
+		"Shelly Cloud password (enables cloud setup)", "Read the Shelly Cloud password from stdin (enables cloud setup)")
 
 	// Telemetry flags
 	cmd.Flags().BoolVar(&wizardOpts.Telemetry, "telemetry", false, "Enable anonymous usage telemetry (opt-in)")
@@ -126,6 +132,10 @@ Use --check to verify your current setup without making changes.`,
 func run(ctx context.Context, opts *Options) error {
 	if opts.Check {
 		return wizard.RunCheck(opts.Factory)
+	}
+	if err := cmdutil.ResolveSecret(opts.Factory.IOStreams(), &opts.WizardOpts.CloudPassword, opts.CloudPasswordStdin,
+		"cloud-password", "Shelly Cloud password"); err != nil {
+		return err
 	}
 	return wizard.Run(ctx, opts.Factory, opts.RootCommand, opts.WizardOpts)
 }

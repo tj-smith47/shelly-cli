@@ -9,7 +9,7 @@ Toggle rgb on/off
 
 ### Synopsis
 
-Toggle a rgb component on or off on the specified device.
+Toggle an rgb component on or off on the specified device.
 
 ```
 shelly rgb toggle <device> [flags]

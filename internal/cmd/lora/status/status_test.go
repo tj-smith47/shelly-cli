@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -98,13 +99,12 @@ func TestNewCommand_Flags(t *testing.T) {
 		t.Fatal("--id flag not found")
 	}
 
-	// Test json flag exists
-	jsonFlag := cmd.Flags().Lookup("json")
-	if jsonFlag == nil {
-		t.Fatal("--json flag not found")
+	formatFlag := cmd.Flags().Lookup("format")
+	if formatFlag == nil {
+		t.Fatal("--format flag not found")
 	}
-	if jsonFlag.DefValue != "false" {
-		t.Errorf("--json default = %q, want %q", jsonFlag.DefValue, "false")
+	if formatFlag.DefValue != "text" {
+		t.Errorf("--format default = %q, want %q", formatFlag.DefValue, "text")
 	}
 }
 
@@ -141,7 +141,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 
 	wantPatterns := []string{
 		"shelly lora status",
-		"--json",
+		"-o json",
 		"--id",
 	}
 
@@ -157,9 +157,9 @@ func TestOptions(t *testing.T) {
 
 	f := cmdutil.NewFactory()
 	opts := &Options{
-		Device:  "test-device",
-		Factory: f,
-		JSON:    true,
+		Device:      "test-device",
+		Factory:     f,
+		OutputFlags: flags.OutputFlags{Format: "json"},
 	}
 
 	if opts.Device != "test-device" {
@@ -168,10 +168,6 @@ func TestOptions(t *testing.T) {
 
 	if opts.Factory == nil {
 		t.Error("Factory is nil")
-	}
-
-	if !opts.JSON {
-		t.Error("JSON should be true")
 	}
 }
 
@@ -205,7 +201,6 @@ func TestRun_DefaultOutput(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Device:  "test-device",
-		JSON:    false,
 	}
 	opts.ID = 100
 
@@ -245,9 +240,9 @@ func TestRun_JSONOutput(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-		JSON:    true,
+		Factory:     tf.Factory,
+		Device:      "test-device",
+		OutputFlags: flags.OutputFlags{Format: "json"},
 	}
 	opts.ID = 100
 
@@ -277,7 +272,6 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Device:  "nonexistent",
-		JSON:    false,
 	}
 	opts.ID = 100
 
@@ -329,7 +323,7 @@ func TestExecute_Success(t *testing.T) {
 }
 
 //nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
-func TestExecute_WithJSONFlag(t *testing.T) {
+func TestExecute_WithJSONFormat(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -358,7 +352,7 @@ func TestExecute_WithJSONFlag(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-device", "--json"})
+	cmd.SetArgs([]string{"test-device", "--format", "json"})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 

@@ -46,7 +46,7 @@ Only sensors present on the device will be shown.`,
   shelly sensor status living-room
 
   # Output as JSON
-  shelly sensor status living-room --json`,
+  shelly sensor status living-room -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -55,7 +55,7 @@ Only sensors present on the device will be shown.`,
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json", "yaml")
 
 	return cmd
 }
@@ -95,13 +95,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.Format == "json" {
-		jsonOut, jsonErr := json.MarshalIndent(data, "", "  ")
-		if jsonErr != nil {
-			return fmt.Errorf("failed to format JSON: %w", jsonErr)
-		}
-		ios.Println(string(jsonOut))
-		return nil
+	if opts.Structured() {
+		return cmdutil.PrintStructured(ios, opts.Format, data)
 	}
 
 	term.DisplayAllSensorData(ios, data, opts.Device)

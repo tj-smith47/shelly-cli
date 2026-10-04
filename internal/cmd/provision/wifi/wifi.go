@@ -16,12 +16,13 @@ import (
 
 // Options holds command options.
 type Options struct {
-	Device   string
-	SSID     string
-	Password string
-	Open     bool
-	NoScan   bool
-	Factory  *cmdutil.Factory
+	Device        string
+	SSID          string
+	Password      string
+	PasswordStdin bool
+	Open          bool
+	NoScan        bool
+	Factory       *cmdutil.Factory
 }
 
 // NewCommand creates the provision wifi command.
@@ -61,7 +62,7 @@ Use --open for a network that has no password.`,
 	}
 
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "WiFi network name (skip selection)")
-	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password, &opts.PasswordStdin)
 	cmdutil.AddOpenFlag(cmd, &opts.Open)
 	cmd.Flags().BoolVar(&opts.NoScan, "no-scan", false, "Skip network scan, prompt for SSID")
 
@@ -73,6 +74,9 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
+	if err := cmdutil.ReadWiFiPasswordStdin(ios, &opts.Password, opts.PasswordStdin); err != nil {
+		return err
+	}
 	svc := opts.Factory.ShellyService()
 
 	// Get SSID if not provided

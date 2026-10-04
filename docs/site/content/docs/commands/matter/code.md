@@ -31,13 +31,13 @@ shelly matter code <device> [flags]
   shelly matter code living-room
 
   # Output as JSON
-  shelly matter code living-room --json
+  shelly matter code living-room -o json
 ```
 
 ### Options
 
 ```
-  -f, --format string   Output format: text, json (default "text")
+  -f, --format string   Output format: text, json, yaml (default "text")
   -h, --help            help for code
 ```
 

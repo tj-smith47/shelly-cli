@@ -34,7 +34,7 @@ shelly energy export <device> [id] [flags]
 ### Options
 
 ```
-  -f, --format string   Output format (csv, json, yaml) (default "csv")
+  -f, --format string   Output format: csv, json, yaml (default "csv")
       --from string     Start time (RFC3339 or YYYY-MM-DD)
   -h, --help            help for export
   -o, --output string   Output file (default: stdout)

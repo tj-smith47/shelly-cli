@@ -132,11 +132,6 @@ func TestOptions(t *testing.T) {
 	if opts.Device != "test-device" {
 		t.Errorf("Device = %q, want %q", opts.Device, "test-device")
 	}
-
-	opts.Format = "json"
-	if opts.Format != "json" {
-		t.Errorf("Format = %q, want %q", opts.Format, "json")
-	}
 }
 
 func TestRun_WithMock(t *testing.T) {

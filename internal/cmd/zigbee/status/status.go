@@ -39,7 +39,7 @@ Displays the current Zigbee state including:
   shelly zigbee status living-room
 
   # Output as JSON
-  shelly zigbee status living-room --json`,
+  shelly zigbee status living-room -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -48,7 +48,7 @@ Displays the current Zigbee state including:
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json", "yaml")
 
 	return cmd
 }
@@ -65,8 +65,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.Format == "json" {
-		return term.OutputZigbeeStatusJSON(ios, status)
+	if opts.Structured() {
+		return cmdutil.PrintStructured(ios, opts.Format, status)
 	}
 
 	term.DisplayZigbeeStatus(ios, status)

@@ -26,8 +26,8 @@ func TestNewCommand(t *testing.T) {
 		t.Fatal("NewCommand returned nil")
 	}
 
-	if cmd.Use != "create <device> [file]" {
-		t.Errorf("Use = %q, want 'create <device> [file]'", cmd.Use)
+	if cmd.Use != "create [device] [file]" {
+		t.Errorf("Use = %q, want 'create [device] [file]'", cmd.Use)
 	}
 
 	if cmd.Short == "" {
@@ -81,10 +81,11 @@ func TestNewCommand_RequiresDevice(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	// Should require at least 1 argument (device)
+	// Zero args pass the arity check because --all takes none; RunE rejects
+	// zero args without --all (TestArgs_AllAndDirCombinations).
 	err := cmd.Args(cmd, []string{})
-	if err == nil {
-		t.Error("Expected error when no args provided")
+	if err != nil {
+		t.Errorf("Expected no arity error with zero args, got: %v", err)
 	}
 
 	// Should accept 1 arg (device only)

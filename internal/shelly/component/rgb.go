@@ -12,14 +12,14 @@ import (
 
 // RGBInfo holds RGB information for list operations.
 type RGBInfo struct {
-	ID         int
-	Name       string
-	Output     bool
-	Brightness int
-	Red        int
-	Green      int
-	Blue       int
-	Power      float64
+	ID         int     `json:"id" yaml:"id"`
+	Name       string  `json:"name" yaml:"name"`
+	Output     bool    `json:"output" yaml:"output"`
+	Brightness int     `json:"brightness" yaml:"brightness"`
+	Red        int     `json:"red" yaml:"red"`
+	Green      int     `json:"green" yaml:"green"`
+	Blue       int     `json:"blue" yaml:"blue"`
+	Power      float64 `json:"power" yaml:"power"`
 }
 
 // RGBSetParams holds parameters for RGBSet operation.

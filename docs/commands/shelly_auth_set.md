@@ -4,10 +4,16 @@ Set authentication credentials
 
 ### Synopsis
 
-Set authentication credentials for a device.
+Set the password a device requires, turning authentication on.
 
-This enables authentication if not already enabled. The username defaults
-to "admin" if not specified.
+Gen1 devices accept any username; without --user they get the user stored
+for them, or admin. Gen2+ devices have a single user, admin, so --user can
+only be left out or set to admin.
+
+Once the device has the new password, every request to it needs that
+password, so the new credentials are saved for a registered device. The
+command then makes an authenticated request with the new password and fails
+if the device does not accept it.
 
 ```
 shelly auth set <device> [flags]
@@ -16,20 +22,23 @@ shelly auth set <device> [flags]
 ### Examples
 
 ```
-  # Set credentials with default username
+  # Set the password (user admin)
   shelly auth set living-room --password secret
 
-  # Set credentials with custom username
-  shelly auth set living-room --user myuser --password secret
+  # Read the password from stdin, keeping it out of shell history
+  shelly auth set living-room --password-stdin < ~/.shelly-living-room-password
+
+  # Set a custom username (Gen1 devices only)
+  shelly auth set garage-gen1 --user myuser --password secret
 ```
 
 ### Options
 
 ```
   -h, --help              help for set
-      --password string   Password for authentication (required)
-      --realm string      Authentication realm (optional)
-      --user string       Username for authentication (default "admin")
+      --password string   New device password (or use --password-stdin)
+      --password-stdin    Read the new device password from stdin
+      --user string       Username: any name on Gen1, where it defaults to the stored user or admin; Gen2+ devices allow only admin
 ```
 
 ### Options inherited from parent commands

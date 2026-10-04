@@ -11,7 +11,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -44,7 +43,7 @@ BTHomeDevice including signal strength, battery, and known objects.`,
   shelly bthome status living-room 200
 
   # Output as JSON
-  shelly bthome status living-room 200 --json`,
+  shelly bthome status living-room 200 -o json`,
 		Args:              cobra.RangeArgs(1, 2),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -61,7 +60,7 @@ BTHomeDevice including signal strength, battery, and known objects.`,
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json", "yaml")
 
 	return cmd
 }
@@ -79,8 +78,8 @@ func run(ctx context.Context, opts *Options) error {
 			return err
 		}
 
-		if opts.Format == "json" {
-			return output.JSON(ios.Out, status)
+		if opts.Structured() {
+			return cmdutil.PrintStructured(ios, opts.Format, status)
 		}
 
 		term.DisplayBTHomeDeviceStatus(ios, status)
@@ -92,8 +91,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.Format == "json" {
-		return output.JSON(ios.Out, status)
+	if opts.Structured() {
+		return cmdutil.PrintStructured(ios, opts.Format, status)
 	}
 
 	term.DisplayBTHomeComponentStatus(ios, status)

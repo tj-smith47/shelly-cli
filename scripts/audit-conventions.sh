@@ -543,7 +543,7 @@ fi
 # The SDK websocket takes no dialer, so netguard sees it only through
 # client.NewDeviceWebSocket, which refuses a non-loopback host under test.
 RAW_WEBSOCKET=$(grep -rn "transport\.NewWebSocket(" --include='*.go' internal/ cmd/ 2>/dev/null |
-    grep -v "^internal/client/detect.go:" || true)
+    grep -v "^internal/client/websocket.go:" || true)
 if [[ -n "$RAW_WEBSOCKET" ]]; then
     error "transport.NewWebSocket called directly (use client.NewDeviceWebSocket):"
     echo "$RAW_WEBSOCKET" | head -10

@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/monitoring"
 )
 
 // Energy component type constants for auto-detection.
 const (
 	ComponentTypeAuto = "auto"
-	ComponentTypeEM   = "em"
-	ComponentTypeEM1  = "em1"
+	ComponentTypeEM   = monitoring.EnergyTypeEM
+	ComponentTypeEM1  = monitoring.EnergyTypeEM1
 )
 
 // Energy aggregation period names.

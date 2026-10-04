@@ -9,7 +9,6 @@ import (
 	"github.com/tj-smith47/shelly-go/zwave"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -20,7 +19,6 @@ const aliasShow = "show"
 
 // Options holds command options.
 type Options struct {
-	flags.OutputFlags
 	Model   string
 	Factory *cmdutil.Factory
 }
@@ -51,8 +49,6 @@ Displays device capabilities, supported protocols, and network topology options.
 			return run(opts)
 		},
 	}
-
-	flags.AddOutputFlags(cmd, &opts.OutputFlags)
 
 	return cmd
 }

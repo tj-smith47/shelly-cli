@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -15,17 +17,17 @@ import (
 
 // ComponentState holds a component's display info and state.
 type ComponentState struct {
-	Type  string // Formatted type like "Switch 0", "Input 1"
-	Name  string // User-assigned name from config (empty if none)
-	State string // State string like "ON (45W)", "idle"
+	Type  string `json:"type" yaml:"type"`   // Formatted type like "Switch 0", "Input 1"
+	Name  string `json:"name" yaml:"name"`   // User-assigned name from config (empty if none)
+	State string `json:"state" yaml:"state"` // State string like "ON (45W)", "idle"
 }
 
 // QuickDeviceStatus holds status for the all-devices view.
 type QuickDeviceStatus struct {
-	Name      string
-	Model     string
-	Online    bool
-	LinkState string // Derived state from parent link (empty if not linked or online)
+	Name      string `json:"name" yaml:"name"`
+	Model     string `json:"model" yaml:"model"`
+	Online    bool   `json:"online" yaml:"online"`
+	LinkState string `json:"link_state,omitempty" yaml:"link_state,omitempty"` // Derived state from parent link (empty if not linked or online)
 }
 
 // DisplayQuickDeviceStatus displays quick status for a single device.
@@ -47,6 +49,17 @@ func DisplayQuickDeviceStatus(ios *iostreams.IOStreams, states []ComponentState)
 	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print component status table", err)
 	}
+}
+
+// PlainComponentStates returns the states with terminal colour codes removed
+// from the state text, for output that a program reads.
+func PlainComponentStates(states []ComponentState) []ComponentState {
+	plain := make([]ComponentState, len(states))
+	for i, cs := range states {
+		cs.State = ansi.Strip(cs.State)
+		plain[i] = cs
+	}
+	return plain
 }
 
 // DisplayAllDevicesQuickStatus displays quick status for all registered devices.

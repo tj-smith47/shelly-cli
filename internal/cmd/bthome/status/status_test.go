@@ -145,7 +145,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 
 	wantPatterns := []string{
 		"shelly bthome status",
-		"--json",
+		"-o json",
 	}
 
 	for _, pattern := range wantPatterns {

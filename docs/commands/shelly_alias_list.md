@@ -1,10 +1,10 @@
 ## shelly alias list
 
-List aliass
+List aliases
 
 ### Synopsis
 
-List all configured aliass.
+List all configured aliases.
 
 Output is formatted as a table by default. Use -o json or -o yaml for
 structured output suitable for scripting.
@@ -16,7 +16,7 @@ shelly alias list [flags]
 ### Examples
 
 ```
-  # List all aliass
+  # List all aliases
   shelly alias list
 
   # Output as JSON

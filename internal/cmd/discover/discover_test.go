@@ -339,6 +339,7 @@ func TestNewCommand_AllFlagsExist(t *testing.T) {
 		"timeout",
 		"register",
 		"skip-existing",
+		"network",
 		"subnet",
 		"method",
 		"skip-plugins",

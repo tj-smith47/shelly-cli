@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -26,22 +25,10 @@ var (
 // Function variables for testability.
 // These can be replaced in tests to inject mock behavior.
 var (
-	osExecutable     = os.Executable
-	evalSymlinks     = filepath.EvalSymlinks
-	execCommandStart = defaultExecCommandStart
-	runtimeGOOS      = runtime.GOOS
+	osExecutable = os.Executable
+	evalSymlinks = filepath.EvalSymlinks
+	runtimeGOOS  = runtime.GOOS
 )
-
-// defaultExecCommandStart is the default implementation that starts a command.
-func defaultExecCommandStart(ctx context.Context, path string, args []string) error {
-	// G204: path is always the resolved path to the current executable
-	// (GetExecutablePath), never user-controlled, so re-exec is safe.
-	cmd := exec.CommandContext(ctx, path, args...) //nolint:gosec // G204: path is the current executable, not user input
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Start()
-}
 
 // SetFs sets the package-level filesystem for testing.
 // Pass nil to reset to the real OS filesystem.
@@ -317,17 +304,6 @@ var getEnv = os.Getenv
 // CanSelfUpdate returns true if the installation method supports self-update.
 func (i InstallInfo) CanSelfUpdate() bool {
 	return i.Method != InstallMethodHomebrew
-}
-
-// RestartCLI spawns a new process to replace the current one.
-// This is used after self-update to run the new version.
-func RestartCLI(ctx context.Context, args []string) error {
-	execPath, err := GetExecutablePath()
-	if err != nil {
-		return err
-	}
-
-	return execCommandStart(ctx, execPath, args)
 }
 
 // ConfirmFunc is a function that asks the user for confirmation.

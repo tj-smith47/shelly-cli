@@ -2,9 +2,6 @@
 package term
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -31,16 +28,6 @@ func DisplayMatterStatus(ios *iostreams.IOStreams, status model.MatterStatus, de
 		ios.Println()
 		ios.Info("Enable Matter with: shelly matter enable %s", device)
 	}
-}
-
-// OutputMatterStatusJSON outputs Matter status as JSON.
-func OutputMatterStatusJSON(ios *iostreams.IOStreams, status model.MatterStatus) error {
-	jsonBytes, err := json.MarshalIndent(status, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to format JSON: %w", err)
-	}
-	ios.Println(string(jsonBytes))
-	return nil
 }
 
 // DisplayCommissioningInfo displays Matter commissioning/pairing information.

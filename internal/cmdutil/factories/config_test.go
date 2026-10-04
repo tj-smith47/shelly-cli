@@ -66,30 +66,6 @@ func TestNewConfigDeleteCommand_Structure(t *testing.T) {
 	}
 }
 
-func TestNewConfigDeleteCommand_SkipConfirmation(t *testing.T) {
-	t.Parallel()
-
-	in := &bytes.Buffer{}
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	ios := iostreams.Test(in, out, errOut)
-
-	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
-		Resource:         "alias",
-		SkipConfirmation: true,
-		ExistsFunc:       func(_ string) (any, bool) { return nil, true },
-		DeleteFunc:       func(_ string) error { return nil },
-	})
-
-	// Check --yes flag does NOT exist (skip confirmation commands)
-	flag := cmd.Flags().Lookup("yes")
-	if flag != nil {
-		t.Error("--yes flag should NOT exist when SkipConfirmation is true")
-	}
-}
-
 func TestNewConfigDeleteCommand_Execute_Success(t *testing.T) {
 	t.Parallel()
 
@@ -127,43 +103,6 @@ func TestNewConfigDeleteCommand_Execute_Success(t *testing.T) {
 	// Check success output
 	if !strings.Contains(out.String(), "Scene") && !strings.Contains(out.String(), "deleted") {
 		t.Errorf("output should contain success message, got: %s", out.String())
-	}
-}
-
-func TestNewConfigDeleteCommand_Execute_SkipConfirmation(t *testing.T) {
-	t.Parallel()
-
-	in := &bytes.Buffer{}
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	ios := iostreams.Test(in, out, errOut)
-
-	var deletedName string
-
-	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
-		Resource:         "alias",
-		SkipConfirmation: true,
-		ExistsFunc: func(name string) (any, bool) {
-			return nil, true
-		},
-		DeleteFunc: func(name string) error {
-			deletedName = name
-			return nil
-		},
-	})
-
-	// No --yes flag needed when SkipConfirmation is true
-	cmd.SetArgs([]string{"lights"})
-	err := cmd.Execute()
-
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	if deletedName != "lights" {
-		t.Errorf("deletedName = %q, want %q", deletedName, "lights")
 	}
 }
 

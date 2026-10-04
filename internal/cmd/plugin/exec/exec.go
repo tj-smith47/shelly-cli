@@ -49,5 +49,5 @@ or when you want to explicitly invoke an extension.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	return plugins.RunPlugin(ctx, opts.Name, opts.Args)
+	return plugins.RunPlugin(ctx, opts.Factory.IOStreams(), opts.Name, opts.Args)
 }

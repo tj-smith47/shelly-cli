@@ -335,7 +335,22 @@ func TestIOStreams_StopProgress_NilIndicator(t *testing.T) {
 // isColorDisabled and isColorForced functions indirectly via System().
 // Note: These tests can't run in parallel because they modify environment variables.
 
+// clearForcedColor removes the force-colour variables for one test. They
+// override every disable setting, so a shell that exports FORCE_COLOR would
+// otherwise decide the result of the disable tests.
+func clearForcedColor(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{"FORCE_COLOR", "SHELLY_FORCE_COLOR"} {
+		// Setenv registers the restore of the original value; Unsetenv alone would not.
+		t.Setenv(name, "")
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatalf("unset %s: %v", name, err)
+		}
+	}
+}
+
 func TestSystem_ColorDisabled_NO_COLOR(t *testing.T) {
+	clearForcedColor(t)
 	// Set NO_COLOR env var
 	t.Setenv("NO_COLOR", "1")
 
@@ -348,6 +363,7 @@ func TestSystem_ColorDisabled_NO_COLOR(t *testing.T) {
 }
 
 func TestSystem_ColorDisabled_SHELLY_NO_COLOR(t *testing.T) {
+	clearForcedColor(t)
 	t.Setenv("SHELLY_NO_COLOR", "1")
 
 	ios := iostreams.System()
@@ -358,6 +374,7 @@ func TestSystem_ColorDisabled_SHELLY_NO_COLOR(t *testing.T) {
 }
 
 func TestSystem_ColorDisabled_TERM_dumb(t *testing.T) {
+	clearForcedColor(t)
 	t.Setenv("TERM", "dumb")
 
 	ios := iostreams.System()

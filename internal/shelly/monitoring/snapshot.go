@@ -208,7 +208,7 @@ func (s *Service) SubscribeEvents(ctx context.Context, device string, handler Ev
 	}
 
 	wsURL := fmt.Sprintf("ws://%s/rpc", resolved.Address)
-	ws, err := client.NewDeviceWebSocket(wsURL,
+	ws, err := client.NewDeviceWebSocket(wsURL, resolved.Auth,
 		transport.WithReconnect(true),
 		transport.WithPingInterval(30*time.Second),
 	)
@@ -245,11 +245,17 @@ func (s *Service) SubscribeEvents(ctx context.Context, device string, handler Ev
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
+	// A device sends no notifications until it has answered one request frame,
+	// and on a password-protected device that frame must authenticate.
+	if _, err := client.StartDeviceNotifications(ctx, ws); err != nil {
+		return fmt.Errorf("start event stream: %w", err)
+	}
+
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func closeWebSocket(ws *transport.WebSocket) {
+func closeWebSocket(ws *client.DeviceWebSocket) {
 	if err := ws.Close(); err != nil {
 		iostreams.DebugErrCat(iostreams.CategoryNetwork, "closing websocket", err)
 	}

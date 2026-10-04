@@ -18,7 +18,7 @@ const componentTemplate = "template"
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return factories.NewConfigExportCommand(f, factories.ConfigExportOpts[config.DeviceTemplate]{
 		Component: componentTemplate,
-		Aliases:   []string{"save", "dump"},
+		Aliases:   []string{"dump"},
 		Short:     "Export a template to a file",
 		Long: `Export a configuration template to a JSON or YAML file.
 

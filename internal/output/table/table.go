@@ -352,11 +352,6 @@ func padRight(s string, width int) string {
 	return s + strings.Repeat(" ", width-len(s))
 }
 
-// Print prints the table to stdout.
-func (t *Table) Print() {
-	fmt.Print(t.Render())
-}
-
 // PrintTo prints the table to the specified writer.
 func (t *Table) PrintTo(w io.Writer) error {
 	_, err := fmt.Fprint(w, t.Render())

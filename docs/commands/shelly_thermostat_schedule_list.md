@@ -26,14 +26,14 @@ shelly thermostat schedule list <device> [flags]
   shelly thermostat schedule list gateway --all
 
   # Output as JSON
-  shelly thermostat schedule list gateway --json
+  shelly thermostat schedule list gateway -o json
 ```
 
 ### Options
 
 ```
       --all                 Show all device schedules
-  -f, --format string       Output format: text, json (default "text")
+  -f, --format string       Output format: text, json, yaml (default "text")
   -h, --help                help for list
       --thermostat-id int   Filter by thermostat component ID
 ```

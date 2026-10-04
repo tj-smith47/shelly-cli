@@ -32,6 +32,9 @@ shelly backup restore <device> <file> [flags]
   # Restore encrypted backup
   shelly backup restore living-room backup.json --decrypt mysecret
 
+  # Read the decryption password from stdin
+  shelly backup restore living-room backup.json --decrypt-stdin < ~/.shelly-backup-password
+
   # Skip scripts during restore
   shelly backup restore living-room backup.json --skip-scripts
 
@@ -69,6 +72,7 @@ shelly backup restore <device> <file> [flags]
       --allow-firmware-downgrade   Force the older-firmware config write instead of the automatic firmware update (Gen1; the device is updated to matched firmware by default when the backup is newer — this skips that and accepts the reboot-loop risk)
       --ap-ip string               Static host IP to use on the device's AP subnet during --to-ap (default 192.168.33.133)
   -d, --decrypt string             Password to decrypt backup
+      --decrypt-stdin              Read the password to decrypt the backup from stdin
       --dns string                 Static IPv4 nameserver (with --static-ip; default: the backup's)
       --dry-run                    Show what would be restored without applying
       --firmware-url string        Firmware image for the automatic downgrade-recovery update (default: derived from the backup's device model)
@@ -78,6 +82,7 @@ shelly backup restore <device> <file> [flags]
       --netmask string             Static IPv4 subnet mask (with --static-ip; default: the backup's)
       --open                       Join a network that has no password
       --password string            WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
+      --password-stdin             Read the WiFi password from stdin
       --skip-auth                  Skip authentication configuration
       --skip-meters                Skip restoring meter/energy-meter configuration (e.g. overpower limits)
       --skip-network               Skip network configuration (WiFi, Ethernet)

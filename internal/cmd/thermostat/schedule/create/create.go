@@ -26,6 +26,9 @@ type Options struct {
 	Enable       bool
 	Disable      bool
 	Enabled      bool
+	// Disabled is the --disabled flag. It has its own variable: two flags bound
+	// to one variable both write their default to it, and the last one wins.
+	Disabled bool
 }
 
 // NewCommand creates the thermostat schedule create command.
@@ -73,6 +76,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			opts.TargetCSet = cmd.Flags().Changed("target")
+			opts.Enabled = opts.Enabled && !opts.Disabled
 			return run(cmd.Context(), opts)
 		},
 	}
@@ -84,9 +88,11 @@ Examples:
 	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable the thermostat")
 	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable the thermostat")
 	cmd.Flags().BoolVar(&opts.Enabled, "enabled", true, "Whether the schedule itself is enabled")
+	cmd.Flags().BoolVar(&opts.Disabled, "disabled", false, "Create the schedule disabled (same as --enabled=false)")
 
 	utils.Must(cmd.MarkFlagRequired("time"))
 	cmd.MarkFlagsMutuallyExclusive("enable", "disable")
+	cmd.MarkFlagsMutuallyExclusive("enabled", "disabled")
 
 	return cmd
 }

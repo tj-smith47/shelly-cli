@@ -12,27 +12,27 @@ import (
 
 // ScriptInfo contains information about a script.
 type ScriptInfo struct {
-	ID      int
-	Name    string
-	Enable  bool
-	Running bool
+	ID      int    `json:"id" yaml:"id"`
+	Name    string `json:"name" yaml:"name"`
+	Enable  bool   `json:"enable" yaml:"enable"`
+	Running bool   `json:"running" yaml:"running"`
 }
 
 // ScriptStatus contains detailed script status.
 type ScriptStatus struct {
-	ID       int
-	Running  bool
-	MemUsage int
-	MemPeak  int
-	MemFree  int
-	Errors   []string
+	ID       int      `json:"id" yaml:"id"`
+	Running  bool     `json:"running" yaml:"running"`
+	MemUsage int      `json:"mem_usage" yaml:"mem_usage"`
+	MemPeak  int      `json:"mem_peak" yaml:"mem_peak"`
+	MemFree  int      `json:"mem_free" yaml:"mem_free"`
+	Errors   []string `json:"errors" yaml:"errors"`
 }
 
 // ScriptConfig contains script configuration.
 type ScriptConfig struct {
-	ID     int
-	Name   string
-	Enable bool
+	ID     int    `json:"id" yaml:"id"`
+	Name   string `json:"name" yaml:"name"`
+	Enable bool   `json:"enable" yaml:"enable"`
 }
 
 // ListScripts lists all scripts on a device.
@@ -226,9 +226,9 @@ func (s *Service) EvalScript(ctx context.Context, identifier string, id int, cod
 
 // InstallScriptResult contains the result of installing a script.
 type InstallScriptResult struct {
-	ID      int
-	Name    string
-	Enabled bool
+	ID      int    `json:"id" yaml:"id"`
+	Name    string `json:"name" yaml:"name"`
+	Enabled bool   `json:"enabled" yaml:"enabled"`
 }
 
 // InstallScript creates a new script, uploads code, and optionally enables it.

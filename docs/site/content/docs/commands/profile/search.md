@@ -31,6 +31,9 @@ shelly profile search <query> [flags]
 
   # Combine filters
   shelly profile search --capability power_metering --protocol mqtt
+
+  # JSON output
+  shelly profile search plug -o json
 ```
 
 ### Options
@@ -38,7 +41,6 @@ shelly profile search <query> [flags]
 ```
       --capability string   Filter by capability (e.g., dimming, scripting, power_metering)
   -h, --help                help for search
-  -o, --output string       Output format: table, json, yaml (default "table")
       --protocol string     Filter by protocol (e.g., mqtt, ble, zwave, matter)
 ```
 
@@ -53,6 +55,7 @@ shelly profile search <query> [flags]
       --no-color                Disable colored output
       --no-headers              Hide table headers in output
       --offline                 Only read from cache, error on cache miss
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
       --raw                     Print the exact device response(s) as a JSON array and suppress normal output

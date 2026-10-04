@@ -13,9 +13,8 @@ import (
 // NewCommand creates the alias delete command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
-		Resource:         "alias",
-		ValidArgsFunc:    completion.AliasNames(),
-		SkipConfirmation: true,
+		Resource:      "alias",
+		ValidArgsFunc: completion.AliasNames(),
 		ExistsFunc: func(name string) (any, bool) {
 			return nil, config.IsAlias(name)
 		},

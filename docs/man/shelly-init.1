@@ -64,6 +64,10 @@ Use --check to verify your current setup without making changes.
 	Shelly Cloud password (enables cloud setup)
 
 .PP
+\fB--cloud-password-stdin\fP[=false]
+	Read the Shelly Cloud password from stdin (enables cloud setup)
+
+.PP
 \fB--completions\fP=""
 	Install completions for shells: bash,zsh,fish,powershell (comma-separated)
 
@@ -212,6 +216,9 @@ Use --check to verify your current setup without making changes.
 
   # With cloud credentials
   shelly init --defaults --cloud-email user@example.com --cloud-password secret
+
+  # With the cloud password read from stdin
+  shelly init --defaults --cloud-email user@example.com --cloud-password-stdin < ~/.shelly-cloud-password
 .EE
 
 

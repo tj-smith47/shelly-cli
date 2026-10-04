@@ -1,48 +1,63 @@
 ## shelly wait
 
-Wait for a duration
+Wait until a device is online or its output is on or off
 
 ### Synopsis
 
-Wait for a specified duration before continuing.
+Wait until a device responds, or until its output is on or off, then exit.
 
-Useful for:
-  - Adding delays between commands in scripts
-  - Waiting for devices to initialize
-  - Creating sequenced automation
+The device is checked every --interval until the condition holds or --timeout
+passes. The exit code is zero once the condition holds and non-zero on
+timeout, so the command can gate the next step of a script.
 
-The duration can be specified in common formats:
-  - Seconds: 30s, 45s
-  - Minutes: 5m, 10m
-  - Hours: 1h, 2h
-  - Combined: 1h30m, 5m30s
+Without --state the command waits for the device to answer. That is useful
+after anything that takes a device off the network for a while:
+  - A firmware update
+  - A reboot or factory reset
+  - A power cycle or a WiFi change
 
-Press Ctrl+C to cancel the wait early.
+With --state on or --state off the command waits until every switch, light
+and RGB output of the device is in that state (or only the one given by --id).
+That is useful after a timer, a schedule, a scene or a physical button is
+expected to change the output.
 
 ```
-shelly wait <duration> [flags]
+shelly wait <device> [flags]
 ```
 
 ### Examples
 
 ```
-  # Wait 5 seconds
-  shelly wait 5s
+  # Continue once the device is back after a firmware update
+  shelly firmware update kitchen --yes && shelly wait kitchen
 
-  # Wait 2 minutes
-  shelly wait 2m
+  # Give a slow device up to five minutes
+  shelly wait garage --timeout 5m
 
-  # Wait 1 hour
-  shelly wait 1h
+  # Check more often
+  shelly wait 192.168.1.100 --interval 500ms
 
-  # Use in a script
-  shelly on kitchen && shelly wait 5s && shelly off kitchen
+  # Use in a script without output
+  if shelly wait kitchen --online --timeout 120s -q; then
+    shelly on kitchen
+  fi
+
+  # Continue once the light has switched off
+  shelly wait hallway --state off --timeout 60s
+
+  # Watch one output of a multi-channel device
+  shelly wait bathroom --state on --id 1
 ```
 
 ### Options
 
 ```
-  -h, --help   help for wait
+  -h, --help                help for wait
+      --id int              Component ID to watch with --state (omit to watch all) (default -1)
+      --interval duration   Time between checks (default 2s)
+      --online              Wait until the device responds (default true)
+      --state string        Wait until the device output is in this state: on, off
+      --timeout duration    How long to wait before giving up (default 2m0s)
 ```
 
 ### Options inherited from parent commands

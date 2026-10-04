@@ -168,37 +168,42 @@ func convertAPFull(ap *components.WiFiAPConfig) *WiFiAPFull {
 	return result
 }
 
+// ScanNetworks runs Wifi.Scan on a connected device.
+func ScanNetworks(ctx context.Context, conn *client.Client) ([]WiFiNetworkFull, error) {
+	scan, err := components.NewWiFi(conn.RPCClient()).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]WiFiNetworkFull, 0, len(scan.Results))
+	for _, r := range scan.Results {
+		n := WiFiNetworkFull{}
+		if r.SSID != nil {
+			n.SSID = *r.SSID
+		}
+		if r.BSSID != nil {
+			n.BSSID = *r.BSSID
+		}
+		if r.Auth != nil {
+			n.Auth = r.Auth.String()
+		}
+		if r.Channel != nil {
+			n.Channel = *r.Channel
+		}
+		if r.RSSI != nil {
+			n.RSSI = *r.RSSI
+		}
+		result = append(result, n)
+	}
+	return result, nil
+}
+
 // ScanNetworksFull scans for available WiFi networks with full details.
 func (s *WiFiService) ScanNetworksFull(ctx context.Context, identifier string) ([]WiFiNetworkFull, error) {
 	var result []WiFiNetworkFull
 	err := s.provider.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		wifi := components.NewWiFi(conn.RPCClient())
-		scan, err := wifi.Scan(ctx)
-		if err != nil {
-			return err
-		}
-
-		result = make([]WiFiNetworkFull, 0, len(scan.Results))
-		for _, r := range scan.Results {
-			network := WiFiNetworkFull{}
-			if r.SSID != nil {
-				network.SSID = *r.SSID
-			}
-			if r.BSSID != nil {
-				network.BSSID = *r.BSSID
-			}
-			if r.Auth != nil {
-				network.Auth = *r.Auth
-			}
-			if r.Channel != nil {
-				network.Channel = *r.Channel
-			}
-			if r.RSSI != nil {
-				network.RSSI = *r.RSSI
-			}
-			result = append(result, network)
-		}
-		return nil
+		var err error
+		result, err = ScanNetworks(ctx, conn)
+		return err
 	})
 	return result, err
 }

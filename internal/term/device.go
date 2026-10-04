@@ -17,6 +17,25 @@ import (
 // unknownLabel is the display fallback for an unidentified device model.
 const unknownLabel = "Unknown"
 
+// DisplayDeviceRegistered prints the result of registering dev: its name and
+// address, then its model with the generation of a Shelly device or the
+// platform of a plugin-managed one. replaced reports that dev took the place of
+// an existing registration of the same name.
+func DisplayDeviceRegistered(ios *iostreams.IOStreams, dev model.Device, replaced bool) {
+	verb := "Added"
+	if replaced {
+		verb = "Replaced"
+	}
+	ios.Success("%s %q at %s", verb, dev.Name, dev.Address)
+	switch {
+	case dev.Model == "":
+	case dev.IsPluginManaged():
+		ios.Info("  %s (%s)", dev.Model, dev.Platform)
+	default:
+		ios.Info("  %s (Gen%d)", dev.Model, dev.Generation)
+	}
+}
+
 // DisplayDeviceStatus prints the device status information.
 func DisplayDeviceStatus(ios *iostreams.IOStreams, status *shelly.DeviceStatus) {
 	ios.Info("Device: %s", theme.Bold().Render(status.Info.ID))

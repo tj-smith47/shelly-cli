@@ -99,7 +99,7 @@ func (s *Service) BTHomeAddDevice(ctx context.Context, identifier, addr, name st
 			return fmt.Errorf("failed to add BTHome device: %w", err)
 		}
 
-		resultMap, ok := resultAny.(map[string]any)
+		resultMap, ok := client.AsObject(resultAny)
 		if !ok {
 			return fmt.Errorf("unexpected response type")
 		}

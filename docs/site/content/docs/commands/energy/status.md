@@ -15,8 +15,14 @@ Displays real-time measurements including voltage, current, power,
 power factor, and frequency. For 3-phase EM components, shows
 per-phase data and totals.
 
+With --all, shows every EM and EM1 component on every registered
+device as one list. Devices that are offline or have no EM or EM1
+component are skipped with a note on stderr. With -o json or -o yaml
+the list is printed as one array whose items carry name, type, id,
+power (watts) and the full em or em1 reading.
+
 ```
-shelly energy status <device> [id] [flags]
+shelly energy status [device] [id] [flags]
 ```
 
 ### Examples
@@ -33,11 +39,18 @@ shelly energy status <device> [id] [flags]
 
   # Output as JSON for scripting
   shelly energy status shelly-3em-pro -o json
+
+  # Show every energy monitor on every registered device
+  shelly energy status --all
+
+  # Every energy monitor as one JSON list
+  shelly energy status --all -o json
 ```
 
 ### Options
 
 ```
+  -a, --all           Target all registered devices
   -h, --help          help for status
       --type string   Component type (auto, em, em1) (default "auto")
 ```

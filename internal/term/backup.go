@@ -179,3 +179,22 @@ func DisplayBackupExportResults(ios *iostreams.IOStreams, results []shelly.Backu
 		}
 	}
 }
+
+// DisplayBackupCreateResults prints one line per device backup, failures on
+// stderr, then a summary with the number of backups written to dir.
+func DisplayBackupCreateResults(ios *iostreams.IOStreams, results []shelly.BackupResult, dir string) {
+	if len(results) == 0 {
+		ios.NoResults("registered devices", "Use 'shelly device add' to register devices first")
+		return
+	}
+	for _, r := range results {
+		if r.Success {
+			ios.Success("%s: %s", r.DeviceName, r.FilePath)
+		} else {
+			ios.Error("%s: %v", r.DeviceName, r.Error)
+		}
+	}
+	if success, _ := shelly.CountBackupResults(results); success > 0 {
+		ios.Success("Backed up %d of %d devices to %s", success, len(results), dir)
+	}
+}

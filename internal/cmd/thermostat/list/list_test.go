@@ -273,7 +273,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 
 	// Example should show JSON usage
-	if !strings.Contains(cmd.Example, "--json") && !strings.Contains(cmd.Example, "-f json") {
+	if !strings.Contains(cmd.Example, "-o json") && !strings.Contains(cmd.Example, "-f json") {
 		t.Error("Example should demonstrate JSON output flag")
 	}
 }

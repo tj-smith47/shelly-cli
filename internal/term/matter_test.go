@@ -65,26 +65,6 @@ func TestDisplayMatterStatus_Paired(t *testing.T) {
 	}
 }
 
-func TestOutputMatterStatusJSON(t *testing.T) {
-	t.Parallel()
-
-	ios, out, _ := testIOStreams()
-	status := model.MatterStatus{
-		Enabled:        true,
-		Commissionable: true,
-		FabricsCount:   1,
-	}
-	err := OutputMatterStatusJSON(ios, status)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	output := out.String()
-	if !strings.Contains(output, "enabled") {
-		t.Error("expected enabled field in JSON")
-	}
-}
-
 func TestDisplayCommissioningInfo_Available(t *testing.T) {
 	t.Parallel()
 

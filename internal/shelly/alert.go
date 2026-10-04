@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -176,7 +177,7 @@ func (s *Service) evaluateThreshold(ctx context.Context, device, condition strin
 		return AlertConditionResult{Triggered: false, Value: "error"}
 	}
 
-	status, ok := result.(map[string]any)
+	status, ok := client.AsObject(result)
 	if !ok {
 		return AlertConditionResult{Triggered: false, Value: alertValueInvalid}
 	}
@@ -289,8 +290,8 @@ func ExecuteWebhook(ctx context.Context, url string, alert config.Alert, value s
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return WebhookResult{Error: fmt.Errorf("send request: %w", err)}
 	}

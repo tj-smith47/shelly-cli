@@ -225,7 +225,7 @@ func TestNewCommand_Example(t *testing.T) {
 	// Verify example contains key usage patterns
 	wantContains := []string{
 		"shelly sensor status",
-		"--json",
+		"-o json",
 	}
 
 	for _, want := range wantContains {

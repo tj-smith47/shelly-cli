@@ -342,7 +342,7 @@ func TestWriteBackupFile(t *testing.T) {
 	bkp := &backup.DeviceBackup{}
 
 	filePath := "/test/backup.json"
-	if err := WriteBackupFile(bkp, filePath); err != nil {
+	if err := WriteBackupFile(bkp, filePath, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

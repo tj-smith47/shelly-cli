@@ -54,7 +54,6 @@ const (
 	testMyOrg           = "myorg"
 	testMyRepo          = "myrepo"
 	testAbc123          = "abc123"
-	testVersionFlag     = "--version"
 	testShelly          = "shelly"
 	testAssetTarGz      = "shelly-linux-amd64.tar.gz"
 	testAssetUnderscore = "shelly_linux_amd64.tar.gz"
@@ -694,84 +693,6 @@ func TestGetExecutablePath_EvalSymlinksError(t *testing.T) {
 		t.Fatal("expected error when evalSymlinks fails")
 	}
 	if !strings.Contains(err.Error(), "failed to resolve symlinks") {
-		t.Errorf("unexpected error message: %v", err)
-	}
-}
-
-//nolint:paralleltest // modifies global function variable
-func TestRestartCLI_Success(t *testing.T) {
-	restore := github.SetOsExecutable(func() (string, error) {
-		return testShellyPath, nil
-	})
-	defer restore()
-
-	restoreSymlinks := github.SetEvalSymlinks(func(path string) (string, error) {
-		return path, nil
-	})
-	defer restoreSymlinks()
-
-	var capturedPath string
-	var capturedArgs []string
-	restoreExec := github.SetExecCommandStart(func(ctx context.Context, path string, args []string) error {
-		capturedPath = path
-		capturedArgs = args
-		return nil
-	})
-	defer restoreExec()
-
-	ctx := context.Background()
-	err := github.RestartCLI(ctx, []string{testVersionFlag})
-	if err != nil {
-		t.Fatalf("RestartCLI() error = %v", err)
-	}
-	if capturedPath != "/usr/bin/shelly" {
-		t.Errorf("RestartCLI() path = %q, want /usr/bin/shelly", capturedPath)
-	}
-	if len(capturedArgs) != 1 || capturedArgs[0] != testVersionFlag {
-		t.Errorf("RestartCLI() args = %v, want [--version]", capturedArgs)
-	}
-}
-
-//nolint:paralleltest // modifies global function variable
-func TestRestartCLI_GetExecutablePathError(t *testing.T) {
-	restore := github.SetOsExecutable(func() (string, error) {
-		return "", errors.New("mock executable error")
-	})
-	defer restore()
-
-	ctx := context.Background()
-	err := github.RestartCLI(ctx, []string{testVersionFlag})
-	if err == nil {
-		t.Fatal("expected error when GetExecutablePath fails")
-	}
-	if !strings.Contains(err.Error(), "failed to get executable path") {
-		t.Errorf("unexpected error message: %v", err)
-	}
-}
-
-//nolint:paralleltest // modifies global function variable
-func TestRestartCLI_ExecCommandStartError(t *testing.T) {
-	restore := github.SetOsExecutable(func() (string, error) {
-		return testShellyPath, nil
-	})
-	defer restore()
-
-	restoreSymlinks := github.SetEvalSymlinks(func(path string) (string, error) {
-		return path, nil
-	})
-	defer restoreSymlinks()
-
-	restoreExec := github.SetExecCommandStart(func(ctx context.Context, path string, args []string) error {
-		return errors.New("mock exec error")
-	})
-	defer restoreExec()
-
-	ctx := context.Background()
-	err := github.RestartCLI(ctx, []string{testVersionFlag})
-	if err == nil {
-		t.Fatal("expected error when execCommandStart fails")
-	}
-	if !strings.Contains(err.Error(), "mock exec error") {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }

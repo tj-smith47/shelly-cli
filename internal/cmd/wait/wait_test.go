@@ -3,50 +3,55 @@ package wait
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
-func TestNewCommand(t *testing.T) {
-	t.Parallel()
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	if cmd == nil {
-		t.Fatal("NewCommand returned nil")
-	}
-
-	if cmd.Use == "" {
-		t.Error("Use is empty")
-	}
-
-	if cmd.Short == "" {
-		t.Error("Short description is empty")
-	}
-}
+const testDevice = "test-device"
 
 func TestNewCommand_Structure(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "wait <duration>" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "wait <duration>")
+	if cmd.Use != "wait <device>" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "wait <device>")
 	}
-
-	wantAliases := []string{"delay", "pause"}
-	if len(cmd.Aliases) != len(wantAliases) {
-		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
+	if len(cmd.Aliases) == 0 {
+		t.Error("Aliases is empty")
 	}
-
-	if cmd.Long == "" {
-		t.Error("Long description is empty")
+	if cmd.Short == "" || cmd.Long == "" {
+		t.Error("Short and Long must be set")
 	}
+	if !strings.Contains(cmd.Example, "shelly wait kitchen") {
+		t.Errorf("Example should show a device wait, got: %s", cmd.Example)
+	}
+	if cmd.ValidArgsFunction == nil {
+		t.Error("ValidArgsFunction should complete device names")
+	}
+}
 
-	if cmd.Example == "" {
-		t.Error("Example is empty")
+func TestNewCommand_Flags(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	defaults := map[string]string{"online": "true", "state": "", "id": "-1", "timeout": "2m0s", "interval": "2s"}
+	for name, want := range defaults {
+		flag := cmd.Flags().Lookup(name)
+		if flag == nil {
+			t.Errorf("flag --%s not found", name)
+			continue
+		}
+		if flag.DefValue != want {
+			t.Errorf("--%s default = %q, want %q", name, flag.DefValue, want)
+		}
 	}
 }
 
@@ -61,8 +66,8 @@ func TestNewCommand_Args(t *testing.T) {
 		wantErr bool
 	}{
 		{"no args", []string{}, true},
-		{"one arg valid", []string{"5s"}, false},
-		{"two args", []string{"5s", "extra"}, true},
+		{"one device", []string{"kitchen"}, false},
+		{"two args", []string{"kitchen", "extra"}, true},
 	}
 
 	for _, tt := range tests {
@@ -76,131 +81,183 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 }
 
-func TestNewCommand_Help(t *testing.T) {
-	t.Parallel()
+// The example scripts call the command in this exact form.
+//
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_ReturnsOnceDeviceAnswers(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       testDevice,
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
 
 	tf := factory.NewTestFactory(t)
-	cmd := NewCommand(tf.Factory)
+	demo.InjectIntoFactory(tf.Factory)
 
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{testDevice, "--online", "--timeout", "120s"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--help"})
 
-	err := cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if out := tf.OutString(); !strings.Contains(out, "is online") {
+		t.Errorf("output should report the device online, got: %s", out)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_TimesOutWhenDeviceNeverAnswers(t *testing.T) {
+	demo, err := mock.StartWithFixtures(&mock.Fixtures{
+		Version: "1",
+		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
+	})
 	if err != nil {
-		t.Errorf("--help should not error: %v", err)
+		t.Fatalf("StartWithFixtures: %v", err)
 	}
-}
-
-func TestNewCommand_ExampleContent(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	wantPatterns := []string{
-		"shelly wait",
-		"5s",
-		"2m",
-		"1h",
-	}
-
-	for _, pattern := range wantPatterns {
-		if !strings.Contains(cmd.Example, pattern) {
-			t.Errorf("expected Example to contain %q", pattern)
-		}
-	}
-}
-
-func TestRun_ShortDuration(t *testing.T) {
-	t.Parallel()
+	defer demo.Cleanup()
 
 	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
-		Factory:     tf.Factory,
-		DurationStr: "1ms",
-	}
-	err := run(context.Background(), opts)
-	if err != nil {
-		t.Errorf("run() error = %v", err)
+		Factory:  tf.Factory,
+		Device:   "nonexistent",
+		Online:   true,
+		Timeout:  50 * time.Millisecond,
+		Interval: 10 * time.Millisecond,
 	}
 
-	out := tf.OutString()
-	if !strings.Contains(out, "Done") {
-		t.Errorf("Output should contain 'Done', got: %s", out)
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Fatal("expected a timeout error")
+	}
+	if !strings.Contains(err.Error(), "did not come online within 50ms") {
+		t.Errorf("error = %v, want a timeout message", err)
 	}
 }
 
-func TestRun_ContextCancellation(t *testing.T) {
-	t.Parallel()
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_StopsWhenCancelled(t *testing.T) {
+	demo, err := mock.StartWithFixtures(&mock.Fixtures{
+		Version: "1",
+		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
+	})
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
 
 	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	opts := &Options{
-		Factory:     tf.Factory,
-		DurationStr: "1h",
+		Factory:  tf.Factory,
+		Device:   "nonexistent",
+		Online:   true,
+		Timeout:  time.Hour,
+		Interval: time.Hour,
 	}
-	err := run(ctx, opts)
-	// With cancelled context, the function should return quickly
-	if err != nil {
-		t.Logf("run() with cancelled context error = %v (may be expected)", err)
+
+	if err := run(ctx, opts); !errors.Is(err, context.Canceled) {
+		t.Errorf("run() error = %v, want context.Canceled", err)
 	}
 }
 
-func TestRun_InvalidDuration(t *testing.T) {
+func TestRun_RejectsOnlineFalse(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
 
-	opts := &Options{
-		Factory:     tf.Factory,
-		DurationStr: "invalid",
-	}
-	err := run(context.Background(), opts)
+	err := run(context.Background(), &Options{Factory: tf.Factory, Device: "kitchen"})
 	if err == nil {
-		t.Error("Expected error for invalid duration")
+		t.Fatal("expected --online=false to be rejected")
 	}
 }
 
-func TestRun_VariousDurations(t *testing.T) {
+func TestRun_RejectsUnknownState(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name     string
-		duration string
-		wantErr  bool
-	}{
-		{"milliseconds", "1ms", false},
-		{"seconds", "1s", false},
-		{"minutes", "1m", false},
-		{"combined", "1m30s", false},
-		{"invalid", "abc", true},
-		{"empty", "", true},
+	tf := factory.NewTestFactory(t)
+
+	err := run(context.Background(), &Options{Factory: tf.Factory, Device: "kitchen", Online: true, State: "dim"})
+	if err == nil || !strings.Contains(err.Error(), "must be on or off") {
+		t.Fatalf("run() error = %v, want an invalid --state error", err)
+	}
+}
+
+// The example aliases call "wait --state on" and "wait --state off".
+//
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_WaitsForOutputState(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       testDevice,
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			testDevice: {"switch:0": map[string]any{"output": true}},
+		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tf := factory.NewTestFactory(t)
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
 
-			ctx, cancel := context.WithCancel(context.Background())
-			if !tt.wantErr {
-				// For valid durations, cancel immediately to not wait
-				cancel()
-			}
-			defer cancel()
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
 
-			opts := &Options{
-				Factory:     tf.Factory,
-				DurationStr: tt.duration,
-			}
-			err := run(ctx, opts)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("run(%q) error = %v, wantErr %v", tt.duration, err, tt.wantErr)
-			}
-		})
+	on := &Options{
+		Factory: tf.Factory, Device: testDevice, Online: true, State: stateOn,
+		Timeout: 5 * time.Second, Interval: 10 * time.Millisecond,
+	}
+	on.ID = -1
+	if err := run(context.Background(), on); err != nil {
+		t.Fatalf("run(--state on) error = %v", err)
+	}
+	if out := tf.OutString(); !strings.Contains(out, "is on") {
+		t.Errorf("output should report the device on, got: %s", out)
+	}
+
+	off := &Options{
+		Factory: tf.Factory, Device: testDevice, Online: true, State: stateOff,
+		Timeout: 50 * time.Millisecond, Interval: 10 * time.Millisecond,
+	}
+	off.ID = -1
+	err = run(context.Background(), off)
+	if err == nil || !strings.Contains(err.Error(), "did not turn off within 50ms") {
+		t.Fatalf("run(--state off) error = %v, want a timeout", err)
 	}
 }

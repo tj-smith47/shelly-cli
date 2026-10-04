@@ -8,11 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	neturl "net/url"
 	"strings"
 	"time"
-
-	"github.com/tj-smith47/shelly-go/transport"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -227,21 +224,6 @@ func deviceHTTPClient(url string) *http.Client {
 	}
 	skipDeviceTLSVerify(tr, url)
 	return &http.Client{Timeout: deviceRequestTimeout, Transport: tr}
-}
-
-// NewDeviceWebSocket returns transport.NewWebSocket(url, opts...). The SDK
-// websocket takes no dialer, so under `go test` a url whose host is not a
-// loopback address is refused here with netguard.ErrBlocked before anything
-// dials.
-func NewDeviceWebSocket(url string, opts ...transport.Option) (*transport.WebSocket, error) {
-	u, err := neturl.Parse(url)
-	if err != nil {
-		return nil, fmt.Errorf("device websocket url %q: %w", url, err)
-	}
-	if err := netguard.RefuseAddr(u.Host); err != nil {
-		return nil, err
-	}
-	return transport.NewWebSocket(url, opts...), nil
 }
 
 // skipDeviceTLSVerify turns off certificate verification on tr when url is

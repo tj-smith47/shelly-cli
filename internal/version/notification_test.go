@@ -1,12 +1,16 @@
 package version
 
 import (
+	"bytes"
+	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 func TestShowUpdateNotification_EnvDisabled(t *testing.T) {
@@ -15,7 +19,7 @@ func TestShowUpdateNotification_EnvDisabled(t *testing.T) {
 
 	// This should return early without doing anything
 	// We just verify it doesn't panic
-	ShowUpdateNotification()
+	ShowUpdateNotification(iostreams.Test(nil, io.Discard, io.Discard))
 }
 func TestShowUpdateNotification_NoCache(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
@@ -26,7 +30,7 @@ func TestShowUpdateNotification_NoCache(t *testing.T) {
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
 
 	// Should not panic with no cache
-	ShowUpdateNotification()
+	ShowUpdateNotification(iostreams.Test(nil, io.Discard, io.Discard))
 }
 func TestShowUpdateNotification_DevBuild(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
@@ -51,7 +55,7 @@ func TestShowUpdateNotification_DevBuild(t *testing.T) {
 	defer func() { Version = originalVersion }()
 
 	// Should return early for dev builds without panic
-	ShowUpdateNotification()
+	ShowUpdateNotification(iostreams.Test(nil, io.Discard, io.Discard))
 }
 func TestShowUpdateNotification_SkippedCommands(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
@@ -81,7 +85,7 @@ func TestShowUpdateNotification_SkippedCommands(t *testing.T) {
 		t.Run("skip_"+cmd, func(t *testing.T) {
 			os.Args = []string{testBinaryName, cmd}
 			// Should return early without panic
-			ShowUpdateNotification()
+			ShowUpdateNotification(iostreams.Test(nil, io.Discard, io.Discard))
 		})
 	}
 }
@@ -100,7 +104,7 @@ func TestShowUpdateNotification_NoArgs(t *testing.T) {
 	os.Args = []string{testBinaryName}
 
 	// Should not panic with no args
-	ShowUpdateNotification()
+	ShowUpdateNotification(iostreams.Test(nil, io.Discard, io.Discard))
 }
 func TestShowUpdateNotification_UpdateAvailable(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
@@ -133,7 +137,11 @@ func TestShowUpdateNotification_UpdateAvailable(t *testing.T) {
 
 	// Should execute the full path including showing notification
 	// (we can't easily verify the output, but we ensure it doesn't panic)
-	ShowUpdateNotification()
+	var stderr bytes.Buffer
+	ShowUpdateNotification(iostreams.Test(nil, io.Discard, &stderr))
+	if !strings.Contains(stderr.String(), "Update available") {
+		t.Errorf("stderr = %q, want the update notification", stderr.String())
+	}
 }
 func TestShowUpdateNotification_EmptyVersion(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
@@ -158,7 +166,7 @@ func TestShowUpdateNotification_EmptyVersion(t *testing.T) {
 	defer func() { Version = originalVersion }()
 
 	// Should return early for empty version
-	ShowUpdateNotification()
+	ShowUpdateNotification(iostreams.Test(nil, io.Discard, io.Discard))
 }
 func TestShowUpdateNotification_NoUpdate(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
@@ -189,5 +197,5 @@ func TestShowUpdateNotification_NoUpdate(t *testing.T) {
 	os.Args = []string{testBinaryName, "device", "list"}
 
 	// Should not show notification when versions are equal
-	ShowUpdateNotification()
+	ShowUpdateNotification(iostreams.Test(nil, io.Discard, io.Discard))
 }

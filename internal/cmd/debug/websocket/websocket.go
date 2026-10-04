@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-go/rpc"
 	"github.com/tj-smith47/shelly-go/transport"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
@@ -94,26 +94,27 @@ func run(ctx context.Context, opts *Options) error {
 		term.DisplayWebSocketInfo(ios, wsInfo.Config, wsInfo.Status)
 	}
 
-	// Build WebSocket options with auth
 	wsURL := fmt.Sprintf("ws://%s/rpc", resolved.Address)
-	wsOpts := []transport.Option{
-		transport.WithReconnect(true),
-		transport.WithPingInterval(15 * time.Second),
-	}
-	if auth := resolved.Auth; auth != nil && auth.Password != "" {
-		wsOpts = append(wsOpts, transport.WithAuth(auth.Username, auth.Password))
-	}
 
 	// Connect to WebSocket
 	ios.Println(theme.Bold().Render("Event Streaming:"))
 	ios.Printf("  Connecting to %s\n", wsURL)
 	ios.Println()
 
-	ws, err := client.NewDeviceWebSocket(wsURL, wsOpts...)
+	ws, err := client.NewDeviceWebSocket(wsURL, resolved.Auth,
+		transport.WithReconnect(true),
+		transport.WithPingInterval(15*time.Second),
+	)
 	if err != nil {
 		return fmt.Errorf("WebSocket connection failed: %w", err)
 	}
+	// Notifications and reconnect state changes arrive on the transport's
+	// goroutines; mu keeps their output and the event count from interleaving
+	// with this goroutine's.
+	var mu sync.Mutex
 	ws.OnStateChange(func(state transport.ConnectionState) {
+		mu.Lock()
+		defer mu.Unlock()
 		term.DisplayWebSocketConnectionState(ios, state.String())
 	})
 
@@ -125,6 +126,8 @@ func run(ctx context.Context, opts *Options) error {
 	// Subscribe and stream events
 	eventCount := 0
 	if err := ws.Subscribe(func(data json.RawMessage) {
+		mu.Lock()
+		defer mu.Unlock()
 		eventCount++
 		timestamp := time.Now().Format("15:04:05")
 		if opts.Raw {
@@ -136,37 +139,40 @@ func run(ctx context.Context, opts *Options) error {
 		ios.DebugErr("subscribe to websocket events", err)
 	}
 
-	// Make an initial RPC call to enable notifications.
-	// Per Shelly docs: "To start receiving notifications over websocket,
-	// you have to send at least one request frame with a valid source (src)."
-	rb := rpc.NewRequestBuilder()
-	req, err := rb.Build("Shelly.GetStatus", nil)
-	if err == nil {
-		if _, err := ws.Call(ctx, req); err != nil {
-			ios.DebugErr("initial GetStatus for notifications", err)
-		}
+	// A device sends no notifications until it has answered one request frame,
+	// and on a password-protected device that frame must authenticate.
+	if _, err := client.StartDeviceNotifications(ctx, ws); err != nil {
+		return fmt.Errorf("start event stream: %w", err)
 	}
 
-	// Wait for completion
+	mu.Lock()
 	if opts.Duration > 0 {
 		ios.Info("Streaming events for %s (press Ctrl+C to stop)...", opts.Duration)
-		ios.Println()
-		select {
-		case <-ctx.Done():
-			ios.Println()
-			ios.Info("Stopped by user")
-		case <-time.After(opts.Duration):
-			ios.Println()
-			ios.Info("Duration reached")
-		}
 	} else {
 		ios.Info("Streaming events indefinitely (press Ctrl+C to stop)...")
-		ios.Println()
+	}
+	ios.Println()
+	mu.Unlock()
+
+	stoppedByUser := true
+	if opts.Duration > 0 {
+		select {
+		case <-ctx.Done():
+		case <-time.After(opts.Duration):
+			stoppedByUser = false
+		}
+	} else {
 		<-ctx.Done()
-		ios.Println()
-		ios.Info("Stopped by user")
 	}
 
+	mu.Lock()
+	defer mu.Unlock()
+	ios.Println()
+	if stoppedByUser {
+		ios.Info("Stopped by user")
+	} else {
+		ios.Info("Duration reached")
+	}
 	ios.Println()
 	ios.Success("Received %d events", eventCount)
 	return nil

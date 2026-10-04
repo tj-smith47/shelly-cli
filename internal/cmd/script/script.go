@@ -22,7 +22,7 @@ import (
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "script",
-		Aliases: []string{"sc"},
+		Aliases: []string{"scripts"},
 		Short:   "Manage device scripts",
 		Long: `Manage JavaScript scripts on Gen2+ Shelly devices.
 

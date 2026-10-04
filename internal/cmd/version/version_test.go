@@ -2,8 +2,12 @@ package version
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -64,7 +68,6 @@ func TestNewCommand_Flags(t *testing.T) {
 		defValue  string
 	}{
 		{"short", "s", "false"},
-		{"json", "", "false"},
 		{"check", "c", "false"},
 	}
 
@@ -155,28 +158,28 @@ func TestRun_Short(t *testing.T) {
 	}
 }
 
-func TestRun_JSON(t *testing.T) {
-	t.Parallel()
+// TestRun_StructuredOutput runs version under the global -o json and -o yaml.
+// The format lives in viper, which is process-wide, so the test is not
+// parallel; HOME is isolated because commands resolve paths under it.
+func TestRun_StructuredOutput(t *testing.T) {
+	t.Setenv("HOME", "/testhome")
+	t.Cleanup(func() { viper.Set("output", nil) })
 
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	ios := iostreams.Test(nil, out, errOut)
-	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	cmd := NewCommand(f)
-	cmd.SetArgs([]string{"--json"})
-	cmd.SetOut(out)
-	cmd.SetErr(errOut)
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// JSON output should start with { and end with }
-	output := strings.TrimSpace(out.String())
-	if !strings.HasPrefix(output, "{") || !strings.HasSuffix(output, "}") {
-		t.Errorf("expected JSON object, got: %s", output)
+	for format, decode := range map[string]func([]byte, any) error{
+		"json": json.Unmarshal,
+		"yaml": yaml.Unmarshal,
+	} {
+		viper.Set("output", format)
+		out := &bytes.Buffer{}
+		cmd := NewCommand(cmdutil.NewFactory().SetIOStreams(iostreams.Test(nil, out, &bytes.Buffer{})))
+		cmd.SetArgs(nil)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("-o %s: %v", format, err)
+		}
+		var decoded map[string]any
+		if err := decode(out.Bytes(), &decoded); err != nil || decoded["version"] == nil || decoded["go_version"] == nil {
+			t.Errorf("-o %s: stdout is not the version document (err %v): %s", format, err, out.String())
+		}
 	}
 }
 
@@ -188,7 +191,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	wantPatterns := []string{
 		"shelly version",
 		"--short",
-		"--json",
+		"-o json",
+		"-o yaml",
 		"--check",
 	}
 

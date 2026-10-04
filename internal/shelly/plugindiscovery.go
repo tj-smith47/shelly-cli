@@ -159,7 +159,7 @@ func RunPluginDetection(ctx context.Context, registry *plugins.Registry, subnets
 
 // generateSubnetsAddresses generates host addresses across all given subnets
 // so plugin discovery covers the same address space as native Shelly discovery
-// when multiple --subnet values are supplied.
+// when multiple --network values are supplied.
 func generateSubnetsAddresses(subnets []string) []string {
 	// Preallocate to the common case of a single /24 (~254 hosts) so multi-subnet
 	// scans append into existing capacity instead of growing from nil.

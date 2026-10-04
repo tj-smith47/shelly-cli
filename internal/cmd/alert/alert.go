@@ -16,7 +16,7 @@ import (
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "alert",
-		Aliases: []string{"alerts", "notify"},
+		Aliases: []string{"alerts"},
 		Short:   "Manage monitoring alerts",
 		Long: `Manage monitoring alerts for device conditions.
 

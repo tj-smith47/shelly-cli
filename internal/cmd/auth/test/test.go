@@ -3,7 +3,7 @@ package test
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,17 +11,15 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds the command options.
 type Options struct {
-	Factory  *cmdutil.Factory
-	Device   string
-	Password string
-	Timeout  time.Duration
-	User     string
+	Factory     *cmdutil.Factory
+	Device      string
+	Credentials cmdutil.DeviceCredentials
+	Timeout     time.Duration
 }
 
 // NewCommand creates the auth test command.
@@ -37,17 +35,27 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Test authentication credentials",
 		Long: `Test authentication credentials against a device.
 
-This command verifies that the provided credentials are valid
-by attempting to connect to the device.
+The device is asked for data it only returns to an authenticated caller
+(Sys.GetStatus on Gen2+ devices, /settings on Gen1 devices), so a wrong
+password fails the test. Without --password or --password-stdin the
+credentials stored for the device are tested; with one of them the given
+credentials are tested instead, and nothing is stored. The user defaults to
+admin.
+
+A device with authentication disabled accepts any credentials; the command
+says so instead of reporting the password as correct.
 
 Exit codes:
-  0 - Authentication successful
-  1 - Authentication failed or error`,
-		Example: `  # Test with provided credentials
+  0 - The device accepted the credentials
+  1 - The device rejected the credentials, or could not be reached`,
+		Example: `  # Test the credentials stored for the device
+  shelly auth test living-room
+
+  # Test other credentials
   shelly auth test living-room --user admin --password secret
 
-  # Test with configured credentials
-  shelly auth test living-room
+  # Read the password from stdin (prompts without echo on a terminal)
+  shelly auth test living-room --password-stdin < ~/.shelly-living-room-password
 
   # Quick test with short timeout
   shelly auth test living-room --timeout 5s`,
@@ -59,8 +67,7 @@ Exit codes:
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.User, "user", "", "Username to test")
-	cmd.Flags().StringVar(&opts.Password, "password", "", "Password to test")
+	cmdutil.AddDeviceCredentialFlags(cmd, &opts.Credentials, "Password to test instead of the stored one", "Read the password to test from stdin")
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 10*time.Second, "Connection timeout")
 
 	return cmd
@@ -73,55 +80,30 @@ func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
-	ios.Info("Testing authentication for %s...", opts.Device)
+	auth, err := opts.Credentials.Auth(ios)
+	if err != nil && !errors.Is(err, cmdutil.ErrNoCredentials) {
+		return err
+	}
 
-	return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
-		if dev.IsGen1() {
-			return fmt.Errorf("auth test is only supported on Gen2+ devices")
-		}
+	dev, err := svc.ResolveWithGeneration(ctx, opts.Device)
+	if err != nil {
+		return err
+	}
+	if auth != nil {
+		dev.Auth = auth
+	}
 
-		conn := dev.Gen2()
+	ios.StartProgress(fmt.Sprintf("Testing authentication for %s...", opts.Device))
+	info, err := svc.ProbeDevice(ctx, dev)
+	if err == nil {
+		dev.Generation = info.Generation
+		err = svc.VerifyCredentials(ctx, dev)
+	}
+	ios.StopProgress()
+	if err != nil {
+		return fmt.Errorf("authentication test failed for %s: %w", opts.Device, err)
+	}
 
-		// Try to make an authenticated call
-		rawResult, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
-		if err != nil {
-			ios.Error("Authentication failed: %v", err)
-			return fmt.Errorf("authentication test failed")
-		}
-
-		// Parse result
-		jsonBytes, err := json.Marshal(rawResult)
-		if err != nil {
-			return fmt.Errorf("failed to marshal result: %w", err)
-		}
-
-		var result struct {
-			ID     string  `json:"id"`
-			MAC    string  `json:"mac"`
-			Auth   bool    `json:"auth_en"`
-			Domain *string `json:"auth_domain"`
-		}
-		if err := json.Unmarshal(jsonBytes, &result); err != nil {
-			return fmt.Errorf("failed to parse result: %w", err)
-		}
-
-		// Success
-		ios.Success("Authentication successful!")
-		ios.Println("")
-
-		ios.Printf("Device: %s\n", opts.Device)
-		ios.Printf("ID: %s\n", result.ID)
-		ios.Printf("MAC: %s\n", model.NormalizeMAC(result.MAC))
-
-		if result.Auth {
-			ios.Info("Authentication is enabled on this device")
-			if result.Domain != nil && *result.Domain != "" {
-				ios.Printf("Auth domain: %s\n", *result.Domain)
-			}
-		} else {
-			ios.Warning("Authentication is not enabled on this device")
-		}
-
-		return nil
-	})
+	term.DisplayAuthTestPassed(ios, dev, info)
+	return nil
 }

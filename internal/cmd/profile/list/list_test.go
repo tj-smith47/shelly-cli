@@ -102,14 +102,8 @@ func TestExecute_ListByGeneration_Unknown(t *testing.T) {
 	cmd.SetErr(tf.TestIO.ErrOut)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Execute() error = %v", err)
-	}
-
-	// Should warn about unknown generation
-	errOutput := tf.ErrString()
-	if !strings.Contains(errOutput, "Unknown generation") {
-		t.Logf("output = %s, errOutput = %s", tf.OutString(), errOutput)
+	if err == nil || !strings.Contains(err.Error(), "unknown generation") {
+		t.Errorf("Execute() error = %v, want an unknown generation error", err)
 	}
 }
 
@@ -148,37 +142,8 @@ func TestExecute_ListBySeries_Unknown(t *testing.T) {
 	cmd.SetErr(tf.TestIO.ErrOut)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Execute() error = %v", err)
-	}
-
-	// Should warn about unknown series
-	errOutput := tf.ErrString()
-	if !strings.Contains(errOutput, "Unknown series") {
-		t.Logf("output = %s, errOutput = %s", tf.OutString(), errOutput)
-	}
-}
-
-func TestExecute_WithOutputFlag(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"-o", "json"})
-	cmd.SetOut(tf.TestIO.Out)
-	cmd.SetErr(tf.TestIO.ErrOut)
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Execute() error = %v", err)
-	}
-
-	// Verify command executed (output format handling depends on viper binding)
-	output := tf.OutString()
-	if output == "" {
-		t.Error("expected output")
+	if err == nil || !strings.Contains(err.Error(), "unknown series") {
+		t.Errorf("Execute() error = %v, want an unknown series error", err)
 	}
 }
 

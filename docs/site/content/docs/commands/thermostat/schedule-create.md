@@ -55,6 +55,7 @@ shelly thermostat schedule create <device> [flags]
 
 ```
       --disable             Disable the thermostat
+      --disabled            Create the schedule disabled (same as --enabled=false)
       --enable              Enable the thermostat
       --enabled             Whether the schedule itself is enabled (default true)
   -h, --help                help for create

@@ -21,21 +21,21 @@ import (
 
 // DeviceInfo holds extended device information.
 type DeviceInfo struct {
-	ID         string
-	MAC        string
-	Type       string // Raw SKU/type code (e.g., "SNSW-001P16EU", "SHSW-1")
-	Model      string // Display name (e.g., "Shelly Plus 1PM") derived via types.ModelDisplayName
-	Generation int
-	Firmware   string
-	App        string
-	AuthEn     bool
-	Address    string
+	ID         string `json:"id" yaml:"id"`
+	MAC        string `json:"mac" yaml:"mac"`
+	Type       string `json:"type" yaml:"type"`   // Raw SKU/type code (e.g., "SNSW-001P16EU", "SHSW-1")
+	Model      string `json:"model" yaml:"model"` // Display name (e.g., "Shelly Plus 1PM") derived via types.ModelDisplayName
+	Generation int    `json:"generation" yaml:"generation"`
+	Firmware   string `json:"firmware" yaml:"firmware"`
+	App        string `json:"app" yaml:"app"`
+	AuthEn     bool   `json:"auth_en" yaml:"auth_en"`
+	Address    string `json:"address" yaml:"address"`
 }
 
 // DeviceStatus holds device status information.
 type DeviceStatus struct {
-	Info   *DeviceInfo
-	Status map[string]any
+	Info   *DeviceInfo    `json:"info" yaml:"info"`
+	Status map[string]any `json:"status" yaml:"status"`
 }
 
 // DeviceReboot reboots the device. Supports both Gen1 (HTTP REST /reboot) and Gen2+
@@ -286,6 +286,67 @@ func (s *Service) DeviceInfo(ctx context.Context, identifier string) (*DeviceInf
 	if err != nil {
 		return nil, err
 	}
+	return s.deviceInfoFor(ctx, identifier, dev)
+}
+
+// ProbeDevice returns information about the device at dev.Address, connecting
+// with dev.Auth and treating dev.Generation as a hint, without looking the
+// address up in the registry. Use it to check a device before registering it,
+// so the credentials the user just gave are the ones used.
+func (s *Service) ProbeDevice(ctx context.Context, dev model.Device) (*DeviceInfo, error) {
+	// /shelly names the generation without credentials. Asking it first keeps
+	// a Gen1 device from being tried as Gen2+ with credentials, where its
+	// basic-auth challenge is an unusable digest challenge that the transport
+	// retries for seconds. Without credentials there is no such retry, so the
+	// extra round trip is skipped.
+	if dev.Generation == 0 && dev.HasAuth() {
+		if detected := tryDetectGeneration(ctx, dev.Address, dev.Auth); detected != nil {
+			dev.Generation = int(detected.Generation)
+		}
+	}
+	info, err := s.deviceInfoFor(ctx, dev.Address, dev)
+	return info, credentialsError(dev, err)
+}
+
+// IdentifyNewDevice asks a device that is about to be registered what it is,
+// and returns dev with its generation, type and model filled in. A device of a
+// plugin platform (dev.Platform other than shelly) is asked through that
+// platform's plugin; any other device through the Shelly API. authEnabled
+// reports whether a Shelly device said it requires authentication.
+//
+// The request that identifies a Shelly device is answered without
+// credentials, so when the device requires authentication and dev.Auth is set
+// the credentials are checked with VerifyCredentials, and a device that
+// rejects them is an error (errors.Is ErrCredentialsRejected).
+func (s *Service) IdentifyNewDevice(ctx context.Context, dev model.Device) (identified model.Device, authEnabled bool, err error) {
+	if dev.IsPluginManaged() {
+		res, err := s.DetectPluginDevice(ctx, dev.Platform, dev.Address, dev.Auth)
+		if err != nil {
+			return dev, false, err
+		}
+		dev.Generation = 0
+		dev.Type = res.Model
+		dev.Model = types.ModelDisplayName(res.Model)
+		return dev, false, nil
+	}
+	info, err := s.ProbeDevice(ctx, dev)
+	if err != nil {
+		return dev, false, err
+	}
+	dev.Generation = info.Generation
+	dev.Type = info.Type
+	dev.Model = info.Model
+	if info.AuthEn && dev.HasAuth() {
+		if err := s.VerifyCredentials(ctx, dev); err != nil {
+			return dev, true, err
+		}
+	}
+	return dev, info.AuthEn, nil
+}
+
+// deviceInfoFor asks the already resolved device dev for its information,
+// trying its known generation first.
+func (s *Service) deviceInfoFor(ctx context.Context, identifier string, dev model.Device) (*DeviceInfo, error) {
 	first, second := s.deviceInfoGen2, s.deviceInfoGen1
 	if dev.Generation == 1 {
 		first, second = s.deviceInfoGen1, s.deviceInfoGen2

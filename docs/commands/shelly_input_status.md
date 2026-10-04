@@ -4,7 +4,7 @@ Show input status
 
 ### Synopsis
 
-Show the current status of a input component on the specified device.
+Show the current status of an input component on the specified device.
 
 ```
 shelly input status <device> [flags]

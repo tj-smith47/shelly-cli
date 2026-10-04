@@ -91,10 +91,10 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Output based on format
 	if output.WantsJSON() {
-		return output.PrintJSON(result)
+		return output.JSON(ios.Out, result)
 	}
 	if output.WantsYAML() {
-		return output.PrintYAML(result)
+		return output.YAML(ios.Out, result)
 	}
 
 	return term.DisplayConfigTable(ios, result)

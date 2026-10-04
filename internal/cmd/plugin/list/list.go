@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
@@ -87,40 +87,31 @@ func run(opts *Options) error {
 		return err
 	}
 
-	if len(extensionList) == 0 {
+	return cmdutil.PrintList(ios, extensionList, func(ios *iostreams.IOStreams, items []plugins.Plugin) {
+		builder := table.NewBuilder("Name", "Version", "Source", "Path")
+		for _, ext := range items {
+			version := ext.Version
+			if version == "" {
+				version = "-"
+			}
+			source := "-"
+			if ext.Manifest != nil {
+				source = ext.Manifest.Source.Type
+			}
+			builder.AddRow(ext.Name, version, source, ext.Path)
+		}
+
+		tbl := builder.WithModeStyle(ios).Build()
+		if err := tbl.PrintTo(ios.Out); err != nil {
+			ios.DebugErr("print extension list table", err)
+		}
+		ios.Println()
+		ios.Count("extension", len(items))
+	}, func() {
 		if opts.All {
 			ios.Info("No extensions found")
 		} else {
 			ios.Info("No extensions installed. Use 'shelly extension install' to install one.")
 		}
-		return nil
-	}
-
-	// Handle JSON/YAML output
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, extensionList)
-	}
-
-	// Table output
-	builder := table.NewBuilder("Name", "Version", "Source", "Path")
-	for _, ext := range extensionList {
-		version := ext.Version
-		if version == "" {
-			version = "-"
-		}
-		source := "-"
-		if ext.Manifest != nil {
-			source = ext.Manifest.Source.Type
-		}
-		builder.AddRow(ext.Name, version, source, ext.Path)
-	}
-
-	tbl := builder.WithModeStyle(ios).Build()
-	if err := tbl.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print extension list table", err)
-	}
-	ios.Println()
-	ios.Count("extension", len(extensionList))
-
-	return nil
+	})
 }

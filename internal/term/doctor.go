@@ -14,6 +14,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/version"
@@ -120,7 +121,7 @@ func CheckConfig(ios *iostreams.IOStreams) int {
 
 		cfg := config.Get()
 		if cfg.Output == "" {
-			cfg.Output = "table"
+			cfg.Output = string(output.FormatTable)
 		}
 		ios.Info("    Output format: %s", cfg.Output)
 		ios.Info("    Theme: %s", cfg.GetThemeConfig().Name)

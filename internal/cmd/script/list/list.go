@@ -85,10 +85,5 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if len(result.Data) == 0 {
-		ios.NoResults("scripts")
-		return nil
-	}
-
-	return cmdutil.PrintListResult(ios, result.Data, term.DisplayScriptList)
+	return cmdutil.PrintList(ios, result.Data, term.DisplayScriptList, func() { ios.NoResults("scripts") })
 }

@@ -96,8 +96,9 @@ func TestNewCommand_Flags(t *testing.T) {
 		name     string
 		defValue string
 	}{
-		{"user", "admin"},
+		{"user", ""},
 		{"password", ""},
+		{"password-stdin", "false"},
 		{"length", "16"},
 		{"generate", "false"},
 		{"show", "false"},
@@ -209,25 +210,34 @@ func TestNewCommand_DefaultLength(t *testing.T) {
 	_ = auth.DefaultPasswordLength // verify constant exists
 }
 
-func TestNewCommand_MissingPassword(t *testing.T) {
+func TestNewCommand_PasswordSources(t *testing.T) {
 	t.Parallel()
 
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	ios := iostreams.Test(nil, out, errOut)
-	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	cmd := NewCommand(f)
-	cmd.SetArgs([]string{"device"}) // no password or generate flag
-	cmd.SetOut(out)
-	cmd.SetErr(errOut)
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for missing password")
-	}
-
-	if !strings.Contains(err.Error(), "--password or --generate is required") {
-		t.Errorf("expected 'password or generate required' error, got: %v", err)
+	for _, tc := range []struct {
+		args []string
+		want []string
+	}{
+		{args: []string{"device"}, want: []string{"--password <value>", "--password-stdin", "--generate"}},
+		{args: []string{"device", "--password", "x", "--password-stdin"}, want: []string{"none of the others can be"}},
+		{args: []string{"device", "--password", "x", "--generate"}, want: []string{"none of the others can be"}},
+		{args: []string{"device", "--password-stdin", "--generate"}, want: []string{"none of the others can be"}},
+	} {
+		t.Run(strings.Join(tc.args[1:], " "), func(t *testing.T) {
+			t.Parallel()
+			ios := iostreams.Test(nil, &bytes.Buffer{}, &bytes.Buffer{})
+			cmd := NewCommand(cmdutil.NewFactory().SetIOStreams(ios))
+			cmd.SetArgs(tc.args)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			for _, w := range tc.want {
+				if !strings.Contains(err.Error(), w) {
+					t.Errorf("error %q does not contain %q", err, w)
+				}
+			}
+		})
 	}
 }

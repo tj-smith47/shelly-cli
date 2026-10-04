@@ -4,7 +4,6 @@ package status
 import (
 	"context"
 	"sort"
-	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -35,12 +34,22 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Show a quick status overview for a device or all registered devices.
 
 If no device is specified, shows a summary of all registered devices
-with their online/offline status and primary component state.`,
+with their online/offline status and primary component state.
+
+Use -o json or -o yaml for structured output. The all-devices list has the
+fields name, model, online and link_state (set when an offline device is
+linked to a parent switch).`,
 		Example: `  # Show status for a specific device
   shelly status living-room
 
   # Show status for all devices
-  shelly status`,
+  shelly status
+
+  # Online state of every device as JSON
+  shelly status -o json
+
+  # Names of the devices that are offline
+  shelly status -o json | jq -r '.[] | select(.online == false) | .name'`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -76,15 +85,18 @@ func run(ctx context.Context, opts *Options) error {
 			return err
 		}
 
-		term.DisplayQuickDeviceStatus(ios, componentStates)
-		return nil
+		if cmdutil.StructuredOutput() {
+			componentStates = term.PlainComponentStates(componentStates)
+		}
+		return cmdutil.PrintListResult(ios, componentStates, term.DisplayQuickDeviceStatus)
 	}
 
 	// All devices status
 	devices := config.ListDevices()
 	if len(devices) == 0 {
-		ios.Warning("No devices registered. Use 'shelly device add' to add devices.")
-		return nil
+		return cmdutil.PrintList(ios, []term.QuickDeviceStatus(nil), term.DisplayAllDevicesQuickStatus, func() {
+			ios.Warning("No devices registered. Use 'shelly device add' to add devices.")
+		})
 	}
 
 	names := make([]string, 0, len(devices))
@@ -93,47 +105,32 @@ func run(ctx context.Context, opts *Options) error {
 	}
 	sort.Strings(names)
 
-	// Check all devices concurrently with per-device timeouts.
-	// Each device gets its own timeout so one slow/offline device
-	// doesn't starve the rest.
 	statuses := make([]term.QuickDeviceStatus, len(names))
 
 	err := cmdutil.RunWithSpinner(ctx, ios, "Checking devices...", func(ctx context.Context) error {
-		var wg sync.WaitGroup
-		for i, name := range names {
-			idx := i
-			deviceName := name
-			wg.Go(func() {
-				devCtx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
-				defer cancel()
-
-				ds := term.QuickDeviceStatus{Name: deviceName}
-				connErr := svc.WithDevice(devCtx, deviceName, func(dev *shelly.DeviceClient) error {
-					devInfo := dev.Info()
-					ds.Model = devInfo.Model
-					ds.Online = true
-					return nil
-				})
-				if connErr != nil {
-					ds.Online = false
-					// Use a fresh context for link resolution since the device
-					// timeout may be exhausted from the failed connection attempt.
-					linkCtx, linkCancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
-					defer linkCancel()
-					if ls, linkErr := svc.ResolveLinkStatus(linkCtx, deviceName); linkErr == nil && ls != nil {
-						ds.LinkState = ls.State
-					}
-				}
-				statuses[idx] = ds
+		shelly.ForEachDevice(ctx, names, shelly.DefaultTimeout, func(devCtx context.Context, idx int, deviceName string) {
+			ds := term.QuickDeviceStatus{Name: deviceName}
+			connErr := svc.WithDevice(devCtx, deviceName, func(dev *shelly.DeviceClient) error {
+				ds.Model = dev.Info().Model
+				ds.Online = true
+				return nil
 			})
-		}
-		wg.Wait()
+			if connErr != nil {
+				// The device's own timeout may be used up by the failed
+				// connection, so the link lookup gets a fresh one.
+				linkCtx, linkCancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+				defer linkCancel()
+				if ls, linkErr := svc.ResolveLinkStatus(linkCtx, deviceName); linkErr == nil && ls != nil {
+					ds.LinkState = ls.State
+				}
+			}
+			statuses[idx] = ds
+		})
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	term.DisplayAllDevicesQuickStatus(ios, statuses)
-	return nil
+	return cmdutil.PrintListResult(ios, statuses, term.DisplayAllDevicesQuickStatus)
 }

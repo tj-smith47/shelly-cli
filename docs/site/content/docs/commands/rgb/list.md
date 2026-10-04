@@ -37,10 +37,10 @@ shelly rgb list <device> [flags]
   shelly rgb list living-room -o json | jq '.[] | select(.output == true)'
 
   # Get current color values
-  shelly rgb list living-room -o json | jq '.[] | {id, r: .rgb.r, g: .rgb.g, b: .rgb.b}'
+  shelly rgb list living-room -o json | jq '.[] | {id, red, green, blue}'
 
   # Find lights set to pure red
-  shelly rgb list living-room -o json | jq '.[] | select(.rgb.r == 255 and .rgb.g == 0 and .rgb.b == 0)'
+  shelly rgb list living-room -o json | jq '.[] | select(.red == 255 and .green == 0 and .blue == 0)'
 
   # Get brightness levels
   shelly rgb list living-room -o json | jq '.[] | {id, brightness}'

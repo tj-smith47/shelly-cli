@@ -215,8 +215,9 @@ func TestAddOpenFlag(t *testing.T) {
 	newCmd := func() (*cobra.Command, *bool) {
 		var open bool
 		var password string
+		var passwordStdin bool
 		cmd := &cobra.Command{Use: "x", RunE: func(*cobra.Command, []string) error { return nil }}
-		cmd.Flags().StringVar(&password, "password", "", "")
+		AddWiFiPasswordFlag(cmd, &password, &passwordStdin)
 		AddOpenFlag(cmd, &open)
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
@@ -237,6 +238,12 @@ func TestAddOpenFlag(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), "none of the others can be") {
 		t.Errorf("--open with --password must be refused, got %v", err)
+	}
+
+	cmd, _ = newCmd()
+	cmd.SetArgs([]string{"--open", "--password-stdin"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "none of the others can be") {
+		t.Errorf("--open with --password-stdin must be refused, got %v", err)
 	}
 }
 

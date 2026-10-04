@@ -33,7 +33,7 @@ Event types:
 
 .PP
 \fB-f\fP, \fB--format\fP="text"
-	Output format: text, json
+	Output format: text, json, yaml
 
 .PP
 \fB-h\fP, \fB--help\fP[=false]
@@ -115,8 +115,11 @@ Event types:
   # Output raw JSON
   shelly cloud events --raw
 
-  # Output in JSON format
-  shelly cloud events --format json
+  # One JSON document per line, one per event
+  shelly cloud events -o json
+
+  # One YAML document per event, separated by ---
+  shelly cloud events -o yaml
 .EE
 
 

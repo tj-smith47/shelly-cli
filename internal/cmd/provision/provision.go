@@ -43,26 +43,27 @@ type provisionService interface {
 
 // Options holds command options.
 type Options struct {
-	Factory      *cmdutil.Factory
-	SSID         string
-	Password     string
-	Open         bool
-	Timezone     string
-	DeviceName   string
-	FromDevice   string
-	FromTemplate string
-	StaticIP     string
-	Gateway      string
-	Netmask      string
-	DNS          string
-	TargetAP     string
-	Timeout      time.Duration
-	BLEOnly      bool
-	APOnly       bool
-	NoCloud      bool
-	DisableAP    bool
-	Yes          bool
-	DiscoverOnly bool
+	Factory       *cmdutil.Factory
+	SSID          string
+	Password      string
+	PasswordStdin bool
+	Open          bool
+	Timezone      string
+	DeviceName    string
+	FromDevice    string
+	FromTemplate  string
+	StaticIP      string
+	Gateway       string
+	Netmask       string
+	DNS           string
+	TargetAP      string
+	Timeout       time.Duration
+	BLEOnly       bool
+	APOnly        bool
+	NoCloud       bool
+	DisableAP     bool
+	Yes           bool
+	DiscoverOnly  bool
 
 	// svc, when non-nil, overrides the service resolved from the Factory. It is the
 	// test injection seam; production leaves it nil and uses Factory.ShellyService().
@@ -89,7 +90,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "provision",
-		Aliases: []string{"prov", "setup"},
+		Aliases: []string{"prov"},
 		Short:   "Discover and provision new Shelly devices",
 		Long: `Discover and provision new Shelly devices on your network.
 
@@ -172,7 +173,7 @@ To register already-networked devices, use: shelly discover --register`,
 	}
 
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "WiFi SSID for provisioning")
-	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password, &opts.PasswordStdin)
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", shelly.DefaultOnboardScanTimeout, "Discovery timeout")
 	cmd.Flags().StringVar(&opts.DeviceName, "name", "", "Device name to assign after provisioning")
 	cmd.Flags().StringVar(&opts.Timezone, "timezone", "", "Timezone to set on device")
@@ -205,6 +206,9 @@ To register already-networked devices, use: shelly discover --register`,
 
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
+	if err := cmdutil.ReadWiFiPasswordStdin(ios, &opts.Password, opts.PasswordStdin); err != nil {
+		return err
+	}
 	svc := opts.service()
 
 	// Load provision source + resolve WiFi credentials. Skipped for

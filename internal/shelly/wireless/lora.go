@@ -50,7 +50,7 @@ func (s *Service) LoRaGetConfig(ctx context.Context, identifier string, componen
 			return fmt.Errorf("failed to get LoRa config: %w", err)
 		}
 		var ok bool
-		config, ok = result.(map[string]any)
+		config, ok = client.AsObject(result)
 		if !ok {
 			return fmt.Errorf("unexpected response type")
 		}
@@ -69,7 +69,7 @@ func (s *Service) LoRaGetStatus(ctx context.Context, identifier string, componen
 			return fmt.Errorf("failed to get LoRa status: %w", err)
 		}
 		var ok bool
-		status, ok = result.(map[string]any)
+		status, ok = client.AsObject(result)
 		if !ok {
 			return fmt.Errorf("unexpected response type")
 		}

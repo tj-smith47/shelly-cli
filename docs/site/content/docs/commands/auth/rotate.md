@@ -11,13 +11,13 @@ Rotate device credentials
 
 Rotate device authentication credentials.
 
-This command sets new authentication credentials on the device,
-optionally generating a secure random password.
+This command sets a new password on the device, optionally generating a
+secure random one. Gen1 devices accept any username, and without --user keep
+the user stored for them; Gen2+ devices have a single user, admin.
 
-For security best practices:
-  - Rotate credentials periodically
-  - Use generated passwords (--generate)
-  - Store credentials securely
+The new credentials are saved for a registered device, and the command then
+makes an authenticated request with the new password and fails if the
+device does not accept it. A generated password is shown only with --show.
 
 ```
 shelly auth rotate <device> [flags]
@@ -28,6 +28,9 @@ shelly auth rotate <device> [flags]
 ```
   # Rotate with a new password
   shelly auth rotate living-room --password newSecret123
+
+  # Read the new password from stdin, keeping it out of shell history
+  shelly auth rotate living-room --password-stdin < ~/.shelly-living-room-password
 
   # Generate a random password
   shelly auth rotate living-room --generate
@@ -45,9 +48,10 @@ shelly auth rotate <device> [flags]
       --generate          Generate a random password
   -h, --help              help for rotate
       --length int        Generated password length (default 16)
-      --password string   New password (or use --generate)
+      --password string   New password (or use --password-stdin or --generate)
+      --password-stdin    Read the new password from stdin
       --show              Show the new password in output
-      --user string       Username for authentication (default "admin")
+      --user string       Username: any name on Gen1, where it defaults to the stored user or admin; Gen2+ devices allow only admin
 ```
 
 ### Options inherited from parent commands

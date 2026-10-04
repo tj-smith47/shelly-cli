@@ -61,6 +61,7 @@ type Options struct {
 	APIP          string
 	SSID          string
 	Password      string
+	PasswordStdin bool
 	Open          bool
 
 	AllowFirmwareDowngrade bool
@@ -174,7 +175,7 @@ Use --dry-run to preview what would change without applying.`,
 	cmd.Flags().StringVar(&opts.ToAP, "to-ap", "", "Migrate onto a target at its factory WiFi AP with this SSID (hops host WiFi; source is never reset)")
 	cmd.Flags().StringVar(&opts.APIP, "ap-ip", "", "Static host IP to use on the target's AP subnet during --to-ap (default 192.168.33.133)")
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Override the WiFi SSID the target joins (defaults to the source's network)")
-	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password, &opts.PasswordStdin)
 	cmdutil.AddOpenFlag(cmd, &opts.Open)
 	cmd.Flags().BoolVar(&opts.AllowFirmwareDowngrade, "allow-firmware-downgrade", false, "Force the older-firmware config write instead of the automatic firmware update (Gen1; the target is updated to matched firmware by default when the source is newer — this skips that and accepts the reboot-loop risk)")
 	cmd.Flags().StringVar(&opts.FirmwareURL, "firmware-url", "", "Firmware image for the automatic downgrade-recovery update (default: derived from the source device model)")
@@ -240,8 +241,14 @@ func (o *Options) previewMigration(
 	return nil
 }
 
-// validateFlags rejects incompatible flag combinations before any device I/O.
+// validateFlags reads --password-stdin, so the checks below see the password,
+// and rejects incompatible flag combinations before any device I/O.
 func (o *Options) validateFlags() error {
+	if o.PasswordStdin {
+		if err := cmdutil.ReadWiFiPasswordStdin(o.Factory.IOStreams(), &o.Password, true); err != nil {
+			return err
+		}
+	}
 	if err := o.network().Validate(o.SkipNetwork); err != nil {
 		return err
 	}

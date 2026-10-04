@@ -32,3 +32,25 @@ var (
 	// ErrNoComponents indicates no matching components were found.
 	ErrNoComponents = errors.New("no matching components found")
 )
+
+// ErrCredentialsRejected indicates a device refused the credentials it was
+// given. Match it with errors.Is; the error itself is a
+// *CredentialsRejectedError naming the user.
+var ErrCredentialsRejected = errors.New("device rejected the credentials")
+
+// CredentialsRejectedError reports that a device answered an authenticated
+// request with "unauthorized" although credentials were sent.
+type CredentialsRejectedError struct {
+	// User is the user name the rejected password was sent for.
+	User string
+}
+
+// Error implements the error interface.
+func (e *CredentialsRejectedError) Error() string {
+	return "device rejected the password for user " + e.User
+}
+
+// Is reports a match for ErrCredentialsRejected.
+func (e *CredentialsRejectedError) Is(target error) bool {
+	return target == ErrCredentialsRejected
+}

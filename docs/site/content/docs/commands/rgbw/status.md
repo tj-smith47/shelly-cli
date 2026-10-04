@@ -9,7 +9,7 @@ Show rgbw status
 
 ### Synopsis
 
-Show the current status of a rgbw component on the specified device.
+Show the current status of an rgbw component on the specified device.
 
 ```
 shelly rgbw status <device> [flags]

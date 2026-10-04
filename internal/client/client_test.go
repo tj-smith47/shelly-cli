@@ -16,6 +16,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/netguard"
+	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
 // Test constants to avoid magic strings.
@@ -2566,6 +2567,14 @@ func newMockRPCServer() *mockRPCServer {
 	}
 }
 
+// Digest challenge values of a mockRPCServer that requires credentials.
+const (
+	digestRealm = "shellyplus1pm-test"
+	digestNonce = "1a2b3c4d"
+)
+
+// withAuth makes the server require HTTP digest credentials on every request,
+// the only scheme a Gen2+ device accepts.
 func (m *mockRPCServer) withAuth(user, pass string) *mockRPCServer {
 	m.authUser = user
 	m.authPass = pass
@@ -2634,12 +2643,10 @@ func (m *mockRPCServer) handlePOSTRPC(w http.ResponseWriter, r *http.Request) bo
 
 func (m *mockRPCServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Check auth if configured
-	if m.authUser != "" {
-		user, pass, ok := r.BasicAuth()
-		if !ok || user != m.authUser || pass != m.authPass {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+	if m.authUser != "" && !testutil.DigestAuthorized(r, m.authUser, digestRealm, digestNonce, m.authPass) {
+		w.Header().Set("WWW-Authenticate", testutil.DigestChallenge(digestRealm, digestNonce))
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 
 	// Handle GET /rpc/<method> format
@@ -8942,10 +8949,10 @@ func TestDeviceHTTPClient_MatchesSDKDefault(t *testing.T) {
 // address is refused before it can dial, and a loopback one is built.
 func TestNewDeviceWebSocket_GuardedUnderTest(t *testing.T) {
 	t.Parallel()
-	if ws, err := NewDeviceWebSocket("ws://192.168.1.100/rpc"); ws != nil || !errors.Is(err, netguard.ErrBlocked) {
+	if ws, err := NewDeviceWebSocket("ws://192.168.1.100/rpc", nil); ws != nil || !errors.Is(err, netguard.ErrBlocked) {
 		t.Errorf("LAN address: ws %v, err %v; want netguard.ErrBlocked", ws, err)
 	}
-	if ws, err := NewDeviceWebSocket("ws://127.0.0.1:8080/rpc"); ws == nil || err != nil {
+	if ws, err := NewDeviceWebSocket("ws://127.0.0.1:8080/rpc", nil); ws == nil || err != nil {
 		t.Errorf("loopback address: ws %v, err %v; want a websocket", ws, err)
 	}
 }

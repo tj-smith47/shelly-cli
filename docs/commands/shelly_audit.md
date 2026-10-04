@@ -7,16 +7,17 @@ Security audit for devices
 Perform a security audit on Shelly devices.
 
 Checks performed:
-  - Authentication status (password protection)
-  - Cloud connection exposure
-  - Firmware version (security patches)
+  - auth:     Authentication status (password protection)
+  - cloud:    Cloud connection exposure (cloud connected without a password)
+  - firmware: Firmware version (security patches)
 
-The audit flags potential security concerns such as:
-  - Devices without authentication enabled
-  - Devices connected to cloud with auth disabled
-  - Outdated firmware that may have vulnerabilities
+Every check runs by default. Pass one or more --check-<name> flags to run
+only those checks.
 
-Use --all to audit all registered devices.
+With no device named, every registered device is audited (the same as --all).
+
+Use -o json or -o yaml for one structured result per device, suitable for
+scripting.
 
 ```
 shelly audit [device...] [flags]
@@ -32,14 +33,23 @@ shelly audit [device...] [flags]
   shelly audit light-1 switch-2
 
   # Audit all registered devices
-  shelly audit --all
+  shelly audit
+
+  # Only check firmware and authentication, as JSON
+  shelly audit --check-firmware --check-auth -o json
+
+  # Only check cloud exposure on one device
+  shelly audit kitchen-light --check-cloud
 ```
 
 ### Options
 
 ```
-      --all    Audit all registered devices
-  -h, --help   help for audit
+      --all              Audit all registered devices (the default when no device is named)
+      --check-auth       Check authentication (password protection)
+      --check-cloud      Check cloud connection exposure
+      --check-firmware   Check for firmware updates
+  -h, --help             help for audit
 ```
 
 ### Options inherited from parent commands

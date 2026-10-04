@@ -14,17 +14,18 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Factory  *cmdutil.Factory
-	Device   string
-	Disable  bool
-	DNS      string
-	Enable   bool
-	Gateway  string
-	Netmask  string
-	Open     bool
-	Password string
-	SSID     string
-	StaticIP string
+	Factory       *cmdutil.Factory
+	Device        string
+	Disable       bool
+	DNS           string
+	Enable        bool
+	Gateway       string
+	Netmask       string
+	Open          bool
+	Password      string
+	PasswordStdin bool
+	SSID          string
+	StaticIP      string
 }
 
 // NewCommand creates the wifi set command.
@@ -71,7 +72,7 @@ no password.`,
 	}
 
 	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "WiFi network name")
-	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password)
+	cmdutil.AddWiFiPasswordFlag(cmd, &opts.Password, &opts.PasswordStdin)
 	cmdutil.AddOpenFlag(cmd, &opts.Open)
 	cmdutil.AddStaticIPFlags(cmd, &opts.StaticIP, &opts.Gateway, &opts.Netmask, &opts.DNS,
 		"Static IPv4 address (DHCP when not set; --gateway, --netmask and --dns default to the device's current ones)",
@@ -88,6 +89,9 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
+	if err := cmdutil.ReadWiFiPasswordStdin(ios, &opts.Password, opts.PasswordStdin); err != nil {
+		return err
+	}
 	svc := opts.Factory.ShellyService()
 
 	// Configuring or enabling WiFi station mode needs an SSID; only --disable

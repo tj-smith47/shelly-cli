@@ -13,14 +13,14 @@ shelly-auth-rotate - Rotate device credentials
 Rotate device authentication credentials.
 
 .PP
-This command sets new authentication credentials on the device,
-optionally generating a secure random password.
+This command sets a new password on the device, optionally generating a
+secure random one. Gen1 devices accept any username, and without --user keep
+the user stored for them; Gen2+ devices have a single user, admin.
 
 .PP
-For security best practices:
-  - Rotate credentials periodically
-  - Use generated passwords (--generate)
-  - Store credentials securely
+The new credentials are saved for a registered device, and the command then
+makes an authenticated request with the new password and fails if the
+device does not accept it. A generated password is shown only with --show.
 
 
 .SH OPTIONS
@@ -37,15 +37,19 @@ For security best practices:
 
 .PP
 \fB--password\fP=""
-	New password (or use --generate)
+	New password (or use --password-stdin or --generate)
+
+.PP
+\fB--password-stdin\fP[=false]
+	Read the new password from stdin
 
 .PP
 \fB--show\fP[=false]
 	Show the new password in output
 
 .PP
-\fB--user\fP="admin"
-	Username for authentication
+\fB--user\fP=""
+	Username: any name on Gen1, where it defaults to the stored user or admin; Gen2+ devices allow only admin
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -113,6 +117,9 @@ For security best practices:
 .EX
   # Rotate with a new password
   shelly auth rotate living-room --password newSecret123
+
+  # Read the new password from stdin, keeping it out of shell history
+  shelly auth rotate living-room --password-stdin < ~/.shelly-living-room-password
 
   # Generate a random password
   shelly auth rotate living-room --generate

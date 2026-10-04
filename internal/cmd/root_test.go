@@ -7,6 +7,8 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -324,38 +326,25 @@ func TestDashIsOutput_ResolvesCommand(t *testing.T) {
 // global through its own flag object (viper bindings, applyRawCapture), so a
 // local flag never switches on the global behavior.
 var localShadowsOfGlobalFlags = map[string]string{
-	"shelly api --raw":                     "compact JSON of the single response",
-	"shelly auth export --output":          "output file path",
-	"shelly batch command --output":        "output format, limited to the formats the command supports",
-	"shelly cloud events --raw":            "print each event message as received",
-	"shelly debug coiot --raw":             "print each event message as received",
-	"shelly debug websocket --raw":         "print each event message as received",
-	"shelly device list --refresh":         "re-read device metadata from hardware",
-	"shelly discover coiot --verbose":      "show Gen1-specific detail",
-	"shelly energy export --output":        "output file path",
-	"shelly firmware download --output":    "output file path",
-	"shelly fleet status --offline":        "list only offline devices",
-	"shelly group members --output":        "output format, limited to the formats the command supports",
-	"shelly init --no-color":               "same meaning as the global flag",
-	"shelly kvs get --raw":                 "print the stored value only",
-	"shelly log export --output":           "output file path",
-	"shelly metrics influxdb --output":     "output file path",
-	"shelly metrics json --output":         "output file path",
-	"shelly modbus status --output":        "output format, limited to the formats the command supports",
-	"shelly plugin create --output":        "output directory",
-	"shelly profile info --output":         "output format, limited to the formats the command supports",
-	"shelly profile list --output":         "output format, limited to the formats the command supports",
-	"shelly profile search --output":       "output format, limited to the formats the command supports",
-	"shelly scene show --output":           "output format, limited to the formats the command supports",
-	"shelly script template list --output": "output format, limited to the formats the command supports",
-	"shelly script template show --output": "output format, limited to the formats the command supports",
-	"shelly sensoraddon list --output":     "output format, limited to the formats the command supports",
-	"shelly sensoraddon scan --output":     "output format, limited to the formats the command supports",
-	"shelly virtual get --output":          "output format, limited to the formats the command supports",
-	"shelly virtual list --output":         "output format, limited to the formats the command supports",
-	"shelly webhook server --log-json":     "log received webhooks as JSON",
-	"shelly zwave config --output":         "output format, limited to the formats the command supports",
-	"shelly zwave info --output":           "output format, limited to the formats the command supports",
+	"shelly api --raw":                  "compact JSON of the single response",
+	"shelly auth export --output":       "output file path",
+	"shelly batch command --output":     "output format, limited to the formats the command supports",
+	"shelly cloud events --raw":         "print each event message as received",
+	"shelly debug coiot --raw":          "print each event message as received",
+	"shelly debug websocket --raw":      "print each event message as received",
+	"shelly device list --refresh":      "re-read device metadata from hardware",
+	"shelly discover coiot --verbose":   "show Gen1-specific detail",
+	"shelly energy export --output":     "output file path",
+	"shelly firmware download --output": "output file path",
+	"shelly fleet status --offline":     "list only offline devices",
+	"shelly init --no-color":            "same meaning as the global flag",
+	"shelly kvs get --raw":              "print the stored value only",
+	"shelly log export --output":        "output file path",
+	"shelly metrics influxdb --output":  "output file path",
+	"shelly metrics json --output":      "output file path",
+	"shelly plugin create --output":     "output directory",
+	"shelly scene show --output":        "output format, limited to the formats the command supports",
+	"shelly webhook server --log-json":  "log received webhooks as JSON",
 }
 
 // TestLocalFlagsDoNotShadowGlobals stops new commands from redefining a global
@@ -461,6 +450,148 @@ func TestEnableDisablePairsAreExclusive(t *testing.T) {
 	if checked == 0 {
 		t.Fatal("no command with an enable/disable pair found")
 	}
+}
+
+// secretFlagPattern matches the name of a flag that carries a secret.
+var secretFlagPattern = regexp.MustCompile(`password|passphrase|token|secret|key|crypt|^auth$`)
+
+// secretFlagsWithoutStdin lists secret-named flags that need no --<name>-stdin
+// sibling, each with the reason.
+var secretFlagsWithoutStdin = map[string]string{
+	// The value is the path of a PEM file; the key itself never reaches the
+	// command line.
+	"shelly cert install --client-key": "file path",
+	// The user:pass pair is kept for existing scripts. --user with
+	// --password-stdin is its stdin form, and --auth is exclusive with both.
+	"shelly device add --auth": "--user with --password-stdin",
+}
+
+// TestSecretFlagsHaveStdinSibling fails when a command takes a secret only as
+// a flag value, which leaks it into shell history and the process list: every
+// such --<name> needs a --<name>-stdin (cmdutil.AddSecretFlags registers both,
+// mutually exclusive).
+func TestSecretFlagsHaveStdinSibling(t *testing.T) {
+	t.Parallel()
+
+	rootCmdMu.Lock()
+	defer rootCmdMu.Unlock()
+
+	seen := map[string]bool{}
+	walkCommands(rootCmd, func(c *cobra.Command) {
+		c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+			if f.Value.Type() == "bool" || f.Value.Type() == "int" || !secretFlagPattern.MatchString(f.Name) {
+				return
+			}
+			key := c.CommandPath() + " --" + f.Name
+			if _, ok := secretFlagsWithoutStdin[key]; ok {
+				seen[key] = true
+				return
+			}
+			stdin := c.LocalFlags().Lookup(f.Name + cmdutil.StdinFlagSuffix)
+			if stdin == nil || stdin.Value.Type() != "bool" {
+				t.Errorf("%s takes a secret only as a value; register it with cmdutil.AddSecretFlags to add --%s%s",
+					key, f.Name, cmdutil.StdinFlagSuffix)
+				return
+			}
+			group := stdin.Annotations["cobra_annotation_mutually_exclusive"]
+			if !slices.Contains(group, f.Name+" "+stdin.Name) && !slices.Contains(group, stdin.Name+" "+f.Name) {
+				t.Errorf("%s and --%s are not mutually exclusive", key, stdin.Name)
+			}
+		})
+	})
+	for key := range secretFlagsWithoutStdin {
+		if !seen[key] {
+			t.Errorf("%s is in secretFlagsWithoutStdin but no longer exists; drop it from the list", key)
+		}
+	}
+}
+
+// stdinSecretArgs holds, per command with a --<name>-stdin flag, positional
+// arguments its Args check accepts.
+var stdinSecretArgs = map[string][]string{
+	"shelly auth rotate":    {"dev"},
+	"shelly auth set":       {"dev"},
+	"shelly auth test":      {"dev"},
+	"shelly backup create":  {"dev", "out.json"},
+	"shelly backup restore": {"dev", "in.json"},
+	"shelly cloud login":    nil,
+	"shelly device add":     {"kitchen", "192.0.2.50", "--no-verify"},
+	"shelly init":           nil,
+	"shelly migrate":        {"src", "dst"},
+	"shelly mqtt set":       {"dev"},
+	"shelly provision":      nil,
+	"shelly provision ble":  {"AA:BB:CC:DD:EE:FF"},
+	"shelly provision wifi": {"dev"},
+	"shelly wifi ap":        {"dev"},
+	"shelly wifi set":       {"dev"},
+}
+
+// TestStdinSecretFlagsReadStdin runs every command with each of its
+// --<name>-stdin flags and an empty stdin. The command must fail naming that
+// flag before it reaches any device, which shows run reads the flag.
+func TestStdinSecretFlagsReadStdin(t *testing.T) {
+	t.Setenv("HOME", "/testhome")
+	rootCmdMu.Lock()
+	defer rootCmdMu.Unlock()
+
+	h := newContractHarness(t, nil, false)
+	type invocation struct {
+		path, flag string
+		args       []string
+	}
+	var runs []invocation
+	walkCommands(rootCmd, func(c *cobra.Command) {
+		c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+			if f.Value.Type() != "bool" || !strings.HasSuffix(f.Name, cmdutil.StdinFlagSuffix) {
+				return
+			}
+			args, ok := stdinSecretArgs[c.CommandPath()]
+			if !ok {
+				t.Errorf("%s --%s: add the command to stdinSecretArgs", c.CommandPath(), f.Name)
+				return
+			}
+			runs = append(runs, invocation{c.CommandPath(), f.Name, args})
+		})
+	})
+	covered := map[string]bool{}
+	for _, r := range runs {
+		covered[r.path] = true
+	}
+	for path := range stdinSecretArgs {
+		if !covered[path] {
+			t.Errorf("%s is in stdinSecretArgs but has no -stdin flag; drop it", path)
+		}
+	}
+	for _, r := range runs {
+		args := append(strings.Fields(strings.TrimPrefix(r.path, "shelly ")), r.args...)
+		args = append(args, "--"+r.flag)
+		_, err := h.run(args)
+		if want := "--" + r.flag + ": stdin is empty"; err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("shelly %s: err = %v, want %q", strings.Join(args, " "), err, want)
+		}
+	}
+}
+
+// TestNoLocalFormatSwitches fails on any local --json flag, and on a local
+// --format not built with flags.AddOutputFlagsCustom. Either one ignores the
+// global -o, so `-o yaml` errors or prints text.
+func TestNoLocalFormatSwitches(t *testing.T) {
+	t.Parallel()
+
+	rootCmdMu.Lock()
+	defer rootCmdMu.Unlock()
+
+	walkCommands(rootCmd, func(c *cobra.Command) {
+		if c.LocalFlags().Lookup("json") != nil {
+			t.Errorf("%s has a local --json flag; drop it and honour -o with cmdutil.PrintResult or flags.AddOutputFlagsCustom",
+				c.CommandPath())
+		}
+		if f := c.LocalFlags().Lookup("format"); f != nil {
+			if _, ok := f.Annotations["shelly_allowed_formats"]; !ok {
+				t.Errorf("%s defines --format without flags.AddOutputFlagsCustom, so -o does not reach it", c.CommandPath())
+			}
+		}
+	})
 }
 
 // TestApplyRawCapture_IgnoresLocalRawFlag asserts a command-local --raw does not

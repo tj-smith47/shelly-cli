@@ -18,16 +18,16 @@ information from the last received packet.
 
 
 .SH OPTIONS
+\fB-f\fP, \fB--format\fP="text"
+	Output format: text, json, yaml
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for status
 
 .PP
 \fB-i\fP, \fB--id\fP=0
 	LoRa component ID (default 0)
-
-.PP
-\fB--json\fP[=false]
-	Output as JSON
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -100,7 +100,7 @@ information from the last received packet.
   shelly lora status living-room --id 100
 
   # Output as JSON
-  shelly lora status living-room --json
+  shelly lora status living-room -o json
 .EE
 
 

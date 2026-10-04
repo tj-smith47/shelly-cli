@@ -74,6 +74,12 @@ func (s *Service) ResetPM1Counters(ctx context.Context, device string, id int, c
 	return s.Monitoring().ResetPM1Counters(ctx, device, id, counterTypes)
 }
 
+// CollectEnergyStatuses reads every EM and EM1 component on each device.
+// See monitoring.Service.CollectEnergyStatuses.
+func (s *Service) CollectEnergyStatuses(ctx context.Context, devices []string) ([]model.EnergyStatusEntry, []model.EnergyStatusSkip) {
+	return s.Monitoring().CollectEnergyStatuses(ctx, devices)
+}
+
 // ListEMComponents returns a list of EM component IDs on a device.
 func (s *Service) ListEMComponents(ctx context.Context, device string) ([]int, error) {
 	return s.Monitoring().ListEMComponents(ctx, device)

@@ -30,8 +30,7 @@ shelly virtual get <device> <key> [flags]
 ### Options
 
 ```
-  -h, --help            help for get
-  -o, --output string   Output format: table, json, yaml (default "table")
+  -h, --help   help for get
 ```
 
 ### Options inherited from parent commands
@@ -45,6 +44,7 @@ shelly virtual get <device> <key> [flags]
       --no-color                Disable colored output
       --no-headers              Hide table headers in output
       --offline                 Only read from cache, error on cache miss
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
       --raw                     Print the exact device response(s) as a JSON array and suppress normal output

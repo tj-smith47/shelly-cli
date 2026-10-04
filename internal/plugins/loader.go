@@ -22,11 +22,11 @@ const (
 
 // Plugin represents a discovered plugin.
 type Plugin struct {
-	Name     string    // Plugin name (without shelly- prefix)
-	Path     string    // Full path to executable
-	Version  string    // Plugin version (if available)
-	Dir      string    // Plugin directory (new format only)
-	Manifest *Manifest // Manifest (new format only)
+	Name     string    `json:"name" yaml:"name"`                             // Plugin name (without shelly- prefix)
+	Path     string    `json:"path" yaml:"path"`                             // Full path to executable
+	Version  string    `json:"version" yaml:"version"`                       // Plugin version (if available)
+	Dir      string    `json:"dir,omitempty" yaml:"dir,omitempty"`           // Plugin directory (new format only)
+	Manifest *Manifest `json:"manifest,omitempty" yaml:"manifest,omitempty"` // Manifest (new format only)
 }
 
 // Loader discovers and loads plugins.

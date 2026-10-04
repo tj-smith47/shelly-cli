@@ -15,14 +15,14 @@ Three authentication methods are available:
    the authorization code is automatically captured. This is the most secure
    method as your password is never stored locally.
 
-2. Auth Key (--key, --server):
+2. Auth Key (--key or --key-stdin, --server):
    Use the authorization key from the Shelly mobile app. Find it in:
    User Settings → Authorization cloud key. You must also provide the
    server URL shown with the key.
 
-3. Email/Password (--email, --password):
-   Provide your Shelly Cloud email and password via flags or environment
-   variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD).
+3. Email/Password (--email, --password or --password-stdin):
+   Provide your Shelly Cloud email and password via flags, stdin or
+   environment variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD).
 
 ```
 shelly cloud login [flags]
@@ -42,6 +42,9 @@ shelly cloud login [flags]
 
   # Email/password login
   shelly cloud login --email user@example.com --password mypassword
+
+  # Email login with the password read from stdin
+  shelly cloud login --email user@example.com --password-stdin < ~/.shelly-cloud-password
 ```
 
 ### Options
@@ -50,8 +53,10 @@ shelly cloud login [flags]
       --email string       Shelly Cloud email
   -h, --help               help for login
       --key string         Authorization key from Shelly App
+      --key-stdin          Read the authorization key from stdin
       --no-browser         Don't auto-open browser, just print the URL
       --password string    Shelly Cloud password
+      --password-stdin     Read the Shelly Cloud password from stdin
       --port int           Port for OAuth callback server (default: auto-select)
       --server string      Server URL for auth key (e.g., shelly-59-eu.shelly.cloud)
       --timeout duration   Timeout waiting for OAuth callback (default 5m0s)

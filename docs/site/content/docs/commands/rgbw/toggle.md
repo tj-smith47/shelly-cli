@@ -9,7 +9,7 @@ Toggle rgbw on/off
 
 ### Synopsis
 
-Toggle a rgbw component on or off on the specified device.
+Toggle an rgbw component on or off on the specified device.
 
 ```
 shelly rgbw toggle <device> [flags]

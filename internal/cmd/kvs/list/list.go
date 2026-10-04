@@ -58,8 +58,8 @@ structured output suitable for scripting.`,
   # Export all KVS data to backup file
   shelly kvs list living-room --values -o json > kvs-backup.json
 
-  # Find string-type keys only
-  shelly kvs list living-room --values -o json | jq '.[] | select(.type == "string")'
+  # Find keys that hold a string value
+  shelly kvs list living-room --values -o json | jq '.[] | select(.value | type == "string")'
 
   # Short form
   shelly kvs ls living-room`,
@@ -117,11 +117,7 @@ func run(ctx context.Context, opts *Options) error {
 		if err != nil {
 			return err
 		}
-		if len(items) == 0 {
-			ios.NoResults("No keys found")
-			return nil
-		}
-		return cmdutil.PrintListResult(ios, items, term.DisplayKVSItems)
+		return cmdutil.PrintList(ios, items, term.DisplayKVSItems, func() { ios.NoResults("keys") })
 	}
 
 	// All values (unfiltered) - use cache
@@ -135,9 +131,5 @@ func run(ctx context.Context, opts *Options) error {
 	if err != nil {
 		return err
 	}
-	if len(result.Data) == 0 {
-		ios.NoResults("No keys found")
-		return nil
-	}
-	return cmdutil.PrintListResult(ios, result.Data, term.DisplayKVSItems)
+	return cmdutil.PrintList(ios, result.Data, term.DisplayKVSItems, func() { ios.NoResults("keys") })
 }

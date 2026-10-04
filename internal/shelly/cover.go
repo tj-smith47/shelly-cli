@@ -22,11 +22,11 @@ const (
 
 // CoverInfo holds cover information for list operations.
 type CoverInfo struct {
-	ID       int
-	Name     string
-	State    string
-	Position int
-	Power    float64
+	ID       int     `json:"id" yaml:"id"`
+	Name     string  `json:"name" yaml:"name"`
+	State    string  `json:"state" yaml:"state"`
+	Position int     `json:"current_pos" yaml:"current_pos"`
+	Power    float64 `json:"power" yaml:"power"`
 }
 
 // ListHeaders returns the column headers for the table.
@@ -170,10 +170,29 @@ func (s *Service) CoverCalibrate(ctx context.Context, identifier string, coverID
 }
 
 // CoverList lists all cover components on a device with their status.
-// Note: Gen1 devices don't have a component enumeration API, so this only works for Gen2+.
+// Gen2+ devices enumerate their components; a Gen1 device lists its rollers
+// from /settings.
 func (s *Service) CoverList(ctx context.Context, identifier string) ([]CoverInfo, error) {
 	var result []CoverInfo
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.withGenAwareAction(ctx, identifier, func(conn *client.Gen1Client) error {
+		names, err := gen1ComponentNames(ctx, conn, model.ComponentCover)
+		if err != nil {
+			return err
+		}
+		result = make([]CoverInfo, 0, len(names))
+		for id, name := range names {
+			roller, err := conn.Roller(id)
+			if err != nil {
+				continue
+			}
+			status, err := roller.GetStatus(ctx)
+			if err != nil {
+				continue
+			}
+			result = append(result, coverInfo(id, name, gen1RollerStatusToCover(id, status)))
+		}
+		return nil
+	}, func(conn *client.Client) error {
 		components, err := conn.FilterComponents(ctx, model.ComponentCover)
 		if err != nil {
 			return err
@@ -181,31 +200,33 @@ func (s *Service) CoverList(ctx context.Context, identifier string) ([]CoverInfo
 
 		result = make([]CoverInfo, 0, len(components))
 		for _, comp := range components {
-			info := CoverInfo{ID: comp.ID}
-
 			status, err := conn.Cover(comp.ID).GetStatus(ctx)
 			if err != nil {
 				continue
 			}
-			info.State = status.State
-			if status.CurrentPosition != nil {
-				info.Position = *status.CurrentPosition
-			}
-			if status.Power != nil {
-				info.Power = *status.Power
-			}
-
+			name := ""
 			config, err := conn.Cover(comp.ID).GetConfig(ctx)
 			if err == nil && config.Name != nil {
-				info.Name = *config.Name
+				name = *config.Name
 			}
-
-			result = append(result, info)
+			result = append(result, coverInfo(comp.ID, name, status))
 		}
 
 		return nil
 	})
 	return result, err
+}
+
+// coverInfo builds a list row from a cover status.
+func coverInfo(id int, name string, status *model.CoverStatus) CoverInfo {
+	info := CoverInfo{ID: id, Name: name, State: status.State}
+	if status.CurrentPosition != nil {
+		info.Position = *status.CurrentPosition
+	}
+	if status.Power != nil {
+		info.Power = *status.Power
+	}
+	return info
 }
 
 // gen1RollerStatusToCover converts Gen1 roller status to model.CoverStatus.

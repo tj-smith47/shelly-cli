@@ -3,7 +3,9 @@ package shelly
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
 
@@ -16,11 +18,11 @@ import (
 
 // LightInfo holds light information for list operations.
 type LightInfo struct {
-	ID         int
-	Name       string
-	Output     bool
-	Brightness int
-	Power      float64
+	ID         int     `json:"id" yaml:"id"`
+	Name       string  `json:"name" yaml:"name"`
+	Output     bool    `json:"output" yaml:"output"`
+	Brightness int     `json:"brightness" yaml:"brightness"`
+	Power      float64 `json:"power" yaml:"power"`
 }
 
 // ListHeaders returns the column headers for the table.
@@ -218,11 +220,114 @@ func (s *Service) lightSetGen1(ctx context.Context, identifier string, lightID i
 	})
 }
 
+// LightIDs returns the IDs of the dimmable light components on a device: the
+// channels of a Gen1 light in white mode, or the Light components of a Gen2+
+// device. A device with only relays, switches, covers, or a Gen1 light in
+// color mode returns an empty list.
+func (s *Service) LightIDs(ctx context.Context, identifier string) ([]int, error) {
+	var ids []int
+	err := s.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
+		if dev.IsGen1() {
+			settings, err := dev.Gen1().GetSettings(ctx)
+			if err != nil {
+				return err
+			}
+			// A Gen1 RGBW in color mode lists its channel under "lights" too,
+			// but it has no /light endpoint to set brightness on.
+			if settings.Mode == "color" {
+				return nil
+			}
+			for i := range settings.Lights {
+				ids = append(ids, i)
+			}
+			return nil
+		}
+		comps, err := dev.Gen2().FilterComponents(ctx, model.ComponentLight)
+		if err != nil {
+			return err
+		}
+		for _, c := range comps {
+			ids = append(ids, c.ID)
+		}
+		return nil
+	})
+	return ids, err
+}
+
+// LightRamp turns the given lights on at brightness from and raises them to
+// brightness to in even steps spread over duration. Steps are at least minStep
+// apart, so a short ramp takes fewer, larger steps. It returns the brightness
+// every light last reached. Cancelling ctx stops the ramp at that level and
+// returns ctx.Err().
+func (s *Service) LightRamp(ctx context.Context, identifier string, lightIDs []int, from, to int, duration, minStep time.Duration) (int, error) {
+	if duration <= 0 {
+		return 0, errors.New("ramp duration must be greater than zero")
+	}
+	on := true
+	set := func(level int) error {
+		for _, id := range lightIDs {
+			if err := s.LightSet(ctx, identifier, id, &level, nil, &on); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				return fmt.Errorf("set light %d to %d%%: %w", id, level, err)
+			}
+		}
+		return nil
+	}
+
+	if err := set(from); err != nil {
+		return 0, err
+	}
+	level := from
+
+	steps := to - from
+	if minStep > 0 {
+		steps = min(steps, int(duration/minStep))
+	}
+	steps = max(steps, 1)
+	ticker := time.NewTicker(duration / time.Duration(steps))
+	defer ticker.Stop()
+
+	for i := 1; i <= steps; i++ {
+		select {
+		case <-ctx.Done():
+			return level, ctx.Err()
+		case <-ticker.C:
+		}
+		next := from + (to-from)*i/steps
+		if err := set(next); err != nil {
+			return level, err
+		}
+		level = next
+	}
+	return level, nil
+}
+
 // LightList lists all light components on a device with their status.
-// Note: Gen1 devices don't have a component enumeration API, so this only works for Gen2+.
+// Gen2+ devices enumerate their components; a Gen1 device lists its white
+// light channels from /settings.
 func (s *Service) LightList(ctx context.Context, identifier string) ([]LightInfo, error) {
 	var result []LightInfo
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.withGenAwareAction(ctx, identifier, func(conn *client.Gen1Client) error {
+		names, err := gen1ComponentNames(ctx, conn, model.ComponentLight)
+		if err != nil {
+			return err
+		}
+		result = make([]LightInfo, 0, len(names))
+		for id, name := range names {
+			light, err := conn.Light(id)
+			if err != nil {
+				continue
+			}
+			status, err := light.GetStatus(ctx)
+			if err != nil {
+				continue
+			}
+			result = append(result, lightInfo(id, name, gen1LightStatusToLight(id, status)))
+		}
+		return nil
+	}, func(conn *client.Client) error {
 		components, err := conn.FilterComponents(ctx, model.ComponentLight)
 		if err != nil {
 			return err
@@ -230,31 +335,34 @@ func (s *Service) LightList(ctx context.Context, identifier string) ([]LightInfo
 
 		result = make([]LightInfo, 0, len(components))
 		for _, comp := range components {
-			info := LightInfo{ID: comp.ID, Brightness: -1}
-
 			status, err := conn.Light(comp.ID).GetStatus(ctx)
 			if err != nil {
 				continue
 			}
-			info.Output = status.Output
-			if status.Brightness != nil {
-				info.Brightness = *status.Brightness
-			}
-			if status.Power != nil {
-				info.Power = *status.Power
-			}
-
+			name := ""
 			config, err := conn.Light(comp.ID).GetConfig(ctx)
 			if err == nil && config.Name != nil {
-				info.Name = *config.Name
+				name = *config.Name
 			}
-
-			result = append(result, info)
+			result = append(result, lightInfo(comp.ID, name, status))
 		}
 
 		return nil
 	})
 	return result, err
+}
+
+// lightInfo builds a list row from a light status. Brightness is -1 when the
+// device does not report one.
+func lightInfo(id int, name string, status *model.LightStatus) LightInfo {
+	info := LightInfo{ID: id, Name: name, Output: status.Output, Brightness: -1}
+	if status.Brightness != nil {
+		info.Brightness = *status.Brightness
+	}
+	if status.Power != nil {
+		info.Power = *status.Power
+	}
+	return info
 }
 
 // gen1LightStatusToLight converts Gen1 light status to model.LightStatus.

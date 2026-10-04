@@ -4,11 +4,14 @@ package list
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // Options holds the command options.
@@ -43,38 +46,44 @@ func run(_ context.Context, opts *Options) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	if len(cfg.Alerts) == 0 {
+	alerts := make([]config.Alert, 0, len(cfg.Alerts))
+	for name, alert := range cfg.Alerts {
+		if alert.Name == "" {
+			alert.Name = name
+		}
+		alerts = append(alerts, alert)
+	}
+	sort.Slice(alerts, func(i, j int) bool { return alerts[i].Name < alerts[j].Name })
+
+	return cmdutil.PrintList(ios, alerts, func(ios *iostreams.IOStreams, alerts []config.Alert) {
+		ios.Success("Configured Alerts (%d)", len(alerts))
+		ios.Println("")
+
+		for _, alert := range alerts {
+			status := "enabled"
+			if !alert.Enabled {
+				status = "disabled"
+			}
+			if alert.SnoozedUntil != "" {
+				if snoozedUntil, err := time.Parse(time.RFC3339, alert.SnoozedUntil); err == nil {
+					if time.Now().Before(snoozedUntil) {
+						status = fmt.Sprintf("snoozed until %s", snoozedUntil.Format("15:04"))
+					}
+				}
+			}
+
+			ios.Printf("  %s [%s]\n", alert.Name, status)
+			ios.Printf("    Device: %s\n", alert.Device)
+			ios.Printf("    Condition: %s\n", alert.Condition)
+			ios.Printf("    Action: %s\n", alert.Action)
+			if alert.Description != "" {
+				ios.Printf("    Description: %s\n", alert.Description)
+			}
+			ios.Println("")
+		}
+	}, func() {
 		ios.Info("No alerts configured")
 		ios.Println("")
 		ios.Info("Create one with: shelly alert create <name> --device <device> --condition <condition>")
-		return nil
-	}
-
-	ios.Success("Configured Alerts (%d)", len(cfg.Alerts))
-	ios.Println("")
-
-	for name, alert := range cfg.Alerts {
-		status := "enabled"
-		if !alert.Enabled {
-			status = "disabled"
-		}
-		if alert.SnoozedUntil != "" {
-			if snoozedUntil, err := time.Parse(time.RFC3339, alert.SnoozedUntil); err == nil {
-				if time.Now().Before(snoozedUntil) {
-					status = fmt.Sprintf("snoozed until %s", snoozedUntil.Format("15:04"))
-				}
-			}
-		}
-
-		ios.Printf("  %s [%s]\n", name, status)
-		ios.Printf("    Device: %s\n", alert.Device)
-		ios.Printf("    Condition: %s\n", alert.Condition)
-		ios.Printf("    Action: %s\n", alert.Action)
-		if alert.Description != "" {
-			ios.Printf("    Description: %s\n", alert.Description)
-		}
-		ios.Println("")
-	}
-
-	return nil
+	})
 }

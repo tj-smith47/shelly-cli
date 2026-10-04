@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
@@ -256,10 +257,10 @@ func TestRun_ContextCancelled(t *testing.T) {
 	cancel()
 
 	opts := &Options{
-		Factory:  tf.Factory,
-		Device:   "test-device",
-		FilePath: "output.json",
-		Format:   "json",
+		Factory:     tf.Factory,
+		Device:      "test-device",
+		FilePath:    "output.json",
+		OutputFlags: flags.OutputFlags{Format: "json"},
 	}
 
 	err := run(ctx, opts)
@@ -279,10 +280,10 @@ func TestRun_Timeout(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	opts := &Options{
-		Factory:  tf.Factory,
-		Device:   "test-device",
-		FilePath: "output.json",
-		Format:   "json",
+		Factory:     tf.Factory,
+		Device:      "test-device",
+		FilePath:    "output.json",
+		OutputFlags: flags.OutputFlags{Format: "json"},
 	}
 
 	err := run(ctx, opts)

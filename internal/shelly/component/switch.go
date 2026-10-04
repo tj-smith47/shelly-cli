@@ -12,10 +12,10 @@ import (
 
 // SwitchInfo holds switch information for list operations.
 type SwitchInfo struct {
-	ID     int
-	Name   string
-	Output bool
-	Power  float64
+	ID     int     `json:"id" yaml:"id"`
+	Name   string  `json:"name" yaml:"name"`
+	Output bool    `json:"output" yaml:"output"`
+	Power  float64 `json:"power" yaml:"power"`
 }
 
 // SwitchOn turns on a switch component.

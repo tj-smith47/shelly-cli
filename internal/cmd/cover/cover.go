@@ -28,7 +28,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   shelly cv close living-room
 
   # Set cover to 50% position
-  shelly cover position bedroom --pos 50`,
+  shelly cover position bedroom 50`,
 	}
 
 	cmd.AddCommand(open.NewCommand(f))

@@ -107,6 +107,7 @@ shelly provision [flags]
       --no-cloud               Disable cloud on provisioned devices
       --open                   Join a network that has no password
       --password string        WiFi password for the network (when omitted and one is needed, the passphrase stored on this host for it is used)
+      --password-stdin         Read the WiFi password from stdin
       --ssid string            WiFi SSID for provisioning
       --static-ip string       Assign a static IP to the device (requires --gateway and --netmask)
       --target-ap string       Provision only the device whose AP SSID matches (non-interactive single device)

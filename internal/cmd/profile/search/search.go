@@ -8,7 +8,6 @@ import (
 	"github.com/tj-smith47/shelly-go/profiles"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -16,7 +15,6 @@ import (
 
 // Options holds command options.
 type Options struct {
-	flags.OutputFlags
 	Query      string
 	Capability string
 	Protocol   string
@@ -44,7 +42,10 @@ Search by text query, or filter by capability or protocol.`,
   shelly profile search --protocol zwave
 
   # Combine filters
-  shelly profile search --capability power_metering --protocol mqtt`,
+  shelly profile search --capability power_metering --protocol mqtt
+
+  # JSON output
+  shelly profile search plug -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.Query = args[0]
@@ -53,7 +54,6 @@ Search by text query, or filter by capability or protocol.`,
 		},
 	}
 
-	flags.AddOutputFlags(cmd, &opts.OutputFlags)
 	cmd.Flags().StringVar(&opts.Capability, "capability", "", "Filter by capability (e.g., dimming, scripting, power_metering)")
 	cmd.Flags().StringVar(&opts.Protocol, "protocol", "", "Filter by protocol (e.g., mqtt, ble, zwave, matter)")
 
@@ -89,12 +89,7 @@ func run(opts *Options) error {
 		return result[i].Model < result[j].Model
 	})
 
-	if len(result) == 0 {
-		ios.Info("No profiles found matching your criteria")
-		return nil
-	}
-
-	return cmdutil.PrintListResult(ios, result, func(ios *iostreams.IOStreams, items []*profiles.Profile) {
+	return cmdutil.PrintList(ios, result, func(ios *iostreams.IOStreams, items []*profiles.Profile) {
 		builder := table.NewBuilder("Model", "Name", "Generation", "Series", "Form Factor")
 		for _, p := range items {
 			builder.AddRow(
@@ -110,5 +105,7 @@ func run(opts *Options) error {
 			ios.DebugErr("print table", err)
 		}
 		ios.Printf("\nFound %d profile(s)\n", len(items))
+	}, func() {
+		ios.Info("No profiles found matching your criteria")
 	})
 }

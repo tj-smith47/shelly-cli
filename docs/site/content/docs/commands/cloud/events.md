@@ -38,8 +38,11 @@ shelly cloud events [flags]
   # Output raw JSON
   shelly cloud events --raw
 
-  # Output in JSON format
-  shelly cloud events --format json
+  # One JSON document per line, one per event
+  shelly cloud events -o json
+
+  # One YAML document per event, separated by ---
+  shelly cloud events -o yaml
 ```
 
 ### Options
@@ -47,7 +50,7 @@ shelly cloud events [flags]
 ```
       --device string   Filter by device ID
       --event string    Filter by event type
-  -f, --format string   Output format: text, json (default "text")
+  -f, --format string   Output format: text, json, yaml (default "text")
   -h, --help            help for events
       --raw             Output raw JSON messages
 ```

@@ -3,18 +3,21 @@ package report
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 const (
-	formatJSON       = "json"
-	formatText       = "text"
-	reportTypeEnergy = "energy"
+	formatJSON = "json"
+	formatText = "text"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -47,7 +50,7 @@ func TestNewCommand_Aliases(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expectedAliases := []string{"generate", "export"}
+	expectedAliases := []string{"generate"}
 	if len(cmd.Aliases) != len(expectedAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, expectedAliases)
 	}
@@ -110,7 +113,7 @@ func TestNewCommand_FlagDefaults(t *testing.T) {
 		name     string
 		defValue string
 	}{
-		{"type", reportTypeDevices},
+		{"type", model.ReportTypeDevices},
 		{"output-file", ""},
 		{"format", formatJSON},
 	}
@@ -153,10 +156,13 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	wantPatterns := []string{
 		"shelly report",
 		"--type",
-		reportTypeDevices,
-		reportTypeEnergy,
-		"-o",
-		"--format",
+		model.ReportTypeDevices,
+		model.ReportTypeEnergy,
+		model.ReportTypeAudit,
+		"-o json",
+		"-o yaml",
+		"-o text",
+		"--output-file",
 	}
 
 	for _, pattern := range wantPatterns {
@@ -172,9 +178,9 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	wantPatterns := []string{
-		reportTypeDevices,
-		reportTypeEnergy,
-		reportTypeAudit,
+		model.ReportTypeDevices,
+		model.ReportTypeEnergy,
+		model.ReportTypeAudit,
 		formatJSON,
 		formatText,
 	}
@@ -190,13 +196,13 @@ func TestOptions(t *testing.T) {
 	t.Parallel()
 
 	opts := &Options{
-		Type:   reportTypeEnergy,
+		Type:   model.ReportTypeEnergy,
 		Output: "/tmp/test.json",
 	}
 	opts.Format = formatJSON
 
-	if opts.Type != reportTypeEnergy {
-		t.Errorf("Type = %q, want %q", opts.Type, reportTypeEnergy)
+	if opts.Type != model.ReportTypeEnergy {
+		t.Errorf("Type = %q, want %q", opts.Type, model.ReportTypeEnergy)
 	}
 
 	if opts.Output != "/tmp/test.json" {
@@ -216,7 +222,7 @@ func TestExecute_NoDevices(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", reportTypeDevices})
+	cmd.SetArgs([]string{"--type", model.ReportTypeDevices})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -233,7 +239,9 @@ func TestExecute_NoDevices(t *testing.T) {
 }
 
 func TestExecute_UnknownReportType(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -280,7 +288,9 @@ func TestExecute_UnknownReportType(t *testing.T) {
 }
 
 func TestExecute_DevicesReport(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -316,7 +326,7 @@ func TestExecute_DevicesReport(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", reportTypeDevices})
+	cmd.SetArgs([]string{"--type", model.ReportTypeDevices})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -327,13 +337,15 @@ func TestExecute_DevicesReport(t *testing.T) {
 
 	// Check output contains expected JSON fields
 	output := tf.OutString()
-	if !strings.Contains(output, reportTypeDevices) {
+	if !strings.Contains(output, model.ReportTypeDevices) {
 		t.Errorf("expected 'devices' in output, got: %s", output)
 	}
 }
 
 func TestExecute_EnergyReport(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -368,7 +380,7 @@ func TestExecute_EnergyReport(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", reportTypeEnergy})
+	cmd.SetArgs([]string{"--type", model.ReportTypeEnergy})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -379,13 +391,15 @@ func TestExecute_EnergyReport(t *testing.T) {
 
 	// Check output contains expected JSON fields
 	output := tf.OutString()
-	if !strings.Contains(output, reportTypeEnergy) {
-		t.Errorf("expected %q in output, got: %s", reportTypeEnergy, output)
+	if !strings.Contains(output, model.ReportTypeEnergy) {
+		t.Errorf("expected %q in output, got: %s", model.ReportTypeEnergy, output)
 	}
 }
 
 func TestExecute_AuditReport(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -420,7 +434,7 @@ func TestExecute_AuditReport(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", reportTypeAudit})
+	cmd.SetArgs([]string{"--type", model.ReportTypeAudit})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -431,13 +445,15 @@ func TestExecute_AuditReport(t *testing.T) {
 
 	// Check output contains expected JSON fields
 	output := tf.OutString()
-	if !strings.Contains(output, reportTypeAudit) {
+	if !strings.Contains(output, model.ReportTypeAudit) {
 		t.Errorf("expected 'audit' in output, got: %s", output)
 	}
 }
 
 func TestExecute_TextFormat(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -472,7 +488,7 @@ func TestExecute_TextFormat(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", reportTypeDevices, "--format", formatText})
+	cmd.SetArgs([]string{"--type", model.ReportTypeDevices, "--format", formatText})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -483,7 +499,9 @@ func TestExecute_TextFormat(t *testing.T) {
 }
 
 func TestExecute_WithMultipleDevices(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -525,7 +543,7 @@ func TestExecute_WithMultipleDevices(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"--type", reportTypeDevices})
+	cmd.SetArgs([]string{"--type", model.ReportTypeDevices})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -536,7 +554,9 @@ func TestExecute_WithMultipleDevices(t *testing.T) {
 }
 
 func TestRun_DevicesReport(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -568,7 +588,7 @@ func TestRun_DevicesReport(t *testing.T) {
 
 	opts := &Options{
 		Factory: tf.Factory,
-		Type:    reportTypeDevices,
+		Type:    model.ReportTypeDevices,
 	}
 	opts.Format = formatJSON
 
@@ -579,7 +599,9 @@ func TestRun_DevicesReport(t *testing.T) {
 }
 
 func TestRun_EnergyReport(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -611,7 +633,7 @@ func TestRun_EnergyReport(t *testing.T) {
 
 	opts := &Options{
 		Factory: tf.Factory,
-		Type:    reportTypeEnergy,
+		Type:    model.ReportTypeEnergy,
 	}
 	opts.Format = formatJSON
 
@@ -622,7 +644,9 @@ func TestRun_EnergyReport(t *testing.T) {
 }
 
 func TestRun_AuditReport(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -654,7 +678,7 @@ func TestRun_AuditReport(t *testing.T) {
 
 	opts := &Options{
 		Factory: tf.Factory,
-		Type:    reportTypeAudit,
+		Type:    model.ReportTypeAudit,
 	}
 	opts.Format = formatJSON
 
@@ -665,7 +689,9 @@ func TestRun_AuditReport(t *testing.T) {
 }
 
 func TestRun_TextFormat(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -697,7 +723,7 @@ func TestRun_TextFormat(t *testing.T) {
 
 	opts := &Options{
 		Factory: tf.Factory,
-		Type:    reportTypeDevices,
+		Type:    model.ReportTypeDevices,
 	}
 	opts.Format = formatText
 
@@ -708,7 +734,9 @@ func TestRun_TextFormat(t *testing.T) {
 }
 
 func TestRun_UnknownReportType(t *testing.T) {
-	t.Parallel()
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -747,5 +775,63 @@ func TestRun_UnknownReportType(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unknown report type") {
 		t.Errorf("expected 'unknown report type' error, got: %v", err)
+	}
+}
+
+// TestRun_StdoutCarriesOnlyTheReport runs every report type in every format
+// and requires stdout to hold just the document, with the device's row.
+func TestRun_StdoutCarriesOnlyTheReport(t *testing.T) {
+	// Reports write what devices tell them to the process-wide registry,
+	// so runs against different mocks must not overlap.
+	t.Setenv("HOME", t.TempDir())
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{Devices: []mock.DeviceFixture{{
+			Name: "test-device", MAC: "AA:BB:CC:DD:EE:FF", Type: "SNSW-001P16EU", Model: "Shelly Plus 1PM", Generation: 2,
+		}}},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true, "apower": 100.5}},
+		},
+	}
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	for _, reportType := range []string{model.ReportTypeDevices, model.ReportTypeEnergy, model.ReportTypeAudit} {
+		for _, format := range []string{formatJSON, "yaml", formatText} {
+			tf := factory.NewTestFactory(t)
+			demo.InjectIntoFactory(tf.Factory)
+			opts := &Options{Factory: tf.Factory, Type: reportType}
+			opts.Format = format
+			if err := run(context.Background(), opts); err != nil {
+				t.Fatalf("%s/%s: %v", reportType, format, err)
+			}
+			out := tf.OutString()
+			var doc struct {
+				ReportType string           `json:"report_type" yaml:"report_type"`
+				Devices    []map[string]any `json:"devices" yaml:"devices"`
+			}
+			switch format {
+			case formatJSON:
+				err = json.Unmarshal([]byte(out), &doc)
+			case "yaml":
+				err = yaml.Unmarshal([]byte(out), &doc)
+			default:
+				if !strings.Contains(out, "test-device") || !strings.Contains(out, "Summary") && !strings.Contains(out, "Total power") {
+					t.Errorf("%s/text: stdout =\n%s", reportType, out)
+				}
+				continue
+			}
+			if err != nil {
+				t.Errorf("%s/%s: stdout is not one document (%v):\n%s", reportType, format, err, out)
+				continue
+			}
+			if doc.ReportType != reportType || len(doc.Devices) != 1 || doc.Devices[0]["name"] != "test-device" {
+				t.Errorf("%s/%s: document = %+v", reportType, format, doc)
+			}
+		}
 	}
 }

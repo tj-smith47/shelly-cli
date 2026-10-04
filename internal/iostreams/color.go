@@ -4,18 +4,11 @@ package iostreams
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"charm.land/lipgloss/v2"
-	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
-
-// isQuietMode checks if quiet mode is enabled via viper.
-func isQuietMode() bool {
-	return viper.GetBool("quiet")
-}
 
 // quietOut returns the output writer, or io.Discard if in quiet mode.
 // Use this for non-essential output that should be suppressed with --quiet.
@@ -195,99 +188,13 @@ func CountTo(w io.Writer, noun string, count int) {
 	writeQuietly(w, "Found %d %s%s\n", count, noun, suffix)
 }
 
-// UpdateNotification prints an update notification with orange symbol and yellow text.
-// Used for non-blocking update notifications during command execution.
-func UpdateNotification(currentVersion, latestVersion string) {
+// UpdateNotification prints an update notification with orange symbol and
+// yellow text to s.ErrOut.
+func (s *IOStreams) UpdateNotification(currentVersion, latestVersion string) {
 	symbol := theme.SemanticWarning().Render("⚠")
 	yellowStyle := lipgloss.NewStyle().Foreground(theme.Yellow())
 	text := yellowStyle.Render(
 		fmt.Sprintf("Update available: %s -> %s (run 'shelly update' to install)", currentVersion, latestVersion),
 	)
-	writelnQuietly(os.Stderr, symbol+" "+text)
-}
-
-// Package-level convenience functions that write to stdout/stderr.
-// Use these when an IOStreams instance is not available (e.g., startup notifications).
-
-// quietStdout returns os.Stdout, or io.Discard if in quiet mode.
-// Use this for non-essential output that should be suppressed with --quiet.
-func quietStdout() io.Writer {
-	if isQuietMode() {
-		return io.Discard
-	}
-	return os.Stdout
-}
-
-// Info prints an informational message to stdout.
-// Messages are suppressed in quiet mode.
-func Info(format string, args ...any) {
-	InfoTo(quietStdout(), format, args...)
-}
-
-// Success prints a success message to stdout.
-// Messages are suppressed in quiet mode.
-func Success(format string, args ...any) {
-	SuccessTo(quietStdout(), format, args...)
-}
-
-// Warning prints a warning message to stderr.
-func Warning(format string, args ...any) {
-	WarningTo(os.Stderr, format, args...)
-}
-
-// Error prints an error message to stderr.
-// Note: For actual command errors, return an error from the command instead.
-func Error(format string, args ...any) {
-	ErrorTo(os.Stderr, format, args...)
-}
-
-// Plain prints a message without any styling to stdout.
-// Messages are suppressed in quiet mode.
-func Plain(format string, args ...any) {
-	PlainTo(quietStdout(), format, args...)
-}
-
-// Hint prints a helpful tip or suggestion to stdout.
-// Hints are suppressed in quiet mode.
-func Hint(format string, args ...any) {
-	HintTo(quietStdout(), format, args...)
-}
-
-// Title prints a section title to stdout.
-// Messages are suppressed in quiet mode.
-func Title(format string, args ...any) {
-	TitleTo(quietStdout(), format, args...)
-}
-
-// Subtitle prints a subtitle to stdout.
-// Messages are suppressed in quiet mode.
-func Subtitle(format string, args ...any) {
-	SubtitleTo(quietStdout(), format, args...)
-}
-
-// Count prints a count summary to stdout.
-// Messages are suppressed in quiet mode.
-func Count(noun string, count int) {
-	CountTo(quietStdout(), noun, count)
-}
-
-// NoResults prints a "no results" message to stdout with optional hints.
-// Messages are suppressed in quiet mode.
-func NoResults(itemType string, hints ...string) {
-	writeQuietly(quietStdout(), "No %s found\n", itemType)
-	for _, hint := range hints {
-		Hint("%s", hint)
-	}
-}
-
-// Added prints a count of items added to stdout.
-func Added(noun string, count int) {
-	if count == 0 {
-		return
-	}
-	suffix := "s"
-	if count == 1 {
-		suffix = ""
-	}
-	Success("Added %d %s%s", count, noun, suffix)
+	writelnQuietly(s.ErrOut, symbol+" "+text)
 }

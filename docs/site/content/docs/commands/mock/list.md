@@ -20,6 +20,9 @@ shelly mock list [flags]
 ```
   # List mock devices
   shelly mock list
+
+  # Output as JSON
+  shelly mock list -o json
 ```
 
 ### Options

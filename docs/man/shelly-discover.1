@@ -46,6 +46,10 @@ stdout as a list (empty when nothing is found) and progress goes to stderr.
 	Discovery method: http, mdns, ble, coiot
 
 .PP
+\fB--network\fP=[]
+	Subnet(s) to scan (repeatable, auto-detected if not specified)
+
+.PP
 \fB-p\fP, \fB--platform\fP=""
 	Only discover devices of this platform (e.g., tasmota)
 
@@ -60,10 +64,6 @@ stdout as a list (empty when nothing is found) and progress goes to stderr.
 .PP
 \fB--skip-plugins\fP[=false]
 	Skip plugin detection (Shelly-only discovery)
-
-.PP
-\fB--subnet\fP=[]
-	Subnet(s) to scan (repeatable, auto-detected if not specified)
 
 .PP
 \fB-t\fP, \fB--timeout\fP=2m0s
@@ -137,10 +137,10 @@ stdout as a list (empty when nothing is found) and progress goes to stderr.
   shelly discover
 
   # Specify subnet for HTTP scan
-  shelly discover --subnet 192.168.1.0/24
+  shelly discover --network 192.168.1.0/24
 
   # Scan multiple subnets
-  shelly discover --subnet 192.168.1.0/24 --subnet 10.0.0.0/24
+  shelly discover --network 192.168.1.0/24 --network 10.0.0.0/24
 
   # Scan all detected subnets without prompting
   shelly discover --all-networks

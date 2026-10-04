@@ -1,12 +1,14 @@
 package plugins
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
@@ -116,7 +118,7 @@ func TestExecutor_ExecuteContext_InvalidPath(t *testing.T) {
 		Path: "/nonexistent/path/to/plugin",
 	}
 
-	err := executor.ExecuteContext(context.Background(), plugin, []string{"--help"})
+	err := executor.ExecuteContext(context.Background(), iostreams.Test(nil, &bytes.Buffer{}, &bytes.Buffer{}), plugin, []string{"--help"})
 	if err == nil {
 		t.Error("ExecuteContext() should fail with invalid plugin path")
 	}
@@ -155,7 +157,7 @@ func TestExecutor_ExecuteContext_WithRealScript(t *testing.T) {
 
 	// Create a test script that exits successfully
 	scriptPath := filepath.Join(tmpDir, "shelly-test")
-	script := "#!/bin/bash\nexit 0\n"
+	script := "#!/bin/bash\necho plugin-out\necho plugin-err >&2\n"
 	testutil.WriteTestScript(t, scriptPath, script)
 
 	executor := NewExecutor()
@@ -165,9 +167,13 @@ func TestExecutor_ExecuteContext_WithRealScript(t *testing.T) {
 		Dir:  tmpDir,
 	}
 
-	err = executor.ExecuteContext(context.Background(), plugin, []string{})
+	var stdout, stderr bytes.Buffer
+	err = executor.ExecuteContext(context.Background(), iostreams.Test(nil, &stdout, &stderr), plugin, []string{})
 	if err != nil {
 		t.Errorf("ExecuteContext() error: %v", err)
+	}
+	if stdout.String() != "plugin-out\n" || stderr.String() != "plugin-err\n" {
+		t.Errorf("plugin streams = %q, %q; want them on the given IOStreams", stdout.String(), stderr.String())
 	}
 }
 
@@ -235,9 +241,9 @@ func TestExecutor_Execute(t *testing.T) {
 		Path: scriptPath,
 	}
 
-	err = executor.Execute(plugin, []string{})
+	err = executor.ExecuteContext(context.Background(), iostreams.Test(nil, &bytes.Buffer{}, &bytes.Buffer{}), plugin, []string{})
 	if err != nil {
-		t.Errorf("Execute() error: %v", err)
+		t.Errorf("ExecuteContext() error: %v", err)
 	}
 }
 
@@ -280,7 +286,7 @@ func TestExecutor_ExecuteCapture(t *testing.T) {
 func TestRunPlugin_NotFound(t *testing.T) {
 	t.Parallel()
 
-	err := RunPlugin(context.Background(), "nonexistent-plugin-12345", []string{})
+	err := RunPlugin(context.Background(), iostreams.Test(nil, &bytes.Buffer{}, &bytes.Buffer{}), "nonexistent-plugin-12345", []string{})
 	if err == nil {
 		t.Error("RunPlugin() should fail for non-existent plugin")
 	}

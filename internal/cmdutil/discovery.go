@@ -46,13 +46,15 @@ type DiscoveryOptions struct {
 // machine-readable data (-o json|yaml|template, --jq, --fields) they write to
 // stderr instead, so stdout holds nothing but the data.
 func StatusStreams(ios *iostreams.IOStreams) *iostreams.IOStreams {
-	if !structuredOutput() {
+	if !StructuredOutput() {
 		return ios
 	}
 	return ios.OnStderr()
 }
 
-func structuredOutput() bool {
+// StructuredOutput reports whether stdout carries machine-readable data:
+// -o json|yaml|template, --jq, or --fields.
+func StructuredOutput() bool {
 	return output.WantsStructured() || jq.HasFilter() || jq.HasFields()
 }
 
@@ -61,15 +63,7 @@ func structuredOutput() bool {
 // message with hints when items is empty. Structured output always writes a
 // list, empty when nothing was found, so a consumer can parse every run.
 func PrintDiscovered[T any](ios *iostreams.IOStreams, items []T, display ListDisplay[T], noun string, hints ...string) error {
-	if len(items) == 0 {
-		if !structuredOutput() {
-			ios.NoResults(noun, hints...)
-			return nil
-		}
-		// A nil slice encodes as null, which is not a list.
-		items = []T{}
-	}
-	return PrintListResult(ios, items, display)
+	return PrintList(ios, items, display, func() { ios.NoResults(noun, hints...) })
 }
 
 // ResolveSubnets determines which subnets to scan based on explicit flags
@@ -231,7 +225,7 @@ func RunPluginOnlyDiscovery(ctx context.Context, opts *DiscoveryOptions) error {
 	defer cancel()
 
 	// Scan every resolved subnet so plugin discovery covers the same address
-	// space as native Shelly discovery when multiple --subnet values are given.
+	// space as native Shelly discovery when multiple --network values are given.
 	pluginDevices := shelly.RunPluginPlatformDiscoveryWithProgress(ctx, registry, opts.Platform, subnets, shelly.IsDeviceRegistered, func(p shelly.DiscoveryProgress) bool {
 		if p.Found && p.Device != nil {
 			mw.UpdateLine("scan", iostreams.StatusRunning,

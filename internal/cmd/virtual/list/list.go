@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -17,7 +16,6 @@ import (
 
 // Options holds command options.
 type Options struct {
-	flags.OutputFlags
 	Device  string
 	Factory *cmdutil.Factory
 }
@@ -46,8 +44,6 @@ Component IDs in the range 200-299 are reserved for virtual components.`,
 			return run(cmd.Context(), opts)
 		},
 	}
-
-	flags.AddOutputFlags(cmd, &opts.OutputFlags)
 
 	return cmd
 }

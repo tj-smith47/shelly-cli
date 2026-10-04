@@ -29,13 +29,13 @@ shelly bthome status <device> [id] [flags]
   shelly bthome status living-room 200
 
   # Output as JSON
-  shelly bthome status living-room 200 --json
+  shelly bthome status living-room 200 -o json
 ```
 
 ### Options
 
 ```
-  -f, --format string   Output format: text, json (default "text")
+  -f, --format string   Output format: text, json, yaml (default "text")
   -h, --help            help for status
 ```
 

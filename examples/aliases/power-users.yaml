@@ -27,8 +27,8 @@ aliases:
   all-off: "batch off --all"
 
   # Configuration export shortcuts
-  cfgx: "config export -o yaml"
-  cfgj: "config export -o json"
+  cfgx: "config show -o yaml"
+  cfgj: "config show -o json"
 
   # Firmware check all devices at once
   fw-check: "firmware check --all"
@@ -40,23 +40,22 @@ aliases:
   pwr-hist: "energy history"
 
   # Quick debug/diagnostics
-  methods: "debug methods"
-  rpc: "debug rpc"
+  methods: "api methods"
 
   # Backup shortcuts
   bk: "backup create"
   bk-all: "backup create --all"
 
   # TUI dashboard access
-  ui: "tui dash"
+  ui: "dash"
 
   # Open device web interface
   web: "device ui"
 
   # Shell aliases for JSON filtering (requires jq)
   # List only online devices
-  online: "!shelly device list -o json | jq -r '.[] | select(.online == true) | .name'"
+  online: "!shelly status -o json | jq -r '.[] | select(.online == true) | .name'"
   # List only offline devices
-  offline: "!shelly device list -o json | jq -r '.[] | select(.online == false) | .name'"
+  offline: "!shelly status -o json | jq -r '.[] | select(.online == false) | .name'"
   # Power summary for all devices
   pwr-summary: "!shelly energy status --all -o json | jq -r '.[] | \"\\(.name): \\(.power // 0)W\"'"

@@ -21,10 +21,10 @@ providing more control than RGB-only outputs.
 
 ```
   # Turn on RGBW with warm white
-  shelly rgbw on kitchen --rgb 255,200,150 --white 128
+  shelly rgbw set kitchen --red 255 --green 200 --blue 150 --white 128 --on
 
   # Set color and brightness
-  shelly rgbw set kitchen --rgb 255,0,0 --brightness 75
+  shelly rgbw set kitchen --red 255 --green 0 --blue 0 --brightness 75
 
   # Toggle RGBW state
   shelly rgbw toggle kitchen

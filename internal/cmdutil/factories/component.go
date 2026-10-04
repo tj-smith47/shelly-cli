@@ -75,7 +75,7 @@ func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command 
 		use = "on <device>"
 		aliases = []string{verbEnable, "1"}
 		short = fmt.Sprintf("Turn %s on", componentLower)
-		long = fmt.Sprintf("Turn on a %s component on the specified device.", componentLower)
+		long = fmt.Sprintf("Turn on %s component on the specified device.", withArticle(componentLower))
 		examples = fmt.Sprintf(`  # Turn on %s
   shelly %s on <device>
 
@@ -89,7 +89,7 @@ func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command 
 		use = "off <device>"
 		aliases = []string{verbDisable, "0"}
 		short = fmt.Sprintf("Turn %s off", componentLower)
-		long = fmt.Sprintf("Turn off a %s component on the specified device.", componentLower)
+		long = fmt.Sprintf("Turn off %s component on the specified device.", withArticle(componentLower))
 		examples = fmt.Sprintf(`  # Turn off %s
   shelly %s off <device>
 
@@ -103,7 +103,7 @@ func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command 
 		use = "toggle <device>"
 		aliases = []string{"flip", "t"}
 		short = fmt.Sprintf("Toggle %s on/off", componentLower)
-		long = fmt.Sprintf("Toggle a %s component on or off on the specified device.", componentLower)
+		long = fmt.Sprintf("Toggle %s component on or off on the specified device.", withArticle(componentLower))
 		examples = fmt.Sprintf(`  # Toggle %s
   shelly %s toggle <device>
 

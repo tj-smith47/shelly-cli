@@ -11,8 +11,10 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // Output format identifiers for the config export command.
@@ -26,7 +28,7 @@ type Options struct {
 	Factory  *cmdutil.Factory
 	Device   string
 	FilePath string
-	Format   string
+	flags.OutputFlags
 }
 
 // NewCommand creates the config export command.
@@ -59,7 +61,7 @@ for YAML output.`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Format, "format", "f", "json", "Output format (json, yaml)")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, string(output.FormatJSON), string(output.FormatJSON), formatYAML, formatYML)
 
 	return cmd
 }

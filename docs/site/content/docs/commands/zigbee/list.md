@@ -28,13 +28,13 @@ shelly zigbee list [flags]
   shelly zigbee list
 
   # Output as JSON
-  shelly zigbee list --json
+  shelly zigbee list -o json
 ```
 
 ### Options
 
 ```
-  -f, --format string   Output format: text, json (default "text")
+  -f, --format string   Output format: text, json, yaml (default "text")
   -h, --help            help for list
 ```
 

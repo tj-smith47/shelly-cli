@@ -7,16 +7,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
 type Options struct {
-	flags.OutputFlags
 	Factory *cmdutil.Factory
 }
 
@@ -42,8 +39,6 @@ templates from your configuration.`,
 		},
 	}
 
-	flags.AddOutputFlags(cmd, &opts.OutputFlags)
-
 	return cmd
 }
 
@@ -52,11 +47,6 @@ func run(opts *Options) error {
 
 	// Get all templates (built-in + user-defined)
 	templates := automation.ListAllScriptTemplates()
-
-	if len(templates) == 0 {
-		ios.NoResults("script templates")
-		return nil
-	}
 
 	// Convert to slice and sort
 	list := make([]config.ScriptTemplate, 0, len(templates))
@@ -67,11 +57,5 @@ func run(opts *Options) error {
 		return list[i].Name < list[j].Name
 	})
 
-	// Handle output formats
-	if output.WantsStructured() {
-		return cmdutil.PrintListResult(ios, list, nil)
-	}
-
-	term.DisplayScriptTemplateList(ios, list)
-	return nil
+	return cmdutil.PrintList(ios, list, term.DisplayScriptTemplateList, func() { ios.NoResults("script templates") })
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/tj-smith47/shelly-go/events"
 	"github.com/tj-smith47/shelly-go/gen1"
 	"github.com/tj-smith47/shelly-go/notifications"
-	"github.com/tj-smith47/shelly-go/rpc"
 	"github.com/tj-smith47/shelly-go/transport"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
@@ -43,7 +42,7 @@ type EventStream struct {
 type deviceConnection struct {
 	name       string
 	address    string
-	ws         *transport.WebSocket
+	ws         *client.DeviceWebSocket
 	cancel     context.CancelFunc
 	generation int
 	online     bool   // tracks last known online state for Gen1 polling
@@ -144,7 +143,7 @@ func (es *EventStream) connectDevice(name, address string) {
 
 	// Connect via WebSocket for Gen2+ devices
 	wsURL := fmt.Sprintf("ws://%s/rpc", address)
-	ws, err := client.NewDeviceWebSocket(wsURL,
+	ws, err := client.NewDeviceWebSocket(wsURL, resolvedDevice.Auth,
 		transport.WithReconnect(true),
 		transport.WithPingInterval(30*time.Second),
 	)
@@ -217,22 +216,16 @@ func (es *EventStream) connectDevice(name, address string) {
 		return
 	}
 
-	// Fetch initial status via WebSocket and enable notifications.
-	// Per Shelly docs: "To start receiving notifications over websocket,
-	// you have to send at least one request frame with a valid source (src)."
-	// We use GetStatus instead of GetDeviceInfo to also get initial state,
-	// eliminating the need for a separate HTTP request during initial load.
-	rb := rpc.NewRequestBuilder()
-	req, err := rb.Build("Shelly.GetStatus", nil)
-	if err == nil {
-		if statusJSON, err := ws.Call(ctx, req); err != nil {
-			debug.TraceEvent("ws: %s initial GetStatus failed: %v", name, err)
-		} else {
-			debug.TraceEvent("ws: %s notifications enabled, publishing initial status", name)
-			// Publish as FullStatusEvent so cache can use it
-			es.bus.Publish(events.NewFullStatusEvent(name, statusJSON).
-				WithSource(events.EventSourceWebSocket))
-		}
+	// A device sends no notifications until it has answered one request
+	// frame, and on a password-protected device that frame must authenticate.
+	// Shelly.GetStatus also gives the initial state, so no separate HTTP
+	// request is needed for the first load.
+	if statusJSON, err := client.StartDeviceNotifications(ctx, ws); err != nil {
+		iostreams.DebugErrCat(iostreams.CategoryNetwork, fmt.Sprintf("start notifications %s", name), err)
+	} else {
+		debug.TraceEvent("ws: %s notifications enabled, publishing initial status", name)
+		es.bus.Publish(events.NewFullStatusEvent(name, statusJSON).
+			WithSource(events.EventSourceWebSocket))
 	}
 
 	// Connection was pre-registered before Connect() to enable state callback
@@ -373,7 +366,7 @@ func (es *EventStream) Stop() {
 	// This avoids deadlock: ws.Close() waits for readLoop to exit, and readLoop
 	// calls handleWebSocketStateChange() which needs es.mu.Lock().
 	es.mu.Lock()
-	websockets := make([]*transport.WebSocket, 0, len(es.connections))
+	websockets := make([]*client.DeviceWebSocket, 0, len(es.connections))
 	for name, conn := range es.connections {
 		conn.cancel()
 		if conn.ws != nil {
@@ -534,7 +527,7 @@ func (es *EventStream) Publish(evt events.Event) {
 	}
 }
 
-func closeWS(ws *transport.WebSocket) {
+func closeWS(ws *client.DeviceWebSocket) {
 	if err := ws.Close(); err != nil {
 		iostreams.DebugErrCat(iostreams.CategoryNetwork, "closing websocket", err)
 	}

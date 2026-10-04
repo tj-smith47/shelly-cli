@@ -7,9 +7,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -18,7 +17,6 @@ const keyGroup = "group"
 
 // Options holds command options.
 type Options struct {
-	flags.OutputFlags
 	Factory   *cmdutil.Factory
 	GroupName string
 }
@@ -29,7 +27,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "members <group>",
-		Aliases: []string{"show", "ls"},
+		Aliases: []string{"show"},
 		Short:   "List group members",
 		Long:    `List all devices that are members of the specified group.`,
 		Example: `  # List members of a group
@@ -41,16 +39,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		ValidArgsFunction: completion.GroupNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.GroupName = args[0]
-			return run(cmd, opts)
+			return run(opts)
 		},
 	}
-
-	flags.AddOutputFlags(cmd, &opts.OutputFlags)
 
 	return cmd
 }
 
-func run(cmd *cobra.Command, opts *Options) error {
+func run(opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	group := opts.Factory.GetGroup(opts.GroupName)
@@ -58,28 +54,20 @@ func run(cmd *cobra.Command, opts *Options) error {
 		return fmt.Errorf("group %q not found", opts.GroupName)
 	}
 
-	if len(group.Devices) == 0 {
-		ios.NoResults("members in group %q", opts.GroupName)
-		return nil
+	members := group.Devices
+	if members == nil {
+		members = []string{}
 	}
-
-	if output.WantsJSON() {
-		data := map[string]any{
-			keyGroup:  opts.GroupName,
-			"members": group.Devices,
-			"count":   len(group.Devices),
+	data := map[string]any{
+		keyGroup:  opts.GroupName,
+		"members": members,
+		"count":   len(members),
+	}
+	return cmdutil.PrintResult(ios, data, func(ios *iostreams.IOStreams, _ map[string]any) {
+		if len(members) == 0 {
+			ios.NoResults(fmt.Sprintf("members in group %q", opts.GroupName))
+			return
 		}
-		return output.JSON(cmd.OutOrStdout(), data)
-	}
-	if output.WantsYAML() {
-		data := map[string]any{
-			keyGroup:  opts.GroupName,
-			"members": group.Devices,
-			"count":   len(group.Devices),
-		}
-		return output.YAML(cmd.OutOrStdout(), data)
-	}
-
-	term.DisplayGroupMembers(ios, opts.GroupName, group.Devices)
-	return nil
+		term.DisplayGroupMembers(ios, opts.GroupName, members)
+	})
 }

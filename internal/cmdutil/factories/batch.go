@@ -15,19 +15,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
-// pluralize returns the plural form of a word.
-// Handles common cases for component names (switch->switches, light->lights).
-func pluralize(word string) string {
-	word = strings.ToLower(word)
-	switch {
-	case strings.HasSuffix(word, "ch") || strings.HasSuffix(word, "sh") ||
-		strings.HasSuffix(word, "x") || strings.HasSuffix(word, "s"):
-		return word + "es"
-	default:
-		return word + "s"
-	}
-}
-
 // BatchComponentOpts configures a batch component command.
 type BatchComponentOpts struct {
 	// Component type: "Switch", "Light", "RGB", "Cover"

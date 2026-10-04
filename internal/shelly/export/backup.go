@@ -35,8 +35,9 @@ func SanitizeFilename(name string) string {
 // embedded shelly-go Backup carries json-only tags and json.RawMessage config
 // sections, so a YAML rendering is an unreadable byte-array blob that the
 // JSON-only restore path cannot read back.
-func WriteBackupFile(bkp *backup.DeviceBackup, filePath string) error {
-	data, err := json.MarshalIndent(bkp, "", "  ")
+// A non-empty password writes the encrypted envelope (see EncodeBackup).
+func WriteBackupFile(bkp *backup.DeviceBackup, filePath, password string) error {
+	data, err := EncodeBackup(bkp, password)
 	if err != nil {
 		return fmt.Errorf("failed to marshal backup: %w", err)
 	}
@@ -126,4 +127,14 @@ func ParseBackupFile(filePath string) (model.BackupFileInfo, error) {
 // WriteBackupFile for why YAML is not a valid backup encoding).
 func MarshalBackup(bkp *backup.DeviceBackup) ([]byte, error) {
 	return json.MarshalIndent(bkp, "", "  ")
+}
+
+// EncodeBackup serializes a backup for writing to a file: an AES-256-GCM
+// envelope when password is set (restored with --decrypt), plaintext JSON
+// otherwise.
+func EncodeBackup(bkp *backup.DeviceBackup, password string) ([]byte, error) {
+	if password != "" {
+		return backup.Encrypt(bkp, password)
+	}
+	return MarshalBackup(bkp)
 }

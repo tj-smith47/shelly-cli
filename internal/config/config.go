@@ -237,8 +237,8 @@ func (c *Config) GetIntegratorCredentials() (tag, token string, err error) {
 
 // Alias represents a command alias.
 type Alias struct {
-	Command string `mapstructure:"command" yaml:"command,omitempty"`
-	Shell   bool   `mapstructure:"shell" yaml:"shell,omitempty"` // If true, execute via shell
+	Command string `mapstructure:"command" json:"command" yaml:"command,omitempty"`
+	Shell   bool   `mapstructure:"shell" json:"shell" yaml:"shell,omitempty"` // If true, execute via shell
 }
 
 // Group represents a device group.

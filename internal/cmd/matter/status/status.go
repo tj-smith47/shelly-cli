@@ -38,7 +38,7 @@ Displays:
   shelly matter status living-room
 
   # Output as JSON
-  shelly matter status living-room --json`,
+  shelly matter status living-room -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -47,7 +47,7 @@ Displays:
 		},
 	}
 
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json", "yaml")
 
 	return cmd
 }
@@ -64,8 +64,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.Format == "json" {
-		return term.OutputMatterStatusJSON(ios, status)
+	if opts.Structured() {
+		return cmdutil.PrintStructured(ios, opts.Format, status)
 	}
 
 	term.DisplayMatterStatus(ios, status, opts.Device)

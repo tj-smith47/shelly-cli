@@ -2,7 +2,7 @@
 .TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-alias-delete - Delete a alias
+shelly-alias-delete - Delete an alias
 
 
 .SH SYNOPSIS
@@ -16,6 +16,10 @@ Delete a saved alias permanently.
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
 	help for delete
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -81,7 +85,7 @@ Delete a saved alias permanently.
 
 .SH EXAMPLE
 .EX
-  # Delete a alias (with confirmation)
+  # Delete an alias (with confirmation)
   shelly alias delete my-alias
 
   # Delete without confirmation

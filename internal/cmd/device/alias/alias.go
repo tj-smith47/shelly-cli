@@ -81,8 +81,7 @@ func run(opts *Options) error {
 		if err != nil {
 			return err
 		}
-		term.DisplayDeviceAliases(ios, opts.Device, aliases)
-		return nil
+		return term.DisplayDeviceAliases(ios, opts.Device, aliases)
 	}
 
 	// Handle --remove flag

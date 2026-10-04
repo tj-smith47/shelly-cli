@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -69,11 +68,6 @@ func GetTemplate() string {
 	return viper.GetString("template")
 }
 
-// Print outputs data in the configured format.
-func Print(data any) error {
-	return PrintTo(os.Stdout, data)
-}
-
 // PrintTo outputs data to the specified writer in the configured format.
 // If --fields is set, prints available field names instead of data.
 // If --jq is set, the jq filter is applied instead.
@@ -86,16 +80,6 @@ func PrintTo(w io.Writer, data any) error {
 	}
 	formatter := NewFormatter(GetFormat())
 	return formatter.Format(w, data)
-}
-
-// PrintJSON outputs data as JSON.
-func PrintJSON(data any) error {
-	return jsonfmt.New().Format(os.Stdout, data)
-}
-
-// PrintYAML outputs data as YAML.
-func PrintYAML(data any) error {
-	return yamlfmt.New().Format(os.Stdout, data)
 }
 
 // JSON outputs data as JSON to the specified writer.
@@ -208,11 +192,6 @@ func ValidFormats() []string {
 // Template outputs data using the specified template to the given writer.
 func Template(w io.Writer, tmpl string, data any) error {
 	return tmplfmt.New(tmpl).Format(w, data)
-}
-
-// PrintTemplate outputs data using the specified template to stdout.
-func PrintTemplate(tmpl string, data any) error {
-	return Template(os.Stdout, tmpl, data)
 }
 
 // IsQuiet returns true if quiet mode is enabled.

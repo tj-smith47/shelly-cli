@@ -1595,7 +1595,7 @@ func TestService_SetAuth_ResolveError(t *testing.T) {
 	resolver := &testutil.Resolver{Err: expectedErr}
 	service := New(resolver)
 
-	err := service.SetAuth(context.Background(), "nonexistent", "admin", "shelly", "password")
+	_, _, err := service.SetAuth(context.Background(), "nonexistent", "admin", "password")
 
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("got error %v, want %v", err, expectedErr)

@@ -15,8 +15,9 @@ Manage device authentication
 Manage device authentication settings.
 
 Enable, configure, or disable authentication for local device access.
-When authentication is enabled, a username and password are required
-for all device operations.
+When authentication is enabled, the device requires a username and
+password for its operations, and the CLI sends the credentials saved for
+each device.
 
 ### Examples
 

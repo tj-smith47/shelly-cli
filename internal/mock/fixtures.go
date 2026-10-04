@@ -38,13 +38,17 @@ type ConfigFixture struct {
 
 // DeviceFixture represents a registered device.
 type DeviceFixture struct {
-	Name        string `yaml:"name"`
-	Address     string `yaml:"address"`
-	MAC         string `yaml:"mac"`
-	Model       string `yaml:"model"`
-	Type        string `yaml:"type"`
-	Generation  int    `yaml:"generation"`
-	Platform    string `yaml:"platform,omitempty"`
+	Name       string `yaml:"name"`
+	Address    string `yaml:"address"`
+	MAC        string `yaml:"mac"`
+	Model      string `yaml:"model"`
+	Type       string `yaml:"type"`
+	Generation int    `yaml:"generation"`
+	Platform   string `yaml:"platform,omitempty"`
+	// AuthUser and AuthPass are the credentials stored for the device in the
+	// registry. With AuthEnabled the mock device also requires them: it
+	// reports authentication enabled and answers 401 to any request that does
+	// not carry them (see DeviceServer.authorized).
 	AuthUser    string `yaml:"auth_user,omitempty"`
 	AuthPass    string `yaml:"auth_pass,omitempty"`
 	AuthEnabled bool   `yaml:"auth_enabled,omitempty"`

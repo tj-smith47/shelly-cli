@@ -49,7 +49,7 @@ support RPC method introspection.`,
   shelly api methods living-room --filter Switch
 
   # Output as JSON
-  shelly api methods living-room --json`,
+  shelly api methods living-room -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -59,7 +59,7 @@ support RPC method introspection.`,
 	}
 
 	cmd.Flags().StringVar(&opts.Filter, "filter", "", "Filter methods by name (case-insensitive)")
-	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json", "yaml")
 
 	return cmd
 }
@@ -106,13 +106,8 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Output
-	if opts.Format == "json" {
-		jsonOutput, err := json.MarshalIndent(methods, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
-		}
-		ios.Println(string(jsonOutput))
-		return nil
+	if opts.Structured() {
+		return cmdutil.PrintStructured(ios, opts.Format, methods)
 	}
 
 	ios.Println(theme.Bold().Render(fmt.Sprintf("Available RPC Methods (%d):", len(methods))))

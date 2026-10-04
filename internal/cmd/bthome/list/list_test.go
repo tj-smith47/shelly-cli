@@ -138,7 +138,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 
 	wantPatterns := []string{
 		"shelly bthome list",
-		"--json",
+		"-o json",
 		"shelly bthome ls",
 	}
 

@@ -45,7 +45,7 @@ func TestNewCommand_Aliases(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expectedAliases := map[string]bool{"prov": true, "setup": true}
+	expectedAliases := map[string]bool{"prov": true}
 	for _, alias := range cmd.Aliases {
 		if !expectedAliases[alias] {
 			t.Errorf("unexpected alias %q", alias)

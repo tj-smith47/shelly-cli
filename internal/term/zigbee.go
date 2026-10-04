@@ -2,7 +2,6 @@
 package term
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -48,16 +47,6 @@ func displayZigbeeDevice(ios *iostreams.IOStreams, dev model.ZigbeeDevice) {
 	ios.Println()
 }
 
-// OutputZigbeeDevicesJSON outputs Zigbee devices as JSON.
-func OutputZigbeeDevicesJSON(ios *iostreams.IOStreams, devices []model.ZigbeeDevice) error {
-	jsonBytes, err := json.MarshalIndent(devices, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to format JSON: %w", err)
-	}
-	ios.Println(string(jsonBytes))
-	return nil
-}
-
 // DisplayZigbeeStatus displays the Zigbee status for a device.
 func DisplayZigbeeStatus(ios *iostreams.IOStreams, status model.ZigbeeStatus) {
 	ios.Println(theme.Bold().Render("Zigbee Status:"))
@@ -98,14 +87,4 @@ func displayZigbeeNetworkInfo(ios *iostreams.IOStreams, status model.ZigbeeStatu
 	if status.CoordinatorEUI64 != "" {
 		ios.Printf("    Coordinator: %s\n", status.CoordinatorEUI64)
 	}
-}
-
-// OutputZigbeeStatusJSON outputs Zigbee status as JSON.
-func OutputZigbeeStatusJSON(ios *iostreams.IOStreams, status model.ZigbeeStatus) error {
-	jsonBytes, err := json.MarshalIndent(status, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to format JSON: %w", err)
-	}
-	ios.Println(string(jsonBytes))
-	return nil
 }

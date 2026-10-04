@@ -159,6 +159,11 @@ func (f *Factory) SetConfigManager(mgr *config.Manager) *Factory {
 // This modifies the factory in-place and returns it for chaining.
 func (f *Factory) SetShellyService(svc *shelly.Service) *Factory {
 	f.shellyService = svc
+	// These wrap the previous service and would keep talking to it.
+	f.automationService = nil
+	f.kvsService = nil
+	f.modbusService = nil
+	f.sensorAddonService = nil
 	origService := f.ShellyService
 	f.ShellyService = func() *shelly.Service {
 		if f.shellyService != nil {

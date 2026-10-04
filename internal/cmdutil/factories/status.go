@@ -49,7 +49,7 @@ func NewStatusCommand[T any](f *cmdutil.Factory, opts StatusOpts[T]) *cobra.Comm
 
 	// Generate descriptions and examples
 	short := fmt.Sprintf("Show %s status", componentLower)
-	long := fmt.Sprintf("Show the current status of a %s component on the specified device.", componentLower)
+	long := fmt.Sprintf("Show the current status of %s component on the specified device.", withArticle(componentLower))
 	examples := fmt.Sprintf(`  # Show %s status
   shelly %s status <device>
 

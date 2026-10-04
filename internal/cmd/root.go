@@ -100,9 +100,11 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/zigbee"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/zwave"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	mockpkg "github.com/tj-smith47/shelly-cli/internal/mock"
+	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/telemetry"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
@@ -184,7 +186,21 @@ func execute() int {
 
 	// Handle shell aliases by executing in shell
 	if isShell {
-		return config.ExecuteShellAlias(ctx, expandedArgs)
+		ios := factory.IOStreams()
+		code, err := config.ExecuteShellAlias(ctx, ios.In, ios.Out, ios.ErrOut, expandedArgs)
+		if err != nil {
+			ios.Errorf("%s: %v\n", theme.StatusError().Render("[ERROR]"), err)
+		}
+		return code
+	}
+
+	// A name that is not a built-in command runs the installed plugin of that
+	// name (shelly myext -> shelly-myext). Built-in commands and their aliases
+	// always win; `shelly plugin exec` reaches a plugin they hide. The call is
+	// rewritten to `plugin exec` so both forms load the config and hand the
+	// plugin the same environment.
+	if isPluginInvocation(rootCmd, expandedArgs) {
+		expandedArgs = append([]string{"plugin", "exec"}, expandedArgs...)
 	}
 
 	// Substitute "-" argument with piped stdin content (enables: echo "dev" | shelly status -).
@@ -193,7 +209,7 @@ func execute() int {
 	if !dashIsOutput(rootCmd, expandedArgs) {
 		expandedArgs, err = utils.ReplaceStdinArg(expandedArgs)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s\n", theme.StatusError().Render("[ERROR]"), err.Error())
+			factory.IOStreams().Errorf("%s: %s\n", theme.StatusError().Render("[ERROR]"), err.Error())
 			return 1
 		}
 	}
@@ -217,10 +233,10 @@ func execute() int {
 	if rawSink != nil {
 		w := rawOut
 		if w == nil {
-			w = os.Stdout
+			w = factory.IOStreams().Out
 		}
 		if rawErr := emitRawResponses(w, rawSink); rawErr != nil {
-			fmt.Fprintf(os.Stderr, "%s: %v\n", theme.StatusError().Render("[ERROR]"), rawErr)
+			factory.IOStreams().Errorf("%s: %v\n", theme.StatusError().Render("[ERROR]"), rawErr)
 		}
 	}
 
@@ -232,12 +248,12 @@ func execute() int {
 		}
 		// Print error with themed coloring: [ERROR]: message
 		errorLabel := theme.StatusError().Render("[ERROR]")
-		fmt.Fprintf(os.Stderr, "%s: %s\n", errorLabel, err.Error())
+		factory.IOStreams().Errorf("%s: %s\n", errorLabel, err.Error())
 		return 1
 	}
 
 	// Show update notification if available (from cache)
-	version.ShowUpdateNotification()
+	version.ShowUpdateNotification(factory.IOStreams())
 
 	return 0
 }
@@ -251,6 +267,19 @@ func dashIsOutput(root *cobra.Command, args []string) bool {
 		return false
 	}
 	return cmdutil.DashIsOutput(target)
+}
+
+// isPluginInvocation reports whether args start with the name of an installed
+// plugin that no built-in command or alias claims.
+func isPluginInvocation(root *cobra.Command, args []string) bool {
+	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+		return false
+	}
+	if target, _, err := root.Find(args[:1]); err == nil && target != root {
+		return false
+	}
+	found, err := plugins.NewLoader().Find(args[0])
+	return err == nil && found != nil
 }
 
 // emitRawResponses marshals the captured device responses to a JSON array and
@@ -346,7 +375,7 @@ func init() {
 	if mockpkg.IsDemoMode() {
 		demo, err := mockpkg.Start()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "demo mode initialization failed: %v\n", err)
+			factory.IOStreams().Errorf("demo mode initialization failed: %v\n", err)
 		} else {
 			demo.InjectIntoFactory(factory)
 		}
@@ -464,6 +493,10 @@ func init() {
 }
 
 func initializeConfig(cmd *cobra.Command, _ []string) error {
+	if err := flags.ApplyGlobalOutputFormat(cmd); err != nil {
+		return err
+	}
+
 	// Load config: flag > env var > default
 	configFile, err := rootCmd.Flags().GetString("config")
 	if err != nil {
@@ -510,13 +543,13 @@ func initializeConfig(cmd *cobra.Command, _ []string) error {
 		expanded := theme.ExpandPath(tc.File)
 		data, err := afero.ReadFile(config.Fs(), expanded)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to read theme file: %v, using default theme\n", err)
+			factory.IOStreams().Warning("failed to read theme file: %v, using default theme", err)
 		} else if err := theme.ApplyThemeFromData(data, tc.Semantic); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: %v, using default theme\n", err)
+			factory.IOStreams().Warning("%v, using default theme", err)
 		}
 	} else if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.Semantic); err != nil {
 		// Log theme error but don't fail - use default theme
-		fmt.Fprintf(os.Stderr, "warning: %v, using default theme\n", err)
+		factory.IOStreams().Warning("%v, using default theme", err)
 	}
 
 	// Handle color settings

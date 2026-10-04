@@ -269,10 +269,8 @@ func TestTable_RenderPlain(t *testing.T) {
 
 func TestTable_Print(t *testing.T) {
 	t.Parallel()
-	// Actually call Print() to cover it - output goes to stdout
 	tbl := New("A")
 	tbl.AddRow("value")
-	tbl.Print() // This writes to stdout, can't capture but exercises the code
 
 	var buf bytes.Buffer
 	err := tbl.PrintTo(&buf)

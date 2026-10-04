@@ -816,7 +816,7 @@ func TestLoadAndValidate(t *testing.T) {
 }
 
 //nolint:paralleltest // Test modifies global state via config.SetFs
-func TestAutoSavePath(t *testing.T) {
+func TestAutoSavePathIn_DefaultDir(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { config.SetFs(nil) })
 
@@ -872,7 +872,7 @@ func TestAutoSavePath(t *testing.T) {
 			},
 		}
 
-		path, err := AutoSavePath(tt.identifier, bkp, tt.format)
+		path, err := AutoSavePathIn("", tt.identifier, bkp, tt.format)
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", tt.name, err)
 		}
@@ -1714,4 +1714,22 @@ func newGen2NameServer(t *testing.T, record func(string)) *httptest.Server {
 	}))
 	t.Cleanup(srv.Close)
 	return srv
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestAutoSavePathIn_CreatesGivenDir(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	bkp := &DeviceBackup{Backup: &shellybackup.Backup{DeviceInfo: &shellybackup.DeviceInfo{MAC: "AA:BB:CC:DD:EE:FF"}}}
+	path, err := AutoSavePathIn("/new/dir", "kitchen", bkp, "json")
+	if err != nil {
+		t.Fatalf("AutoSavePathIn: %v", err)
+	}
+	if !strings.HasPrefix(path, "/new/dir/kitchen-aabbccddeeff-") {
+		t.Errorf("path = %q, want it under /new/dir with the auto name", path)
+	}
+	if info, err := config.Fs().Stat("/new/dir"); err != nil || !info.IsDir() {
+		t.Errorf("/new/dir was not created: %v", err)
+	}
 }
