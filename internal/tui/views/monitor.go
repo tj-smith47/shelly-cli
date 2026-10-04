@@ -863,7 +863,7 @@ func (m *Monitor) openEnergyHistory(msg EnergyHistoryRequestMsg) tea.Cmd {
 		monSvc := svc.Monitoring()
 
 		// First get snapshot to determine EM/EM1 type
-		snapshot, err := svc.GetMonitoringSnapshotAuto(ctx, address)
+		snapshot, err := svc.GetMonitoringSnapshot(ctx, address)
 		if err != nil {
 			return energyHistoryDataMsg{DeviceName: deviceName, Err: fmt.Errorf("get snapshot: %w", err)}
 		}
@@ -947,7 +947,7 @@ func (m *Monitor) openPhaseDetail(msg PhaseDetailRequestMsg) tea.Cmd {
 	address := msg.Address
 
 	return func() tea.Msg {
-		snapshot, err := svc.GetMonitoringSnapshotAuto(ctx, address)
+		snapshot, err := svc.GetMonitoringSnapshot(ctx, address)
 		if err != nil {
 			return phaseDetailDataMsg{DeviceName: deviceName, Err: fmt.Errorf("get snapshot: %w", err)}
 		}

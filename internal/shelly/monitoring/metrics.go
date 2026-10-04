@@ -2,14 +2,12 @@ package monitoring
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
@@ -25,29 +23,11 @@ func (s *Service) CollectPrometheusMetrics(ctx context.Context, device string) (
 		metrics.Metrics = append(metrics.Metrics, export.CollectSystemPrometheusMetrics(device, deviceStatus.Status)...)
 	}
 
-	pmIDs, pmErr := s.ListPMComponents(ctx, device)
-	if pmErr != nil {
+	readings, err := s.ReadPowerReadings(ctx, device)
+	if err != nil {
 		online = false
-	} else {
-		pmMetrics := export.CollectMeterPrometheusMetrics(device, "pm", pmIDs, func(id int) (*model.PMStatus, error) {
-			return s.GetPMStatus(ctx, device, id)
-		})
-		metrics.Metrics = append(metrics.Metrics, pmMetrics...)
 	}
-
-	if pm1IDs, err := s.ListPM1Components(ctx, device); err == nil {
-		pm1Metrics := export.CollectMeterPrometheusMetrics(device, "pm1", pm1IDs, func(id int) (*model.PMStatus, error) {
-			return s.GetPM1Status(ctx, device, id)
-		})
-		metrics.Metrics = append(metrics.Metrics, pm1Metrics...)
-	}
-
-	if em1IDs, err := s.ListEM1Components(ctx, device); err == nil {
-		em1Metrics := export.CollectMeterPrometheusMetrics(device, "em1", em1IDs, func(id int) (*model.EM1Status, error) {
-			return s.GetEM1Status(ctx, device, id)
-		})
-		metrics.Metrics = append(metrics.Metrics, em1Metrics...)
-	}
+	metrics.Metrics = append(metrics.Metrics, export.ReadingsToPrometheusMetrics(export.ComponentReadings(readings))...)
 
 	onlineVal := 0.0
 	if online {
@@ -58,109 +38,7 @@ func (s *Service) CollectPrometheusMetrics(ctx context.Context, device string) (
 		Type: "gauge", Labels: map[string]string{"device": device}, Value: onlineVal,
 	})
 
-	metrics.Metrics = append(metrics.Metrics, s.collectEMPrometheusMetrics(ctx, device)...)
-
 	return metrics, nil
-}
-
-func (s *Service) collectEMPrometheusMetrics(ctx context.Context, device string) []export.PrometheusMetric {
-	readings := s.collectEMReadings(ctx, device)
-	return export.ReadingsToPrometheusMetrics(readings)
-}
-
-// CollectComponentReadings collects all meter readings from a device.
-func (s *Service) CollectComponentReadings(ctx context.Context, device string) []model.ComponentReading {
-	var readings []model.ComponentReading
-
-	if pmIDs, err := s.ListPMComponents(ctx, device); err == nil {
-		readings = append(readings, export.CollectMeterReadings(device, "pm", pmIDs, func(id int) (*model.PMStatus, error) {
-			return s.GetPMStatus(ctx, device, id)
-		})...)
-	}
-
-	if pm1IDs, err := s.ListPM1Components(ctx, device); err == nil {
-		readings = append(readings, export.CollectMeterReadings(device, "pm1", pm1IDs, func(id int) (*model.PMStatus, error) {
-			return s.GetPM1Status(ctx, device, id)
-		})...)
-	}
-
-	if em1IDs, err := s.ListEM1Components(ctx, device); err == nil {
-		readings = append(readings, export.CollectMeterReadings(device, "em1", em1IDs, func(id int) (*model.EM1Status, error) {
-			return s.GetEM1Status(ctx, device, id)
-		})...)
-	}
-
-	readings = append(readings, s.collectEMReadings(ctx, device)...)
-	return readings
-}
-
-func (s *Service) collectEMReadings(ctx context.Context, device string) []model.ComponentReading {
-	emIDs, err := s.ListEMComponents(ctx, device)
-	if err != nil {
-		return nil
-	}
-	emStatuses := make([]*model.EMStatus, 0, len(emIDs))
-	for _, id := range emIDs {
-		status, err := s.GetEMStatus(ctx, device, id)
-		if err != nil {
-			continue
-		}
-		emStatuses = append(emStatuses, status)
-	}
-	return export.CollectEMReadings(device, emStatuses)
-}
-
-// CollectInfluxDBPoints collects metrics from a device in InfluxDB line protocol format.
-func (s *Service) CollectInfluxDBPoints(ctx context.Context, device string) ([]export.InfluxDBPoint, error) {
-	var points []export.InfluxDBPoint
-	now := time.Now()
-
-	pm1IDs, err := s.ListPM1Components(ctx, device)
-	if err == nil {
-		for _, id := range pm1IDs {
-			status, err := s.GetPM1Status(ctx, device, id)
-			if err != nil {
-				continue
-			}
-
-			fields := map[string]float64{
-				"power":   status.APower,
-				"voltage": status.Voltage,
-				"current": status.Current,
-			}
-
-			if status.AEnergy != nil {
-				fields["energy"] = status.AEnergy.Total
-			}
-			if status.Freq != nil {
-				fields["frequency"] = *status.Freq
-			}
-
-			points = append(points, export.InfluxDBPoint{
-				Measurement: "shelly_power",
-				Tags: map[string]string{
-					"device":       device,
-					"component":    "pm1",
-					"component_id": fmt.Sprintf("%d", id),
-				},
-				Fields:    fields,
-				Timestamp: now,
-			})
-		}
-	}
-
-	emIDs, err := s.ListEMComponents(ctx, device)
-	if err == nil {
-		for _, id := range emIDs {
-			status, err := s.GetEMStatus(ctx, device, id)
-			if err != nil {
-				continue
-			}
-			points = append(points, export.EMReadingsToInfluxDBPoints([]*model.EMStatus{status}, device, now)...)
-		}
-	}
-
-	return points, nil
 }
 
 // CollectJSONMetrics collects metrics from multiple devices for JSON output.
@@ -179,12 +57,12 @@ func (s *Service) CollectJSONMetrics(ctx context.Context, devices []string) expo
 		idx := i
 		dev := device
 		g.Go(func() error {
-			readings := s.CollectComponentReadings(ctx, dev)
+			readings, err := s.ReadPowerReadings(ctx, dev)
 			mu.Lock()
 			output.Devices[idx] = export.JSONMetricsDevice{
 				Device:     dev,
-				Online:     len(readings) > 0,
-				Components: readings,
+				Online:     err == nil,
+				Components: export.ComponentReadings(readings),
 			}
 			mu.Unlock()
 			return nil
@@ -310,17 +188,19 @@ func (s *Service) CollectInfluxDBPointsMulti(ctx context.Context, devices []stri
 	for _, device := range devices {
 		dev := device
 		g.Go(func() error {
-			readings := s.CollectComponentReadings(ctx, dev)
-			points := export.ReadingsToInfluxDBPoints(readings, now)
-			for i := range points {
-				points[i].Measurement = measurement
-				for k, v := range tags {
-					points[i].Tags[k] = v
+			// An unreachable device contributes no points; the others are still written.
+			if readings, err := s.ReadPowerReadings(ctx, dev); err == nil {
+				points := export.ReadingsToInfluxDBPoints(export.ComponentReadings(readings), now)
+				for i := range points {
+					points[i].Measurement = measurement
+					for k, v := range tags {
+						points[i].Tags[k] = v
+					}
 				}
+				mu.Lock()
+				allPoints = append(allPoints, points...)
+				mu.Unlock()
 			}
-			mu.Lock()
-			allPoints = append(allPoints, points...)
-			mu.Unlock()
 			return nil
 		})
 	}

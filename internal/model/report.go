@@ -50,8 +50,8 @@ type DevicesReportSummary struct {
 
 // EnergyReportRow is one device in the energy report. Reporting is true when
 // the device has at least one power meter (Gen1 meter or emeter, Gen2+ EM,
-// EM1, PM, PM1 or a switch that measures power); PowerW is the sum of their
-// active power.
+// EM1, PM, PM1, or a switch, cover or light that meters its load); PowerW is
+// the sum of their active power.
 type EnergyReportRow struct {
 	Name      string  `json:"name" yaml:"name"`
 	Online    bool    `json:"online" yaml:"online"`

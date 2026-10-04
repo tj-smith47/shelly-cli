@@ -3,15 +3,11 @@ package list
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/output/table"
 )
 
 // Options holds command options.
@@ -27,28 +23,32 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list <device>",
 		Short: "List energy monitoring components",
-		Long: `List all energy monitoring components (EM/EM1) on a device.
+		Long: `List every component on a device that meters power, with its live reading.
 
-Shows component IDs and types for all energy monitors found on the device.
-EM components are 3-phase monitors (Shelly Pro 3EM, etc.), EM1 components
-are single-phase monitors (Shelly EM, Shelly Plus 1PM, etc.).
+That is any EM (3-phase) or EM1 (single-phase) energy monitor, any PM
+or PM1 power meter, any switch, cover or light that meters its load
+(Plus 1PM, Plus 2PM, Plus Plug, Pro 4PM, dimmers, RGBW PM), and the
+meters of a Gen1 device (Shelly 1PM, Plug S, Duo bulbs, EM). Energy
+monitors are listed first.
 
-Use 'shelly energy status' with a component ID to get real-time readings.
+Use 'shelly energy status' with a component ID for one component in
+full.
 
 Output is formatted as a table by default. Use -o json or -o yaml for
-structured output suitable for scripting.
+structured output; each item carries name, type, id, power (watts) and
+the full reading under em, em1 or meter.
 
-Columns: ID, Type`,
-		Example: `  # List energy monitoring components on a device
+Columns: Device, Component, Voltage, Current, Power, Energy`,
+		Example: `  # List the components that meter power on a device
   shelly energy list shelly-3em-pro
 
   # Output as JSON for scripting
   shelly energy list shelly-3em-pro -o json
 
-  # Get IDs of 3-phase monitors
-  shelly energy list shelly-3em-pro -o json | jq -r '.[] | select(.type | contains("3-phase")) | .id'
+  # IDs of the 3-phase monitors
+  shelly energy list shelly-3em-pro -o json | jq -r '.[] | select(.type == "em") | .id'
 
-  # Count total energy components
+  # Count the components that meter power
   shelly energy list shelly-3em-pro -o json | jq length
 
   # Short form
@@ -66,44 +66,5 @@ Columns: ID, Type`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
-
-	// List EM components
-	emIDs, err := svc.ListEMComponents(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to list EM components: %w", err)
-	}
-
-	// List EM1 components
-	em1IDs, err := svc.ListEM1Components(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to list EM1 components: %w", err)
-	}
-
-	// Combine results
-	components := make([]model.ComponentListItem, 0, len(emIDs)+len(em1IDs))
-	for _, id := range emIDs {
-		components = append(components, model.ComponentListItem{
-			ID:   id,
-			Type: "EM (3-phase)",
-		})
-	}
-	for _, id := range em1IDs {
-		components = append(components, model.ComponentListItem{
-			ID:   id,
-			Type: "EM1 (single-phase)",
-		})
-	}
-
-	return cmdutil.PrintList(ios, components, func(ios *iostreams.IOStreams, items []model.ComponentListItem) {
-		builder := table.NewBuilder("ID", "Type")
-		for _, comp := range items {
-			builder.AddRow(fmt.Sprintf("%d", comp.ID), comp.Type)
-		}
-		tbl := builder.WithModeStyle(ios).Build()
-		if err := tbl.PrintTo(ios.Out); err != nil {
-			ios.DebugErr("print table", err)
-		}
-	}, func() { ios.NoResults("energy monitoring components") })
+	return cmdutil.RunPowerList(ctx, opts.Factory, opts.Device)
 }

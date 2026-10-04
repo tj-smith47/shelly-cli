@@ -216,33 +216,3 @@ func CollectSystemPrometheusMetrics(device string, status map[string]any) []Prom
 
 	return metrics
 }
-
-// CollectMeterPrometheusMetrics is a generic collector for any meter type.
-func CollectMeterPrometheusMetrics[T model.MeterReading](
-	device, compType string,
-	ids []int,
-	getFunc func(id int) (T, error),
-) []PrometheusMetric {
-	metrics := make([]PrometheusMetric, 0, len(ids)*5)
-	for _, id := range ids {
-		status, err := getFunc(id)
-		if err != nil {
-			continue
-		}
-		labels := map[string]string{tagDevice: device, tagComponent: compType, tagComponentID: fmt.Sprintf("%d", id)}
-		metrics = append(metrics, BuildPowerPromMetrics(labels, status.GetPower(), status.GetVoltage(), status.GetCurrent())...)
-		if energy := status.GetEnergy(); energy != nil {
-			metrics = append(metrics, PrometheusMetric{
-				Name: "shelly_energy_wh_total", Help: "Total energy consumption in watt-hours",
-				Type: promTypeCounter, Labels: labels, Value: *energy,
-			})
-		}
-		if freq := status.GetFreq(); freq != nil {
-			metrics = append(metrics, PrometheusMetric{
-				Name: "shelly_frequency_hz", Help: "AC frequency in hertz",
-				Type: promTypeGauge, Labels: labels, Value: *freq,
-			})
-		}
-	}
-	return metrics
-}

@@ -1,1169 +1,219 @@
 package status
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
-func TestNewCommand(t *testing.T) {
-	t.Parallel()
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	if cmd == nil {
-		t.Fatal("NewCommand returned nil")
+// carrierFixtures registers one device per kind of component that meters
+// power, plus a relay that meters nothing.
+func carrierFixtures() *mock.Fixtures {
+	gen2 := func(name, typ string) mock.DeviceFixture {
+		return mock.DeviceFixture{Name: name, Address: "192.0.2.1", MAC: "AA:BB:CC:00:00:" + name[:2], Type: typ, Model: typ, Generation: 2}
 	}
-
-	if cmd.Use == "" {
-		t.Error("Use is empty")
+	meter := func(id int, w float64) map[string]any {
+		return map[string]any{"id": id, "output": true, "apower": w, "voltage": 230.0, "current": w / 230,
+			"aenergy": map[string]any{"total": 1000.0 + w}}
 	}
-
-	if cmd.Short == "" {
-		t.Error("Short description is empty")
-	}
-}
-
-func TestNewCommand_Structure(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Test Use
-	if cmd.Use != commandUse {
-		t.Errorf("Use = %q, want %q", cmd.Use, commandUse)
-	}
-
-	// Test Aliases
-	wantAliases := []string{"st"}
-	if len(cmd.Aliases) != len(wantAliases) {
-		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
-	} else {
-		for i, alias := range wantAliases {
-			if cmd.Aliases[i] != alias {
-				t.Errorf("Aliases[%d] = %q, want %q", i, cmd.Aliases[i], alias)
-			}
-		}
-	}
-
-	// Test Long
-	if cmd.Long == "" {
-		t.Error("Long description is empty")
-	}
-
-	// Test Example
-	if cmd.Example == "" {
-		t.Error("Example is empty")
+	return &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{Devices: []mock.DeviceFixture{
+			gen2("p1pm", "SNSW-001P16EU"),
+			gen2("p2pm", "SNSW-102P16EU"),
+			gen2("cv", "SNSW-102P16EU"),
+			gen2("dim", "SNDM-0013US"),
+			gen2("rgbwpm", "SNDC-0D4P10WW"),
+			gen2("mini", "SNPM-001PCEU16"),
+			gen2("p3em", "SPEM-003CEBEU"),
+			gen2("pem", "SPEM-002CEBEU50"),
+			gen2("relay", "SNSW-001X16EU"),
+			{Name: "g1pm", Address: "192.0.2.2", MAC: "AA:BB:CC:00:01:01", Type: "SHSW-PM", Model: "SHSW-PM", Generation: 1},
+			{Name: "g1em", Address: "192.0.2.3", MAC: "AA:BB:CC:00:01:02", Type: "SHEM", Model: "SHEM", Generation: 1},
+		}},
+		DeviceStates: map[string]mock.DeviceState{
+			"p1pm":   {"switch:0": meter(0, 48.5)},
+			"p2pm":   {"switch:0": meter(0, 10), "switch:1": meter(1, 20)},
+			"cv":     {"cover:0": meter(0, 35)},
+			"dim":    {"light:0": meter(0, 7.5)},
+			"rgbwpm": {"rgbw:0": meter(0, 6)},
+			"mini":   {"pm1:0": meter(0, 12.5)},
+			"p3em":   {"em:0": map[string]any{"id": 0, "total_current": 4.5, "total_act_power": 1035.0}},
+			"pem": {
+				"em1:0": map[string]any{"id": 0, "voltage": 230.0, "current": 2.5, "act_power": 575.0},
+				"em1:1": map[string]any{"id": 1, "voltage": 231.0, "current": 0.5, "act_power": 100.0},
+			},
+			"relay": {"switch:0": map[string]any{"id": 0, "output": true}},
+			"g1pm":  {"meters": []any{map[string]any{"power": 60.5, "total": 600, "is_valid": true}}},
+			"g1em": {"emeters": []any{
+				map[string]any{"power": 300.0, "voltage": 231.0, "current": 1.3, "total": 5000.0},
+				map[string]any{"power": 40.0, "voltage": 231.0, "current": 0.2, "total": 700.0},
+			}},
+		},
 	}
 }
 
-func TestNewCommand_Args(t *testing.T) {
-	t.Parallel()
+func execute(t *testing.T, format string, args ...string) (*factory.TestFactory, error) {
+	t.Helper()
+	demo, err := mock.StartWithFixtures(carrierFixtures())
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	t.Cleanup(demo.Cleanup)
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+	if format != "" {
+		viper.Set("output", format)
+		t.Cleanup(viper.Reset)
+	}
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs(args)
+	cmd.SetOut(&strings.Builder{})
+	cmd.SetErr(&strings.Builder{})
+	return tf, cmd.Execute()
+}
 
-	cmd := NewCommand(cmdutil.NewFactory())
-
+//nolint:paralleltest // uses the global default config manager and viper
+func TestRun_EveryCarrier(t *testing.T) {
 	tests := []struct {
-		name    string
-		args    []string
-		wantErr bool
+		args      []string
+		wantType  string
+		wantID    int
+		wantPower float64
+		wantKey   string
 	}{
-		{"no args", []string{}, true},
-		{"one arg valid", []string{"device"}, false},
-		{"two args valid", []string{"device", "0"}, false},
-		{"three args", []string{"device", "0", "extra"}, true},
+		{[]string{"p1pm"}, "switch", 0, 48.5, "meter"},
+		{[]string{"p2pm", "1"}, "switch", 1, 20, "meter"},
+		{[]string{"cv"}, "cover", 0, 35, "meter"},
+		{[]string{"dim"}, "light", 0, 7.5, "meter"},
+		{[]string{"rgbwpm"}, "rgbw", 0, 6, "meter"},
+		{[]string{"mini", "--type", "pm1"}, "pm1", 0, 12.5, "meter"},
+		{[]string{"p3em"}, "em", 0, 1035, "em"},
+		{[]string{"pem", "1"}, "em1", 1, 100, "em1"},
+		{[]string{"g1pm"}, "meter", 0, 60.5, "meter"},
+		{[]string{"g1em", "1"}, "emeter", 1, 40, "meter"},
 	}
-
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			err := cmd.Args(cmd, tt.args)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Args() error = %v, wantErr %v", err, tt.wantErr)
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			tf, err := execute(t, "json", tt.args...)
+			if err != nil {
+				t.Fatalf("Execute: %v\nstderr: %s", err, tf.ErrString())
+			}
+			var raw map[string]any
+			if err := json.Unmarshal([]byte(tf.OutString()), &raw); err != nil {
+				t.Fatalf("stdout is not one JSON object: %v\n%s", err, tf.OutString())
+			}
+			var r model.PowerReading
+			if err := json.Unmarshal([]byte(tf.OutString()), &r); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if r.Name != tt.args[0] || r.Type != tt.wantType || r.ID != tt.wantID || r.Power != tt.wantPower {
+				t.Errorf("reading = %+v, want %s %s:%d %v W", r, tt.args[0], tt.wantType, tt.wantID, tt.wantPower)
+			}
+			if _, ok := raw[tt.wantKey]; !ok {
+				t.Errorf("JSON has no %q key:\n%s", tt.wantKey, tf.OutString())
 			}
 		})
 	}
 }
 
-func TestNewCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Test type flag
-	flag := cmd.Flags().Lookup("type")
-	if flag == nil {
-		t.Fatal("--type flag not found")
-	}
-	if flag.DefValue != "auto" {
-		t.Errorf("--type default = %q, want %q", flag.DefValue, "auto")
-	}
-}
-
-func TestNewCommand_Help(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-	cmd := NewCommand(tf.Factory)
-
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--help"})
-
-	err := cmd.Execute()
+//nolint:paralleltest // uses the global default config manager and viper
+func TestRun_Gen1MeterTotalIsWattHours(t *testing.T) {
+	tf, err := execute(t, "json", "g1pm")
 	if err != nil {
-		t.Errorf("--help should not error: %v", err)
+		t.Fatalf("Execute: %v", err)
+	}
+	var r model.PowerReading
+	if err := json.Unmarshal([]byte(tf.OutString()), &r); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	// The device reports 600 watt-minutes.
+	if r.Meter == nil || r.Meter.AEnergy == nil || r.Meter.AEnergy.Total != 10 {
+		t.Errorf("meter = %+v, want aenergy.total 10 Wh", r.Meter)
 	}
 }
 
-func TestNewCommand_ExampleContent(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	wantPatterns := []string{
-		"shelly power status",
-		"--type",
-		"-o json",
+//nolint:paralleltest // uses the global default config manager and viper
+func TestRun_Table(t *testing.T) {
+	tf, err := execute(t, "", "p2pm", "1")
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
 	}
-
-	for _, pattern := range wantPatterns {
-		if !strings.Contains(cmd.Example, pattern) {
-			t.Errorf("expected Example to contain %q", pattern)
+	out := tf.OutString()
+	for _, want := range []string{"Switch #1", "Voltage: 230.00 V", "Power:   20.00 W", "Total: 1020.00 Wh"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
 		}
 	}
 }
 
-func TestNewCommand_InvalidComponentID(t *testing.T) {
-	t.Parallel()
-
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	ios := iostreams.Test(nil, out, errOut)
-	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	cmd := NewCommand(f)
-	cmd.SetArgs([]string{"device", "not-a-number"})
-	cmd.SetOut(out)
-	cmd.SetErr(errOut)
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for invalid component ID")
-	}
-
-	if !strings.Contains(err.Error(), "invalid component ID") {
-		t.Errorf("expected 'invalid component ID' error, got: %v", err)
-	}
-}
-
-func TestExecute_Help(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"--help"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("--help should not error: %v", err)
-	}
-
-	output := buf.String()
-	if !strings.Contains(output, "power meter status") {
-		t.Errorf("help output should contain command description, got: %s", output)
-	}
-	if !strings.Contains(output, "status <device>") {
-		t.Error("help output should show usage")
-	}
-}
-
-func TestExecute_NoArgs(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error when no device argument provided")
-	}
-}
-
-func TestExecute_TooManyArgs(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"device1", "device2", "extra"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error when too many arguments provided")
-	}
-}
-
-func TestExecute_WithMockPMDevice(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "test-pm",
-					Address:    "192.168.1.100",
-					MAC:        "AA:BB:CC:DD:EE:FF",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"test-pm": {
-				"pm:0": map[string]any{
-					"voltage": 230.5,
-					"current": 1.2,
-					"apower":  275.6,
-					"freq":    50.0,
-					"aenergy": map[string]any{"total": 1234.5},
-				},
-			},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-pm"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err != nil {
-		t.Logf("Execute error = %v (may be expected for mock)", err)
-	}
-}
-
-func TestExecute_WithMockPM1Device(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "test-pm1",
-					Address:    "192.168.1.101",
-					MAC:        "AA:BB:CC:DD:EE:00",
-					Type:       "SNSW-002P16EU",
-					Model:      "Shelly Plus 2PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"test-pm1": {
-				"pm1:0": map[string]any{
-					"voltage": 230.0,
-					"current": 2.5,
-					"apower":  575.0,
-					"freq":    50.0,
-					"aenergy": map[string]any{"total": 5678.9},
-				},
-			},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-pm1"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err != nil {
-		t.Logf("Execute error = %v (may be expected for mock)", err)
-	}
-}
-
-func TestExecute_WithComponentID(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "multi-pm",
-					Address:    "192.168.1.102",
-					MAC:        "AA:BB:CC:DD:EE:11",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"multi-pm": {
-				"pm:0": map[string]any{
-					"voltage": 230.0,
-					"current": 1.0,
-					"apower":  230.0,
-					"freq":    50.0,
-				},
-			},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"multi-pm", "0"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err != nil {
-		t.Logf("Execute error = %v (may be expected for mock)", err)
-	}
-}
-
-func TestExecute_DeviceNotFound(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"nonexistent"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err == nil {
-		t.Error("expected error for nonexistent device")
-	}
-}
-
-func TestExecute_WithTypeFlag(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "typed-pm",
-					Address:    "192.168.1.103",
-					MAC:        "AA:BB:CC:DD:EE:22",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"typed-pm": {
-				"pm:0": map[string]any{
-					"voltage": 230.0,
-					"current": 1.5,
-					"apower":  345.0,
-				},
-			},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"typed-pm", "--type", shelly.ComponentTypePM})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err != nil {
-		t.Logf("Execute error = %v (may be expected for mock)", err)
-	}
-}
-
-func TestExecute_NoComponentsFound(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "no-pm",
-					Address:    "192.168.1.104",
-					MAC:        "AA:BB:CC:DD:EE:33",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"no-pm": {},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"no-pm"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	// This will likely error due to no power meter components found
-	if err != nil {
-		t.Logf("Execute error (expected): %v", err)
-	}
-}
-
-func TestExecute_WithJSON(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "json-pm",
-					Address:    "192.168.1.105",
-					MAC:        "AA:BB:CC:DD:EE:44",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"json-pm": {
-				"pm:0": map[string]any{
-					"voltage": 230.0,
-					"current": 1.0,
-					"apower":  230.0,
-					"aenergy": map[string]any{"total": 100.5},
-				},
-			},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"json-pm", "-o", "json"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err != nil {
-		t.Logf("Execute error = %v (may be expected for mock)", err)
-	}
-}
-
-func TestExecute_WithInvalidID(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "invalid-id",
-					Address:    "192.168.1.106",
-					MAC:        "AA:BB:CC:DD:EE:55",
-					Type:       "SNSW-001P16EU",
-					Model:      "Shelly Plus 1PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"invalid-id": {
-				"pm:0": map[string]any{
-					"voltage": 230.0,
-					"current": 1.0,
-					"apower":  230.0,
-				},
-			},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"invalid-id", "abc"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err == nil {
-		t.Error("expected error for invalid component ID")
-	}
-	if !strings.Contains(err.Error(), "invalid component ID") {
-		t.Errorf("expected 'invalid component ID' error, got: %v", err)
-	}
-}
-
-func TestExecute_WithPM1TypeFlag(t *testing.T) {
-	t.Parallel()
-
-	fixtures := &mock.Fixtures{
-		Version: "1",
-		Config: mock.ConfigFixture{
-			Devices: []mock.DeviceFixture{
-				{
-					Name:       "pm1-typed",
-					Address:    "192.168.1.107",
-					MAC:        "AA:BB:CC:DD:EE:66",
-					Type:       "SNSW-002P16EU",
-					Model:      "Shelly Plus 2PM",
-					Generation: 2,
-				},
-			},
-		},
-		DeviceStates: map[string]mock.DeviceState{
-			"pm1-typed": {
-				"pm1:0": map[string]any{
-					"voltage": 230.0,
-					"current": 2.0,
-					"apower":  460.0,
-				},
-			},
-		},
-	}
-
-	demo, err := mock.StartWithFixtures(fixtures)
-	if err != nil {
-		t.Fatalf("StartWithFixtures: %v", err)
-	}
-	defer demo.Cleanup()
-
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"pm1-typed", "--type", shelly.ComponentTypePM1})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err = cmd.Execute()
-	if err != nil {
-		t.Logf("Execute error = %v (may be expected for mock)", err)
-	}
-}
-
-func TestRun_PMSuccess(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	// Create a test context
-	ctx := context.Background()
-
-	opts := &Options{
-		Factory:       tf.Factory,
-		Device:        "nonexistent-pm",
-		ComponentID:   0,
-		ComponentType: shelly.ComponentTypePM,
-	}
-	// Call run directly with known PM type to cover PM success path
-	err := run(ctx, opts)
-
-	// We expect an error because the device doesn't exist in mock
-	if err == nil {
-		t.Error("expected error due to nonexistent device")
-	}
-	if !strings.Contains(err.Error(), "failed to get pm status") {
-		t.Logf("error = %v", err)
-	}
-}
-
-func TestRun_PM1Success(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	// Create a test context
-	ctx := context.Background()
-
-	opts := &Options{
-		Factory:       tf.Factory,
-		Device:        "nonexistent-pm1",
-		ComponentID:   0,
-		ComponentType: shelly.ComponentTypePM1,
-	}
-	// Call run directly with known PM1 type to cover PM1 success path
-	err := run(ctx, opts)
-
-	// We expect an error because the device doesn't exist in mock
-	if err == nil {
-		t.Error("expected error due to nonexistent device")
-	}
-	if !strings.Contains(err.Error(), "failed to get pm1 status") {
-		t.Logf("error = %v", err)
-	}
-}
-
-func TestRun_AutoDetectToPM(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-	ctx := context.Background()
-
-	opts := &Options{
-		Factory:       tf.Factory,
-		Device:        "test-device",
-		ComponentID:   0,
-		ComponentType: shelly.ComponentTypeAuto,
-	}
-	// Call run with auto-detect type
-	err := run(ctx, opts)
-
-	// We expect an error because the device doesn't exist
-	if err == nil {
-		t.Error("expected error due to nonexistent device")
-	}
-	// When auto-detect returns auto, it goes to default case
-	if !strings.Contains(err.Error(), "no power meter components found") {
-		t.Logf("error = %v", err)
-	}
-}
-
-func TestNewCommand_RunE_InvalidID(t *testing.T) {
-	t.Parallel()
-
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	ios := iostreams.Test(nil, out, errOut)
-	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	cmd := NewCommand(f)
-	cmd.SetArgs([]string{"mydevice", "abc123"})
-	cmd.SetOut(out)
-	cmd.SetErr(errOut)
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for invalid component ID in RunE")
-	}
-	// The error could be either from parsing or from trying to get the component
-	if !strings.Contains(err.Error(), "invalid component ID") && !strings.Contains(err.Error(), "no power meter") {
-		t.Errorf("expected error for invalid component ID, got: %v", err)
-	}
-}
-
-func TestNewCommand_RequiresArg(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Should require at least 1 argument
-	err := cmd.Args(cmd, []string{})
-	if err == nil {
-		t.Error("Expected error when no args provided")
-	}
-
-	// Should accept 1 argument
-	err = cmd.Args(cmd, []string{"device1"})
-	if err != nil {
-		t.Errorf("Expected no error with one arg, got: %v", err)
-	}
-
-	// Should accept 2 arguments
-	err = cmd.Args(cmd, []string{"device1", "0"})
-	if err != nil {
-		t.Errorf("Expected no error with two args, got: %v", err)
-	}
-}
-
-func TestNewCommand_HasRunE(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	if cmd.RunE == nil {
-		t.Error("RunE should be set")
-	}
-}
-
-func TestNewCommand_FlagDefaults(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Parse with no flags to get defaults
-	if err := cmd.ParseFlags([]string{}); err != nil {
-		t.Fatalf("ParseFlags error: %v", err)
-	}
-
-	typeFlag := cmd.Flags().Lookup("type")
-	if typeFlag.DefValue != "auto" {
-		t.Errorf("type default = %q, want auto", typeFlag.DefValue)
-	}
-}
-
-func TestRun_DirectCall_PM(t *testing.T) {
-	t.Parallel()
-
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	ios := iostreams.Test(nil, out, errOut)
-	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	ctx := context.Background()
-
-	opts := &Options{
-		Factory:       f,
-		Device:        "test-device",
-		ComponentID:   0,
-		ComponentType: shelly.ComponentTypePM,
-	}
-	// Directly test the run function with PM type
-	// This should hit the GetPMStatus path
-	err := run(ctx, opts)
-
-	// We expect an error because the device doesn't exist
-	if err == nil {
-		t.Error("expected error when device not found")
-	}
-}
-
-func TestRun_DirectCall_PM1(t *testing.T) {
-	t.Parallel()
-
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	ios := iostreams.Test(nil, out, errOut)
-	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	ctx := context.Background()
-
-	opts := &Options{
-		Factory:       f,
-		Device:        "test-device",
-		ComponentID:   0,
-		ComponentType: shelly.ComponentTypePM1,
-	}
-	// Directly test the run function with PM1 type
-	// This should hit the GetPM1Status path
-	err := run(ctx, opts)
-
-	// We expect an error because the device doesn't exist
-	if err == nil {
-		t.Error("expected error when device not found")
-	}
-}
-
-func TestRun_DirectCall_Auto(t *testing.T) {
-	t.Parallel()
-
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	ios := iostreams.Test(nil, out, errOut)
-	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	ctx := context.Background()
-
-	opts := &Options{
-		Factory:       f,
-		Device:        "test-device",
-		ComponentID:   0,
-		ComponentType: shelly.ComponentTypeAuto,
-	}
-	// Directly test the run function with auto-detect type
-	// This should go to the default case (no power meter components found)
-	err := run(ctx, opts)
-
-	// We expect an error because no power meter components found
-	if err == nil {
-		t.Error("expected error when no power meter components found")
-	}
-	if !strings.Contains(err.Error(), "no power meter components found") {
-		t.Errorf("expected 'no power meter components found' error, got: %v", err)
-	}
-}
-
-func TestNewCommand_Short(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	expected := "Show power meter status"
-	if cmd.Short != expected {
-		t.Errorf("Short = %q, want %q", cmd.Short, expected)
-	}
-}
-
-func TestNewCommand_Long(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	if cmd.Long == "" {
-		t.Error("Long description is empty")
-	}
-
-	if !strings.Contains(cmd.Long, "power meter") {
-		t.Error("Long should contain 'power meter'")
-	}
-}
-
-func TestNewCommand_Use(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	expected := commandUse
-	if cmd.Use != expected {
-		t.Errorf("Use = %q, want %q", cmd.Use, expected)
-	}
-}
-
-func TestNewCommand_FlagParsing(t *testing.T) {
-	t.Parallel()
-
+//nolint:paralleltest // uses the global default config manager and viper
+func TestRun_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
 		args    []string
-		wantErr bool
+		wantErr string
 	}{
-		{
-			name:    "type flag short",
-			args:    []string{"--type", "pm"},
-			wantErr: false,
-		},
-		{
-			name:    "type flag value",
-			args:    []string{"--type", "pm1"},
-			wantErr: false,
-		},
-		{
-			name:    "type flag auto",
-			args:    []string{"--type", "auto"},
-			wantErr: false,
-		},
+		{[]string{"relay"}, "relay: no component on this device reports power"},
+		{[]string{"p2pm", "5"}, "p2pm has no component 5 that reports power; its power readings are: switch:0, switch:1"},
+		{[]string{"p1pm", "--type", "pm1"}, "p1pm has no pm1 that reports power; its power readings are: switch:0"},
+		{[]string{"p1pm", "x"}, `invalid component ID "x"`},
 	}
-
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			cmd := NewCommand(cmdutil.NewFactory())
-
-			err := cmd.ParseFlags(tt.args)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseFlags() error = %v, wantErr %v", err, tt.wantErr)
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			_, err := execute(t, "", tt.args...)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("err = %v, want containing %q", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestNewCommand_RejectsNoArgs(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Should reject empty args
-	err := cmd.Args(cmd, []string{})
-	if err == nil {
-		t.Error("Expected error for no arguments")
-	}
-}
-
-func TestNewCommand_AcceptsSingleArg(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Should accept single device argument
-	err := cmd.Args(cmd, []string{"device-name"})
+//nolint:paralleltest // uses the global default config manager and viper
+func TestRun_All(t *testing.T) {
+	tf, err := execute(t, "json", "--all")
 	if err != nil {
-		t.Errorf("Should accept single device argument, got error: %v", err)
+		t.Fatalf("Execute: %v", err)
+	}
+	var readings []model.PowerReading
+	if err := json.Unmarshal([]byte(tf.OutString()), &readings); err != nil {
+		t.Fatalf("stdout is not one JSON list: %v\n%s", err, tf.OutString())
+	}
+	got := map[string]bool{}
+	for _, r := range readings {
+		got[r.Name+" "+r.Type] = true
+	}
+	for _, want := range []string{"p1pm switch", "p2pm switch", "cv cover", "dim light", "rgbwpm rgbw",
+		"mini pm1", "p3em em", "pem em1", "g1pm meter", "g1em emeter"} {
+		if !got[want] {
+			t.Errorf("--all is missing %q; got %v", want, got)
+		}
+	}
+	if len(readings) != 13 {
+		t.Errorf("got %d readings, want 13", len(readings))
+	}
+	if stderr := tf.ErrString(); !strings.Contains(stderr, "Skipped relay: no component on this device reports power") {
+		t.Errorf("stderr does not name the relay:\n%s", stderr)
 	}
 }
 
-func TestNewCommand_AcceptsTwoArgs(t *testing.T) {
+func TestNewCommand_Shape(t *testing.T) {
 	t.Parallel()
-
 	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Should accept device and ID
-	err := cmd.Args(cmd, []string{"device-name", "0"})
-	if err != nil {
-		t.Errorf("Should accept device and ID, got error: %v", err)
+	if cmd.Use != "status [device] [id]" || len(cmd.Aliases) == 0 || cmd.Example == "" {
+		t.Errorf("Use=%q Aliases=%v Example empty=%v", cmd.Use, cmd.Aliases, cmd.Example == "")
 	}
-}
-
-func TestNewCommand_RejectsThreeArgs(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Should reject three or more args
-	err := cmd.Args(cmd, []string{"device", "0", "extra"})
-	if err == nil {
-		t.Error("Should reject more than 2 arguments")
-	}
-}
-
-func TestExecute_SetsContextCorrectly(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-	ctx := context.Background()
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(ctx)
-	cmd.SetArgs([]string{"test-device"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	// Execute and check that context wasn't modified
-	err := cmd.Execute()
-	// Error expected due to device not found, but that's ok - we're checking context is preserved
-	if err != nil {
-		t.Logf("Execute error (expected): %v", err)
-	}
-
-	// Just verify no panic occurred
-	if cmd.Context() != ctx {
-		t.Error("Context should be preserved")
-	}
-}
-
-func TestExecute_WithZeroComponentID(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-device", "0"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err := cmd.Execute()
-	// Will error due to device not existing, but command should parse correctly
-	if err != nil {
-		t.Logf("Execute error (expected): %v", err)
-	}
-}
-
-func TestExecute_WithNumericComponentID(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-device", "5"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err := cmd.Execute()
-	// Will error due to device not existing, but command should parse ID correctly
-	if err != nil {
-		t.Logf("Execute error (expected): %v", err)
-	}
-}
-
-func TestRun_WithExplicitPM_CallsGetPMStatus(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-	ctx := context.Background()
-
-	opts := &Options{
-		Factory:       tf.Factory,
-		Device:        "nonexistent",
-		ComponentID:   0,
-		ComponentType: shelly.ComponentTypePM,
-	}
-	// When we specify PM type explicitly, it should try GetPMStatus
-	err := run(ctx, opts)
-
-	// Expect error from trying to get PM status on nonexistent device
-	if err == nil {
-		t.Error("expected error")
-	}
-	if !strings.Contains(err.Error(), "failed to get pm status") {
-		t.Errorf("expected 'failed to get pm status' error, got: %v", err)
-	}
-}
-
-func TestRun_WithExplicitPM1_CallsGetPM1Status(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-	ctx := context.Background()
-
-	opts := &Options{
-		Factory:       tf.Factory,
-		Device:        "nonexistent",
-		ComponentID:   0,
-		ComponentType: shelly.ComponentTypePM1,
-	}
-	// When we specify PM1 type explicitly, it should try GetPM1Status
-	err := run(ctx, opts)
-
-	// Expect error from trying to get PM1 status on nonexistent device
-	if err == nil {
-		t.Error("expected error")
-	}
-	if !strings.Contains(err.Error(), "failed to get pm1 status") {
-		t.Errorf("expected 'failed to get pm1 status' error, got: %v", err)
-	}
-}
-
-func TestRun_WithAuto_ReturnsNoPowerMeterError(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-	ctx := context.Background()
-
-	opts := &Options{
-		Factory:       tf.Factory,
-		Device:        "nonexistent-device",
-		ComponentID:   0,
-		ComponentType: shelly.ComponentTypeAuto,
-	}
-	// When we use auto-detect with a device that has no power meters
-	err := run(ctx, opts)
-
-	// Should get "no power meter components found" error
-	if err == nil {
-		t.Error("expected error when no power meter found")
-	}
-	if !strings.Contains(err.Error(), "no power meter components found") {
-		t.Errorf("expected 'no power meter components found', got: %v", err)
-	}
-}
-
-func TestNewCommand_TypeFlagOptions(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Verify the type flag exists and has correct description
-	typeFlag := cmd.Flags().Lookup("type")
-	if typeFlag == nil {
-		t.Fatal("type flag should exist")
-	}
-
-	if typeFlag.Usage == "" {
-		t.Error("type flag should have usage documentation")
-	}
-
-	// Check that it accepts values
-	expectedUsage := "Component type"
-	if !strings.Contains(typeFlag.Usage, expectedUsage) {
-		t.Logf("flag usage: %s", typeFlag.Usage)
+	for _, name := range []string{"type", "all"} {
+		if cmd.Flags().Lookup(name) == nil {
+			t.Errorf("missing --%s", name)
+		}
 	}
 }

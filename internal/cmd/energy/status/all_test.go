@@ -21,6 +21,7 @@ func allFixtures() *mock.Fixtures {
 				{Name: "pro3em", Address: "192.168.1.20", MAC: "AA:BB:CC:00:00:20", Type: "SPEM-003CEBEU", Model: "Shelly Pro 3EM", Generation: 2},
 				{Name: "proem", Address: "192.168.1.21", MAC: "AA:BB:CC:00:00:21", Type: "SPEM-002CEBEU50", Model: "Shelly Pro EM", Generation: 2},
 				{Name: "plug", Address: "192.168.1.22", MAC: "AA:BB:CC:00:00:22", Type: "SNPL-00112EU", Model: "Shelly Plus Plug S", Generation: 2},
+				{Name: "office", Address: "192.168.1.23", MAC: "AA:BB:CC:00:00:23", Type: "SNSW-001P16EU", Model: "Shelly Plus 1PM", Generation: 2},
 			},
 		},
 		DeviceStates: map[string]mock.DeviceState{
@@ -29,7 +30,8 @@ func allFixtures() *mock.Fixtures {
 				"em1:0": map[string]any{"id": 0, "voltage": 230.0, "current": 2.5, "act_power": 575.0},
 				"em1:1": map[string]any{"id": 1, "voltage": 231.0, "current": 0.5, "act_power": 100.0},
 			},
-			"plug": {"switch:0": map[string]any{"output": true}},
+			"plug":   {"switch:0": map[string]any{"output": true}},
+			"office": {"switch:0": map[string]any{"id": 0, "output": true, "apower": 48.5, "voltage": 121.0}},
 		},
 	}
 }
@@ -66,7 +68,7 @@ func runAll(t *testing.T, format string) *factory.TestFactory {
 func TestAll_JSONIsOneList(t *testing.T) {
 	tf := runAll(t, "json")
 
-	var entries []model.EnergyStatusEntry
+	var entries []model.PowerReading
 	if err := json.Unmarshal([]byte(tf.OutString()), &entries); err != nil {
 		t.Fatalf("stdout is not one JSON list: %v\n%s", err, tf.OutString())
 	}
@@ -80,9 +82,10 @@ func TestAll_JSONIsOneList(t *testing.T) {
 		got[key{e.Name, e.Type, e.ID}] = e.Power
 	}
 	want := map[key]float64{
-		{"pro3em", "em", 0}: 1035,
-		{"proem", "em1", 0}: 575,
-		{"proem", "em1", 1}: 100,
+		{"pro3em", "em", 0}:     1035,
+		{"proem", "em1", 0}:     575,
+		{"proem", "em1", 1}:     100,
+		{"office", "switch", 0}: 48.5,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("entries = %+v, want %d entries", entries, len(want))
@@ -94,7 +97,7 @@ func TestAll_JSONIsOneList(t *testing.T) {
 	}
 
 	stderr := tf.ErrString()
-	for _, want := range []string{"Skipped plug: no energy monitor", "Skipped dead: unreachable"} {
+	for _, want := range []string{"Skipped plug: no component on this device reports power", "Skipped dead: unreachable"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr missing %q:\n%s", want, stderr)
 		}
@@ -106,8 +109,8 @@ func TestAll_YAMLIsOneList(t *testing.T) {
 	tf := runAll(t, "yaml")
 
 	out := tf.OutString()
-	if !strings.HasPrefix(out, "- ") || strings.Count(out, "\n- ") != 2 {
-		t.Errorf("stdout is not a 3-item YAML list:\n%s", out)
+	if !strings.HasPrefix(out, "- ") || strings.Count(out, "\n- ") != 3 {
+		t.Errorf("stdout is not a 4-item YAML list:\n%s", out)
 	}
 }
 
@@ -116,7 +119,7 @@ func TestAll_Table(t *testing.T) {
 	tf := runAll(t, "")
 
 	out := tf.OutString()
-	for _, want := range []string{"pro3em", "EM #0", "proem", "EM1 #0", "EM1 #1", "230.00 V"} {
+	for _, want := range []string{"pro3em", "EM #0", "proem", "EM1 #0", "EM1 #1", "230.00 V", "office", "Switch #0", "48.5 W"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("table missing %q:\n%s", want, out)
 		}

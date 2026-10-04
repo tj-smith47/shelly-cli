@@ -1,7 +1,10 @@
 // Package model defines core domain types for the Shelly CLI.
 package model
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // DashboardData represents aggregated energy dashboard data.
 type DashboardData struct {
@@ -17,20 +20,25 @@ type DashboardData struct {
 	CostPerKwh    float64                `json:"cost_per_kwh,omitempty"`
 }
 
-// EnergyStatusEntry is the status of one energy monitor component (EM or EM1)
-// on a registered device. Power is the component's total active power in watts;
-// the full reading is in EM or EM1, whichever matches Type.
-type EnergyStatusEntry struct {
+// PowerReading is one power measurement on a device, from whichever
+// component carries it: an EM or EM1 energy monitor, a PM or PM1 power meter,
+// a Gen2+ switch, cover or light that meters its load, or a Gen1 meter or
+// emeter. Type is the component type as the device names it ("em", "pm1",
+// "switch", "meter", ...) and ID its index. Power is the active power in
+// watts. The full reading is in EM, EM1 or Meter: EM for "em", EM1 for "em1",
+// Meter for every other type.
+type PowerReading struct {
 	Name  string     `json:"name"`
 	Type  string     `json:"type"`
 	ID    int        `json:"id"`
 	Power float64    `json:"power"`
 	EM    *EMStatus  `json:"em,omitempty"`
 	EM1   *EM1Status `json:"em1,omitempty"`
+	Meter *PMStatus  `json:"meter,omitempty"`
 }
 
-// EnergyStatusSkip names a device, or one of its components, whose energy
-// status could not be read, and why.
+// EnergyStatusSkip names a device whose power readings could not be read,
+// or that has nothing that meters power, and why.
 type EnergyStatusSkip struct {
 	Device string `json:"device"`
 	Reason string `json:"reason"`
@@ -129,6 +137,21 @@ type PMStatus struct {
 	AEnergy    *PMEnergyCounters `json:"aenergy,omitempty"`
 	RetAEnergy *PMEnergyCounters `json:"ret_aenergy,omitempty"`
 	Errors     []string          `json:"errors,omitempty"`
+}
+
+// MarshalJSON leaves voltage and current out when Voltage is zero. A mains
+// powered meter never reads 0 V, so zero means the device measures neither
+// (Gen1 relays and bulbs report power and energy only).
+func (s PMStatus) MarshalJSON() ([]byte, error) {
+	type plain PMStatus
+	if s.Voltage != 0 {
+		return json.Marshal(plain(s))
+	}
+	return json.Marshal(struct {
+		plain
+		Voltage *float64 `json:"voltage,omitempty"`
+		Current *float64 `json:"current,omitempty"`
+	}{plain: plain(s)})
 }
 
 // PMEnergyCounters represents accumulated energy measurements for power meters.

@@ -123,21 +123,16 @@ func (s *Service) GenerateEnergyReport(ctx context.Context, devices map[string]m
 	return report
 }
 
-// energyReportRow checks that the device answers before reading its meters,
-// because a monitoring snapshot of a device that does not answer is empty
-// rather than an error, which would read as "online, no meters".
+// energyReportRow reads the device's power meters; a device that does not
+// answer is reported offline with the error.
 func (s *Service) energyReportRow(ctx context.Context, name string) model.EnergyReportRow {
 	row := model.EnergyReportRow{Name: name}
-	if _, err := s.probeDevice(ctx, name); err != nil {
-		row.Error = err.Error()
-		return row
-	}
-	row.Online = true
-	snapshot, err := s.GetMonitoringSnapshotAuto(ctx, name)
+	snapshot, err := s.GetMonitoringSnapshot(ctx, name)
 	if err != nil {
 		row.Error = err.Error()
 		return row
 	}
+	row.Online = true
 	row.Reporting = len(snapshot.EM)+len(snapshot.EM1)+len(snapshot.PM) > 0
 	power, _ := output.CalculateSnapshotTotals(snapshot)
 	row.PowerW = roundWatts(power)

@@ -55,88 +55,52 @@ func (s *Service) collectDeviceStatus(ctx context.Context, device string, opts O
 		Timestamp: time.Now(),
 		Online:    true,
 	}
-
-	if opts.IncludeEnergy {
-		status.EM = s.collectEMStatus(ctx, device)
-		status.EM1 = s.collectEM1Status(ctx, device)
+	readings, err := s.ReadPowerReadings(ctx, device)
+	if err != nil {
+		status.Online = false
+		status.Error = err.Error()
+		return status
 	}
-
-	if opts.IncludePower {
-		status.PM = s.collectPMStatus(ctx, device)
-	}
-
+	addReadingsToSnapshot(&status, readings, opts)
 	return status
 }
 
-// GetMonitoringSnapshot returns a single snapshot of all monitoring data for a device.
+// addReadingsToSnapshot files each reading under EM, EM1 or PM. A switch,
+// cover, light or Gen1 meter reading goes under PM, the shape they share.
+func addReadingsToSnapshot(snapshot *model.MonitoringSnapshot, readings []model.PowerReading, opts Options) {
+	for _, r := range readings {
+		switch {
+		case r.EM != nil:
+			if opts.IncludeEnergy {
+				snapshot.EM = append(snapshot.EM, *r.EM)
+			}
+		case r.EM1 != nil:
+			if opts.IncludeEnergy {
+				snapshot.EM1 = append(snapshot.EM1, *r.EM1)
+			}
+		case r.Meter != nil:
+			if opts.IncludePower {
+				snapshot.PM = append(snapshot.PM, *r.Meter)
+			}
+		}
+	}
+}
+
+// GetMonitoringSnapshot returns a single snapshot of all monitoring data for
+// a device, Gen1 or Gen2+.
 func (s *Service) GetMonitoringSnapshot(ctx context.Context, device string) (*model.MonitoringSnapshot, error) {
-	opts := Options{
-		IncludeEnergy: true,
-		IncludePower:  true,
+	readings, err := s.ReadPowerReadings(ctx, device)
+	if err != nil {
+		return nil, err
 	}
-	status := s.collectDeviceStatus(ctx, device, opts)
-	return &status, nil
-}
-
-// GetMonitoringSnapshotAuto returns monitoring data for a device, auto-detecting generation.
-func (s *Service) GetMonitoringSnapshotAuto(ctx context.Context, device string) (*model.MonitoringSnapshot, error) {
-	resolvedDevice, err := s.connector.ResolveWithGeneration(ctx, device)
-
-	// If we know it's Gen1, try Gen1 first
-	if err == nil && resolvedDevice.Generation == 1 {
-		gen1Snapshot, gen1Err := s.getGen1MonitoringSnapshot(ctx, device)
-		if gen1Err == nil {
-			return gen1Snapshot, nil
-		}
-		snapshot, err := s.GetMonitoringSnapshot(ctx, device)
-		if err == nil && (len(snapshot.PM) > 0 || len(snapshot.EM) > 0 || len(snapshot.EM1) > 0) {
-			return snapshot, nil
-		}
-		return &model.MonitoringSnapshot{Device: device, Timestamp: time.Now(), Online: true}, nil
-	}
-
-	// Gen2+ or unknown: Try Gen2 first
-	snapshot, err := s.GetMonitoringSnapshot(ctx, device)
-	if err == nil && (len(snapshot.PM) > 0 || len(snapshot.EM) > 0 || len(snapshot.EM1) > 0) {
-		return snapshot, nil
-	}
-
-	gen1Snapshot, gen1Err := s.getGen1MonitoringSnapshot(ctx, device)
-	if gen1Err == nil {
-		return gen1Snapshot, nil
-	}
-
-	if err == nil {
-		return snapshot, nil
-	}
-	return nil, err
-}
-
-func (s *Service) getGen1MonitoringSnapshot(ctx context.Context, device string) (*model.MonitoringSnapshot, error) {
-	var snapshot *model.MonitoringSnapshot
-	err := s.connector.WithGen1Connection(ctx, device, func(conn *client.Gen1Client) error {
-		status, err := conn.GetStatus(ctx)
-		if err != nil {
-			return err
-		}
-
-		snapshot = &model.MonitoringSnapshot{
-			Device:    device,
-			Timestamp: time.Now(),
-			Online:    true,
-		}
-
-		snapshot.PM = convertGen1Meters(status.Meters)
-		snapshot.PM = append(snapshot.PM, convertGen1EMeters(status.EMeters, len(status.Meters))...)
-
-		return nil
-	})
-	return snapshot, err
+	snapshot := &model.MonitoringSnapshot{Device: device, Timestamp: time.Now(), Online: true}
+	addReadingsToSnapshot(snapshot, readings, Options{IncludeEnergy: true, IncludePower: true})
+	return snapshot, nil
 }
 
 // GetGen1StatusJSON returns Gen1 device status as JSON for event streaming.
 func (s *Service) GetGen1StatusJSON(ctx context.Context, identifier string) (json.RawMessage, error) {
-	snapshot, err := s.getGen1MonitoringSnapshot(ctx, identifier)
+	snapshot, err := s.GetMonitoringSnapshot(ctx, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -261,107 +225,17 @@ func closeWebSocket(ws *client.DeviceWebSocket) {
 	}
 }
 
-// Collection helpers
-
-func (s *Service) collectEMStatus(ctx context.Context, device string) []model.EMStatus {
-	var result []model.EMStatus
-	emIDs, err := s.ListEMComponents(ctx, device)
-	if err != nil {
-		return result
-	}
-	for _, id := range emIDs {
-		if emStatus, err := s.GetEMStatus(ctx, device, id); err == nil {
-			result = append(result, *emStatus)
-		}
-	}
-	return result
-}
-
-func (s *Service) collectEM1Status(ctx context.Context, device string) []model.EM1Status {
-	var result []model.EM1Status
-	em1IDs, err := s.ListEM1Components(ctx, device)
-	if err != nil {
-		return result
-	}
-	for _, id := range em1IDs {
-		if em1Status, err := s.GetEM1Status(ctx, device, id); err == nil {
-			result = append(result, *em1Status)
-		}
-	}
-	return result
-}
-
-func (s *Service) collectPMStatus(ctx context.Context, device string) []model.PMStatus {
-	var result []model.PMStatus
-	pmIDs, err := s.ListPMComponents(ctx, device)
-	if err == nil {
-		for _, id := range pmIDs {
-			if pmStatus, err := s.GetPMStatus(ctx, device, id); err == nil {
-				result = append(result, *pmStatus)
-			}
-		}
-	}
-	pm1IDs, err := s.ListPM1Components(ctx, device)
-	if err == nil {
-		for _, id := range pm1IDs {
-			if pm1Status, err := s.GetPM1Status(ctx, device, id); err == nil {
-				result = append(result, *pm1Status)
-			}
-		}
-	}
-	result = append(result, s.collectSwitchPowerStatus(ctx, device)...)
-	return result
-}
-
-func (s *Service) collectSwitchPowerStatus(ctx context.Context, device string) []model.PMStatus {
-	var result []model.PMStatus
-	connErr := s.connector.WithConnection(ctx, device, func(conn *client.Client) error {
-		comps, err := conn.FilterComponents(ctx, model.ComponentSwitch)
-		if err != nil {
-			iostreams.DebugErrCat(iostreams.CategoryDevice, "list switches for power", err)
-			return err
-		}
-		for _, comp := range comps {
-			status, err := conn.Switch(comp.ID).GetStatus(ctx)
-			if err != nil {
-				continue
-			}
-			if status.Power != nil {
-				pm := model.PMStatus{
-					ID:     100 + comp.ID,
-					APower: *status.Power,
-				}
-				if status.Voltage != nil {
-					pm.Voltage = *status.Voltage
-				}
-				if status.Current != nil {
-					pm.Current = *status.Current
-				}
-				result = append(result, pm)
-			}
-		}
-		return nil
-	})
-	if connErr != nil {
-		iostreams.DebugErrCat(iostreams.CategoryNetwork, "switch power collection", connErr)
-	}
-	return result
-}
-
 // Gen1 conversion helpers
 
 // convertGen1Meters converts Gen1 meters to model.PMStatus.
 func convertGen1Meters(meters []gen1.MeterStatus) []model.PMStatus {
 	result := make([]model.PMStatus, len(meters))
 	for i, m := range meters {
-		result[i] = model.PMStatus{
-			ID:      i,
-			APower:  m.Power,
-			Voltage: 0, // Gen1 meters don't expose voltage directly
-			Current: 0, // Gen1 meters don't expose current directly
-		}
+		result[i] = model.PMStatus{ID: i, APower: m.Power}
+		// A Gen1 meter counts its total in watt-minutes; every other meter,
+		// and model.PMEnergyCounters, counts watt-hours.
 		if m.Total > 0 {
-			result[i].AEnergy = &model.PMEnergyCounters{Total: float64(m.Total)}
+			result[i].AEnergy = &model.PMEnergyCounters{Total: float64(m.Total) / 60}
 		}
 	}
 	return result

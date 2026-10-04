@@ -474,10 +474,10 @@ func TestRun_WithOptions(t *testing.T) {
 	if err == nil {
 		t.Log("Expected error for nonexistent device")
 	} else {
-		// Should be an EM components error, not nil factory error
+		// Should be a read error, not nil factory error
 		errStr := err.Error()
-		if !strings.Contains(errStr, "EM components") {
-			t.Errorf("Expected EM components error, got: %v", err)
+		if !strings.Contains(errStr, "failed to read power") {
+			t.Errorf("Expected a failed-to-read-power error, got: %v", err)
 		}
 	}
 }
@@ -603,11 +603,11 @@ func TestRun_MultipleDeviceFormats(t *testing.T) {
 			// Run - will fail but exercises device name handling
 			err := run(ctx, opts)
 
-			// Should get an EM-related error (EM or EM1), not a device format error
+			// Should get a read error, not a device format error
 			if err != nil {
 				errStr := err.Error()
-				if !strings.Contains(errStr, "EM") {
-					t.Errorf("Expected EM/EM1 components error for device %q, got: %v", tt.device, err)
+				if !strings.Contains(errStr, "failed to read power") {
+					t.Errorf("Expected a failed-to-read-power error for device %q, got: %v", tt.device, err)
 				}
 			}
 		})
@@ -1301,12 +1301,10 @@ func TestRun_NoComponentsOnDevice(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = run(ctx, opts)
-	if err != nil {
-		t.Logf("Run error (may be expected for mock limitations): %v", err)
+	if err := run(ctx, opts); err != nil {
+		t.Fatalf("run: %v", err)
 	}
-
-	// Should output "no energy monitoring components" message
-	output := tf.TestIO.Out.String()
-	t.Logf("Output: %s", output)
+	if out := tf.TestIO.Out.String() + tf.TestIO.ErrOut.String(); !strings.Contains(out, "components that meter power") {
+		t.Errorf("output does not say nothing meters power:\n%s", out)
+	}
 }

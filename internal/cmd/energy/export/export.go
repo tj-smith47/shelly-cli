@@ -45,7 +45,13 @@ Supports multiple output formats:
   - YAML: Human-readable YAML format
 
 The exported data includes timestamp, voltage, current, power, and energy
-measurements for the specified time range.`,
+measurements for the specified time range.
+
+Only EM and EM1 energy monitors (such as the Pro 3EM and Pro EM) store
+this history, in their EMData or EM1Data component. Switches, covers,
+lights and PM meters (Plus 1PM, Plus 2PM, Plug), and Gen1 devices, keep
+only a running energy total: read it, with the live power, using
+'shelly energy status <device>'.`,
 		Example: `  # Export last 24 hours as CSV
   shelly energy export shelly-3em-pro > data.csv
 
@@ -108,6 +114,7 @@ func run(ctx context.Context, opts *Options) error {
 	case shelly.ComponentTypeEM1:
 		return shellyexport.EM1Data(ctx, ios, svc.GetEM1DataHistory, opts.Device, opts.ComponentID, startTS, endTS, opts.Format, opts.OutputFile)
 	default:
-		return fmt.Errorf("no energy data components found")
+		return fmt.Errorf("invalid --type %q (use auto, em or em1): only EM and EM1 energy monitors keep history; "+
+			"for the live reading of any other component use 'shelly energy status %s'", componentType, opts.Device)
 	}
 }

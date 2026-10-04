@@ -9,6 +9,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/charmbracelet/colorprofile"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/viper"
 )
@@ -59,15 +60,22 @@ type IOStreams struct {
 
 	// Plain mode - machine-readable output without borders/colors
 	plainMode bool
+
+	// outColor and errColor wrap the process streams and strip escape
+	// sequences from them when colour is off. Styles always render their
+	// escape codes, so this is the one place they are removed. Both are nil
+	// for streams built by Test.
+	outColor, errColor *colorprofile.Writer
 }
 
 // System creates IOStreams connected to stdin/stdout/stderr.
 func System() *IOStreams {
 	ios := &IOStreams{
-		In:     os.Stdin,
-		Out:    os.Stdout,
-		ErrOut: os.Stderr,
+		In:       os.Stdin,
+		outColor: &colorprofile.Writer{Forward: os.Stdout, Profile: colorprofile.TrueColor},
+		errColor: &colorprofile.Writer{Forward: os.Stderr, Profile: colorprofile.TrueColor},
 	}
+	ios.Out, ios.ErrOut = ios.outColor, ios.errColor
 
 	// Detect TTY - os.Stdin/Stdout/Stderr are already *os.File
 	ios.isStdinTTY = isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())
@@ -80,6 +88,8 @@ func System() *IOStreams {
 	if ios.colorForced {
 		ios.colorEnabled = true
 	}
+
+	ios.applyColorProfiles()
 
 	// Check quiet mode from viper
 	ios.quiet = viper.GetBool("quiet")
@@ -145,6 +155,34 @@ func IsColorDisabled() bool {
 	return false
 }
 
+// ApplyColorFlags turns colour off when --no-color or --plain was given,
+// which wins over FORCE_COLOR. The streams are built before flags are
+// parsed, so the flags are applied here.
+func (s *IOStreams) ApplyColorFlags() {
+	if viper.GetBool("no-color") || viper.GetBool("plain") {
+		s.colorEnabled = false
+		s.colorForced = false
+	}
+	s.applyColorProfiles()
+}
+
+// applyColorProfiles sets each process stream to pass escape sequences
+// through or strip them. Stdout follows colorEnabled; stderr is decided on
+// its own terminal, since one of the two is often redirected alone.
+func (s *IOStreams) applyColorProfiles() {
+	if s.outColor == nil || s.errColor == nil {
+		return
+	}
+	profile := func(enabled bool) colorprofile.Profile {
+		if enabled {
+			return colorprofile.TrueColor
+		}
+		return colorprofile.NoTTY
+	}
+	s.outColor.Profile = profile(s.colorEnabled)
+	s.errColor.Profile = profile(s.colorForced || (s.isStderrTTY && !IsColorDisabled()))
+}
+
 // isColorForced checks if color is explicitly forced.
 func isColorForced() bool {
 	// Check FORCE_COLOR
@@ -181,6 +219,7 @@ func (s *IOStreams) ColorEnabled() bool {
 // SetColorEnabled explicitly sets the color enabled state.
 func (s *IOStreams) SetColorEnabled(enabled bool) {
 	s.colorEnabled = enabled
+	s.applyColorProfiles()
 }
 
 // IsQuiet returns true if quiet mode is enabled.

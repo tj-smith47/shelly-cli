@@ -39,65 +39,28 @@ type MonitoringDeviceStatus = monitoring.DeviceStatusResult
 
 // Delegation methods - these delegate to the monitoring subpackage.
 
-// GetEMStatus returns the status of an Energy Monitor (EM) component.
-func (s *Service) GetEMStatus(ctx context.Context, device string, id int) (*model.EMStatus, error) {
-	return s.Monitoring().GetEMStatus(ctx, device, id)
+// ResetPowerCounters resets the energy counters of one component that meters
+// power. See monitoring.Service.ResetPowerCounters.
+func (s *Service) ResetPowerCounters(ctx context.Context, device, typ string, id int, counterTypes []string) (model.PowerReading, error) {
+	return s.Monitoring().ResetPowerCounters(ctx, device, typ, id, counterTypes)
 }
 
-// GetEM1Status returns the status of a single-phase Energy Monitor (EM1) component.
-func (s *Service) GetEM1Status(ctx context.Context, device string, id int) (*model.EM1Status, error) {
-	return s.Monitoring().GetEM1Status(ctx, device, id)
+// ReadPowerReadings returns every power reading the device reports.
+// See monitoring.Service.ReadPowerReadings.
+func (s *Service) ReadPowerReadings(ctx context.Context, device string) ([]model.PowerReading, error) {
+	return s.Monitoring().ReadPowerReadings(ctx, device)
 }
 
-// GetPMStatus returns the status of a Power Meter (PM) component.
-func (s *Service) GetPMStatus(ctx context.Context, device string, id int) (*model.PMStatus, error) {
-	return s.Monitoring().GetPMStatus(ctx, device, id)
+// ReadPowerReading returns one power reading of the device.
+// See monitoring.Service.ReadPowerReading.
+func (s *Service) ReadPowerReading(ctx context.Context, device, typ string, id int) (model.PowerReading, error) {
+	return s.Monitoring().ReadPowerReading(ctx, device, typ, id)
 }
 
-// GetPM1Status returns the status of a Power Meter (PM1) component.
-func (s *Service) GetPM1Status(ctx context.Context, device string, id int) (*model.PMStatus, error) {
-	return s.Monitoring().GetPM1Status(ctx, device, id)
-}
-
-// ResetEMCounters resets energy counters on an EM component.
-func (s *Service) ResetEMCounters(ctx context.Context, device string, id int, counterTypes []string) error {
-	return s.Monitoring().ResetEMCounters(ctx, device, id, counterTypes)
-}
-
-// ResetPMCounters resets energy counters on a PM component.
-func (s *Service) ResetPMCounters(ctx context.Context, device string, id int, counterTypes []string) error {
-	return s.Monitoring().ResetPMCounters(ctx, device, id, counterTypes)
-}
-
-// ResetPM1Counters resets energy counters on a PM1 component.
-func (s *Service) ResetPM1Counters(ctx context.Context, device string, id int, counterTypes []string) error {
-	return s.Monitoring().ResetPM1Counters(ctx, device, id, counterTypes)
-}
-
-// CollectEnergyStatuses reads every EM and EM1 component on each device.
-// See monitoring.Service.CollectEnergyStatuses.
-func (s *Service) CollectEnergyStatuses(ctx context.Context, devices []string) ([]model.EnergyStatusEntry, []model.EnergyStatusSkip) {
-	return s.Monitoring().CollectEnergyStatuses(ctx, devices)
-}
-
-// ListEMComponents returns a list of EM component IDs on a device.
-func (s *Service) ListEMComponents(ctx context.Context, device string) ([]int, error) {
-	return s.Monitoring().ListEMComponents(ctx, device)
-}
-
-// ListEM1Components returns a list of EM1 component IDs on a device.
-func (s *Service) ListEM1Components(ctx context.Context, device string) ([]int, error) {
-	return s.Monitoring().ListEM1Components(ctx, device)
-}
-
-// ListPMComponents returns a list of PM component IDs on a device.
-func (s *Service) ListPMComponents(ctx context.Context, device string) ([]int, error) {
-	return s.Monitoring().ListPMComponents(ctx, device)
-}
-
-// ListPM1Components returns a list of PM1 component IDs on a device.
-func (s *Service) ListPM1Components(ctx context.Context, device string) ([]int, error) {
-	return s.Monitoring().ListPM1Components(ctx, device)
+// CollectPowerReadings reads every power reading on each device.
+// See monitoring.Service.CollectPowerReadings.
+func (s *Service) CollectPowerReadings(ctx context.Context, devices []string) ([]model.PowerReading, []model.EnergyStatusSkip) {
+	return s.Monitoring().CollectPowerReadings(ctx, devices)
 }
 
 // MonitorDevice continuously monitors a device and calls the callback with updates.
@@ -108,11 +71,6 @@ func (s *Service) MonitorDevice(ctx context.Context, device string, opts Monitor
 // GetMonitoringSnapshot returns a single snapshot of all monitoring data for a device.
 func (s *Service) GetMonitoringSnapshot(ctx context.Context, device string) (*model.MonitoringSnapshot, error) {
 	return s.Monitoring().GetMonitoringSnapshot(ctx, device)
-}
-
-// GetMonitoringSnapshotAuto returns monitoring data for a device, auto-detecting generation.
-func (s *Service) GetMonitoringSnapshotAuto(ctx context.Context, device string) (*model.MonitoringSnapshot, error) {
-	return s.Monitoring().GetMonitoringSnapshotAuto(ctx, device)
 }
 
 // GetGen1StatusJSON returns Gen1 device status as JSON for event streaming.
@@ -148,16 +106,6 @@ func (s *Service) SubscribeEvents(ctx context.Context, device string, handler Ev
 // CollectPrometheusMetrics collects metrics from a device in Prometheus format.
 func (s *Service) CollectPrometheusMetrics(ctx context.Context, device string) (*export.PrometheusMetrics, error) {
 	return s.Monitoring().CollectPrometheusMetrics(ctx, device)
-}
-
-// CollectComponentReadings collects all meter readings from a device.
-func (s *Service) CollectComponentReadings(ctx context.Context, device string) []model.ComponentReading {
-	return s.Monitoring().CollectComponentReadings(ctx, device)
-}
-
-// CollectInfluxDBPoints collects metrics from a device in InfluxDB line protocol format.
-func (s *Service) CollectInfluxDBPoints(ctx context.Context, device string) ([]export.InfluxDBPoint, error) {
-	return s.Monitoring().CollectInfluxDBPoints(ctx, device)
 }
 
 // GetEMDataRecords retrieves available time intervals with stored EMData.

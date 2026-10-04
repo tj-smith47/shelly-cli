@@ -334,7 +334,7 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 	pollCtx, pollCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer pollCancel()
 
-	snapshot, err := m.svc.GetMonitoringSnapshotAuto(pollCtx, device.Address)
+	snapshot, err := m.svc.GetMonitoringSnapshot(pollCtx, device.Address)
 	if err != nil {
 		status.Error = err
 		// For linked devices, resolve parent switch state instead of showing "offline".

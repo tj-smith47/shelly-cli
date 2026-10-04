@@ -353,7 +353,7 @@ func (m Model) Visible() bool {
 func (m Model) fetchDeviceDetails(device model.Device) tea.Cmd {
 	return func() tea.Msg {
 		// Get monitoring snapshot (auto-detects Gen1 vs Gen2)
-		status, err := m.svc.GetMonitoringSnapshotAuto(m.ctx, device.Address)
+		status, err := m.svc.GetMonitoringSnapshot(m.ctx, device.Address)
 		if err != nil {
 			return Msg{
 				Device: device,

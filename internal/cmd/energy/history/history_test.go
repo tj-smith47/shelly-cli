@@ -626,8 +626,8 @@ func TestExecute_AutoDetectType(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when no energy data components found")
 	}
-	if err != nil && !strings.Contains(err.Error(), "no energy data components") {
-		t.Logf("Error: %v", err)
+	if err != nil && !strings.Contains(err.Error(), "keeps no energy history") {
+		t.Errorf("Error: %v", err)
 	}
 }
 
@@ -852,8 +852,8 @@ func TestRun_UnknownComponentType(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for unknown component type")
 	}
-	if err != nil && !strings.Contains(err.Error(), "no energy data components") {
-		t.Errorf("expected 'no energy data components' error, got: %v", err)
+	if err != nil && !strings.Contains(err.Error(), "invalid --type") {
+		t.Errorf("expected 'invalid --type' error, got: %v", err)
 	}
 }
 

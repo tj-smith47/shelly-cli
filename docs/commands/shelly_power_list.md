@@ -4,18 +4,21 @@ List power meter components
 
 ### Synopsis
 
-List all power meter components (PM/PM1) on a device.
+List every component on a device that meters power, with its live reading.
 
-PM components are power meters typically found on multi-channel devices
-(Shelly Pro 4PM, etc.). PM1 components are single-channel power meters
-found on devices like Shelly Plus 1PM.
+That is any PM or PM1 power meter, any switch, cover or light that
+meters its load (Plus 1PM, Plus 2PM, Plus Plug, Pro 4PM, dimmers, RGBW
+PM), any EM or EM1 energy monitor, and the meters of a Gen1 device
+(Shelly 1PM, Plug S, Duo bulbs, EM).
 
-Use 'shelly power status' with a component ID to get real-time readings.
+Use 'shelly power status' with a component ID for one component in
+full.
 
 Output is formatted as a table by default. Use -o json or -o yaml for
-structured output suitable for scripting.
+structured output; each item carries name, type, id, power (watts) and
+the full reading under em, em1 or meter.
 
-Columns: ID, Type (PM or PM1)
+Columns: Device, Component, Voltage, Current, Power, Energy
 
 ```
 shelly power list <device> [flags]
@@ -24,23 +27,20 @@ shelly power list <device> [flags]
 ### Examples
 
 ```
-  # List power meter components on a device
+  # List the components that meter power on a device
   shelly power list living-room
 
   # Output as JSON for scripting
   shelly power list living-room -o json
 
-  # Get count of power meter components
+  # Count the components that meter power
   shelly power list living-room -o json | jq length
 
-  # Get IDs of PM1 components only
-  shelly power list living-room -o json | jq -r '.[] | select(.type == "PM1") | .id'
+  # IDs of the switch channels that meter power
+  shelly power list living-room -o json | jq -r '.[] | select(.type == "switch") | .id'
 
-  # Check all devices for power meters
-  shelly device list -o json | jq -r '.[].name' | while read dev; do
-    count=$(shelly power list "$dev" -o json 2>/dev/null | jq length)
-    [ "$count" -gt 0 ] && echo "$dev: $count power meters"
-  done
+  # Total power of a device in watts
+  shelly power list living-room -o json | jq '[.[].power] | add'
 
   # Short form
   shelly power ls living-room

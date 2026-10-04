@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/monitoring"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -223,8 +224,9 @@ func formatComponentSummary(components []model.ComponentPower) string {
 
 	parts := make([]string, 0, len(counts))
 	for typ, count := range counts {
-		parts = append(parts, fmt.Sprintf("%d %s", count, typ))
+		parts = append(parts, fmt.Sprintf("%d %s", count, MeterLabel(typ)))
 	}
+	sort.Strings(parts)
 
 	return fmt.Sprintf("%d (%s)", len(components), joinStrings(parts, ", "))
 }
@@ -324,13 +326,20 @@ func displayBarChart(ios *iostreams.IOStreams, devices []model.DeviceEnergy, max
 
 // DisplayPMStatusDetails shows detailed power meter status in human-readable format.
 func DisplayPMStatusDetails(ios *iostreams.IOStreams, status *model.PMStatus, componentType string) {
-	typeLabel := "Power Meter (PM)"
-	if componentType == shelly.ComponentTypePM1 {
-		typeLabel = "Power Meter (PM1)"
+	typeLabel := MeterLabel(componentType)
+	switch componentType {
+	case shelly.ComponentTypePM, shelly.ComponentTypePM1, monitoring.MeterTypeGen1Meter:
+		typeLabel = "Power Meter (" + typeLabel + ")"
+	case monitoring.MeterTypeGen1EMeter:
+		typeLabel = "Energy Meter (" + typeLabel + ")"
 	}
 	ios.Printf("%s #%d\n\n", typeLabel, status.ID)
-	ios.Printf("Voltage: %.2f V\n", status.Voltage)
-	ios.Printf("Current: %.2f A\n", status.Current)
+	// A Gen1 meter reports power and energy only; zero voltage and current
+	// there mean "not measured".
+	if status.Voltage != 0 || status.Current != 0 {
+		ios.Printf("Voltage: %.2f V\n", status.Voltage)
+		ios.Printf("Current: %.2f A\n", status.Current)
+	}
 	ios.Printf("Power:   %.2f W\n", status.APower)
 
 	if status.Freq != nil {

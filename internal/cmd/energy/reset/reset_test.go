@@ -282,7 +282,7 @@ func TestRun_Error(t *testing.T) {
 	}
 
 	// Should contain "failed to reset" error message
-	if !strings.Contains(err.Error(), "failed to reset EM counters") && !strings.Contains(err.Error(), "context deadline exceeded") {
+	if !strings.Contains(err.Error(), "failed to reset energy counters") && !strings.Contains(err.Error(), "context deadline exceeded") {
 		t.Errorf("expected reset error, got: %v", err)
 	}
 }
@@ -336,7 +336,7 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	wantPatterns := []string{
-		"Reset energy counters",
+		"energy counters",
 		"EM",
 		"3-phase",
 	}
@@ -395,5 +395,65 @@ func TestRun_DefaultComponentID(t *testing.T) {
 	err = cmd.Execute()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_EveryCarrier(t *testing.T) {
+	tests := []struct {
+		name    string
+		state   mock.DeviceState
+		gen     int
+		args    []string
+		want    string
+		wantErr string
+	}{
+		{"switch channel", mock.DeviceState{
+			"switch:0": map[string]any{"id": 0, "apower": 1.0},
+			"switch:1": map[string]any{"id": 1, "apower": 2.0},
+		}, 2, []string{"1"}, "Energy counters reset for Switch #1", ""},
+		{"cover", mock.DeviceState{"cover:0": map[string]any{"id": 0, "apower": 3.0}}, 2, nil, "Energy counters reset for Cover #0", ""},
+		{"pm1", mock.DeviceState{"pm1:0": map[string]any{"id": 0, "apower": 3.0}}, 2, []string{"--type", "pm1"}, "Energy counters reset for PM1 #0", ""},
+		{"em1 has no reset", mock.DeviceState{"em1:0": map[string]any{"id": 0, "act_power": 3.0}}, 2, nil, "",
+			"em1:0 on dev has no counter reset; energy reset works on cover, em, light, pm, pm1, rgb, rgbw, switch components"},
+		{"gen1 has no reset", mock.DeviceState{"meters": []any{map[string]any{"power": 3.0}}}, 1, nil, "",
+			"meter:0 on dev has no counter reset"},
+		{"nothing meters", mock.DeviceState{"switch:0": map[string]any{"id": 0, "output": true}}, 2, nil, "",
+			"dev: no component on this device reports power"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			demo, err := mock.StartWithFixtures(&mock.Fixtures{
+				Version: "1",
+				Config: mock.ConfigFixture{Devices: []mock.DeviceFixture{
+					{Name: "dev", Address: "192.0.2.10", MAC: "AA:BB:CC:DD:EE:FF", Type: "X", Model: "X", Generation: tt.gen},
+				}},
+				DeviceStates: map[string]mock.DeviceState{"dev": tt.state},
+			})
+			if err != nil {
+				t.Fatalf("StartWithFixtures: %v", err)
+			}
+			t.Cleanup(demo.Cleanup)
+			tf := factory.NewTestFactory(t)
+			demo.InjectIntoFactory(tf.Factory)
+			cmd := NewCommand(tf.Factory)
+			cmd.SetContext(context.Background())
+			cmd.SetArgs(append([]string{"dev"}, tt.args...))
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			err = cmd.Execute()
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("err = %v, want containing %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+			if out := tf.OutString() + tf.ErrString(); !strings.Contains(out, tt.want) {
+				t.Errorf("output missing %q:\n%s", tt.want, out)
+			}
+		})
 	}
 }

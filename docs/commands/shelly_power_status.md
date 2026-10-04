@@ -4,36 +4,56 @@ Show power meter status
 
 ### Synopsis
 
-Show current status of a power meter component.
+Show the live power reading of one component on a device.
 
-Displays real-time measurements including voltage, current, power,
-frequency, and accumulated energy.
+Reads whichever component meters power: a PM or PM1 power meter, a
+switch, cover or light that meters its load (Plus 1PM, Plus 2PM, Plus
+Plug, Pro 4PM, dimmers, RGBW PM), an EM or EM1 energy monitor, or the
+meters of a Gen1 device (Shelly 1PM, Plug S, Duo bulbs, EM). Shows
+voltage, current, power, frequency and accumulated energy, as far as
+the component reports them.
+
+Without an ID the first component that meters power is shown; 'shelly
+power list' lists them all. Use --type when two component types share
+an ID.
+
+With --all, shows every power reading on every registered device as one
+list. Devices that are offline or meter nothing are skipped with a note
+on stderr. With -o json or -o yaml each reading carries name, type, id,
+power (watts) and the full reading under em, em1 or meter.
 
 ```
-shelly power status <device> [id] [flags]
+shelly power status [device] [id] [flags]
 ```
 
 ### Examples
 
 ```
-  # Show power meter status
+  # Show the first power reading of a device
   shelly power status living-room
 
-  # Show specific component by ID
-  shelly power status living-room 0
+  # Show channel 1 of a two-channel switch
+  shelly power status living-room 1
 
-  # Specify component type explicitly
-  shelly power status living-room --type pm1
+  # Pick the component type explicitly
+  shelly power status living-room 0 --type pm1
 
   # Output as JSON for scripting
   shelly power status living-room -o json
+
+  # Read just the power in watts
+  shelly power status living-room -o json | jq '.power'
+
+  # Every power reading on every registered device
+  shelly power status --all
 ```
 
 ### Options
 
 ```
+  -a, --all           Target all registered devices
   -h, --help          help for status
-      --type string   Component type (auto, pm, pm1) (default "auto")
+      --type string   Component type: auto, or one of em, em1, pm, pm1, switch, cover, light, rgb, rgbw, cct, meter (Gen1), emeter (Gen1) (default "auto")
 ```
 
 ### Options inherited from parent commands

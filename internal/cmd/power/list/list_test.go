@@ -473,10 +473,10 @@ func TestRun_WithOptions(t *testing.T) {
 	if err == nil {
 		t.Log("Expected error for nonexistent device")
 	} else {
-		// Should be a PM components error, not nil factory error
+		// Should be a read error, not nil factory error
 		errStr := err.Error()
-		if !strings.Contains(errStr, "PM components") {
-			t.Errorf("Expected PM components error, got: %v", err)
+		if !strings.Contains(errStr, "failed to read power") {
+			t.Errorf("Expected a failed-to-read-power error, got: %v", err)
 		}
 	}
 }
@@ -602,11 +602,11 @@ func TestRun_MultipleDeviceFormats(t *testing.T) {
 			// Run - will fail but exercises device name handling
 			err := run(ctx, opts)
 
-			// Should get a PM-related error (PM or PM1), not a device format error
+			// Should get a read error, not a device format error
 			if err != nil {
 				errStr := err.Error()
-				if !strings.Contains(errStr, "PM") {
-					t.Errorf("Expected PM/PM1 components error for device %q, got: %v", tt.device, err)
+				if !strings.Contains(errStr, "failed to read power") {
+					t.Errorf("Expected a failed-to-read-power error for device %q, got: %v", tt.device, err)
 				}
 			}
 		})

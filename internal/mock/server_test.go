@@ -652,7 +652,17 @@ func TestDeviceServer_JSONRPC(t *testing.T) {
 		body := []byte(`{"id":12,"method":"Unknown.Method"}`)
 		resp := httpPost(t, server.DeviceURL("Test Device")+"/rpc", body)
 		defer closeBody(t, resp)
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		// Gen2+ firmware answers HTTP 200 with the RPC error in the body.
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		var got struct {
+			Error struct {
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		assert.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+		assert.Equal(t, 404, got.Error.Code)
+		assert.Equal(t, "No handler for Unknown.Method", got.Error.Message)
 	})
 
 	t.Run("Invalid JSON", func(t *testing.T) {

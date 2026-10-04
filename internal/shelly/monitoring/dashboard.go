@@ -12,34 +12,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
-// componentCollector defines how to collect power data from a component type.
-type componentCollector[T any] struct {
-	compType  string
-	listIDs   func(ctx context.Context, device string) ([]int, error)
-	getStatus func(ctx context.Context, device string, id int) (T, error)
-	toPower   func(status T, id int) (model.ComponentPower, float64, float64) // returns comp, power, energy
-}
-
-// collectComponents is a generic helper for collecting component power data.
-func collectComponents[T any](ctx context.Context, device string, c componentCollector[T], status *model.DashboardDeviceEntry) {
-	ids, err := c.listIDs(ctx, device)
-	if err != nil {
-		return
-	}
-	for _, id := range ids {
-		compStatus, err := c.getStatus(ctx, device, id)
-		if err != nil {
-			continue
-		}
-		comp, power, energy := c.toPower(compStatus, id)
-		comp.Type = c.compType
-		comp.ID = id
-		status.Components = append(status.Components, comp)
-		status.TotalPower += power
-		status.TotalEnergy += energy
-	}
-}
-
 // CollectDashboardData collects energy data from multiple devices concurrently.
 func (s *Service) CollectDashboardData(ctx context.Context, ios *iostreams.IOStreams, devices []string) model.DashboardData {
 	dashboard := model.DashboardData{
@@ -80,52 +52,29 @@ func (s *Service) CollectDashboardData(ctx context.Context, ios *iostreams.IOStr
 
 func (s *Service) collectDashboardDeviceStatus(ctx context.Context, device string) model.DashboardDeviceEntry {
 	status := model.DashboardDeviceEntry{Device: device, Online: true}
-
-	// Collect each component type using the generic collector
-	collectComponents(ctx, device, componentCollector[*model.EMStatus]{
-		compType: "EM", listIDs: s.ListEMComponents, getStatus: s.GetEMStatus,
-		toPower: func(st *model.EMStatus, id int) (model.ComponentPower, float64, float64) {
-			return model.ComponentPower{Voltage: st.AVoltage, Current: st.TotalCurrent, Power: st.TotalActivePower}, st.TotalActivePower, 0
-		},
-	}, &status)
-
-	collectComponents(ctx, device, componentCollector[*model.EM1Status]{
-		compType: "EM1", listIDs: s.ListEM1Components, getStatus: s.GetEM1Status,
-		toPower: func(st *model.EM1Status, id int) (model.ComponentPower, float64, float64) {
-			return model.ComponentPower{Voltage: st.Voltage, Current: st.Current, Power: st.ActPower}, st.ActPower, 0
-		},
-	}, &status)
-
-	collectComponents(ctx, device, componentCollector[*model.PMStatus]{
-		compType: "PM", listIDs: s.ListPMComponents, getStatus: s.GetPMStatus,
-		toPower: func(st *model.PMStatus, id int) (model.ComponentPower, float64, float64) {
-			energy := 0.0
-			if st.AEnergy != nil {
-				energy = st.AEnergy.Total
-			}
-			return model.ComponentPower{Voltage: st.Voltage, Current: st.Current, Power: st.APower, Energy: energy}, st.APower, energy
-		},
-	}, &status)
-
-	collectComponents(ctx, device, componentCollector[*model.PMStatus]{
-		compType: "PM1", listIDs: s.ListPM1Components, getStatus: s.GetPM1Status,
-		toPower: func(st *model.PMStatus, id int) (model.ComponentPower, float64, float64) {
-			energy := 0.0
-			if st.AEnergy != nil {
-				energy = st.AEnergy.Total
-			}
-			return model.ComponentPower{Voltage: st.Voltage, Current: st.Current, Power: st.APower, Energy: energy}, st.APower, energy
-		},
-	}, &status)
-
-	// Mark offline if no components found
-	if len(status.Components) == 0 {
-		if _, pingErr := s.ListPMComponents(ctx, device); pingErr != nil {
-			status.Online = false
-			status.Error = "device unreachable"
-		}
+	readings, err := s.ReadPowerReadings(ctx, device)
+	if err != nil {
+		status.Online = false
+		status.Error = "device unreachable"
+		return status
 	}
-
+	for _, r := range readings {
+		comp := model.ComponentPower{Type: r.Type, ID: r.ID, Power: r.Power}
+		switch {
+		case r.EM != nil:
+			comp.Voltage, comp.Current = r.EM.AVoltage, r.EM.TotalCurrent
+		case r.EM1 != nil:
+			comp.Voltage, comp.Current = r.EM1.Voltage, r.EM1.Current
+		case r.Meter != nil:
+			comp.Voltage, comp.Current = r.Meter.Voltage, r.Meter.Current
+			if r.Meter.AEnergy != nil {
+				comp.Energy = r.Meter.AEnergy.Total
+			}
+		}
+		status.Components = append(status.Components, comp)
+		status.TotalPower += comp.Power
+		status.TotalEnergy += comp.Energy
+	}
 	return status
 }
 
@@ -199,29 +148,22 @@ func (s *Service) collectDeviceEnergy(ctx context.Context, device string, startT
 		return result
 	}
 
-	// Try current power from PM/PM1 for devices without history
-	if power := s.collectCurrentPower(ctx, device); power > 0 {
+	// A meter without stored history still gives the device's live power.
+	readings, err := s.ReadPowerReadings(ctx, device)
+	if err != nil {
+		result.Online, result.Error = false, "device unreachable"
+		return result
+	}
+	if len(readings) > 0 {
+		var power float64
+		for _, r := range readings {
+			power += r.Power
+		}
 		result.AvgPower, result.PeakPower, result.DataPoints = power, power, 1
 		result.Error = "no historical data"
 		return result
 	}
 
-	result.Online, result.Error = false, "no data available"
+	result.Online, result.Error = false, ErrNoPowerMeter.Error()
 	return result
-}
-
-func (s *Service) collectCurrentPower(ctx context.Context, device string) float64 {
-	var totalPower float64
-	for _, list := range []func(context.Context, string) ([]int, error){s.ListPMComponents, s.ListPM1Components} {
-		if ids, err := list(ctx, device); err == nil {
-			for _, id := range ids {
-				if pm, err := s.GetPMStatus(ctx, device, id); err == nil {
-					totalPower += pm.APower
-				} else if pm1, err := s.GetPM1Status(ctx, device, id); err == nil {
-					totalPower += pm1.APower
-				}
-			}
-		}
-	}
-	return totalPower
 }

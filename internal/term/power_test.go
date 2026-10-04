@@ -392,8 +392,8 @@ func TestFormatComponentSummary(t *testing.T) {
 		if !strings.Contains(result, "1") {
 			t.Errorf("result should contain count, got %q", result)
 		}
-		if !strings.Contains(result, testCompSwitch) {
-			t.Errorf("result should contain 'switch', got %q", result)
+		if !strings.Contains(result, "1 Switch") {
+			t.Errorf("result should contain '1 Switch', got %q", result)
 		}
 	})
 

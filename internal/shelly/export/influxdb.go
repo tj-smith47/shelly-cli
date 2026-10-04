@@ -109,69 +109,35 @@ func ParseTags(tagPairs []string) map[string]string {
 	return tags
 }
 
-// EMReadingsToInfluxDBPoints converts EM readings to InfluxDB points with phase labels.
-func EMReadingsToInfluxDBPoints(emStatuses []*model.EMStatus, device string, timestamp time.Time) []InfluxDBPoint {
-	points := make([]InfluxDBPoint, 0, len(emStatuses)*4)
-	for _, status := range emStatuses {
-		compID := fmt.Sprintf("%d", status.ID)
-		points = append(points,
-			// Phase A
-			InfluxDBPoint{
-				Measurement: measurementPower,
-				Tags:        map[string]string{tagDevice: device, tagComponent: "em", tagComponentID: compID, tagPhase: "a"},
-				Fields:      map[string]float64{fieldPower: status.AActivePower, fieldVoltage: status.AVoltage, fieldCurrent: status.ACurrent},
-				Timestamp:   timestamp,
-			},
-			// Phase B
-			InfluxDBPoint{
-				Measurement: measurementPower,
-				Tags:        map[string]string{tagDevice: device, tagComponent: "em", tagComponentID: compID, tagPhase: "b"},
-				Fields:      map[string]float64{fieldPower: status.BActivePower, fieldVoltage: status.BVoltage, fieldCurrent: status.BCurrent},
-				Timestamp:   timestamp,
-			},
-			// Phase C
-			InfluxDBPoint{
-				Measurement: measurementPower,
-				Tags:        map[string]string{tagDevice: device, tagComponent: "em", tagComponentID: compID, tagPhase: "c"},
-				Fields:      map[string]float64{fieldPower: status.CActivePower, fieldVoltage: status.CVoltage, fieldCurrent: status.CCurrent},
-				Timestamp:   timestamp,
-			},
-			// Total
-			InfluxDBPoint{
-				Measurement: measurementPower,
-				Tags:        map[string]string{tagDevice: device, tagComponent: "em", tagComponentID: compID, tagPhase: "total"},
-				Fields:      map[string]float64{fieldPower: status.TotalActivePower, fieldCurrent: status.TotalCurrent},
-				Timestamp:   timestamp,
-			},
-		)
-	}
-	return points
-}
-
-// CollectMeterReadings is a generic collector for single-phase meter types.
-func CollectMeterReadings[T model.MeterReading](
-	device, compType string,
-	ids []int,
-	getFunc func(id int) (T, error),
-) []model.ComponentReading {
-	readings := make([]model.ComponentReading, 0, len(ids))
-	for _, id := range ids {
-		status, err := getFunc(id)
-		if err != nil {
+// ComponentReadings converts power readings to the per-meter rows the metrics
+// exporters write. An EM reading becomes one row per phase plus a total row.
+func ComponentReadings(readings []model.PowerReading) []model.ComponentReading {
+	rows := make([]model.ComponentReading, 0, len(readings))
+	for _, r := range readings {
+		var m model.MeterReading
+		switch {
+		case r.EM != nil:
+			rows = append(rows, CollectEMReadings(r.Name, []*model.EMStatus{r.EM})...)
+			continue
+		case r.EM1 != nil:
+			m = r.EM1
+		case r.Meter != nil:
+			m = r.Meter
+		default:
 			continue
 		}
-		readings = append(readings, model.ComponentReading{
-			Device:  device,
-			Type:    compType,
-			ID:      id,
-			Power:   status.GetPower(),
-			Voltage: status.GetVoltage(),
-			Current: status.GetCurrent(),
-			Energy:  status.GetEnergy(),
-			Freq:    status.GetFreq(),
+		rows = append(rows, model.ComponentReading{
+			Device:  r.Name,
+			Type:    r.Type,
+			ID:      r.ID,
+			Power:   m.GetPower(),
+			Voltage: m.GetVoltage(),
+			Current: m.GetCurrent(),
+			Energy:  m.GetEnergy(),
+			Freq:    m.GetFreq(),
 		})
 	}
-	return readings
+	return rows
 }
 
 // CollectEMReadings collects 3-phase EM readings (each phase as separate reading).

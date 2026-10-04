@@ -354,9 +354,28 @@ func contractState() mock.DeviceState {
 	}
 }
 
+// harnessDevice is one mock device served by newHarness.
+type harnessDevice struct {
+	name  string
+	gen   int
+	model string
+	state mock.DeviceState
+}
+
 // newContractHarness points the command tree's factory at a mock server that
 // serves a populated device under every name in devices, plus bareDevice.
 func newContractHarness(t *testing.T, devices []string, withGen1 bool) *contractHarness {
+	t.Helper()
+	populated := make([]harnessDevice, len(devices))
+	for i, name := range devices {
+		populated[i] = harnessDevice{name: name, gen: 2, model: "SNSW-001P16EU", state: contractState()}
+	}
+	return newHarness(t, populated, withGen1)
+}
+
+// newHarness points the command tree's factory at a mock server that serves
+// devices, plus bareDevice and, with withGen1, a Gen1 relay and bulb.
+func newHarness(t *testing.T, devices []harnessDevice, withGen1 bool) *contractHarness {
 	t.Helper()
 	memFs := testfactory.SetupTestFs(t)
 
@@ -368,9 +387,9 @@ func newContractHarness(t *testing.T, devices []string, withGen1 bool) *contract
 			Name: name, Address: "192.0.2.10", MAC: mac, Type: model, Model: model, Generation: gen,
 		})
 	}
-	for _, name := range devices {
-		add(name, 2, "SNSW-001P16EU")
-		fixtures.DeviceStates[name] = contractState()
+	for _, d := range devices {
+		add(d.name, d.gen, d.model)
+		fixtures.DeviceStates[d.name] = d.state
 	}
 	add(bareDevice, 2, "SNSW-001P16EU")
 	fixtures.DeviceStates[bareDevice] = mock.DeviceState{}
@@ -387,9 +406,9 @@ func newContractHarness(t *testing.T, devices []string, withGen1 bool) *contract
 		}
 	}
 	if len(devices) > 0 {
-		fixtures.Config.Groups = []mock.GroupFixture{{Name: "living-room", Devices: devices[:1]}}
+		fixtures.Config.Groups = []mock.GroupFixture{{Name: "living-room", Devices: []string{devices[0].name}}}
 		fixtures.Config.Scenes = []mock.SceneFixture{{Name: "movie-night", Actions: []mock.SceneActionFixture{
-			{Device: devices[0], Method: "Switch.Set", Params: map[string]any{"id": 0, "on": false}},
+			{Device: devices[0].name, Method: "Switch.Set", Params: map[string]any{"id": 0, "on": false}},
 		}}}
 		fixtures.Config.Aliases = []mock.AliasFixture{{Name: "lights", Command: "light list"}}
 	}

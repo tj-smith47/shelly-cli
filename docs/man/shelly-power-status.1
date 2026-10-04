@@ -6,24 +6,43 @@ shelly-power-status - Show power meter status
 
 
 .SH SYNOPSIS
-\fBshelly power status  [id] [flags]\fP
+\fBshelly power status [device] [id] [flags]\fP
 
 
 .SH DESCRIPTION
-Show current status of a power meter component.
+Show the live power reading of one component on a device.
 
 .PP
-Displays real-time measurements including voltage, current, power,
-frequency, and accumulated energy.
+Reads whichever component meters power: a PM or PM1 power meter, a
+switch, cover or light that meters its load (Plus 1PM, Plus 2PM, Plus
+Plug, Pro 4PM, dimmers, RGBW PM), an EM or EM1 energy monitor, or the
+meters of a Gen1 device (Shelly 1PM, Plug S, Duo bulbs, EM). Shows
+voltage, current, power, frequency and accumulated energy, as far as
+the component reports them.
+
+.PP
+Without an ID the first component that meters power is shown; 'shelly
+power list' lists them all. Use --type when two component types share
+an ID.
+
+.PP
+With --all, shows every power reading on every registered device as one
+list. Devices that are offline or meter nothing are skipped with a note
+on stderr. With -o json or -o yaml each reading carries name, type, id,
+power (watts) and the full reading under em, em1 or meter.
 
 
 .SH OPTIONS
+\fB-a\fP, \fB--all\fP[=false]
+	Target all registered devices
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for status
 
 .PP
 \fB--type\fP="auto"
-	Component type (auto, pm, pm1)
+	Component type: auto, or one of em, em1, pm, pm1, switch, cover, light, rgb, rgbw, cct, meter (Gen1), emeter (Gen1)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -89,17 +108,23 @@ frequency, and accumulated energy.
 
 .SH EXAMPLE
 .EX
-  # Show power meter status
+  # Show the first power reading of a device
   shelly power status living-room
 
-  # Show specific component by ID
-  shelly power status living-room 0
+  # Show channel 1 of a two-channel switch
+  shelly power status living-room 1
 
-  # Specify component type explicitly
-  shelly power status living-room --type pm1
+  # Pick the component type explicitly
+  shelly power status living-room 0 --type pm1
 
   # Output as JSON for scripting
   shelly power status living-room -o json
+
+  # Read just the power in watts
+  shelly power status living-room -o json | jq '.power'
+
+  # Every power reading on every registered device
+  shelly power status --all
 .EE
 
 

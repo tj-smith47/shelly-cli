@@ -72,10 +72,6 @@ func (a *monitoringAdapter) DeviceStatus(ctx context.Context, identifier string)
 }
 
 // Monitoring returns the monitoring service.
-// The service is lazily initialized on first access.
 func (s *Service) Monitoring() *monitoring.Service {
-	if s.monitoringService == nil {
-		s.monitoringService = monitoring.NewService(&monitoringAdapter{s})
-	}
 	return s.monitoringService
 }

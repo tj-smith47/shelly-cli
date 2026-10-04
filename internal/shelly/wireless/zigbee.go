@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/errutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -186,7 +187,7 @@ func (s *Service) FetchZigbeeStatus(ctx context.Context, device string, ios *ios
 	// Get config
 	cfg, err := s.ZigbeeGetConfig(ctx, device)
 	if err != nil {
-		return status, fmt.Errorf("zigbee not available on this device: %w", err)
+		return status, errutil.NotAvailable("Zigbee", err)
 	}
 	if enable, ok := cfg[keyEnable].(bool); ok {
 		status.Enabled = enable

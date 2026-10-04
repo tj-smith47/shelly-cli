@@ -9,10 +9,15 @@ Reset energy monitor counters
 
 ### Synopsis
 
-Reset energy counters for an EM (3-phase) energy monitor.
+Reset the accumulated energy counters of a component that meters power.
 
-Note: Only EM components support counter reset. EM1 components
-do not have a reset capability.
+Works on EM (3-phase) energy monitors, PM and PM1 power meters, and
+switches, covers and lights that meter their load (Plus 1PM, Plus 2PM,
+Plug, dimmers, RGBW PM). The component is chosen as 'shelly energy
+status' chooses it: the first one that meters power, or the one with
+the given ID and --type.
+
+EM1 energy monitors and Gen1 meters have no counter reset.
 
 ```
 shelly energy reset <device> [id] [flags]
@@ -27,6 +32,9 @@ shelly energy reset <device> [id] [flags]
   # Reset specific counter types
   shelly energy reset shelly-3em-pro 0 --types active,reactive
 
+  # Reset the energy total of switch channel 1 on a Plus 2PM
+  shelly energy reset kitchen 1 --type switch
+
   # Reset with device alias
   shelly energy reset basement-em
 ```
@@ -35,6 +43,7 @@ shelly energy reset <device> [id] [flags]
 
 ```
   -h, --help            help for reset
+      --type string     Component type: auto, or one of em, em1, pm, pm1, switch, cover, light, rgb, rgbw, cct, meter (Gen1), emeter (Gen1) (default "auto")
       --types strings   Counter types to reset (leave empty for all)
 ```
 

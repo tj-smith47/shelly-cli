@@ -40,6 +40,10 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 Shows each device's total energy consumption, average power, and percentage
 of the total consumption. Useful for identifying high-energy consumers.
 
+Energy for the period comes from the history stored by EM and EM1 energy
+monitors. A device without stored history (a Plus 1PM, Plus 2PM or Plug, a
+Gen1 device) is shown with its live power and the note "no historical data".
+
 By default, compares all registered devices. Use --devices to specify a subset.`,
 		Example: `  # Compare all devices for the last day
   shelly energy compare

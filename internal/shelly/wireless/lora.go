@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/errutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -86,7 +87,7 @@ func (s *Service) FetchLoRaFullStatus(ctx context.Context, device string, compon
 	cfgMap, err := s.LoRaGetConfig(ctx, device, componentID)
 	if err != nil {
 		ios.Debug("LoRa.GetConfig failed: %v", err)
-		return full, fmt.Errorf("LoRa not available on this device: %w", err)
+		return full, errutil.NotAvailable("LoRa", err)
 	}
 
 	full.Config = parseLoRaConfig(cfgMap)

@@ -44,7 +44,9 @@ Works with:
   - EM1 components (single-phase energy monitors)
 
 The device must have EMData or EM1Data components that store historical
-measurements. Not all Shelly devices support historical data storage.`,
+measurements. Switches, covers, lights and PM meters (Plus 1PM, Plus 2PM,
+Plug), and Gen1 devices, keep only a running energy total: read it, with
+the live power, using 'shelly energy status <device>'.`,
 		Example: `  # Show last 24 hours of energy data
   shelly energy history shelly-3em-pro
 
@@ -113,6 +115,7 @@ func run(ctx context.Context, opts *Options) error {
 		term.DisplayEM1DataHistory(ios, data, opts.ComponentID, startTS, endTS, opts.Limit)
 		return nil
 	default:
-		return fmt.Errorf("no energy data components found (device may not support historical data storage)")
+		return fmt.Errorf("invalid --type %q (use auto, em or em1): only EM and EM1 energy monitors keep history; "+
+			"for the live reading of any other component use 'shelly energy status %s'", componentType, opts.Device)
 	}
 }

@@ -102,6 +102,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/errutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	mockpkg "github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
@@ -246,7 +247,10 @@ func execute() int {
 			// Exit quietly for signal-based cancellation
 			return 130 // 128 + SIGINT (2)
 		}
-		// Print error with themed coloring: [ERROR]: message
+		// A device without the component a command needs answers "No handler
+		// for <Method>"; every command reports that as "<Component> not
+		// available on this device".
+		err = errutil.NotAvailable("", err)
 		errorLabel := theme.StatusError().Render("[ERROR]")
 		factory.IOStreams().Errorf("%s: %s\n", errorLabel, err.Error())
 		return 1
@@ -554,6 +558,7 @@ func initializeConfig(cmd *cobra.Command, _ []string) error {
 
 	// Handle color settings
 	// Priority: --no-color flag > NO_COLOR env > SHELLY_NO_COLOR env
+	factory.IOStreams().ApplyColorFlags()
 	if iostreams.IsColorDisabled() {
 		lipgloss.Writer.Profile = colorprofile.Ascii
 	}

@@ -2,6 +2,7 @@ package term
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
@@ -274,23 +275,63 @@ func DisplayEM1Status(ios *iostreams.IOStreams, status *model.EM1Status) {
 	}
 }
 
-// DisplayEnergyStatusList shows one row per energy monitor component across
-// devices. A 3-phase EM row has no single voltage, so its Voltage cell is "-".
-func DisplayEnergyStatusList(ios *iostreams.IOStreams, entries []model.EnergyStatusEntry) {
-	builder := table.NewBuilder("Device", "Component", "Voltage", "Current", "Power")
-	for _, e := range entries {
+// MeterLabel returns the display name of a power-reading component type:
+// "EM", "PM1", "RGBW", "Switch", "Meter".
+func MeterLabel(typ string) string {
+	switch typ {
+	case monitoring.EnergyTypeEM, monitoring.EnergyTypeEM1, monitoring.MeterTypePM, monitoring.MeterTypePM1, "rgb", "rgbw", "cct":
+		return strings.ToUpper(typ)
+	case monitoring.MeterTypeGen1EMeter:
+		return "EMeter"
+	case "":
+		return ""
+	}
+	return strings.ToUpper(typ[:1]) + typ[1:]
+}
+
+// DisplayPowerReadingList shows one row per power reading across devices. A
+// 3-phase EM row has no single voltage, so its Voltage cell is "-", and a Gen1
+// meter that reports no voltage or current shows "-" there too.
+func DisplayPowerReadingList(ios *iostreams.IOStreams, readings []model.PowerReading) {
+	builder := table.NewBuilder("Device", "Component", "Voltage", "Current", "Power", "Energy")
+	for _, r := range readings {
+		voltage, current, energy := "-", "-", "-"
 		switch {
-		case e.EM != nil:
-			builder.AddRow(e.Name, fmt.Sprintf("EM #%d", e.ID), "-",
-				fmt.Sprintf("%.2f A", e.EM.TotalCurrent), output.FormatPower(e.Power))
-		case e.EM1 != nil:
-			builder.AddRow(e.Name, fmt.Sprintf("EM1 #%d", e.ID), fmt.Sprintf("%.2f V", e.EM1.Voltage),
-				fmt.Sprintf("%.2f A", e.EM1.Current), output.FormatPower(e.Power))
+		case r.EM != nil:
+			current = fmt.Sprintf("%.2f A", r.EM.TotalCurrent)
+		case r.EM1 != nil:
+			voltage = fmt.Sprintf("%.2f V", r.EM1.Voltage)
+			current = fmt.Sprintf("%.2f A", r.EM1.Current)
+		case r.Meter != nil:
+			if r.Meter.Voltage != 0 {
+				voltage = fmt.Sprintf("%.2f V", r.Meter.Voltage)
+			}
+			if r.Meter.Voltage != 0 || r.Meter.Current != 0 {
+				current = fmt.Sprintf("%.2f A", r.Meter.Current)
+			}
+			if r.Meter.AEnergy != nil {
+				energy = output.FormatEnergy(r.Meter.AEnergy.Total)
+			}
 		}
+		builder.AddRow(r.Name, fmt.Sprintf("%s #%d", MeterLabel(r.Type), r.ID), voltage, current, output.FormatPower(r.Power), energy)
 	}
 
 	tbl := builder.WithModeStyle(ios).Build()
 	if err := tbl.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print energy status table", err)
+		ios.DebugErr("print power reading table", err)
+	}
+}
+
+// DisplayPowerReading shows one power reading in full: the per-phase table of
+// an EM, the single-phase details of an EM1, or the meter details of any other
+// component.
+func DisplayPowerReading(ios *iostreams.IOStreams, r model.PowerReading) {
+	switch {
+	case r.EM != nil:
+		DisplayEMStatus(ios, r.EM)
+	case r.EM1 != nil:
+		DisplayEM1Status(ios, r.EM1)
+	case r.Meter != nil:
+		DisplayPMStatusDetails(ios, r.Meter, r.Type)
 	}
 }

@@ -22,6 +22,13 @@ Supports multiple output formats:
 The exported data includes timestamp, voltage, current, power, and energy
 measurements for the specified time range.
 
+.PP
+Only EM and EM1 energy monitors (such as the Pro 3EM and Pro EM) store
+this history, in their EMData or EM1Data component. Switches, covers,
+lights and PM meters (Plus 1PM, Plus 2PM, Plug), and Gen1 devices, keep
+only a running energy total: read it, with the live power, using
+\&'shelly energy status \&'.
+
 
 .SH OPTIONS
 \fB-f\fP, \fB--format\fP="csv"

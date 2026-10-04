@@ -102,7 +102,7 @@ func TestGetEMDataCSVURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			svc := &Service{resolver: tt.resolver}
+			svc := New(tt.resolver)
 			url, err := svc.GetEMDataCSVURL(tt.device, tt.id, tt.startTS, tt.endTS, tt.addKeys)
 			if tt.wantError {
 				if err == nil {
@@ -211,7 +211,7 @@ func TestGetEM1DataCSVURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			svc := &Service{resolver: tt.resolver}
+			svc := New(tt.resolver)
 			url, err := svc.GetEM1DataCSVURL(tt.device, tt.id, tt.startTS, tt.endTS, tt.addKeys)
 			if tt.wantError {
 				if err == nil {

@@ -450,9 +450,9 @@ func TestExecute_DeleteByID(t *testing.T) {
 	cmd.SetArgs([]string{"test-device", "--id", "1"})
 
 	err = cmd.Execute()
-	// Schedule.Delete is not handled by mock, so it returns "method not found"
-	if err != nil && !strings.Contains(err.Error(), "method not found") {
-		// This is expected to fail with method not found in mock
+	// Schedule.Delete is not handled by mock, so it answers "No handler for"
+	if err != nil && !strings.Contains(err.Error(), "No handler for") {
+		// This is expected to fail with "No handler for" in the mock
 		t.Logf("Execute returned error (expected - mock doesn't support Schedule.Delete): %v", err)
 	}
 }
@@ -494,7 +494,7 @@ func TestExecute_DeleteByIDWithShortFlag(t *testing.T) {
 
 	err = cmd.Execute()
 	// Schedule.Delete is not handled by mock
-	if err != nil && !strings.Contains(err.Error(), "method not found") {
+	if err != nil && !strings.Contains(err.Error(), "No handler for") {
 		t.Logf("Execute returned error (expected in mock): %v", err)
 	}
 }
@@ -726,8 +726,8 @@ func TestExecute_IDFlagWithNumericValue(t *testing.T) {
 			cmd.SetArgs([]string{"test-device", "--id", tt.id})
 
 			err = cmd.Execute()
-			// Expected to fail with method not found in mock
-			if err != nil && !strings.Contains(err.Error(), "method not found") {
+			// Expected to fail with "No handler for" in the mock
+			if err != nil && !strings.Contains(err.Error(), "No handler for") {
 				t.Logf("Execute returned error: %v (expected - mock doesn't support Schedule.Delete)", err)
 			}
 		})

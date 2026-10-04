@@ -198,6 +198,7 @@ func New(resolver DeviceResolver, opts ...ServiceOption) *Service {
 	svc.modbusService = modbus.New(svc)
 	// Initialize provision service
 	svc.provisionService = provision.New(svc)
+	svc.monitoringService = monitoring.NewService(&monitoringAdapter{svc})
 	return svc
 }
 

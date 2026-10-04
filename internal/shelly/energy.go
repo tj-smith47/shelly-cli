@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/tj-smith47/shelly-cli/internal/errutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/monitoring"
 )
@@ -25,68 +26,42 @@ const (
 	periodMonth = "month"
 )
 
-// DetectEnergyComponentByID auto-detects the energy component type by checking
-// which component list contains the given ID. Returns ComponentTypeAuto if no match found.
-// If detection fails, a warning is logged via ios.
-func (s *Service) DetectEnergyComponentByID(ctx context.Context, ios *iostreams.IOStreams, device string, id int) string {
-	emIDs, emErr := s.ListEMComponents(ctx, device)
-	if emErr != nil {
-		ios.DebugErr("list EM components", emErr)
-	}
-	em1IDs, em1Err := s.ListEM1Components(ctx, device)
-	if em1Err != nil {
-		ios.DebugErr("list EM1 components", em1Err)
-	}
-
-	// Check if ID matches EM component
-	for _, emID := range emIDs {
-		if emID == id {
-			return ComponentTypeEM
-		}
-	}
-
-	// Check if ID matches EM1 component
-	for _, em1ID := range em1IDs {
-		if em1ID == id {
-			return ComponentTypeEM1
-		}
-	}
-
-	// Default to first available type
-	if len(emIDs) > 0 {
-		return ComponentTypeEM
-	}
-	if len(em1IDs) > 0 {
-		return ComponentTypeEM1
-	}
-
-	// Detection failed - warn if both list operations returned errors
-	if emErr != nil && em1Err != nil {
-		ios.Warning("Could not detect energy component type: device may be offline or have no energy monitoring")
-	}
-
-	return ComponentTypeAuto
-}
-
-// DetectEnergyComponentType auto-detects whether a device uses EM or EM1 data components.
-// It probes the device for EMData and EM1Data records and returns the appropriate type.
-// Returns an error if no energy data components are found.
+// DetectEnergyComponentType finds which stored-history component, EMData or
+// EM1Data, a device keeps for the given ID. Only EM and EM1 energy monitors
+// keep history; for any other device, Gen1 included, the error says so and names the command
+// that reads its live power and energy totals. An unreachable device returns
+// the connection error.
 func (s *Service) DetectEnergyComponentType(ctx context.Context, ios *iostreams.IOStreams, device string, id int) (string, error) {
-	// Try EMData first
-	emRecords, err := s.GetEMDataRecords(ctx, device, id, nil)
-	if err == nil && emRecords != nil && len(emRecords.Records) > 0 {
+	noHistory := fmt.Errorf("%s keeps no energy history: only EM and EM1 energy monitors "+
+		"(such as the Pro 3EM and Pro EM) store it; for its live power and energy totals "+
+		"use 'shelly energy status %s'", device, device)
+	if dev, err := s.ResolveWithGeneration(ctx, device); err == nil && dev.Generation == 1 {
+		return "", noHistory
+	}
+
+	emRecords, emErr := s.GetEMDataRecords(ctx, device, id, nil)
+	if emErr == nil && emRecords != nil && len(emRecords.Records) > 0 {
 		return ComponentTypeEM, nil
 	}
-	ios.DebugErr("get EMData records", err)
+	ios.DebugErr("get EMData records", emErr)
 
-	// Try EM1Data
-	em1Records, err := s.GetEM1DataRecords(ctx, device, id, nil)
-	if err == nil && em1Records != nil && len(em1Records.Records) > 0 {
+	em1Records, em1Err := s.GetEM1DataRecords(ctx, device, id, nil)
+	if em1Err == nil && em1Records != nil && len(em1Records.Records) > 0 {
 		return ComponentTypeEM1, nil
 	}
-	ios.DebugErr("get EM1Data records", err)
+	ios.DebugErr("get EM1Data records", em1Err)
 
-	return "", fmt.Errorf("no energy data components found")
+	switch {
+	case emErr == nil || em1Err == nil:
+		return "", fmt.Errorf("%s has no stored energy records for component %d yet; "+
+			"for its live power and energy totals use 'shelly energy status %s'", device, id, device)
+	case errutil.IsNotAvailable(emErr) && errutil.IsNotAvailable(em1Err):
+		return "", noHistory
+	case !errutil.IsNotAvailable(em1Err):
+		return "", fmt.Errorf("failed to read energy history: %w", em1Err)
+	default:
+		return "", fmt.Errorf("failed to read energy history: %w", emErr)
+	}
 }
 
 // CalculateTimeRange converts period/from/to flags to Unix timestamps.

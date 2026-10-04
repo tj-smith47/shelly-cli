@@ -4,18 +4,22 @@ List energy monitoring components
 
 ### Synopsis
 
-List all energy monitoring components (EM/EM1) on a device.
+List every component on a device that meters power, with its live reading.
 
-Shows component IDs and types for all energy monitors found on the device.
-EM components are 3-phase monitors (Shelly Pro 3EM, etc.), EM1 components
-are single-phase monitors (Shelly EM, Shelly Plus 1PM, etc.).
+That is any EM (3-phase) or EM1 (single-phase) energy monitor, any PM
+or PM1 power meter, any switch, cover or light that meters its load
+(Plus 1PM, Plus 2PM, Plus Plug, Pro 4PM, dimmers, RGBW PM), and the
+meters of a Gen1 device (Shelly 1PM, Plug S, Duo bulbs, EM). Energy
+monitors are listed first.
 
-Use 'shelly energy status' with a component ID to get real-time readings.
+Use 'shelly energy status' with a component ID for one component in
+full.
 
 Output is formatted as a table by default. Use -o json or -o yaml for
-structured output suitable for scripting.
+structured output; each item carries name, type, id, power (watts) and
+the full reading under em, em1 or meter.
 
-Columns: ID, Type
+Columns: Device, Component, Voltage, Current, Power, Energy
 
 ```
 shelly energy list <device> [flags]
@@ -24,16 +28,16 @@ shelly energy list <device> [flags]
 ### Examples
 
 ```
-  # List energy monitoring components on a device
+  # List the components that meter power on a device
   shelly energy list shelly-3em-pro
 
   # Output as JSON for scripting
   shelly energy list shelly-3em-pro -o json
 
-  # Get IDs of 3-phase monitors
-  shelly energy list shelly-3em-pro -o json | jq -r '.[] | select(.type | contains("3-phase")) | .id'
+  # IDs of the 3-phase monitors
+  shelly energy list shelly-3em-pro -o json | jq -r '.[] | select(.type == "em") | .id'
 
-  # Count total energy components
+  # Count the components that meter power
   shelly energy list shelly-3em-pro -o json | jq length
 
   # Short form

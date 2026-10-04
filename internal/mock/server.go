@@ -640,8 +640,14 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		}
 		result = ds.getEMStatus(state, id)
 
-	case "EM.ResetCounters":
-		// Reset EM counters - return success
+	case "EM.ResetCounters", "PM.ResetCounters", "PM1.ResetCounters", "Switch.ResetCounters",
+		"Cover.ResetCounters", "Light.ResetCounters", "RGB.ResetCounters", "RGBW.ResetCounters":
+		ns, _, _ := strings.Cut(req.Method, ".")
+		key := fmt.Sprintf("%s:%d", strings.ToLower(ns), ds.getIDFromParams(req.Params))
+		if _, ok := state[key]; !ok {
+			ds.writeRPCError(w, req.ID, "component not found: "+key)
+			return
+		}
 		result = map[string]any{}
 
 	case "EM1.GetStatus":
@@ -661,25 +667,27 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		}
 		result = status
 
-	case "EMData.GetRecords":
-		// Return EMData records from device state or default
+	case "EMData.GetRecords", "EMData.GetData", "EM1Data.GetRecords", "EM1Data.GetData":
+		// Only a device with the matching energy monitor stores history; a
+		// Plus 1PM or Plug answers these methods like any unknown one.
+		ns, method, _ := strings.Cut(req.Method, ".")
 		id := ds.getIDFromParams(req.Params)
-		result = ds.getEMDataRecords(state, id)
-
-	case "EMData.GetData":
-		// Return EMData history from device state or default
-		id := ds.getIDFromParams(req.Params)
-		result = ds.getEMDataHistory(state, id)
-
-	case "EM1Data.GetRecords":
-		// Return EM1Data records from device state or default
-		id := ds.getIDFromParams(req.Params)
-		result = ds.getEM1DataRecords(state, id)
-
-	case "EM1Data.GetData":
-		// Return EM1Data history from device state or default
-		id := ds.getIDFromParams(req.Params)
-		result = ds.getEM1DataHistory(state, id)
+		monitor := strings.TrimSuffix(strings.ToLower(ns), "data")
+		_, hasMonitor := state[fmt.Sprintf("%s:%d", monitor, id)]
+		_, hasData := state[fmt.Sprintf("%s:%d", strings.ToLower(ns), id)]
+		switch {
+		case !hasMonitor && !hasData:
+			ds.writeNoHandler(w, req.ID, req.Method)
+			return
+		case ns == "EMData" && method == "GetRecords":
+			result = ds.getEMDataRecords(state, id)
+		case ns == "EMData":
+			result = ds.getEMDataHistory(state, id)
+		case method == "GetRecords":
+			result = ds.getEM1DataRecords(state, id)
+		default:
+			result = ds.getEM1DataHistory(state, id)
+		}
 
 	case "BTHome.GetStatus":
 		// Return BTHome component status from device state
@@ -944,7 +952,8 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		result = map[string]any{"devices": devices}
 
 	default:
-		ds.writeRPCError(w, req.ID, "method not found")
+		// A real Gen2+ device answers a method it does not have this way.
+		ds.writeNoHandler(w, req.ID, req.Method)
 		return
 	}
 
@@ -1055,10 +1064,20 @@ func (ds *DeviceServer) writeRPCResult(w http.ResponseWriter, id int, result any
 }
 
 func (ds *DeviceServer) writeRPCError(w http.ResponseWriter, id int, message string) {
-	w.WriteHeader(http.StatusNotFound)
+	ds.writeRPCErrorStatus(w, http.StatusNotFound, id, -32601, message)
+}
+
+// writeNoHandler answers a method the device does not have the way Gen2+
+// firmware does: HTTP 200 with RPC error code 404 in the body.
+func (ds *DeviceServer) writeNoHandler(w http.ResponseWriter, id int, method string) {
+	ds.writeRPCErrorStatus(w, http.StatusOK, id, http.StatusNotFound, "No handler for "+method)
+}
+
+func (ds *DeviceServer) writeRPCErrorStatus(w http.ResponseWriter, status, id, code int, message string) {
+	w.WriteHeader(status)
 	resp := map[string]any{
 		"id":    id,
-		"error": map[string]any{"code": -32601, "message": message},
+		"error": map[string]any{"code": code, "message": message},
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

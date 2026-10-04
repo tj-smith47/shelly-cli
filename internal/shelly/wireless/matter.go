@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/errutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -18,7 +19,7 @@ func (s *Service) FetchMatterStatus(ctx context.Context, device string, ios *ios
 	cfg, err := s.MatterGetConfig(ctx, device)
 	if err != nil {
 		ios.Debug("Matter.GetConfig failed: %v", err)
-		return status, fmt.Errorf("matter not available on this device: %w", err)
+		return status, errutil.NotAvailable("Matter", err)
 	}
 	status.Enabled = cfg.Enable
 

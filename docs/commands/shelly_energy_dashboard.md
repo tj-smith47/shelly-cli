@@ -7,17 +7,10 @@ Show energy dashboard for all devices
 Display an aggregated energy dashboard showing power consumption across all devices.
 
 Shows total power consumption, per-device breakdown, and optional cost estimation.
-By default, queries all registered devices. Use --devices to specify a subset.
-
-Examples:
-  # Show dashboard for all registered devices
-  shelly energy dashboard
-
-  # Show dashboard for specific devices
-  shelly energy dashboard --devices kitchen,living-room,garage
-
-  # Include cost estimation at $0.12 per kWh
-  shelly energy dashboard --cost 0.12 --currency USD
+Every component that meters power counts: EM and EM1 energy monitors, PM and
+PM1 power meters, switches, covers and lights that meter their load, and the
+meters of Gen1 devices. By default, queries all registered devices. Use
+--devices to specify a subset.
 
 ```
 shelly energy dashboard [flags]

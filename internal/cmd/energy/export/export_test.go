@@ -993,8 +993,8 @@ func TestRun_UnknownComponentType(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for unknown component type")
 	}
-	if !strings.Contains(err.Error(), "no energy data components found") {
-		t.Errorf("Expected 'no energy data components found' error, got: %v", err)
+	if !strings.Contains(err.Error(), "invalid --type") {
+		t.Errorf("Expected 'invalid --type' error, got: %v", err)
 	}
 }
 

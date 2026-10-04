@@ -19,7 +19,9 @@ Works with:
   - EM1 components (single-phase energy monitors)
 
 The device must have EMData or EM1Data components that store historical
-measurements. Not all Shelly devices support historical data storage.
+measurements. Switches, covers, lights and PM meters (Plus 1PM, Plus 2PM,
+Plug), and Gen1 devices, keep only a running energy total: read it, with
+the live power, using 'shelly energy status <device>'.
 
 ```
 shelly energy history <device> [id] [flags]
