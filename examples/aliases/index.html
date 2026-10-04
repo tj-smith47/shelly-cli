@@ -119,14 +119,14 @@ latest
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>home</span>: <span style=color:#f1fa8c>&#34;scene activate home&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Energy logging (shell mode for file output)</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>log-power</span>: <span style=color:#f1fa8c>&#34;!shelly energy status --all -o csv &gt;&gt; ~/shelly-power.csv&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>log-power</span>: <span style=color:#f1fa8c>&#34;!shelly energy status --all -o json | jq -r &#39;.[] | [(now | todate), .name, .power] | @csv&#39; &gt;&gt; ~/shelly-power.csv&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Health checks for monitoring</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>check-all</span>: <span style=color:#f1fa8c>&#34;!shelly device list -o json | jq -e &#39;all(.online)&#39; &gt; /dev/null &amp;&amp; echo OK || echo FAIL&#34;</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>check-offline</span>: <span style=color:#f1fa8c>&#34;!shelly device list -o json | jq -r &#39;.[] | select(.online == false) | .name&#39;&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>check-all</span>: <span style=color:#f1fa8c>&#34;!shelly status -o json | jq -e &#39;all(.online)&#39; &gt; /dev/null &amp;&amp; echo OK || echo FAIL&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>check-offline</span>: <span style=color:#f1fa8c>&#34;!shelly status -o json | jq -r &#39;.[] | select(.online == false) | .name&#39;&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Webhook testing</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>hook-test</span>: <span style=color:#f1fa8c>&#34;webhook server --port 8080 --log&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>hook-test</span>: <span style=color:#f1fa8c>&#34;webhook server --port 8080 --log-json&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Backup automation</span>
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>backup-daily</span>: <span style=color:#f1fa8c>&#34;!shelly backup create --all --dir ~/shelly-backups/$(date +%Y-%m-%d)&#34;</span>
@@ -139,15 +139,15 @@ latest
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>alert-snooze</span>: <span style=color:#f1fa8c>&#34;alert snooze&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Report generation</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>report-daily</span>: <span style=color:#f1fa8c>&#34;!shelly report energy --format json &gt; ~/shelly-reports/energy-$(date +%Y-%m-%d).json&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>report-daily</span>: <span style=color:#f1fa8c>&#34;!shelly report --type energy --format json &gt; ~/shelly-reports/energy-$(date +%Y-%m-%d).json&#34;</span>
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>report-audit</span>: <span style=color:#f1fa8c>&#34;audit --check-firmware --check-auth -o json&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Prometheus metrics export</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>metrics</span>: <span style=color:#f1fa8c>&#34;metrics export prometheus&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>metrics</span>: <span style=color:#f1fa8c>&#34;metrics prometheus&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Party and fun</span>
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>party-mode</span>: <span style=color:#f1fa8c>&#34;party --duration 5m&#34;</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>sleep-mode</span>: <span style=color:#f1fa8c>&#34;sleep --duration 30m&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>sleep-mode</span>: <span style=color:#f1fa8c>&#34;sleep --delay 30m&#34;</span>
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>wake-mode</span>: <span style=color:#f1fa8c>&#34;wake --duration 15m --simulate sunrise&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Conditional operations (shell mode with proper bash syntax)</span>
@@ -213,7 +213,6 @@ latest
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">59
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">60
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">61
-</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">62
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#6272a4># Power User Aliases for Shelly CLI</span>
 </span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
 </span></span><span style=display:flex><span><span style=color:#6272a4># Import: shelly alias import examples/aliases/power-users.yaml</span>
@@ -243,8 +242,8 @@ latest
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>all-off</span>: <span style=color:#f1fa8c>&#34;batch off --all&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Configuration export shortcuts</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cfgx</span>: <span style=color:#f1fa8c>&#34;config export -o yaml&#34;</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cfgj</span>: <span style=color:#f1fa8c>&#34;config export -o json&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cfgx</span>: <span style=color:#f1fa8c>&#34;config show -o yaml&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cfgj</span>: <span style=color:#f1fa8c>&#34;config show -o json&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Firmware check all devices at once</span>
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>fw-check</span>: <span style=color:#f1fa8c>&#34;firmware check --all&#34;</span>
@@ -256,24 +255,23 @@ latest
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>pwr-hist</span>: <span style=color:#f1fa8c>&#34;energy history&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Quick debug/diagnostics</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>methods</span>: <span style=color:#f1fa8c>&#34;debug methods&#34;</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>rpc</span>: <span style=color:#f1fa8c>&#34;debug rpc&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>methods</span>: <span style=color:#f1fa8c>&#34;api methods&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Backup shortcuts</span>
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>bk</span>: <span style=color:#f1fa8c>&#34;backup create&#34;</span>
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>bk-all</span>: <span style=color:#f1fa8c>&#34;backup create --all&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># TUI dashboard access</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>ui</span>: <span style=color:#f1fa8c>&#34;tui dash&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>ui</span>: <span style=color:#f1fa8c>&#34;dash&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Open device web interface</span>
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>web</span>: <span style=color:#f1fa8c>&#34;device ui&#34;</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Shell aliases for JSON filtering (requires jq)</span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># List only online devices</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>online</span>: <span style=color:#f1fa8c>&#34;!shelly device list -o json | jq -r &#39;.[] | select(.online == true) | .name&#39;&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>online</span>: <span style=color:#f1fa8c>&#34;!shelly status -o json | jq -r &#39;.[] | select(.online == true) | .name&#39;&#34;</span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># List only offline devices</span>
-</span></span><span style=display:flex><span>  <span style=color:#ff79c6>offline</span>: <span style=color:#f1fa8c>&#34;!shelly device list -o json | jq -r &#39;.[] | select(.online == false) | .name&#39;&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>offline</span>: <span style=color:#f1fa8c>&#34;!shelly status -o json | jq -r &#39;.[] | select(.online == false) | .name&#39;&#34;</span>
 </span></span><span style=display:flex><span>  <span style=color:#6272a4># Power summary for all devices</span>
 </span></span><span style=display:flex><span>  <span style=color:#ff79c6>pwr-summary</span>: <span style=color:#f1fa8c>&#34;!shelly energy status --all -o json | jq -r &#39;.[] | \&#34;\\(.name): \\(.power // 0)W\&#34;&#39;&#34;</span></span></span></code></pre></td></tr></table></div></div></figure></div><hr><h2 id=shortcutsyaml>shortcuts.yaml</h2><p>Common Shortcut Aliases for Shelly CLI</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2

@@ -10,7 +10,7 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;p&gt;Columns: ID, Name, State (ON/OFF), Color (R:G:B), Brightness (%), Power&lt;/p&gt;</description></item><item><title>shelly rgb off</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/off/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/off/</guid><description>&lt;h2 id="shelly-rgb-off"&gt;shelly rgb off&lt;/h2&gt;
 &lt;p&gt;Turn rgb off&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
-&lt;p&gt;Turn off a rgb component on the specified device.&lt;/p&gt;
+&lt;p&gt;Turn off an rgb component on the specified device.&lt;/p&gt;
 
 
 
@@ -140,7 +140,7 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;/ul&gt;</description></item><item><title>shelly rgb on</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/on/</guid><description>&lt;h2 id="shelly-rgb-on"&gt;shelly rgb on&lt;/h2&gt;
 &lt;p&gt;Turn rgb on&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
-&lt;p&gt;Turn on a rgb component on the specified device.&lt;/p&gt;
+&lt;p&gt;Turn on an rgb component on the specified device.&lt;/p&gt;
 
 
 
@@ -404,7 +404,7 @@ Values not specified will be left unchanged.&lt;/p&gt;
 &lt;/ul&gt;</description></item><item><title>shelly rgb status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/status/</guid><description>&lt;h2 id="shelly-rgb-status"&gt;shelly rgb status&lt;/h2&gt;
 &lt;p&gt;Show rgb status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
-&lt;p&gt;Show the current status of a rgb component on the specified device.&lt;/p&gt;
+&lt;p&gt;Show the current status of an rgb component on the specified device.&lt;/p&gt;
 
 
 
@@ -526,7 +526,7 @@ Values not specified will be left unchanged.&lt;/p&gt;
 &lt;/ul&gt;</description></item><item><title>shelly rgb toggle</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/toggle/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgb/toggle/</guid><description>&lt;h2 id="shelly-rgb-toggle"&gt;shelly rgb toggle&lt;/h2&gt;
 &lt;p&gt;Toggle rgb on/off&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
-&lt;p&gt;Toggle a rgb component on or off on the specified device.&lt;/p&gt;
+&lt;p&gt;Toggle an rgb component on or off on the specified device.&lt;/p&gt;
 
 
 

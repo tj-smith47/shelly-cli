@@ -140,7 +140,15 @@ Use &amp;ndash;dry-run to preview actions without executing them.&lt;/p&gt;
 &lt;li&gt;
 
 &lt;a class="link link--text" href="shelly_scene.md"&gt;shelly scene&lt;/a&gt;	 - Manage device scenes&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly scene create</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/create/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/create/</guid><description>&lt;h2 id="shelly-scene-create"&gt;shelly scene create&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly scene add-action</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/add-action/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/add-action/</guid><description>&lt;h2 id="shelly-scene-add-action"&gt;shelly scene add-action&lt;/h2&gt;
+&lt;p&gt;Add a device action to a scene&lt;/p&gt;
+&lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
+&lt;p&gt;Add a device action to a scene.&lt;/p&gt;
+&lt;p&gt;An action is one RPC call that &amp;lsquo;shelly scene activate&amp;rsquo; sends to a device.
+The method is the RPC method name, and params is its parameters as a JSON
+object. Actions run in the order they were added.&lt;/p&gt;
+&lt;p&gt;The device does not have to be reachable when the action is added: nothing is
+sent until the scene is activated.&lt;/p&gt;</description></item><item><title>shelly scene create</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/create/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/scene/create/</guid><description>&lt;h2 id="shelly-scene-create"&gt;shelly scene create&lt;/h2&gt;
 &lt;p&gt;Create a new scene&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Create a new empty scene.&lt;/p&gt;

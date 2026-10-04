@@ -9,7 +9,7 @@ white channel value, brightness level, and power consumption if supported.&lt;/p
 structured output suitable for scripting.&lt;/p&gt;</description></item><item><title>shelly rgbw off</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgbw/off/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgbw/off/</guid><description>&lt;h2 id="shelly-rgbw-off"&gt;shelly rgbw off&lt;/h2&gt;
 &lt;p&gt;Turn rgbw off&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
-&lt;p&gt;Turn off a rgbw component on the specified device.&lt;/p&gt;
+&lt;p&gt;Turn off an rgbw component on the specified device.&lt;/p&gt;
 
 
 
@@ -139,7 +139,7 @@ structured output suitable for scripting.&lt;/p&gt;</description></item><item><t
 &lt;/ul&gt;</description></item><item><title>shelly rgbw on</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgbw/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgbw/on/</guid><description>&lt;h2 id="shelly-rgbw-on"&gt;shelly rgbw on&lt;/h2&gt;
 &lt;p&gt;Turn rgbw on&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
-&lt;p&gt;Turn on a rgbw component on the specified device.&lt;/p&gt;
+&lt;p&gt;Turn on an rgbw component on the specified device.&lt;/p&gt;
 
 
 
@@ -417,7 +417,7 @@ Values not specified will be left unchanged.&lt;/p&gt;
 &lt;/ul&gt;</description></item><item><title>shelly rgbw status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgbw/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgbw/status/</guid><description>&lt;h2 id="shelly-rgbw-status"&gt;shelly rgbw status&lt;/h2&gt;
 &lt;p&gt;Show rgbw status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
-&lt;p&gt;Show the current status of a rgbw component on the specified device.&lt;/p&gt;
+&lt;p&gt;Show the current status of an rgbw component on the specified device.&lt;/p&gt;
 
 
 
@@ -539,7 +539,7 @@ Values not specified will be left unchanged.&lt;/p&gt;
 &lt;/ul&gt;</description></item><item><title>shelly rgbw toggle</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/rgbw/toggle/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/rgbw/toggle/</guid><description>&lt;h2 id="shelly-rgbw-toggle"&gt;shelly rgbw toggle&lt;/h2&gt;
 &lt;p&gt;Toggle rgbw on/off&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
-&lt;p&gt;Toggle a rgbw component on or off on the specified device.&lt;/p&gt;
+&lt;p&gt;Toggle an rgbw component on or off on the specified device.&lt;/p&gt;
 
 
 

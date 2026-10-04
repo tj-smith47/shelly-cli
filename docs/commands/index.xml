@@ -323,7 +323,7 @@ and controlling Shelly devices on your local network.&lt;/p&gt;
 &lt;a class="link link--text" href="shelly_virtual.md"&gt;shelly virtual&lt;/a&gt;	 - Manage virtual components&lt;/li&gt;
 &lt;li&gt;
 
-&lt;a class="link link--text" href="shelly_wait.md"&gt;shelly wait&lt;/a&gt;	 - Wait for a duration&lt;/li&gt;
+&lt;a class="link link--text" href="shelly_wait.md"&gt;shelly wait&lt;/a&gt;	 - Wait until a device is online or its output is on or off&lt;/li&gt;
 &lt;li&gt;
 
 &lt;a class="link link--text" href="shelly_wake.md"&gt;shelly wake&lt;/a&gt;	 - Turn device on after a delay&lt;/li&gt;

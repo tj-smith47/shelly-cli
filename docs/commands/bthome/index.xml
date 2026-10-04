@@ -154,7 +154,7 @@ device that collects their readings.&lt;/p&gt;
 &lt;p&gt;Shows configured BTHomeDevice components with their current status,
 signal strength (RSSI), battery level, and last update time.&lt;/p&gt;
 &lt;p&gt;Use &amp;lsquo;shelly bthome add&amp;rsquo; to discover and pair new devices.
-Use &amp;lsquo;shelly bthome sensors&amp;rsquo; to view sensor readings.&lt;/p&gt;</description></item><item><title>shelly bthome remove</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/remove/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/remove/</guid><description>&lt;h2 id="shelly-bthome-remove"&gt;shelly bthome remove&lt;/h2&gt;
+Use &amp;lsquo;shelly bthome status &lt;device&gt; &lt;id&gt;&amp;rsquo; to view the readings of one device.&lt;/p&gt;</description></item><item><title>shelly bthome remove</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/remove/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/remove/</guid><description>&lt;h2 id="shelly-bthome-remove"&gt;shelly bthome remove&lt;/h2&gt;
 &lt;p&gt;Remove a BTHome device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Remove a BTHome device from a Shelly gateway.&lt;/p&gt;
@@ -332,7 +332,7 @@ BTHomeDevice including signal strength, battery, and known objects.&lt;/p&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly bthome status living-room 200
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; # Output as JSON
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly bthome status living-room 200 --json&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; shelly bthome status living-room 200 -o json&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;
  &lt;/figure&gt;
@@ -352,7 +352,7 @@ BTHomeDevice including signal strength, battery, and known objects.&lt;/p&gt;
 &lt;/span&gt;&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"&gt;2
 &lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%"&gt;
-&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-fallback" data-lang="fallback"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -f, --format string Output format: text, json (default &amp;#34;text&amp;#34;)
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-fallback" data-lang="fallback"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -f, --format string Output format: text, json, yaml (default &amp;#34;text&amp;#34;)
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; -h, --help help for status&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;
