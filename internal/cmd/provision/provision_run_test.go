@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-go/reprovision"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -716,5 +717,55 @@ func TestNewCommand_DisableAPExcludesBLEOnly(t *testing.T) {
 	err := cmd.ExecuteContext(provisionTestCtx(t))
 	if err == nil || !strings.Contains(err.Error(), "disable-ap") {
 		t.Fatalf("error = %v, want a mutually-exclusive error naming disable-ap", err)
+	}
+}
+
+// TestRun_ConfirmGate: without a terminal and without --yes, discovered devices
+// are never provisioned; --all --yes provisions them all without a prompt.
+func TestRun_ConfirmGate(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name    string
+		opts    Options
+		wantErr bool
+		calls   int
+	}{
+		{name: "no --yes", opts: Options{SSID: testSSID, Password: "secret"}, wantErr: true},
+		{name: "--all without --yes", opts: Options{SSID: testSSID, Password: "secret", All: true}, wantErr: true},
+		{name: "--all --yes", opts: Options{SSID: testSSID, Password: "secret", All: true, Yes: true}, calls: 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tf := factory.NewTestFactory(t)
+			var bleCalls int
+			stub := &stubProvisionService{
+				discover: func(context.Context, *shelly.OnboardOptions, func(shelly.OnboardProgress)) ([]shelly.OnboardDevice, error) {
+					return []shelly.OnboardDevice{bleDevice("bulb1"), bleDevice("bulb2")}, nil
+				},
+				onboardBLE: func(_ context.Context, devices []*shelly.OnboardDevice, _ *shelly.OnboardWiFiConfig, _ *shelly.OnboardOptions) []*shelly.OnboardResult {
+					bleCalls++
+					results := make([]*shelly.OnboardResult, 0, len(devices))
+					for _, d := range devices {
+						results = append(results, &shelly.OnboardResult{Device: d, NewAddress: "10.0.0.50"})
+					}
+					return results
+				},
+			}
+			opts := tt.opts
+			opts.Factory = tf.Factory
+			opts.svc = stub
+
+			err := run(provisionTestCtx(t), &opts)
+			if tt.wantErr {
+				if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+					t.Fatalf("error = %v, want ErrConfirmationRequired", err)
+				}
+			} else if err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			if bleCalls != tt.calls {
+				t.Errorf("onboard calls = %d, want %d", bleCalls, tt.calls)
+			}
+		})
 	}
 }

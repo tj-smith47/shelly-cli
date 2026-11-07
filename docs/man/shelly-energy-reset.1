@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-energy-reset - Reset energy monitor counters
@@ -34,6 +34,10 @@ EM1 energy monitors and Gen1 meters have no counter reset.
 .PP
 \fB--types\fP=[]
 	Counter types to reset (leave empty for all)
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -110,6 +114,9 @@ EM1 energy monitors and Gen1 meters have no counter reset.
 
   # Reset with device alias
   shelly energy reset basement-em
+
+  # Skip the confirmation prompt (scripts)
+  shelly energy reset basement-em --yes
 .EE
 
 

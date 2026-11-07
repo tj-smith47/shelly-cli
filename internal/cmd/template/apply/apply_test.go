@@ -3,6 +3,7 @@ package apply
 import (
 	"bytes"
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -1381,13 +1382,7 @@ func TestRun_ConfirmationDeclined(t *testing.T) {
 	cmd.SetArgs([]string{"decline-template", "test-device"})
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Errorf("Execute error: %v", err)
-	}
-
-	// Should show "Cancelled" message
-	output := tf.TestIO.Out.String()
-	if !containsSubstring(output, "Cancelled") {
-		t.Logf("expected 'Cancelled' in output, got: %q", output)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Errorf("Execute error = %v, want cmdutil.ErrConfirmationRequired", err)
 	}
 }

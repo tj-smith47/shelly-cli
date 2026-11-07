@@ -21,6 +21,9 @@ shelly thermostat schedule delete <device> [flags]
 
   # Delete all schedules
   shelly thermostat schedule delete gateway --all
+
+  # Skip the confirmation prompt (scripts)
+  shelly thermostat schedule delete gateway --id 1 --yes
 ```
 
 ### Options
@@ -29,6 +32,7 @@ shelly thermostat schedule delete <device> [flags]
       --all      Delete all schedules
   -h, --help     help for delete
       --id int   Schedule ID to delete
+  -y, --yes      Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

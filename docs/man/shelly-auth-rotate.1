@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-auth-rotate - Rotate device credentials
@@ -50,6 +50,10 @@ device does not accept it. A generated password is shown only with --show.
 .PP
 \fB--user\fP=""
 	Username: any name on Gen1, where it defaults to the stored user or admin; Gen2+ devices allow only admin
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -129,6 +133,9 @@ device does not accept it. A generated password is shown only with --show.
 
   # Use specific password length
   shelly auth rotate living-room --generate --length 24
+
+  # Skip the confirmation prompt (scripts)
+  shelly auth rotate living-room --generate --yes
 .EE
 
 

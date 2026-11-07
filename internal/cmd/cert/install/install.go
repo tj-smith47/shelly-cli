@@ -3,10 +3,12 @@ package install
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -17,6 +19,7 @@ type Options struct {
 	ClientCert string
 	ClientKey  string
 	Device     string
+	Yes        bool
 }
 
 // NewCommand creates the cert install command.
@@ -35,7 +38,10 @@ as well as client certificates for mutual TLS authentication.`,
   shelly cert install kitchen --ca /path/to/ca.pem
 
   # Install client certificate and key
-  shelly cert install kitchen --client-cert cert.pem --client-key key.pem`,
+  shelly cert install kitchen --client-cert cert.pem --client-key key.pem
+
+  # Skip the confirmation prompt (scripts)
+  shelly cert install kitchen --ca ca.pem --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
@@ -46,6 +52,7 @@ as well as client certificates for mutual TLS authentication.`,
 	cmd.Flags().StringVar(&opts.CAFile, "ca", "", "CA certificate file (PEM format)")
 	cmd.Flags().StringVar(&opts.ClientCert, "client-cert", "", "Client certificate file (PEM format)")
 	cmd.Flags().StringVar(&opts.ClientKey, "client-key", "", "Client private key file (PEM format)")
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	return cmd
 }
@@ -64,8 +71,17 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Install the certificate on %s? This replaces any certificate the device already holds", opts.Device), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
+	}
+
 	var result shelly.CertInstallResult
-	err := cmdutil.RunWithSpinner(ctx, ios, "Installing certificate...", func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, "Installing certificate...", func(ctx context.Context) error {
 		var installErr error
 		result, installErr = svc.InstallCert(ctx, opts.Device, spec)
 		return installErr

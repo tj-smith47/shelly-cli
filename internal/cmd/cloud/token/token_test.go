@@ -330,7 +330,7 @@ func TestRun_NotLoggedIn(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)
@@ -364,7 +364,7 @@ func TestRun_InvalidToken(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)
@@ -396,7 +396,7 @@ func TestRun_ValidToken_TTY(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 	ios.SetStdoutTTY(true)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)
@@ -449,7 +449,7 @@ func TestRun_ValidToken_NonTTY(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 	ios.SetStdoutTTY(false)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)
@@ -488,7 +488,7 @@ func TestRun_ExpiredToken_TTY(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 	ios.SetStdoutTTY(true)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)
@@ -530,7 +530,7 @@ func TestRun_TokenWithoutExpiry(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 	ios.SetStdoutTTY(true)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)
@@ -567,7 +567,7 @@ func TestRun_TokenWithoutServerURL(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 	ios.SetStdoutTTY(true)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)
@@ -596,6 +596,7 @@ func TestExecute_NotLoggedIn(t *testing.T) {
 	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 	cmd := NewCommand(tf.Factory)
 
 	cmd.SetOut(tf.TestIO.Out)
@@ -623,6 +624,7 @@ func TestExecute_ValidToken(t *testing.T) {
 	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 	tf.TestIO.SetStdoutTTY(true)
 	cmd := NewCommand(tf.Factory)
 
@@ -671,6 +673,7 @@ func TestExecute_InvalidToken(t *testing.T) {
 	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 	cmd := NewCommand(tf.Factory)
 
 	cmd.SetOut(tf.TestIO.Out)
@@ -694,6 +697,7 @@ func TestExecute_ExpiredToken(t *testing.T) {
 	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 	tf.TestIO.SetStdoutTTY(true)
 	cmd := NewCommand(tf.Factory)
 
@@ -732,7 +736,7 @@ func TestRun_ShortToken_TTY(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 	ios.SetStdoutTTY(true)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)
@@ -769,7 +773,7 @@ func TestRun_TokenWithClipboardHint(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 	ios.SetStdoutTTY(true)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)
@@ -798,7 +802,7 @@ func TestRun_WithIOStreams(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	// This will fail because no config, but it exercises the run function
 	opts := &Options{Factory: f}
@@ -830,6 +834,7 @@ func TestExecute_NonTTY_FullToken(t *testing.T) {
 	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 	tf.TestIO.SetStdoutTTY(false)
 	cmd := NewCommand(tf.Factory)
 
@@ -870,7 +875,7 @@ func TestRun_TokenMinimalClaims(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 	ios.SetStdoutTTY(true)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)
@@ -902,6 +907,7 @@ func TestExecute_WithContext(t *testing.T) {
 	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 	tf.TestIO.SetStdoutTTY(true)
 	cmd := NewCommand(tf.Factory)
 
@@ -942,7 +948,7 @@ func TestRun_LongToken_Truncation(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 	ios.SetStdoutTTY(true)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	opts := &Options{Factory: f}
 	err := run(opts)

@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-thermostat-schedule-delete - Delete a thermostat schedule
@@ -28,6 +28,10 @@ Use --all to delete all schedules (use with caution).
 .PP
 \fB--id\fP=0
 	Schedule ID to delete
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -98,6 +102,9 @@ Use --all to delete all schedules (use with caution).
 
   # Delete all schedules
   shelly thermostat schedule delete gateway --all
+
+  # Skip the confirmation prompt (scripts)
+  shelly thermostat schedule delete gateway --id 1 --yes
 .EE
 
 

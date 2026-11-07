@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-cloud-logout - Clear cloud credentials
@@ -20,6 +20,10 @@ You will need to login again to use cloud commands.
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
 	help for logout
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -87,6 +91,9 @@ You will need to login again to use cloud commands.
 .EX
   # Logout from Shelly Cloud
   shelly cloud logout
+
+  # Skip the confirmation prompt (scripts)
+  shelly cloud logout --yes
 .EE
 
 

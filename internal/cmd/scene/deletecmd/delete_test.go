@@ -2,6 +2,7 @@ package deletecmd
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -295,18 +296,12 @@ func TestExecute_DeleteCancelled(t *testing.T) {
 	cmd := NewCommand(f)
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
-	// Without --yes flag, in non-TTY mode confirmation returns false
+	// Without --yes and without a terminal the delete refuses with an error.
 	cmd.SetArgs([]string{"movie-night"})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	// Verify cancellation message
-	output := out.String()
-	if !strings.Contains(output, "cancelled") {
-		t.Errorf("expected 'cancelled' in output, got: %s", output)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("Execute error = %v, want ErrConfirmationRequired", err)
 	}
 
 	// Verify scene is NOT removed from config

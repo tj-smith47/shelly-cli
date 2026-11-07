@@ -96,9 +96,12 @@ type NetworkFlags struct {
 	Password string
 	Open     bool
 	StaticIP string
-	Gateway  string
-	Netmask  string
-	DNS      string
+	// CopyBackupAddress is set by migrate: the source's static address moves
+	// to the target instead of the target keeping its own.
+	CopyBackupAddress bool
+	Gateway           string
+	Netmask           string
+	DNS               string
 }
 
 // Validate refuses flag combinations that cannot apply. With skipNetwork no
@@ -129,17 +132,18 @@ func (n *NetworkFlags) Validate(skipNetwork bool) error {
 // Override returns the network override the flags describe, or nil when none
 // was given.
 func (n *NetworkFlags) Override() *backup.NetworkOverride {
-	if n.StaticIP == "" && n.SSID == "" && n.Password == "" && !n.Open {
+	if n.StaticIP == "" && n.SSID == "" && n.Password == "" && !n.Open && !n.CopyBackupAddress {
 		return nil
 	}
 	return &backup.NetworkOverride{
-		SSID:     n.SSID,
-		Password: n.Password,
-		Open:     n.Open,
-		StaticIP: n.StaticIP,
-		Gateway:  n.Gateway,
-		Netmask:  n.Netmask,
-		DNS:      n.DNS,
+		SSID:              n.SSID,
+		Password:          n.Password,
+		Open:              n.Open,
+		StaticIP:          n.StaticIP,
+		Gateway:           n.Gateway,
+		Netmask:           n.Netmask,
+		DNS:               n.DNS,
+		CopyBackupAddress: n.CopyBackupAddress,
 	}
 }
 

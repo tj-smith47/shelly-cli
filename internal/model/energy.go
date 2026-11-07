@@ -207,16 +207,16 @@ type MeterReading interface {
 }
 
 // GetPower returns the active power.
-func (s *PMStatus) GetPower() float64 { return s.APower }
+func (s PMStatus) GetPower() float64 { return s.APower }
 
 // GetVoltage returns the voltage.
-func (s *PMStatus) GetVoltage() float64 { return s.Voltage }
+func (s PMStatus) GetVoltage() float64 { return s.Voltage }
 
 // GetCurrent returns the current.
-func (s *PMStatus) GetCurrent() float64 { return s.Current }
+func (s PMStatus) GetCurrent() float64 { return s.Current }
 
 // GetEnergy returns the total energy if available.
-func (s *PMStatus) GetEnergy() *float64 {
+func (s PMStatus) GetEnergy() *float64 {
 	if s.AEnergy == nil {
 		return nil
 	}
@@ -224,7 +224,7 @@ func (s *PMStatus) GetEnergy() *float64 {
 }
 
 // GetFreq returns the frequency if available.
-func (s *PMStatus) GetFreq() *float64 { return s.Freq }
+func (s PMStatus) GetFreq() *float64 { return s.Freq }
 
 // GetPower returns the total active power.
 func (s *EMStatus) GetPower() float64 { return s.TotalActivePower }

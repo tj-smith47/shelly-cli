@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision/inspect"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision/wifi"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -62,6 +63,7 @@ type Options struct {
 	APOnly        bool
 	NoCloud       bool
 	DisableAP     bool
+	All           bool
 	Yes           bool
 	DiscoverOnly  bool
 
@@ -143,6 +145,9 @@ To register already-networked devices, use: shelly discover --register`,
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
 
+  # Provision every discovered device from a script (no selection, no prompt)
+  shelly provision --ssid MyNetwork --password secret --all --yes
+
   # Join a network that has no password
   shelly provision --ssid GuestWiFi --open --yes
 
@@ -183,8 +188,8 @@ To register already-networked devices, use: shelly discover --register`,
 	cmd.Flags().StringVar(&opts.FromTemplate, "from-template", "", "Apply saved template after provisioning")
 	cmd.Flags().BoolVar(&opts.NoCloud, "no-cloud", false, "Disable cloud on provisioned devices")
 	cmd.Flags().BoolVar(&opts.DisableAP, "disable-ap", false, "Turn off a Gen2+ device's access point once it answers on the LAN (WiFi AP onboarding)")
-	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompts")
-	cmd.Flags().BoolVar(&opts.Yes, "all", false, "Provision all discovered devices (non-interactive)")
+	flags.AddYesFlag(cmd, &opts.Yes)
+	cmd.Flags().BoolVar(&opts.All, "all", false, "Provision every discovered device instead of choosing from a list")
 	cmd.Flags().StringVar(&opts.StaticIP, "static-ip", "", "Assign a static IP to the device (requires --gateway and --netmask)")
 	cmd.Flags().StringVar(&opts.Gateway, "gateway", "", "Gateway for the static IP")
 	cmd.Flags().StringVar(&opts.Netmask, "netmask", "", "Netmask for the static IP (e.g. 255.255.254.0)")
@@ -249,6 +254,15 @@ func run(ctx context.Context, opts *Options) error {
 	}
 	if len(selected) == 0 {
 		ios.Info("No devices selected")
+		return nil
+	}
+
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Provision %d device(s) onto %s?", len(selected), opts.SSID), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
 		return nil
 	}
 
@@ -320,10 +334,10 @@ func (o *Options) buildWiFiConfig() *shelly.OnboardWiFiConfig {
 
 // selectDevices resolves which discovered devices to provision. With --target-ap
 // it returns the single device whose AP SSID matches (non-interactive); otherwise
-// it runs the interactive multi-select (bypassed by --yes/--all).
+// it runs the interactive multi-select (bypassed by --all).
 func (o *Options) selectDevices(devices []shelly.OnboardDevice) ([]shelly.OnboardDevice, error) {
 	if o.TargetAP == "" {
-		return term.SelectOnboardDevices(o.Factory.IOStreams(), devices, o.Yes)
+		return term.SelectOnboardDevices(o.Factory.IOStreams(), devices, o.All)
 	}
 	device, ok := shelly.FindByAP(devices, o.TargetAP)
 	if !ok {

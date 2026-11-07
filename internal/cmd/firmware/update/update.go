@@ -10,7 +10,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -103,7 +102,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	cfg, err := config.Load()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}

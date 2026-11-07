@@ -5,7 +5,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -43,7 +42,10 @@ Displays whether you're logged in, your email, and token validity.`,
 func run(opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
-	cfg := config.Get()
+	cfg, err := opts.Factory.Config()
+	if err != nil {
+		return err
+	}
 
 	ios.Title("Cloud Authentication Status")
 	ios.Println()

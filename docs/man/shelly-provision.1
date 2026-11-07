@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-provision - Discover and provision new Shelly devices
@@ -60,7 +60,7 @@ To register already-networked devices, use: shelly discover --register
 
 .SH OPTIONS
 \fB--all\fP[=false]
-	Provision all discovered devices (non-interactive)
+	Provision every discovered device instead of choosing from a list
 
 .PP
 \fB--ap-only\fP[=false]
@@ -144,7 +144,7 @@ To register already-networked devices, use: shelly discover --register
 
 .PP
 \fB-y\fP, \fB--yes\fP[=false]
-	Skip confirmation prompts
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -221,6 +221,9 @@ To register already-networked devices, use: shelly discover --register
 
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
+
+  # Provision every discovered device from a script (no selection, no prompt)
+  shelly provision --ssid MyNetwork --password secret --all --yes
 
   # Join a network that has no password
   shelly provision --ssid GuestWiFi --open --yes

@@ -19,6 +19,10 @@ its own. A station on another network is written with the password stored on
 this host for it; with no stored password it is left out with a warning, and
 the network can be set with 'shelly wifi set'.
 
+--push overwrites device configuration, so it asks for confirmation first;
+pass --yes to skip the prompt (required when there is no terminal, such as in
+a script). --dry-run never prompts.
+
 ```
 shelly sync [flags]
 ```
@@ -34,6 +38,9 @@ shelly sync [flags]
 
   # Preview sync without making changes
   shelly sync --pull --dry-run
+
+  # Push from a script (no confirmation prompt)
+  shelly sync --push --yes
 ```
 
 ### Options
@@ -44,6 +51,7 @@ shelly sync [flags]
   -h, --help             help for sync
       --pull             Pull device configs to local storage
       --push             Push local configs to devices
+  -y, --yes              Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

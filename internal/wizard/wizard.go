@@ -65,7 +65,7 @@ func Run(ctx context.Context, f *cmdutil.Factory, rootCmd *cobra.Command, opts *
 
 	PrintWelcome(ios)
 
-	shouldContinue, err := CheckAndConfirmConfig(ios, opts)
+	shouldContinue, err := CheckAndConfirmConfig(f, opts)
 	if err != nil {
 		return err
 	}

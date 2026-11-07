@@ -2,15 +2,19 @@
 package logout
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
+	Yes     bool
 }
 
 // NewCommand creates the cloud logout command.
@@ -26,11 +30,16 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 This removes your access token and email from the local configuration.
 You will need to login again to use cloud commands.`,
 		Example: `  # Logout from Shelly Cloud
-  shelly cloud logout`,
+  shelly cloud logout
+
+  # Skip the confirmation prompt (scripts)
+  shelly cloud logout --yes`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return run(opts)
 		},
 	}
+
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	return cmd
 }
@@ -38,7 +47,10 @@ You will need to login again to use cloud commands.`,
 func run(opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
-	cfg := config.Get()
+	cfg, err := opts.Factory.Config()
+	if err != nil {
+		return err
+	}
 
 	// Check if we're logged in
 	if cfg.Cloud.AccessToken == "" {
@@ -47,6 +59,19 @@ func run(opts *Options) error {
 	}
 
 	email := cfg.Cloud.Email
+
+	what := "Log out from Shelly Cloud and forget the stored token?"
+	if email != "" {
+		what = fmt.Sprintf("Log out %s from Shelly Cloud and forget the stored token?", email)
+	}
+	confirmed, err := opts.Factory.ConfirmAction(what, opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
+	}
 
 	// Clear credentials
 	cfg.Cloud.Enabled = false

@@ -2,6 +2,7 @@ package remove
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -296,7 +297,7 @@ func TestExecute_Success(t *testing.T) {
 	cmd := NewCommand(f)
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
-	cmd.SetArgs([]string{"testplugin"})
+	cmd.SetArgs([]string{"testplugin", "--yes"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -340,7 +341,7 @@ func TestExecute_OldFormat(t *testing.T) {
 	cmd := NewCommand(f)
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
-	cmd.SetArgs([]string{"oldplugin"})
+	cmd.SetArgs([]string{"oldplugin", "--yes"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -438,7 +439,7 @@ func TestRun_Success(t *testing.T) {
 	ios := iostreams.Test(nil, stdout, stderr)
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	opts := &Options{Factory: f, Name: "testrun"}
+	opts := &Options{Factory: f, Name: "testrun", Yes: true}
 	err := run(opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -493,5 +494,32 @@ func TestPluginsConstants(t *testing.T) {
 
 	if plugins.PluginPrefix != "shelly-" {
 		t.Errorf("PluginPrefix = %q, want %q", plugins.PluginPrefix, "shelly-")
+	}
+}
+
+func TestRun_ConfirmGate(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
+	pluginDir := testPluginsDir + "/shelly-gateplugin"
+	if err := afero.WriteFile(fs, pluginDir+"/shelly-gateplugin", []byte("#!/bin/bash\necho test"), 0o750); err != nil {
+		t.Fatalf("failed to create plugin file: %v", err)
+	}
+	f := cmdutil.NewFactory().SetIOStreams(iostreams.Test(nil, &bytes.Buffer{}, &bytes.Buffer{}))
+
+	err := run(&Options{Factory: f, Name: "gateplugin"})
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("no terminal, no --yes: error = %v, want ErrConfirmationRequired", err)
+	}
+	if _, err := fs.Stat(pluginDir); err != nil {
+		t.Fatal("plugin removed without confirmation")
+	}
+
+	if err := run(&Options{Factory: f, Name: "gateplugin", Yes: true}); err != nil {
+		t.Fatalf("--yes: error = %v", err)
+	}
+	if _, err := fs.Stat(pluginDir); !os.IsNotExist(err) {
+		t.Fatal("plugin still present after --yes")
 	}
 }

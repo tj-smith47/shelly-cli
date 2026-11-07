@@ -397,8 +397,11 @@ func TestRun_Gen2Device(t *testing.T) {
 
 	// Give it a moment to connect and print device info
 	select {
-	case <-done:
+	case runErr := <-done:
 		// Command completed before we could verify output
+		if runErr != nil {
+			t.Logf("run returned: %v", runErr)
+		}
 		output := stdout.String() + stderr.String()
 		// Should have connected and shown device info
 		if !strings.Contains(output, "Connected to") && !strings.Contains(output, "Shelly") {

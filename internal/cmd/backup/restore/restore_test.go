@@ -730,7 +730,7 @@ func TestRun_RestoreBackupFails(t *testing.T) {
 
 	// TEST-NET-1 device: run reaches the RestoreBackup call (covering the full
 	// non-dry-run, non-AP body) and fails dialing the unreachable device.
-	opts := &Options{Factory: tf.Factory, Device: "192.0.2.30", FilePath: backupFile}
+	opts := &Options{Factory: tf.Factory, Device: "192.0.2.30", FilePath: backupFile, Yes: true}
 	err := run(ctx, opts)
 	if err == nil {
 		t.Fatal("expected restore to fail against an unreachable device")
@@ -756,7 +756,7 @@ func TestRun_ToAP_RestoreViaAPFails(t *testing.T) {
 	// reprovision flows refuse to reach the network, so the restore fails
 	// before any host WiFi hop is attempted.
 	opts := &Options{Factory: tf.Factory, Device: "dst", FilePath: backupFile, ToAP: "ShellyBulbDuo-AABBCC",
-		SSID: "home", Password: "pw"}
+		SSID: "home", Password: "pw", Yes: true}
 	err := run(ctx, opts)
 	if err == nil {
 		t.Fatal("expected restore-via-AP to fail")
@@ -840,7 +840,7 @@ func TestRun_TraceFileOpenError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	opts := &Options{Factory: tf.Factory, Device: "dst", FilePath: backupFile, TraceFile: "/test/trace.log"}
+	opts := &Options{Factory: tf.Factory, Device: "dst", FilePath: backupFile, TraceFile: "/test/trace.log", Yes: true}
 	err := run(ctx, opts)
 	if err == nil {
 		t.Fatal("expected run to fail opening a trace file over a directory")

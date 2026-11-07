@@ -91,6 +91,14 @@ func (r *mockResolver) Resolve(identifier string) (model.Device, error) {
 	return r.mgr.ResolveDevice(identifier)
 }
 
+func (r *mockResolver) GetDevice(name string) (model.Device, bool) {
+	return r.mgr.GetDevice(name)
+}
+
+func (r *mockResolver) SetDeviceAuth(name, username, password string) error {
+	return r.mgr.SetDeviceAuth(name, username, password)
+}
+
 func (r *mockResolver) ResolveWithGeneration(_ context.Context, identifier string) (model.Device, error) {
 	return r.mgr.ResolveDevice(identifier)
 }

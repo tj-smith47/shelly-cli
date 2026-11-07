@@ -18,7 +18,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Import a scene definition from a file.
 
 Format is auto-detected from file extension (.json, .yaml, .yml).
-Use --name to override the scene name from the file.`,
+Use --name to override the scene name from the file, and --force to replace
+a scene that already has that name.`,
 		Example: `  # Import from YAML file
   shelly scene import scene.yaml
 
@@ -28,11 +29,11 @@ Use --name to override the scene name from the file.`,
   # Import with different name
   shelly scene import scene.yaml --name my-scene
 
-  # Overwrite existing scene
-  shelly scene import scene.yaml --overwrite`,
+  # Replace an existing scene with the same name
+  shelly scene import scene.yaml --force`,
 		SupportsNameArg: false,
 		NameFlagEnabled: true,
-		ForceFlagName:   "overwrite",
+		ForceFlagAlias:  "overwrite",
 		Importer:        config.ImportSceneFromFile,
 	})
 }

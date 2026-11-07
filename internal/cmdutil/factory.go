@@ -471,13 +471,27 @@ func (f *Factory) ExpandTargets(args []string, groupName string, all bool) ([]st
 // Confirmation Helpers
 // =============================================================================
 
-// ConfirmAction prompts for confirmation, respecting the yes flag.
-// Returns true if confirmed (or yes is true), false otherwise.
+// ErrConfirmationRequired is returned by ConfirmAction when a command that
+// changes or destroys state runs without a terminal to ask on and without
+// --yes. Scripts must opt in explicitly; a silent "no" would exit 0 having done
+// nothing, and a silent "yes" would destroy state nobody confirmed.
+var ErrConfirmationRequired = errors.New("confirmation required: re-run with --yes (no terminal to prompt on)")
+
+// ConfirmAction is the one confirmation gate for commands that delete,
+// overwrite or reset state. With yes set it returns true without asking. On a
+// terminal it prompts and returns the answer (false means the user declined;
+// callers report "Cancelled" and return nil). Without a terminal it returns
+// ErrConfirmationRequired, so the command exits non-zero instead of silently
+// doing nothing.
 func (f *Factory) ConfirmAction(message string, yes bool) (bool, error) {
 	if yes {
 		return true, nil
 	}
-	return f.IOStreams().Confirm(message, false)
+	ios := f.IOStreams()
+	if !ios.CanPrompt() {
+		return false, ErrConfirmationRequired
+	}
+	return ios.Confirm(message, false)
 }
 
 // =============================================================================

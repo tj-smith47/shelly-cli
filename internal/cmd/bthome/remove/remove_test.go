@@ -2,6 +2,7 @@ package remove
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -253,18 +254,12 @@ func TestRun_Cancelled(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	// Don't use --yes so confirmation is required
-	// In non-TTY mode (test mode), confirmation returns false by default
+	// Test streams are not a terminal, so the gate refuses.
 	cmd.SetArgs([]string{"test-device", "200"})
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-
-	// Should show "Operation cancelled" - Info() goes to stdout
-	output := tf.OutString()
-	if !strings.Contains(output, "cancelled") {
-		t.Errorf("Output = %q, want to contain 'cancelled'", output)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Errorf("Execute() error = %v, want cmdutil.ErrConfirmationRequired", err)
 	}
 }
 

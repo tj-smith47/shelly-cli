@@ -3,6 +3,7 @@ package sync
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -306,6 +307,7 @@ func TestRun_PushNoSyncDir(t *testing.T) {
 	opts := &Options{
 		Factory: f,
 		Push:    true,
+		Yes:     true,
 	}
 
 	err := run(context.Background(), opts)
@@ -414,6 +416,7 @@ func TestRun_PushSpecificDevices(t *testing.T) {
 		Factory: f,
 		Devices: []string{"living-room"},
 		Push:    true,
+		Yes:     true,
 	}
 
 	// Use short timeout to prevent hanging on network operations
@@ -504,5 +507,41 @@ func TestNewCommand_Args(t *testing.T) {
 	// Just verify the command is set up correctly
 	if cmd.Use != "sync" {
 		t.Errorf("Use = %q, want %q", cmd.Use, "sync")
+	}
+}
+
+// TestRun_PushRefusesWithoutYes proves the --push confirmation gate: without
+// --yes and without a terminal run returns ErrConfirmationRequired before the
+// push header is printed; --dry-run and --yes both reach the push.
+func TestRun_PushRefusesWithoutYes(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", "/test/config")
+
+	execute := func(opts Options) (string, error) {
+		var stdout, stderr testutil.SafeBuffer
+		ios := iostreams.Test(nil, &stdout, &stderr)
+		opts.Factory = cmdutil.NewWithIOStreams(ios)
+		opts.Push = true
+		err := run(context.Background(), &opts)
+		return stdout.String() + stderr.String(), err
+	}
+
+	out, err := execute(Options{})
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("run error = %v, want ErrConfirmationRequired", err)
+	}
+	if strings.Contains(out, "Pushing") {
+		t.Fatalf("push started without confirmation: %q", out)
+	}
+
+	for _, opts := range []Options{{DryRun: true}, {Yes: true}} {
+		out, err := execute(opts)
+		if errors.Is(err, cmdutil.ErrConfirmationRequired) {
+			t.Fatalf("run(%+v) hit the confirmation gate", opts)
+		}
+		if !strings.Contains(out, "Pushing") {
+			t.Fatalf("run(%+v) output = %q, want the push header", opts, out)
+		}
 	}
 }

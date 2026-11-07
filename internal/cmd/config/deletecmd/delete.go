@@ -66,46 +66,41 @@ func run(opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	for _, key := range opts.Keys {
-		// Check if this is a parent key with nested values
 		children, isParent := config.IsParentSetting(key)
-		if isParent && !opts.Yes {
+		if !isParent {
+			if err := config.DeleteSetting(key); err != nil {
+				return fmt.Errorf("failed to delete %s: %w", key, err)
+			}
+			ios.Success("Deleted %s", key)
+			continue
+		}
+
+		if !opts.Yes {
 			ios.Warning("Key %q has %d nested values:", key, len(children))
 			for _, child := range children {
 				ios.Printf("  - %s\n", child)
 			}
-
-			confirmed, err := ios.Confirm(fmt.Sprintf("Delete %q and all nested values?", key), false)
-			if err != nil {
-				return fmt.Errorf("confirmation failed: %w", err)
-			}
-			if !confirmed {
-				ios.Info("Skipped %s", key)
-				continue
-			}
-
-			// Delete all child keys first
-			for _, child := range children {
-				if err := config.DeleteSetting(child); err != nil {
-					// Log but continue - some might not exist in file
-					ios.DebugErr("delete child setting", err)
-				}
-			}
+		}
+		confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Delete %q and all nested values?", key), opts.Yes)
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			ios.Info("Cancelled")
+			return nil
 		}
 
-		if err := config.DeleteSetting(key); err != nil {
-			// If it's a parent-only key (no direct value), it might not exist in file
-			if isParent && strings.Contains(err.Error(), "not set") {
-				ios.Success("Deleted %s (and %d nested values)", key, len(children))
-				continue
+		for _, child := range children {
+			if err := config.DeleteSetting(child); err != nil {
+				// A child listed by viper may come from defaults rather than the file.
+				ios.DebugErr("delete child setting", err)
 			}
+		}
+		// A parent key with no direct value of its own is reported as "not set".
+		if err := config.DeleteSetting(key); err != nil && !strings.Contains(err.Error(), "not set") {
 			return fmt.Errorf("failed to delete %s: %w", key, err)
 		}
-
-		if isParent {
-			ios.Success("Deleted %s (and %d nested values)", key, len(children))
-		} else {
-			ios.Success("Deleted %s", key)
-		}
+		ios.Success("Deleted %s (and %d nested values)", key, len(children))
 	}
 
 	return nil

@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-device-config-import - Import configuration from a file
@@ -28,6 +28,11 @@ station that cannot be written that way is left out with a warning; set it
 with 'shelly wifi set'. --dry-run shows each station's planned write without
 its password.
 
+.PP
+The import changes the device's configuration, so it asks for confirmation
+first; pass --yes to skip the prompt (required when there is no terminal, such
+as in a script). --dry-run never prompts.
+
 
 .SH OPTIONS
 \fB--dry-run\fP[=false]
@@ -36,6 +41,10 @@ its password.
 .PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for import
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -106,6 +115,9 @@ its password.
 
   # Dry run - show what would change without applying
   shelly device config import living-room config.json --dry-run
+
+  # Import from a script (no confirmation prompt)
+  shelly device config import living-room config.json --yes
 .EE
 
 

@@ -20,6 +20,10 @@ station that cannot be written that way is left out with a warning; set it
 with 'shelly wifi set'. --dry-run shows each station's planned write without
 its password.
 
+The import changes the device's configuration, so it asks for confirmation
+first; pass --yes to skip the prompt (required when there is no terminal, such
+as in a script). --dry-run never prompts.
+
 ```
 shelly device config import <device> <file> [flags]
 ```
@@ -32,6 +36,9 @@ shelly device config import <device> <file> [flags]
 
   # Dry run - show what would change without applying
   shelly device config import living-room config.json --dry-run
+
+  # Import from a script (no confirmation prompt)
+  shelly device config import living-room config.json --yes
 ```
 
 ### Options
@@ -39,6 +46,7 @@ shelly device config import <device> <file> [flags]
 ```
       --dry-run   Show what would be changed without applying
   -h, --help      help for import
+  -y, --yes       Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

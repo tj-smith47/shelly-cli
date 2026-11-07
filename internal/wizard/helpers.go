@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/tj-smith47/shelly-go/cloud"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -31,25 +32,30 @@ func CheckExistingConfig() (exists bool, path string) {
 	return exists, path
 }
 
-// CheckAndConfirmConfig checks for existing config and confirms overwrite.
-func CheckAndConfirmConfig(ios *iostreams.IOStreams, opts *Options) (bool, error) {
+// CheckAndConfirmConfig checks for an existing config file and, when one is
+// there, asks before overwriting it. --force answers yes; --defaults keeps the
+// existing file and says so; without a terminal the gate refuses with
+// cmdutil.ErrConfirmationRequired so a script cannot clobber a config it never
+// confirmed.
+func CheckAndConfirmConfig(f *cmdutil.Factory, opts *Options) (bool, error) {
 	configExists, configPath := CheckExistingConfig()
 	if !configExists || opts.Force {
 		return true, nil
 	}
 
+	ios := f.IOStreams()
 	if opts.UseDefaults() {
 		ios.Warning("Configuration already exists at %s", configPath)
 		ios.Info("Use --force to overwrite")
 		return false, nil
 	}
 
-	overwrite, err := ios.Confirm("Configuration already exists. Overwrite?", false)
+	overwrite, err := f.ConfirmAction(fmt.Sprintf("Configuration already exists at %s. Overwrite?", configPath), opts.Force)
 	if err != nil {
 		return false, err
 	}
 	if !overwrite {
-		ios.Info("Setup cancelled. Your existing configuration was preserved.")
+		ios.Info("Cancelled")
 		return false, nil
 	}
 	return true, nil

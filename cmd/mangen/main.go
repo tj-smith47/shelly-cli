@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra/doc"
 
@@ -18,7 +19,7 @@ func main() {
 	if len(os.Args) > 1 {
 		outputDir = os.Args[1]
 	}
-	outputDir = filepath.Clean(outputDir)
+	outputDir = insideWorkingDir(outputDir)
 
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(outputDir, 0o750); err != nil {
@@ -65,4 +66,22 @@ func main() {
 	}
 
 	fmt.Printf("Generated %d man pages in %s\n", len(files), outputDir)
+}
+
+// insideWorkingDir confines dir to the working directory and returns its
+// absolute form: the generators only ever write into the repo.
+func insideWorkingDir(dir string) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("failed to read the working directory: %v", err)
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		log.Fatalf("invalid output directory %q: %v", dir, err)
+	}
+	rel, err := filepath.Rel(cwd, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		log.Fatalf("output directory %q is outside the working directory %q", dir, cwd)
+	}
+	return filepath.Join(cwd, rel)
 }

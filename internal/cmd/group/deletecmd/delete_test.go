@@ -2,6 +2,7 @@ package deletecmd
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -217,20 +218,15 @@ func TestExecute_CancelConfirmation(t *testing.T) {
 	ios := iostreams.Test(nil, out, errOut)
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	// Without --yes and in non-TTY mode, confirmation should return false
+	// Without --yes and in non-TTY mode, the gate refuses
 	cmd := NewCommand(f)
 	cmd.SetArgs([]string{"my-group"}) // Note: no --yes flag
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Execute returned error: %v", err)
-	}
-
-	output := out.String()
-	if !strings.Contains(output, "cancelled") {
-		t.Errorf("expected 'cancelled' in output, got: %s", output)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Errorf("Execute error = %v, want cmdutil.ErrConfirmationRequired", err)
 	}
 
 	// Verify group still exists (not deleted because confirmation was cancelled)

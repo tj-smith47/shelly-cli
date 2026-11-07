@@ -39,6 +39,9 @@ shelly action clear <device> <event> [flags]
 
   # Clear action at a specific index
   shelly action clear relay out_on_url --index 1
+
+  # Skip the confirmation prompt (scripts)
+  shelly action clear living-room out_on_url --yes
 ```
 
 ### Options
@@ -46,6 +49,7 @@ shelly action clear <device> <event> [flags]
 ```
   -h, --help        help for clear
       --index int   Action index (for multi-channel devices)
+  -y, --yes         Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

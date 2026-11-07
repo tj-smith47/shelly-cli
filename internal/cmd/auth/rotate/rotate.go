@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/auth"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -25,6 +26,7 @@ type Options struct {
 	PasswordStdin bool
 	ShowSecret    bool
 	User          string
+	Yes           bool
 }
 
 // NewCommand creates the auth rotate command.
@@ -60,7 +62,10 @@ device does not accept it. A generated password is shown only with --show.`,
   shelly auth rotate living-room --generate --show
 
   # Use specific password length
-  shelly auth rotate living-room --generate --length 24`,
+  shelly auth rotate living-room --generate --length 24
+
+  # Skip the confirmation prompt (scripts)
+  shelly auth rotate living-room --generate --yes`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,6 +80,7 @@ device does not accept it. A generated password is shown only with --show.`,
 	cmd.Flags().IntVar(&opts.Length, "length", auth.DefaultPasswordLength, "Generated password length")
 	cmd.Flags().BoolVar(&opts.Generate, "generate", false, "Generate a random password")
 	cmd.Flags().BoolVar(&opts.ShowSecret, "show", false, "Show the new password in output")
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	cmd.MarkFlagsMutuallyExclusive("password", "generate")
 	cmd.MarkFlagsMutuallyExclusive("password-stdin", "generate")
@@ -100,6 +106,15 @@ func run(ctx context.Context, opts *Options) error {
 
 	if password == "" {
 		return errors.New("a new password is required: give it with --password <value>, read it from stdin with --password-stdin, or generate one with --generate")
+	}
+
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Replace the password on %s? Anything still using the old one stops authenticating", opts.Device), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)

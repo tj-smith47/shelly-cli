@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-plugin-remove - Remove an installed extension
@@ -20,6 +20,10 @@ Extensions found in PATH cannot be removed with this command.
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
 	help for remove
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -87,6 +91,9 @@ Extensions found in PATH cannot be removed with this command.
 .EX
   # Remove an extension
   shelly extension remove myext
+
+  # Skip the confirmation prompt (scripts)
+  shelly extension remove myext --yes
 .EE
 
 

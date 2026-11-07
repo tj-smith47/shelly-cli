@@ -55,11 +55,29 @@ func TestNewCommand_Flags(t *testing.T) {
 		t.Errorf("name shorthand = %q, want n", nameFlag.Shorthand)
 	}
 
+	forceFlag := cmd.Flags().Lookup("force")
+	if forceFlag == nil {
+		t.Fatal("force flag not found")
+	}
+	if forceFlag.Shorthand != "f" {
+		t.Errorf("force shorthand = %q, want f", forceFlag.Shorthand)
+	}
+	if forceFlag.DefValue != "false" {
+		t.Errorf("force default = %q, want false", forceFlag.DefValue)
+	}
+
+	// --overwrite stays as a hidden alias so existing scripts keep working.
 	overwriteFlag := cmd.Flags().Lookup("overwrite")
 	if overwriteFlag == nil {
-		t.Fatal("overwrite flag not found")
+		t.Fatal("overwrite alias not found")
 	}
-	if overwriteFlag.DefValue != "false" {
-		t.Errorf("overwrite default = %q, want false", overwriteFlag.DefValue)
+	if !overwriteFlag.Hidden {
+		t.Error("overwrite alias should be hidden")
+	}
+	if err := cmd.Flags().Set("overwrite", "true"); err != nil {
+		t.Fatalf("set overwrite: %v", err)
+	}
+	if forceFlag.Value.String() != "true" {
+		t.Error("--overwrite should set the same value as --force")
 	}
 }

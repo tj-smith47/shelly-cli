@@ -3,6 +3,7 @@ package remove
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -234,23 +235,69 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 	}
 }
 
-func TestExecute_Cancelled(t *testing.T) {
+func TestExecute_ConfirmGate(t *testing.T) {
 	t.Parallel()
 
-	tf := factory.NewTestFactory(t)
-
-	// Simulate cancelled confirmation
-	tf.TestIO.In.WriteString("n\n")
-
-	var buf bytes.Buffer
-	cmd := NewCommand(tf.Factory)
-	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-device", "temperature:100"})
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Logf("Execute error = %v (may be expected)", err)
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
 	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	t.Cleanup(demo.Cleanup)
+
+	t.Run("no terminal without --yes refuses", func(t *testing.T) {
+		t.Parallel()
+		tf := factory.NewTestFactory(t)
+		demo.InjectIntoFactory(tf.Factory)
+		cmd := NewCommand(tf.Factory)
+		cmd.SetContext(context.Background())
+		cmd.SetArgs([]string{"test-device", "temperature:100"})
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+
+		if err := cmd.Execute(); !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+			t.Fatalf("Execute() error = %v, want ErrConfirmationRequired", err)
+		}
+		if strings.Contains(tf.OutString(), "Removed peripheral") {
+			t.Fatalf("action ran without confirmation: %q", tf.OutString())
+		}
+	})
+
+	t.Run("--yes reaches the device", func(t *testing.T) {
+		t.Parallel()
+		tf := factory.NewTestFactory(t)
+		demo.InjectIntoFactory(tf.Factory)
+		cmd := NewCommand(tf.Factory)
+		cmd.SetContext(context.Background())
+		cmd.SetArgs([]string{"test-device", "temperature:100", "--yes"})
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+
+		err := cmd.Execute()
+		if errors.Is(err, cmdutil.ErrConfirmationRequired) {
+			t.Fatalf("--yes still asked for confirmation: %v", err)
+		}
+		// The mock does not implement this RPC; the gate was passed once the call reached it.
+		if err != nil && !strings.Contains(err.Error(), "No handler") && !strings.Contains(err.Error(), "not available") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }

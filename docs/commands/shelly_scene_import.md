@@ -7,7 +7,8 @@ Import a scene from file
 Import a scene definition from a file.
 
 Format is auto-detected from file extension (.json, .yaml, .yml).
-Use --name to override the scene name from the file.
+Use --name to override the scene name from the file, and --force to replace
+a scene that already has that name.
 
 ```
 shelly scene import <file> [flags]
@@ -25,16 +26,16 @@ shelly scene import <file> [flags]
   # Import with different name
   shelly scene import scene.yaml --name my-scene
 
-  # Overwrite existing scene
-  shelly scene import scene.yaml --overwrite
+  # Replace an existing scene with the same name
+  shelly scene import scene.yaml --force
 ```
 
 ### Options
 
 ```
+  -f, --force         Replace an existing scene with the same name
   -h, --help          help for import
   -n, --name string   Override scene name from file
-      --overwrite     Overwrite existing scene
 ```
 
 ### Options inherited from parent commands

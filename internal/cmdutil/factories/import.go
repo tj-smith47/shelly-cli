@@ -34,8 +34,14 @@ type ConfigImportOpts struct {
 	// NameFlagEnabled adds a --name flag for name override (used when SupportsNameArg is false).
 	NameFlagEnabled bool
 
-	// ForceFlagName is the name of the overwrite flag ("overwrite" or "force").
+	// ForceFlagName is the name of the replace-existing flag. Empty means
+	// "force" with shorthand "f".
 	ForceFlagName string
+
+	// ForceFlagAlias, when set, registers a hidden flag of that name bound to
+	// the same variable as the force flag, so scripts written against an older
+	// spelling keep working.
+	ForceFlagAlias string
 
 	// ValidArgsFunc provides completion for arguments.
 	ValidArgsFunc func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)
@@ -93,19 +99,22 @@ func NewConfigImportCommand(f *cmdutil.Factory, config ConfigImportOpts) *cobra.
 		cmd.Flags().StringVarP(&opts.Name, "name", "n", "", fmt.Sprintf("Override %s name from file", config.Component))
 	}
 
-	// Add force/overwrite flag
 	flagName := config.ForceFlagName
 	if flagName == "" {
-		flagName = "overwrite"
+		flagName = "force"
 	}
 	shorthand := ""
 	if flagName == "force" {
 		shorthand = "f"
 	}
-	if shorthand != "" {
-		cmd.Flags().BoolVarP(&opts.Overwrite, flagName, shorthand, false, fmt.Sprintf("Overwrite existing %s", config.Component))
-	} else {
-		cmd.Flags().BoolVar(&opts.Overwrite, flagName, false, fmt.Sprintf("Overwrite existing %s", config.Component))
+	usage := fmt.Sprintf("Replace an existing %s with the same name", config.Component)
+	cmd.Flags().BoolVarP(&opts.Overwrite, flagName, shorthand, false, usage)
+	if alias := config.ForceFlagAlias; alias != "" {
+		cmd.Flags().BoolVar(&opts.Overwrite, alias, false, usage)
+		if err := cmd.Flags().MarkHidden(alias); err != nil {
+			// MarkHidden only fails on an unknown flag name; the alias is defined above.
+			panic(err)
+		}
 	}
 
 	return cmd

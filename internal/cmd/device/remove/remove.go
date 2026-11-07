@@ -8,15 +8,17 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
 	Name    string
-	Force   bool
+	Yes     bool
 }
 
 // NewCommand creates the device remove command.
@@ -34,8 +36,8 @@ This does not affect the physical device itself.`,
 		Example: `  # Remove a device
   shelly device remove kitchen
 
-  # Remove with force (skip confirmation)
-  shelly device remove kitchen --force
+  # Skip the confirmation prompt (scripts)
+  shelly device remove kitchen --yes
 
   # Short form
   shelly dev rm bedroom`,
@@ -47,7 +49,11 @@ This does not affect the physical device itself.`,
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Skip confirmation prompt")
+	flags.AddYesFlag(cmd, &opts.Yes)
+	// --force is the spelling older scripts use for --yes; it stays accepted but
+	// out of the help text so new callers learn the one spelling.
+	cmd.Flags().BoolVar(&opts.Yes, "force", false, "Skip confirmation prompt")
+	utils.Must(cmd.Flags().MarkHidden("force"))
 
 	return cmd
 }
@@ -61,20 +67,17 @@ func run(_ context.Context, opts *Options) error {
 		return fmt.Errorf("device %q not found", opts.Name)
 	}
 
-	// Confirm unless forced
-	if !opts.Force {
-		displayName := dev.Name
-		if displayName == "" {
-			displayName = opts.Name
-		}
-		confirmed, err := ios.Confirm(fmt.Sprintf("Remove device %q?", displayName), false)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Info("Cancelled")
-			return nil
-		}
+	displayName := dev.Name
+	if displayName == "" {
+		displayName = opts.Name
+	}
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Remove device %q?", displayName), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	if err := config.UnregisterDevice(opts.Name); err != nil {

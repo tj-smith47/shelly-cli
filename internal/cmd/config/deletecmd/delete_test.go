@@ -3,6 +3,7 @@ package deletecmd
 
 import (
 	"bytes"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -281,5 +282,47 @@ func TestNewCommand_LongDescriptionContent(t *testing.T) {
 		if !strings.Contains(cmd.Long, pattern) {
 			t.Errorf("expected Long to contain %q", pattern)
 		}
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs and viper
+func TestRun_ConfirmGate_ParentKey(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	configFile := "/tmp/shelly-gate/config.yaml"
+	if err := fs.MkdirAll(filepath.Dir(configFile), 0o750); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := afero.WriteFile(fs, configFile, []byte("defaults:\n  timeout: 30s\n  output: json\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	viper.Reset()
+	viper.SetFs(fs)
+	viper.SetConfigFile(configFile)
+	if err := viper.ReadInConfig(); err != nil {
+		t.Fatalf("ReadInConfig: %v", err)
+	}
+	tf := factory.NewTestFactory(t)
+
+	err := run(&Options{Factory: tf.Factory, Keys: []string{"defaults"}})
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("parent key without terminal or --yes: error = %v, want ErrConfirmationRequired", err)
+	}
+	if !viper.IsSet("defaults.timeout") {
+		t.Fatal("nested value deleted without confirmation")
+	}
+
+	opts := &Options{Factory: tf.Factory, Keys: []string{"defaults"}}
+	opts.Yes = true
+	if err := run(opts); err != nil {
+		t.Fatalf("--yes: error = %v", err)
+	}
+	data, err := afero.ReadFile(fs, configFile)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(data), "timeout") {
+		t.Fatalf("nested values survived --yes: %q", data)
 	}
 }

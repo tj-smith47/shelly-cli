@@ -987,10 +987,11 @@ func TestFactory_ConfirmAction_NonTTY(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	// In non-TTY mode (Test creates non-TTY), default confirmation should be false
+	// Without a terminal and without --yes the gate refuses with an error, so
+	// a script that forgot --yes exits non-zero instead of silently doing nothing.
 	confirmed, err := f.ConfirmAction("Are you sure?", false)
-	if err != nil {
-		t.Fatalf("ConfirmAction error = %v", err)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("ConfirmAction error = %v, want ErrConfirmationRequired", err)
 	}
 	if confirmed {
 		t.Error("ConfirmAction should return false in non-TTY mode without --yes")

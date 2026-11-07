@@ -23,12 +23,16 @@ shelly cloud logout [flags]
 ```
   # Logout from Shelly Cloud
   shelly cloud logout
+
+  # Skip the confirmation prompt (scripts)
+  shelly cloud logout --yes
 ```
 
 ### Options
 
 ```
   -h, --help   help for logout
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

@@ -7,6 +7,7 @@ package deletecmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -447,7 +448,7 @@ func TestExecute_DeleteByID(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(tf.TestIO.Out)
 	cmd.SetErr(tf.TestIO.ErrOut)
-	cmd.SetArgs([]string{"test-device", "--id", "1"})
+	cmd.SetArgs([]string{"test-device", "--id", "1", "--yes"})
 
 	err = cmd.Execute()
 	// Schedule.Delete is not handled by mock, so it answers "No handler for"
@@ -490,7 +491,7 @@ func TestExecute_DeleteByIDWithShortFlag(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(tf.TestIO.Out)
 	cmd.SetErr(tf.TestIO.ErrOut)
-	cmd.SetArgs([]string{"test-gateway", "--id", "5"})
+	cmd.SetArgs([]string{"test-gateway", "--id", "5", "--yes"})
 
 	err = cmd.Execute()
 	// Schedule.Delete is not handled by mock
@@ -532,7 +533,7 @@ func TestExecute_DeleteAll(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(tf.TestIO.Out)
 	cmd.SetErr(tf.TestIO.ErrOut)
-	cmd.SetArgs([]string{"test-device", "--all"})
+	cmd.SetArgs([]string{"test-device", "--all", "--yes"})
 
 	err = cmd.Execute()
 	if err != nil {
@@ -578,7 +579,7 @@ func TestExecute_DeleteAllFromGateway(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(tf.TestIO.Out)
 	cmd.SetErr(tf.TestIO.ErrOut)
-	cmd.SetArgs([]string{"gateway-device", "--all"})
+	cmd.SetArgs([]string{"gateway-device", "--all", "--yes"})
 
 	err = cmd.Execute()
 	if err != nil {
@@ -723,7 +724,7 @@ func TestExecute_IDFlagWithNumericValue(t *testing.T) {
 			cmd := NewCommand(tf.Factory)
 			cmd.SetOut(tf.TestIO.Out)
 			cmd.SetErr(tf.TestIO.ErrOut)
-			cmd.SetArgs([]string{"test-device", "--id", tt.id})
+			cmd.SetArgs([]string{"test-device", "--id", tt.id, "--yes"})
 
 			err = cmd.Execute()
 			// Expected to fail with "No handler for" in the mock
@@ -847,7 +848,7 @@ func TestExecute_SuccessMessageFormat(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(tf.TestIO.Out)
 	cmd.SetErr(tf.TestIO.ErrOut)
-	cmd.SetArgs([]string{"success-device", "--all"})
+	cmd.SetArgs([]string{"success-device", "--all", "--yes"})
 
 	err = cmd.Execute()
 	if err != nil {
@@ -858,5 +859,73 @@ func TestExecute_SuccessMessageFormat(t *testing.T) {
 	// Should include the device name in success message
 	if !strings.Contains(output, "success-device") {
 		t.Errorf("expected device name 'success-device' in output, got: %s", output)
+	}
+}
+
+// TestExecute_ConfirmGate proves the gate for --id and --all: no terminal and
+// no --yes returns ErrConfirmationRequired before any RPC; --yes reaches the
+// device (whose mock answers "No handler for" Schedule.Delete/DeleteAll).
+//
+//nolint:paralleltest // InjectIntoFactory installs the global config manager.
+func TestExecute_ConfirmGate(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gate-trv",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "TRV-01",
+					Model:      "Shelly TRV",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gate-trv": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	for name, args := range map[string][]string{"single": {"gate-trv", "--id", "1"}, "all": {"gate-trv", "--all"}} {
+		t.Run(name+" no terminal without --yes refuses", func(t *testing.T) {
+			tf := factory.NewTestFactory(t)
+			demo.InjectIntoFactory(tf.Factory)
+			cmd := NewCommand(tf.Factory)
+			cmd.SetContext(context.Background())
+			cmd.SetArgs(args)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			if err := cmd.Execute(); !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+				t.Fatalf("Execute() error = %v, want ErrConfirmationRequired", err)
+			}
+			if strings.Contains(tf.OutString(), "Deleted") {
+				t.Fatalf("schedule deleted without confirmation: %q", tf.OutString())
+			}
+		})
+		t.Run(name+" --yes reaches the device", func(t *testing.T) {
+			tf := factory.NewTestFactory(t)
+			demo.InjectIntoFactory(tf.Factory)
+			cmd := NewCommand(tf.Factory)
+			cmd.SetContext(context.Background())
+			cmd.SetArgs(append(append([]string{}, args...), "--yes"))
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			err := cmd.Execute()
+			if errors.Is(err, cmdutil.ErrConfirmationRequired) {
+				t.Fatalf("--yes still asked for confirmation: %v", err)
+			}
+			if err != nil && !strings.Contains(err.Error(), "No handler") && !strings.Contains(err.Error(), "not available") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
 	}
 }

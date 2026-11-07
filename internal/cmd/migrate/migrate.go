@@ -11,8 +11,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate/diff"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate/validate"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -159,7 +159,7 @@ Use --dry-run to preview what would change without applying.`,
 
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would be changed without applying")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "Force migration between different device types")
-	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesFlag(cmd, &opts.Yes)
 	cmd.Flags().BoolVar(&opts.ResetSource, "reset-source", true, "Factory reset source device after migration")
 	cmd.Flags().BoolVar(&opts.SkipAuth, "skip-auth", false, "Skip authentication configuration")
 	cmd.Flags().BoolVar(&opts.SkipNetwork, "skip-network", false, "Skip network configuration (WiFi, Ethernet)")
@@ -266,13 +266,14 @@ func (o *Options) validateFlags() error {
 // network returns the WiFi override flags.
 func (o *Options) network() *cmdutil.NetworkFlags {
 	return &cmdutil.NetworkFlags{
-		SSID:     o.SSID,
-		Password: o.Password,
-		Open:     o.Open,
-		StaticIP: o.StaticIP,
-		Gateway:  o.Gateway,
-		Netmask:  o.Netmask,
-		DNS:      o.DNS,
+		SSID:              o.SSID,
+		Password:          o.Password,
+		Open:              o.Open,
+		StaticIP:          o.StaticIP,
+		CopyBackupAddress: true,
+		Gateway:           o.Gateway,
+		Netmask:           o.Netmask,
+		DNS:               o.DNS,
 	}
 }
 
@@ -290,21 +291,19 @@ func (o *Options) staticNetwork(bkp *backup.DeviceBackup) (shellybackup.StaticNe
 // confirmMigration prompts the user for confirmation unless --yes was passed.
 // Returns (true, nil) to proceed, (false, nil) if cancelled.
 func (o *Options) confirmMigration(resetSource bool) (bool, error) {
-	if o.Yes {
-		return true, nil
-	}
 	msg := fmt.Sprintf("Migrate %q -> %q", o.Source, o.Target)
 	if resetSource {
 		msg += fmt.Sprintf(" (source %q will be factory reset)", o.Source)
 	}
-	confirmed, err := o.Factory.ConfirmAction(msg+"?", false)
+	confirmed, err := o.Factory.ConfirmAction(msg+"?", o.Yes)
 	if err != nil {
-		return false, fmt.Errorf("confirmation failed: %w", err)
+		return false, err
 	}
 	if !confirmed {
-		o.Factory.IOStreams().Info("Migration cancelled")
+		o.Factory.IOStreams().Info("Cancelled")
+		return false, nil
 	}
-	return confirmed, nil
+	return true, nil
 }
 
 // restoreOptions builds the restore options for the target from the flags.
@@ -351,8 +350,12 @@ func (o *Options) migrateViaAP(
 		return err
 	}
 
-	if confirmed, err := o.confirmMigration(false); err != nil || !confirmed {
+	confirmed, err := o.confirmMigration(false)
+	if err != nil {
 		return err
+	}
+	if !confirmed {
+		return nil
 	}
 
 	// The AP-hop restore-and-report sequence (including partial-failure handling)
@@ -363,13 +366,7 @@ func (o *Options) migrateViaAP(
 }
 
 func run(ctx context.Context, opts *Options) error {
-	// --to-ap performs a WiFi hop, a full restore at the AP, and a LAN-rejoin
-	// poll, which together far exceed a normal migration's budget.
-	timeout := shelly.DefaultTimeout * 5
-	if opts.ToAP != "" {
-		timeout = shelly.DefaultTimeout * 30
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, backup.RestoreTimeout(opts.ToAP != ""))
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
@@ -414,14 +411,17 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Warn about IP conflict if migrating network without resetting source.
 	// A static-IP override gives the target a distinct address, so no conflict.
-	if !opts.SkipNetwork && !resetSource && override == nil {
+	if !opts.SkipNetwork && !resetSource && !override.IsStatic() {
 		ios.Warning("Migrating network settings without factory-resetting the source device")
 		ios.Warning("This may cause IP conflicts on your network")
 	}
 
-	// Confirm before proceeding
-	if confirmed, err := opts.confirmMigration(resetSource); err != nil || !confirmed {
+	confirmed, err := opts.confirmMigration(resetSource)
+	if err != nil {
 		return err
+	}
+	if !confirmed {
+		return nil
 	}
 
 	var result *backup.RestoreResult

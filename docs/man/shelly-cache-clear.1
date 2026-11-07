@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-cache-clear - Clear the cache
@@ -14,10 +14,13 @@ Clear cached device data.
 
 .PP
 Use flags to specify what to clear:
-  --all      Clear all cached data (requires confirmation)
+  --all      Clear all cached data
   --device   Clear cache for a specific device
   --type     Clear cache for a specific data type (requires --device)
   --expired  Clear only expired entries
+
+.PP
+Each form asks for confirmation; pass --yes to skip the prompt in scripts.
 
 
 .SH OPTIONS
@@ -119,6 +122,9 @@ Use flags to specify what to clear:
 
   # Clear only expired entries
   shelly cache clear --expired
+
+  # Skip the confirmation prompt (scripts)
+  shelly cache clear --all --yes
 .EE
 
 

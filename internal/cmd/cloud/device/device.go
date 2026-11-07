@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -63,7 +62,10 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	// Check if logged in
-	cfg := config.Get()
+	cfg, err := opts.Factory.Config()
+	if err != nil {
+		return err
+	}
 	if cfg.Cloud.AccessToken == "" {
 		ios.Error("Not logged in to Shelly Cloud")
 		ios.Info("Use 'shelly cloud login' to authenticate")

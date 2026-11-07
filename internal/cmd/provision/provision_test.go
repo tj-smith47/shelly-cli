@@ -85,6 +85,7 @@ func TestNewCommand_Flags(t *testing.T) {
 		{"from-template", "from-template", ""},
 		{"no-cloud", "no-cloud", "false"},
 		{"yes", "yes", "false"},
+		{"all", "all", "false"},
 	}
 
 	for _, tt := range tests {
@@ -135,6 +136,7 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 		{"no-cloud", []string{"--no-cloud"}},
 		{"yes long", []string{"--yes"}},
 		{"yes short", []string{"-y"}},
+		{"all", []string{"--all"}},
 		{"combined", []string{"--ssid", "Net", "--password", "pass", "--ble-only", "-y"}},
 		{"from-device with ap-only", []string{"--from-device", "fl", "--ap-only", "-y"}},
 	}

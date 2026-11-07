@@ -3,6 +3,7 @@ package configimport
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -588,7 +589,7 @@ func TestRun_ImportJSONConfig(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"test-device", configFile})
+	cmd.SetArgs([]string{"test-device", configFile, "--yes"})
 
 	err = cmd.Execute()
 	if err != nil {
@@ -655,7 +656,7 @@ func TestRun_ImportYAMLConfig(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"yaml-device", configFile})
+	cmd.SetArgs([]string{"yaml-device", configFile, "--yes"})
 
 	err = cmd.Execute()
 	if err != nil {
@@ -817,7 +818,7 @@ func TestRun_AppliesConfig(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"overwrite-device", configFile})
+	cmd.SetArgs([]string{"overwrite-device", configFile, "--yes"})
 
 	err = cmd.Execute()
 	if err != nil {
@@ -959,7 +960,7 @@ func TestRun_ComplexJSONConfig(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"complex-device", configFile})
+	cmd.SetArgs([]string{"complex-device", configFile, "--yes"})
 
 	err = cmd.Execute()
 	if err != nil {
@@ -1034,7 +1035,7 @@ wifi:
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"yaml-complex", configFile})
+	cmd.SetArgs([]string{"yaml-complex", configFile, "--yes"})
 
 	err = cmd.Execute()
 	if err != nil {
@@ -1147,5 +1148,68 @@ func TestRun_JSONParsedFirstBeforeYAML(t *testing.T) {
 	// Should not be a parse error
 	if strings.Contains(err.Error(), "failed to parse file") {
 		t.Errorf("Should not be a parse error for valid JSON, got: %v", err)
+	}
+}
+
+// TestRun_RefusesWithoutYes proves the confirmation gate: without --yes and
+// without a terminal the import returns ErrConfirmationRequired and writes
+// nothing; --dry-run skips the gate; --yes applies the file.
+//
+//nolint:paralleltest // Uses shared mock server
+func TestRun_RefusesWithoutYes(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{{
+				Name: "test-device", Address: "192.168.1.100", MAC: "AA:BB:CC:DD:EE:FF",
+				Type: "SNSW-001P16EU", Model: "Shelly Plus 1PM", Generation: 2,
+			}},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	configFile := testConfigPath
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(`{"sys":{"device":{"name":"New Name"}}}`), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	execute := func(args ...string) (*factory.TestFactory, error) {
+		tf := factory.NewTestFactory(t)
+		demo.InjectIntoFactory(tf.Factory)
+		cmd := NewCommand(tf.Factory)
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs(append([]string{"test-device", configFile}, args...))
+		return tf, cmd.Execute()
+	}
+
+	tf, err := execute()
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("Execute() error = %v, want ErrConfirmationRequired", err)
+	}
+	if strings.Contains(tf.OutString(), "Configuration imported") {
+		t.Fatalf("import ran without confirmation: %s", tf.OutString())
+	}
+
+	if _, err := execute("--dry-run"); err != nil {
+		t.Fatalf("Execute(--dry-run) error = %v, want nil (dry run never prompts)", err)
+	}
+
+	tf, err = execute("--yes")
+	if err != nil {
+		t.Fatalf("Execute(--yes) error = %v", err)
+	}
+	if !strings.Contains(tf.OutString(), "Configuration imported") {
+		t.Fatalf("Execute(--yes) output = %q, want success message", tf.OutString())
 	}
 }

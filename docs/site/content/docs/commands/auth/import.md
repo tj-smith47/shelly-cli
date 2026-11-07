@@ -27,6 +27,9 @@ shelly auth import <file> [flags]
 
   # Preview without applying
   shelly auth import credentials.json --dry-run
+
+  # From a script (no prompt)
+  shelly auth import credentials.json --yes
 ```
 
 ### Options
@@ -34,6 +37,7 @@ shelly auth import <file> [flags]
 ```
       --dry-run   Preview actions without executing
   -h, --help      help for import
+  -y, --yes       Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

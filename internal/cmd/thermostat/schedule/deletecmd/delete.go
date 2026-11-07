@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -18,6 +19,7 @@ type Options struct {
 	Device     string
 	ScheduleID int
 	All        bool
+	Yes        bool
 }
 
 // NewCommand creates the thermostat schedule delete command.
@@ -36,7 +38,10 @@ Use --all to delete all schedules (use with caution).`,
   shelly thermostat schedule delete gateway --id 1
 
   # Delete all schedules
-  shelly thermostat schedule delete gateway --all`,
+  shelly thermostat schedule delete gateway --all
+
+  # Skip the confirmation prompt (scripts)
+  shelly thermostat schedule delete gateway --id 1 --yes`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -47,6 +52,7 @@ Use --all to delete all schedules (use with caution).`,
 
 	cmd.Flags().IntVar(&opts.ScheduleID, "id", 0, "Schedule ID to delete")
 	cmd.Flags().BoolVar(&opts.All, "all", false, "Delete all schedules")
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	cmd.MarkFlagsMutuallyExclusive("id", "all")
 
@@ -68,8 +74,21 @@ func run(ctx context.Context, opts *Options) error {
 
 		conn := dev.Gen2()
 
+		what := fmt.Sprintf("Delete schedule %d from %s?", opts.ScheduleID, opts.Device)
 		if opts.All {
-			err := cmdutil.RunWithSpinner(ctx, ios, "Deleting all schedules...", func(ctx context.Context) error {
+			what = fmt.Sprintf("Delete all schedules from %s?", opts.Device)
+		}
+		confirmed, err := opts.Factory.ConfirmAction(what, opts.Yes)
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			ios.Info("Cancelled")
+			return nil
+		}
+
+		if opts.All {
+			err = cmdutil.RunWithSpinner(ctx, ios, "Deleting all schedules...", func(ctx context.Context) error {
 				_, callErr := conn.Call(ctx, "Schedule.DeleteAll", nil)
 				return callErr
 			})
@@ -85,7 +104,7 @@ func run(ctx context.Context, opts *Options) error {
 			"id": opts.ScheduleID,
 		}
 
-		err := cmdutil.RunWithSpinner(ctx, ios, "Deleting schedule...", func(ctx context.Context) error {
+		err = cmdutil.RunWithSpinner(ctx, ios, "Deleting schedule...", func(ctx context.Context) error {
 			_, callErr := conn.Call(ctx, "Schedule.Delete", params)
 			return callErr
 		})

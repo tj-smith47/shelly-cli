@@ -2,8 +2,11 @@ package clearcmd
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
@@ -166,5 +169,41 @@ func TestRun_Success(t *testing.T) {
 	// Should not error even if log file doesn't exist
 	if err != nil {
 		t.Logf("run() error = %v (may be expected if log path unavailable)", err)
+	}
+}
+
+//nolint:paralleltest // SetupTestFs swaps the global filesystem.
+func TestRun_ConfirmGate(t *testing.T) {
+	fs := factory.SetupTestFs(t)
+	logPath, err := cmdutil.GetLogPath()
+	if err != nil {
+		t.Fatalf("GetLogPath: %v", err)
+	}
+	if err := afero.WriteFile(fs, logPath, []byte("line1\nline2\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	tf := factory.NewTestFactory(t)
+
+	err = run(&Options{Factory: tf.Factory})
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("no terminal, no --yes: error = %v, want ErrConfirmationRequired", err)
+	}
+	data, err := afero.ReadFile(fs, logPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if len(data) == 0 {
+		t.Fatal("log truncated without confirmation")
+	}
+
+	if err := run(&Options{Factory: tf.Factory, Yes: true}); err != nil {
+		t.Fatalf("--yes: error = %v", err)
+	}
+	data, err = afero.ReadFile(fs, logPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if len(data) != 0 {
+		t.Fatalf("log not truncated with --yes: %q", data)
 	}
 }

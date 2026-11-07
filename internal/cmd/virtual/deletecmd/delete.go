@@ -48,7 +48,7 @@ This action cannot be undone.`,
 		},
 	}
 
-	flags.AddConfirmFlags(cmd, &opts.ConfirmFlags)
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
@@ -65,19 +65,16 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	// Confirm deletion
-	if !opts.Yes {
-		confirmed, err := ios.Confirm(fmt.Sprintf("Delete virtual component %s?", opts.Key), false)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Info("Cancelled")
-			return nil
-		}
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Delete virtual component %s?", opts.Key), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
-	err := cmdutil.RunWithSpinner(ctx, ios, "Deleting virtual component...", func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, "Deleting virtual component...", func(ctx context.Context) error {
 		return svc.DeleteVirtualComponent(ctx, opts.Device, opts.Key)
 	})
 	if err != nil {

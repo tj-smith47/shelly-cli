@@ -1733,3 +1733,13 @@ func TestAutoSavePathIn_CreatesGivenDir(t *testing.T) {
 		t.Errorf("/new/dir was not created: %v", err)
 	}
 }
+
+func TestRestoreTimeout(t *testing.T) {
+	t.Parallel()
+	if got := RestoreTimeout(false); got != LANRestoreTimeout {
+		t.Errorf("RestoreTimeout(false) = %v, want %v", got, LANRestoreTimeout)
+	}
+	if got := RestoreTimeout(true); got != APRestoreTimeout {
+		t.Errorf("RestoreTimeout(true) = %v, want %v", got, APRestoreTimeout)
+	}
+}

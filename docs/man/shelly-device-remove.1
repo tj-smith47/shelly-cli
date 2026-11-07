@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-device-remove - Remove a device from the registry
@@ -18,12 +18,12 @@ This does not affect the physical device itself.
 
 
 .SH OPTIONS
-\fB-f\fP, \fB--force\fP[=false]
-	Skip confirmation prompt
-
-.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for remove
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -92,8 +92,8 @@ This does not affect the physical device itself.
   # Remove a device
   shelly device remove kitchen
 
-  # Remove with force (skip confirmation)
-  shelly device remove kitchen --force
+  # Skip the confirmation prompt (scripts)
+  shelly device remove kitchen --yes
 
   # Short form
   shelly dev rm bedroom

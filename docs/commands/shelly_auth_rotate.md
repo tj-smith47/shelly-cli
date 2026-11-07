@@ -35,6 +35,9 @@ shelly auth rotate <device> [flags]
 
   # Use specific password length
   shelly auth rotate living-room --generate --length 24
+
+  # Skip the confirmation prompt (scripts)
+  shelly auth rotate living-room --generate --yes
 ```
 
 ### Options
@@ -47,6 +50,7 @@ shelly auth rotate <device> [flags]
       --password-stdin    Read the new password from stdin
       --show              Show the new password in output
       --user string       Username: any name on Gen1, where it defaults to the stored user or admin; Gen2+ devices allow only admin
+  -y, --yes               Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

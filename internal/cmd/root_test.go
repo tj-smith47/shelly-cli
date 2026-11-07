@@ -4,7 +4,9 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"slices"
@@ -623,5 +625,122 @@ func TestApplyRawCapture_IgnoresLocalRawFlag(t *testing.T) {
 	if rawSink != nil {
 		rawSink = nil
 		t.Error("local --raw installed the global capture sink")
+	}
+}
+
+// destructiveCommandNames are the command names whose action deletes,
+// overwrites or resets something the user cannot get back. Every such command
+// prompts on a terminal, takes --yes to skip the prompt, and refuses with
+// cmdutil.ErrConfirmationRequired when there is no terminal and no --yes.
+var destructiveCommandNames = map[string]bool{
+	"apply": true, "clear": true, "delete": true, "delete-all": true, "factory-reset": true,
+	"import": true, "logout": true, "migrate": true, "remove": true, "reset": true,
+	"restore": true, "rollback": true, "rotate": true,
+}
+
+// destructiveCommandPaths are destructive commands whose name is not a
+// destructive verb.
+var destructiveCommandPaths = map[string]bool{
+	"shelly cert install":    true,
+	"shelly firmware update": true,
+	"shelly provision":       true,
+	"shelly sync":            true,
+	"shelly update":          true,
+}
+
+// confirmationExempt lists commands matched by name that do not need the gate,
+// with the reason. An import that refuses to replace an existing item unless
+// --force is given destroys nothing without that explicit flag.
+var confirmationExempt = map[string]string{
+	"shelly scene import":    "refuses to replace an existing scene without --force",
+	"shelly template import": "refuses to replace an existing template without --force",
+	"shelly theme import":    "validates a theme file; --apply only selects it, which theme set undoes",
+	"shelly zwave reset":     "prints the device's own reset instructions; no write",
+}
+
+// TestDestructiveCommandsTakeYes keeps the confirmation UX uniform: one flag
+// spelling (--yes/-y, "Skip confirmation prompt") on every command that
+// destroys or overwrites state, and no --confirm outside device factory-reset.
+func TestDestructiveCommandsTakeYes(t *testing.T) {
+	t.Parallel()
+
+	rootCmdMu.Lock()
+	defer rootCmdMu.Unlock()
+
+	seenExempt := map[string]bool{}
+	seenPath := map[string]bool{}
+	walkCommands(rootCmd, func(c *cobra.Command) {
+		// An alias forwards its arguments, flags included, to the real command.
+		if !c.Runnable() || cmdutil.IsAlias(c) {
+			return
+		}
+		path := c.CommandPath()
+		if f := c.Flags().Lookup("confirm"); f != nil && path != "shelly device factory-reset" {
+			t.Errorf("%s registers --confirm; the double-confirm flag belongs to device factory-reset only", path)
+		}
+		if reason, ok := confirmationExempt[path]; ok {
+			seenExempt[path] = true
+			if c.Flags().Lookup("yes") != nil {
+				t.Errorf("%s has --yes but is exempt (%s); drop it from confirmationExempt", path, reason)
+			}
+			return
+		}
+		if destructiveCommandPaths[path] {
+			seenPath[path] = true
+		} else if !destructiveCommandNames[c.Name()] {
+			return
+		}
+		f := c.Flags().Lookup("yes")
+		if f == nil {
+			t.Errorf("%s changes state the user cannot get back but has no --yes flag; "+
+				"register flags.AddYesFlag and gate the action with Factory.ConfirmAction", path)
+			return
+		}
+		if f.Shorthand != "y" || f.Usage != "Skip confirmation prompt" {
+			t.Errorf("%s: --yes must be registered through flags.AddYesFlag (shorthand -y, usage %q), got -%s %q",
+				path, "Skip confirmation prompt", f.Shorthand, f.Usage)
+		}
+	})
+	for path := range confirmationExempt {
+		if !seenExempt[path] {
+			t.Errorf("%s is listed in confirmationExempt but no such runnable command exists", path)
+		}
+	}
+	for path := range destructiveCommandPaths {
+		if !seenPath[path] {
+			t.Errorf("%s is listed in destructiveCommandPaths but no such runnable command exists", path)
+		}
+	}
+}
+
+// TestCommandsReadConfigThroughFactory asserts no command reads the
+// process-wide config (config.Get, config.Load) instead of its factory's.
+// The factory's manager is what tests and the mock inject; a command on the
+// global one silently sees another configuration (another test's manager,
+// or an uninjected default) and misbehaves without failing.
+func TestCommandsReadConfigThroughFactory(t *testing.T) {
+	t.Parallel()
+	globalRead := regexp.MustCompile(`\bconfig\.(Get|Load)\(\)`)
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		// root.go reads theme and telemetry settings before any factory exists.
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") || path == "root.go" {
+			return nil
+		}
+		src, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		for i, line := range strings.Split(string(src), "\n") {
+			if globalRead.MatchString(line) {
+				t.Errorf("%s:%d reads the global config: use opts.Factory.Config()", path, i+1)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

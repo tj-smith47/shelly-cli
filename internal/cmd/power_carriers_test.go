@@ -99,6 +99,9 @@ func TestPowerCommandsReadEveryCarrier(t *testing.T) {
 	for path, checks := range powerCarrierChecks {
 		for _, c := range checks {
 			args := append(append([]string{}, c.args...), "-o", "json")
+			if path == "shelly energy reset" {
+				args = append(args, "--yes")
+			}
 			stdout, err := h.run(args)
 			invocation := "shelly " + strings.Join(args, " ")
 			if c.wantErr != "" {

@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-group-remove - Remove devices from a group
@@ -20,6 +20,10 @@ Removing a device from a group does not delete the device.
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
 	help for remove
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -96,6 +100,9 @@ Removing a device from a group does not delete the device.
 
   # Short form
   shelly grp rm office 192.168.1.100
+
+  # Skip the confirmation prompt (scripts)
+  shelly group remove living-room light-1 --yes
 .EE
 
 

@@ -12,10 +12,12 @@ Clear the cache
 Clear cached device data.
 
 Use flags to specify what to clear:
-  --all      Clear all cached data (requires confirmation)
+  --all      Clear all cached data
   --device   Clear cache for a specific device
   --type     Clear cache for a specific data type (requires --device)
   --expired  Clear only expired entries
+
+Each form asks for confirmation; pass --yes to skip the prompt in scripts.
 
 ```
 shelly cache clear [flags]
@@ -35,6 +37,9 @@ shelly cache clear [flags]
 
   # Clear only expired entries
   shelly cache clear --expired
+
+  # Skip the confirmation prompt (scripts)
+  shelly cache clear --all --yes
 ```
 
 ### Options

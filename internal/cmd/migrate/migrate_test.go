@@ -3,6 +3,7 @@ package migrate
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -690,11 +691,11 @@ func TestConfirmMigration(t *testing.T) {
 		yes         bool
 		resetSource bool
 		wantOK      bool
-		wantOut     string
+		wantErr     error
 	}{
 		{name: "yes skips prompt", yes: true, wantOK: true},
-		{name: "non-tty declines without reset", wantOK: false, wantOut: "Migration cancelled"},
-		{name: "non-tty declines with reset note", resetSource: true, wantOK: false, wantOut: "Migration cancelled"},
+		{name: "non-tty without --yes refuses", wantErr: cmdutil.ErrConfirmationRequired},
+		{name: "non-tty without --yes refuses with reset note", resetSource: true, wantErr: cmdutil.ErrConfirmationRequired},
 	}
 
 	for _, tt := range tests {
@@ -704,14 +705,11 @@ func TestConfirmMigration(t *testing.T) {
 			opts := &Options{Factory: tf.Factory, Source: "src", Target: "dst", Yes: tt.yes}
 
 			ok, err := opts.confirmMigration(tt.resetSource)
-			if err != nil {
-				t.Fatalf("confirmMigration: %v", err)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("confirmMigration() error = %v, want %v", err, tt.wantErr)
 			}
 			if ok != tt.wantOK {
 				t.Errorf("confirmMigration() = %v, want %v", ok, tt.wantOK)
-			}
-			if tt.wantOut != "" && !strings.Contains(tf.OutString(), tt.wantOut) {
-				t.Errorf("output %q does not contain %q", tf.OutString(), tt.wantOut)
 			}
 		})
 	}
@@ -743,15 +741,13 @@ func TestMigrateViaAP_ConfirmCancels(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	// Non-TTY confirm declines, so migrateViaAP returns nil before RestoreToAP —
-	// no WiFi hop is attempted.
+	// Without a terminal and without --yes the gate refuses before RestoreToAP,
+	// so no WiFi hop is attempted.
 	opts := &Options{Factory: tf.Factory, Source: "src", Target: "dst", ToAP: "ShellyBulbDuo-AABBCC"}
 	override := &clibackup.NetworkOverride{SSID: "home", Password: "pw"}
-	if err := opts.migrateViaAP(ctx, tf.ShellyService(), noWiFiBackup(), shellybackup.StaticNetwork{}, override); err != nil {
-		t.Fatalf("migrateViaAP with declined confirm: %v", err)
-	}
-	if !strings.Contains(tf.OutString(), "Migration cancelled") {
-		t.Errorf("expected cancellation notice, got %q", tf.OutString())
+	err := opts.migrateViaAP(ctx, tf.ShellyService(), noWiFiBackup(), shellybackup.StaticNetwork{}, override)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("migrateViaAP error = %v, want ErrConfirmationRequired", err)
 	}
 }
 

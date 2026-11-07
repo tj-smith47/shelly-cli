@@ -2,9 +2,11 @@ package rotate
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/auth"
@@ -42,7 +44,7 @@ func TestRun_GeneratedPasswordIsStoredAndWorks(t *testing.T) {
 		demo.InjectIntoFactory(tf.Factory)
 		tf.TestIO.In.WriteString("stdin-pass\r\n")
 		cmd := NewCommand(tf.Factory)
-		cmd.SetArgs([]string{"porch", "--password-stdin"})
+		cmd.SetArgs([]string{"porch", "--password-stdin", "--yes"})
 		cmd.SetContext(context.Background())
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("execute: %v", err)
@@ -64,7 +66,7 @@ func TestRun_GeneratedPasswordIsStoredAndWorks(t *testing.T) {
 			tf := factory.NewTestFactory(t)
 			demo.InjectIntoFactory(tf.Factory)
 
-			if err := run(context.Background(), &Options{Factory: tf.Factory, Device: device, Generate: true, Length: 20}); err != nil {
+			if err := run(context.Background(), &Options{Factory: tf.Factory, Device: device, Generate: true, Length: 20, Yes: true}); err != nil {
 				t.Fatalf("run: %v", err)
 			}
 			dev, ok := demo.ConfigMgr.GetDevice(device)
@@ -91,5 +93,38 @@ func TestRun_GeneratedPasswordIsStoredAndWorks(t *testing.T) {
 				t.Fatal("device still accepts the old password")
 			}
 		})
+	}
+}
+
+// TestRun_ConfirmGate: without a terminal and --yes the rotation is refused and
+// the device keeps its password; with --yes it is replaced.
+func TestRun_ConfirmGate(t *testing.T) {
+	t.Parallel()
+	demo, err := mock.StartWithFixtures(&mock.Fixtures{Version: "1", Config: mock.ConfigFixture{
+		Devices: []mock.DeviceFixture{{
+			Name: "gate", MAC: "AA:BB:CC:DD:EE:21", Type: "SNSW-001X16EU", Model: "SNSW-001X16EU", Generation: 2,
+			AuthEnabled: true, AuthUser: auth.DefaultUser, AuthPass: "old-pass",
+		}},
+	}})
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	t.Cleanup(demo.Cleanup)
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), &Options{Factory: tf.Factory, Device: "gate", Password: "new-pass"})
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("no terminal, no --yes: error = %v, want ErrConfirmationRequired", err)
+	}
+	if dev, _ := demo.ConfigMgr.GetDevice("gate"); dev.Auth == nil || dev.Auth.Password != "old-pass" {
+		t.Fatalf("password changed without confirmation: %+v", dev.Auth)
+	}
+
+	if err := run(context.Background(), &Options{Factory: tf.Factory, Device: "gate", Password: "new-pass", Yes: true}); err != nil {
+		t.Fatalf("--yes: error = %v", err)
+	}
+	if dev, _ := demo.ConfigMgr.GetDevice("gate"); dev.Auth == nil || dev.Auth.Password != "new-pass" {
+		t.Fatalf("password not rotated with --yes: %+v", dev.Auth)
 	}
 }

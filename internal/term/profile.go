@@ -41,8 +41,8 @@ func DisplayProfile(ios *iostreams.IOStreams, p *profiles.Profile) {
 	ios.Println()
 	ios.Printf("  %s:\n", theme.Dim().Render("Capabilities"))
 	caps := profileCapabilityList(p)
-	for _, cap := range caps {
-		ios.Printf("    • %s\n", cap)
+	for _, capability := range caps {
+		ios.Printf("    • %s\n", capability)
 	}
 
 	// Limits

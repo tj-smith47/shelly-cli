@@ -11,7 +11,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -88,7 +87,7 @@ func run(ctx context.Context, opts *Options) error {
 	svc := f.ShellyService()
 
 	// Load config
-	cfg, err := config.Load()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
@@ -130,17 +129,13 @@ func run(ctx context.Context, opts *Options) error {
 
 	toUpdate := shelly.GetEntriesByIndices(entries, selectedIndices)
 
-	// Confirm if needed
-	if !opts.Yes {
-		msg := fmt.Sprintf("Update %d device(s) to %s?", len(toUpdate), stage)
-		confirmed, confirmErr := ios.Confirm(msg, false)
-		if confirmErr != nil {
-			return confirmErr
-		}
-		if !confirmed {
-			ios.Warning("Update cancelled")
-			return nil
-		}
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Update %d device(s) to %s?", len(toUpdate), stage), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	// Execute updates

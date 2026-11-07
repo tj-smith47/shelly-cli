@@ -258,7 +258,7 @@ func TestRun_NotLoggedIn(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	ctx := context.Background()
 	opts := &Options{Factory: f, DeviceID: "test-device"}
@@ -298,7 +298,7 @@ func TestRun_NotLoggedIn_ShowsLoginHint(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	ctx := context.Background()
 	opts := &Options{Factory: f, DeviceID: "test-device"}
@@ -341,7 +341,7 @@ func TestRun_WithCancelledContext(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	// Create cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -375,7 +375,7 @@ func TestRun_WithTimeout(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	// Create context with very short timeout (already expired)
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
@@ -428,7 +428,7 @@ func TestNewCommand_Execute_WithDeviceID(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	cmd := NewCommand(f)
 	cmd.SetOut(out)
@@ -598,7 +598,7 @@ func TestRun_WithMockCloudServer(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	ctx := context.Background()
 	opts := &Options{Factory: f, DeviceID: "test-device-123"}
@@ -663,7 +663,7 @@ func TestRun_WithMockCloudServer_StatusFlag(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	cmd := NewCommand(f)
 	cmd.SetOut(out)
@@ -741,7 +741,7 @@ func TestNewCommand_Execute_WithStatusFlag(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	cmd := NewCommand(f)
 	cmd.SetOut(out)
@@ -780,7 +780,7 @@ func TestNewCommand_RunEIsCallable(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	cmd := NewCommand(f)
 	// Must set context before calling RunE directly
@@ -831,7 +831,7 @@ func TestRun_OutputGoesToStreams(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 
-	f := cmdutil.NewFactory().SetIOStreams(ios)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	ctx := context.Background()
 	opts := &Options{Factory: f, DeviceID: "test-device"}

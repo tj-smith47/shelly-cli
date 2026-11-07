@@ -26,6 +26,9 @@ shelly cert install <device> [flags]
 
   # Install client certificate and key
   shelly cert install kitchen --client-cert cert.pem --client-key key.pem
+
+  # Skip the confirmation prompt (scripts)
+  shelly cert install kitchen --ca ca.pem --yes
 ```
 
 ### Options
@@ -35,6 +38,7 @@ shelly cert install <device> [flags]
       --client-cert string   Client certificate file (PEM format)
       --client-key string    Client private key file (PEM format)
   -h, --help                 help for install
+  -y, --yes                  Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

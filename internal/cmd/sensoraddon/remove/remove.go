@@ -47,7 +47,7 @@ Note: Changes require a device reboot to take effect.`,
 		},
 	}
 
-	flags.AddConfirmFlags(cmd, &opts.ConfirmFlags)
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
@@ -59,19 +59,16 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.SensorAddonService()
 
-	// Confirm removal
-	if !opts.Yes {
-		confirmed, err := ios.Confirm(fmt.Sprintf("Remove peripheral %s?", opts.Component), false)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Info("Cancelled")
-			return nil
-		}
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Remove peripheral %s?", opts.Component), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
-	err := cmdutil.RunWithSpinner(ctx, ios, "Removing peripheral...", func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, "Removing peripheral...", func(ctx context.Context) error {
 		return svc.RemovePeripheral(ctx, opts.Device, opts.Component)
 	})
 	if err != nil {

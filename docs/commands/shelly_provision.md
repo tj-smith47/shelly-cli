@@ -63,6 +63,9 @@ shelly provision [flags]
   # Provide WiFi credentials via flags (non-interactive)
   shelly provision --ssid MyNetwork --password secret --yes
 
+  # Provision every discovered device from a script (no selection, no prompt)
+  shelly provision --ssid MyNetwork --password secret --all --yes
+
   # Join a network that has no password
   shelly provision --ssid GuestWiFi --open --yes
 
@@ -92,7 +95,7 @@ shelly provision [flags]
 ### Options
 
 ```
-      --all                    Provision all discovered devices (non-interactive)
+      --all                    Provision every discovered device instead of choosing from a list
       --ap-only                Only discover via WiFi AP (Gen1 devices)
       --ble-only               Only discover via BLE (Gen2+ devices)
       --disable-ap             Turn off a Gen2+ device's access point once it answers on the LAN (WiFi AP onboarding)
@@ -113,7 +116,7 @@ shelly provision [flags]
       --target-ap string       Provision only the device whose AP SSID matches (non-interactive single device)
       --timeout duration       Discovery timeout (default 2m0s)
       --timezone string        Timezone to set on device
-  -y, --yes                    Skip confirmation prompts
+  -y, --yes                    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

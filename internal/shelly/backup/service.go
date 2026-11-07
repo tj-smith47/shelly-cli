@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 	"github.com/tj-smith47/shelly-go/gen1"
@@ -14,6 +15,27 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
+
+// Restore budgets. A Gen1 restore paces and probes each of its steps, waits
+// for the device clock before writing light config, and when timezone
+// autodetect left the device clockless it reboots the device and waits up to
+// four minutes for the boot-time timezone lookup. An AP restore adds the WiFi
+// hop, the AP pass, the device's reboot onto the LAN and the rejoin poll
+// before that same LAN restore.
+const (
+	LANRestoreTimeout = 8 * time.Minute
+	APRestoreTimeout  = 15 * time.Minute
+)
+
+// RestoreTimeout returns the context budget for one restore or migration:
+// APRestoreTimeout when it goes through a factory access point, otherwise
+// LANRestoreTimeout.
+func RestoreTimeout(toAP bool) time.Duration {
+	if toAP {
+		return APRestoreTimeout
+	}
+	return LANRestoreTimeout
+}
 
 // ShellyConnector provides connectivity to Shelly devices.
 // This interface is implemented by *shelly.BackupConnector.

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 )
 
 const commandUse = "clear"
@@ -32,10 +33,12 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Clear cached device data.
 
 Use flags to specify what to clear:
-  --all      Clear all cached data (requires confirmation)
+  --all      Clear all cached data
   --device   Clear cache for a specific device
   --type     Clear cache for a specific data type (requires --device)
-  --expired  Clear only expired entries`,
+  --expired  Clear only expired entries
+
+Each form asks for confirmation; pass --yes to skip the prompt in scripts.`,
 		Aliases: []string{"c", "rm", "clean"},
 		Example: `  # Clear all cache
   shelly cache clear --all
@@ -47,7 +50,10 @@ Use flags to specify what to clear:
   shelly cache clear --device kitchen --type firmware
 
   # Clear only expired entries
-  shelly cache clear --expired`,
+  shelly cache clear --expired
+
+  # Skip the confirmation prompt (scripts)
+  shelly cache clear --all --yes`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), opts)
 		},
@@ -57,7 +63,7 @@ Use flags to specify what to clear:
 	cmd.Flags().StringVarP(&opts.Device, "device", "d", "", "Clear cache for specific device")
 	cmd.Flags().StringVarP(&opts.Type, "type", "t", "", "Clear cache for specific data type (requires --device)")
 	cmd.Flags().BoolVarP(&opts.Expired, "expired", "e", false, "Clear only expired entries")
-	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	return cmd
 }
@@ -69,6 +75,43 @@ func run(_ context.Context, opts *Options) error {
 
 	if fc == nil {
 		ios.Info("Cache not available")
+		return nil
+	}
+
+	// Flag validation happens before the prompt so a bad invocation never asks.
+	if opts.Type != "" && opts.Device == "" {
+		return fmt.Errorf("--type requires --device flag")
+	}
+	if !opts.Expired && opts.Device == "" && !opts.All {
+		return fmt.Errorf("specify --all to clear all cache, --device for specific device, or --expired for cleanup")
+	}
+
+	var what string
+	switch {
+	case opts.Expired:
+		what = "Clear all expired cache entries?"
+	case opts.Device != "" && opts.Type != "":
+		what = fmt.Sprintf("Clear the %s cache for %s?", opts.Type, opts.Device)
+	case opts.Device != "":
+		what = fmt.Sprintf("Clear all cached data for %s?", opts.Device)
+	default:
+		stats, err := fc.Stats()
+		if err != nil {
+			return err
+		}
+		if stats.TotalEntries == 0 {
+			ios.Info("Cache is already empty")
+			return nil
+		}
+		what = fmt.Sprintf("Clear all %d cache entries?", stats.TotalEntries)
+	}
+
+	confirmed, err := opts.Factory.ConfirmAction(what, opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
 		return nil
 	}
 
@@ -105,39 +148,6 @@ func run(_ context.Context, opts *Options) error {
 		}
 		ios.Success("Cleared all cache for %s", opts.Device)
 		return nil
-	}
-
-	// --type without --device is not supported
-	if opts.Type != "" {
-		return fmt.Errorf("--type requires --device flag")
-	}
-
-	// --all flag required for full cache clear
-	if !opts.All {
-		return fmt.Errorf("specify --all to clear all cache, --device for specific device, or --expired for cleanup")
-	}
-
-	// Full cache clear - get stats first
-	stats, err := fc.Stats()
-	if err != nil {
-		return err
-	}
-
-	if stats.TotalEntries == 0 {
-		ios.Info("Cache is already empty")
-		return nil
-	}
-
-	// Confirm unless --yes
-	if !opts.Yes {
-		confirmed, err := ios.Confirm(fmt.Sprintf("Clear all %d cache entries?", stats.TotalEntries), false)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Info("Cancelled")
-			return nil
-		}
 	}
 
 	if err := fc.InvalidateAll(); err != nil {

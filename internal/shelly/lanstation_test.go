@@ -379,3 +379,64 @@ func TestPlanLANStation_Address(t *testing.T) {
 		})
 	}
 }
+
+// TestPlanLANStation_OtherDeviceAddress: a static address recorded by a backup
+// of another device is not copied onto the target, which keeps its own static
+// address; a DHCP target is refused without --static-ip; the same device,
+// --static-ip and a migration (CopyBackupAddress) keep the former rules.
+func TestPlanLANStation_OtherDeviceAddress(t *testing.T) {
+	t.Parallel()
+	const otherMAC, deviceMAC = "112233445566", "AABBCCDDEEFF"
+	tests := []struct {
+		name      string
+		gen       int
+		backupMAC string
+		staStatic string
+		ov        *backup.NetworkOverride
+		want      string
+		wantErr   bool
+	}{
+		{name: "gen1 other device, static target", gen: 1, backupMAC: otherMAC, staStatic: "10.0.0.7",
+			want: "static address 10.0.0.7 (gateway 10.0.0.1, netmask 255.255.255.0) kept from the device (the backup is of another device)"},
+		{name: "gen2 other device, static target", gen: 2, backupMAC: otherMAC, staStatic: "10.0.0.7",
+			want: "static address 10.0.0.7 (gateway 10.0.0.1, netmask 255.255.255.0) kept from the device (the backup is of another device)"},
+		{name: "other device, dhcp target", gen: 2, backupMAC: otherMAC, wantErr: true},
+		{name: "same device", gen: 2, backupMAC: deviceMAC, staStatic: "10.0.0.7",
+			want: "static address 10.0.0.5 (gateway 10.0.0.1, netmask 255.255.255.0) from the backup"},
+		{name: "same device by suffix", gen: 1, backupMAC: "ddeeff", staStatic: "10.0.0.7",
+			want: "static address 10.0.0.5 (gateway 10.0.0.1, netmask 255.255.255.0) from the backup"},
+		{name: "other device, --static-ip", gen: 2, backupMAC: otherMAC, ov: &backup.NetworkOverride{StaticIP: "10.0.0.9"},
+			want: "static address 10.0.0.9 (gateway 10.0.0.1, netmask 255.255.255.0) from --static-ip"},
+		{name: "other device, migration copies the source address", gen: 2, backupMAC: otherMAC,
+			ov:   &backup.NetworkOverride{CopyBackupAddress: true},
+			want: "static address 10.0.0.5 (gateway 10.0.0.1, netmask 255.255.255.0) from the backup"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			d := newAPDevServer(t, tt.gen)
+			d.staSSID, d.staStatic = "home", tt.staStatic
+			svc := New(d.resolver(tt.gen), WithRateLimiter(ratelimit.New()), WithWiFiScanner(&recordingScanner{}))
+			bkp := stationBackup(tt.gen, testStation{ssid: "home", key: "k", staticIP: "10.0.0.5"}, nil)
+			bkp.DeviceInfo.MAC = tt.backupMAC
+			bkp.WiFi = json.RawMessage(strings.Replace(string(bkp.WiFi), `"ip":"10.0.0.5"`,
+				`"ip":"10.0.0.5","gw":"10.0.0.1","mask":"255.255.255.0","netmask":"255.255.255.0"`, 1))
+			ov, plan, err := svc.PlanLANStation(context.Background(), "apdev", bkp, tt.ov, false)
+			if tt.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "pass --static-ip") {
+					t.Fatalf("PlanLANStation() error = %v, want a refusal naming --static-ip", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("PlanLANStation() error = %v", err)
+			}
+			if !strings.Contains(plan.String(), tt.want) {
+				t.Errorf("plan = %q, want it to contain %q", plan.String(), tt.want)
+			}
+			if strings.Contains(tt.want, "kept from the device") && (ov == nil || ov.StaticIP != tt.staStatic) {
+				t.Errorf("override = %+v, want StaticIP %s so the restore writes the kept address", ov, tt.staStatic)
+			}
+		})
+	}
+}

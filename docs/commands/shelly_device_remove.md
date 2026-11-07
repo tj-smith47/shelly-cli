@@ -19,8 +19,8 @@ shelly device remove <name> [flags]
   # Remove a device
   shelly device remove kitchen
 
-  # Remove with force (skip confirmation)
-  shelly device remove kitchen --force
+  # Skip the confirmation prompt (scripts)
+  shelly device remove kitchen --yes
 
   # Short form
   shelly dev rm bedroom
@@ -29,8 +29,8 @@ shelly device remove <name> [flags]
 ### Options
 
 ```
-  -f, --force   Skip confirmation prompt
-  -h, --help    help for remove
+  -h, --help   help for remove
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

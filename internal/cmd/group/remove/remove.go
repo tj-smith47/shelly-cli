@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 )
 
 // Options holds the options for the remove command.
@@ -14,6 +15,7 @@ type Options struct {
 	Factory   *cmdutil.Factory
 	Devices   []string
 	GroupName string
+	Yes       bool
 }
 
 // NewCommand creates the group remove command.
@@ -38,7 +40,10 @@ Removing a device from a group does not delete the device.`,
   shelly group rm bedroom lamp
 
   # Short form
-  shelly grp rm office 192.168.1.100`,
+  shelly grp rm office 192.168.1.100
+
+  # Skip the confirmation prompt (scripts)
+  shelly group remove living-room light-1 --yes`,
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
 			opts.GroupName = args[0]
@@ -46,6 +51,8 @@ Removing a device from a group does not delete the device.`,
 			return run(opts)
 		},
 	}
+
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	return cmd
 }
@@ -56,6 +63,15 @@ func run(opts *Options) error {
 	// Check if group exists
 	if opts.Factory.GetGroup(opts.GroupName) == nil {
 		return fmt.Errorf("group %q not found", opts.GroupName)
+	}
+
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Remove %d device(s) from group %q?", len(opts.Devices), opts.GroupName), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	// Get config manager for mutations

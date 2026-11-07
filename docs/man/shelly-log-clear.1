@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-log-clear - Clear log file
@@ -16,6 +16,10 @@ Clear all entries from the CLI log file.
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
 	help for clear
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -83,6 +87,9 @@ Clear all entries from the CLI log file.
 .EX
   # Clear log file
   shelly log clear
+
+  # Skip the confirmation prompt (scripts)
+  shelly log clear --yes
 .EE
 
 

@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-sync - Synchronize device configurations
@@ -28,6 +28,11 @@ its own. A station on another network is written with the password stored on
 this host for it; with no stored password it is left out with a warning, and
 the network can be set with 'shelly wifi set'.
 
+.PP
+--push overwrites device configuration, so it asks for confirmation first;
+pass --yes to skip the prompt (required when there is no terminal, such as in
+a script). --dry-run never prompts.
+
 
 .SH OPTIONS
 \fB--device\fP=[]
@@ -48,6 +53,10 @@ the network can be set with 'shelly wifi set'.
 .PP
 \fB--push\fP[=false]
 	Push local configs to devices
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -121,6 +130,9 @@ the network can be set with 'shelly wifi set'.
 
   # Preview sync without making changes
   shelly sync --pull --dry-run
+
+  # Push from a script (no confirmation prompt)
+  shelly sync --push --yes
 .EE
 
 

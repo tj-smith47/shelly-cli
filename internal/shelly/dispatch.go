@@ -151,7 +151,7 @@ func (s *Service) SupportsPluginCommand(device model.Device, command string) err
 	const componentCover = "cover"
 	var hookAvailable bool
 	switch command {
-	case "on", "off", "toggle", "switch", "light", componentCover: //nolint:goconst // switch is a command keyword
+	case "on", "off", "toggle", "switch", "light", componentCover:
 		hookAvailable = plugin.Manifest.Hooks.Control != ""
 	case "status":
 		hookAvailable = plugin.Manifest.Hooks.Status != ""

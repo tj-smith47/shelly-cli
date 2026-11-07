@@ -3,6 +3,7 @@ package deletecmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -156,7 +157,7 @@ func TestRun_DeleteExisting(t *testing.T) {
 	}
 
 	// Delete it
-	opts := &Options{Factory: tf.Factory, Name: testName}
+	opts := &Options{Factory: tf.Factory, Name: testName, Yes: true}
 	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
@@ -170,5 +171,34 @@ func TestRun_DeleteExisting(t *testing.T) {
 	out := tf.OutString()
 	if !strings.Contains(out, "Deleted") {
 		t.Errorf("Output should contain 'Deleted', got: %s", out)
+	}
+}
+
+//nolint:paralleltest // SetupTestFs swaps the global filesystem.
+func TestRun_ConfirmGate(t *testing.T) {
+	fs := factory.SetupTestFs(t)
+	tf := factory.NewTestFactory(t)
+	mockDir, err := mock.Dir()
+	if err != nil {
+		t.Fatalf("mock.Dir: %v", err)
+	}
+	filename := filepath.Join(mockDir, "gate.json")
+	if err := afero.WriteFile(fs, filename, []byte(`{"name":"gate"}`), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	err = run(context.Background(), &Options{Factory: tf.Factory, Name: "gate"})
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("no terminal, no --yes: error = %v, want ErrConfirmationRequired", err)
+	}
+	if _, err := fs.Stat(filename); err != nil {
+		t.Fatal("mock file deleted without confirmation")
+	}
+
+	if err := run(context.Background(), &Options{Factory: tf.Factory, Name: "gate", Yes: true}); err != nil {
+		t.Fatalf("--yes: error = %v", err)
+	}
+	if _, err := fs.Stat(filename); err == nil {
+		t.Fatal("mock file still present after --yes")
 	}
 }

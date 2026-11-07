@@ -15,6 +15,10 @@ By default, everything from the backup is restored including network
 and authentication settings. Use --skip-* flags to exclude specific
 sections.
 
+The restore overwrites the device's current configuration, so it asks for
+confirmation first; pass --yes to skip the prompt (required when there is no
+terminal, such as in a script). --dry-run never prompts.
+
 ```
 shelly backup restore <device> <file> [flags]
 ```
@@ -27,6 +31,9 @@ shelly backup restore <device> <file> [flags]
 
   # Dry run - show what would change
   shelly backup restore living-room backup.json --dry-run
+
+  # Restore from a script (no confirmation prompt)
+  shelly backup restore living-room backup.json --yes
 
   # Restore without network config (keep current WiFi)
   shelly backup restore living-room backup.json --skip-network
@@ -96,8 +103,9 @@ shelly backup restore <device> <file> [flags]
       --skip-state                 Skip restoring live component state (color temperature, brightness); apply configuration only
       --skip-webhooks              Skip webhook restoration
       --ssid string                Override the WiFi SSID the device joins (defaults to the backup's network)
-      --static-ip string           Override the backup's WiFi with this static IPv4 address (--gateway, --netmask and --dns default to the backup's)
+      --static-ip string           Static IPv4 address for the device (default: the backup's own; a backup of another device keeps the target's current static address, and refuses a DHCP target without this flag; --gateway, --netmask and --dns default to the backup's)
       --to-ap string               Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)
+  -y, --yes                        Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

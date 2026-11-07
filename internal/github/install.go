@@ -320,10 +320,10 @@ func (c *Client) PerformRollback(ctx context.Context, ios *iostreams.IOStreams, 
 
 	confirmed, err := confirm("Proceed with rollback?", skipConfirm)
 	if err != nil {
-		return fmt.Errorf("failed to read confirmation: %w", err)
+		return err
 	}
 	if !confirmed {
-		ios.Info("Rollback cancelled")
+		ios.Info("Cancelled")
 		return nil
 	}
 
@@ -336,11 +336,11 @@ func (c *Client) PerformUpdate(ctx context.Context, ios *iostreams.IOStreams, re
 
 	confirmed, err := confirm("\nProceed with update?", skipConfirm)
 	if err != nil {
-		return fmt.Errorf("failed to read confirmation: %w", err)
+		return err
 	}
 	if !confirmed {
-		ios.Info("Update cancelled")
-		return fmt.Errorf("update cancelled by user")
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	return c.InstallRelease(ctx, ios, release)

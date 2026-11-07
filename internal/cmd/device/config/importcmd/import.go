@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
@@ -21,6 +22,7 @@ type Options struct {
 	Device   string
 	FilePath string
 	DryRun   bool
+	Yes      bool
 }
 
 // NewCommand creates the config import command.
@@ -45,12 +47,19 @@ address (ip, netmask, gw, nameserver, ipv4mode), and its network is written
 only when the device is not already on it and this host has its password. A
 station that cannot be written that way is left out with a warning; set it
 with 'shelly wifi set'. --dry-run shows each station's planned write without
-its password.`,
+its password.
+
+The import changes the device's configuration, so it asks for confirmation
+first; pass --yes to skip the prompt (required when there is no terminal, such
+as in a script). --dry-run never prompts.`,
 		Example: `  # Import configuration
   shelly device config import living-room config-backup.json
 
   # Dry run - show what would change without applying
-  shelly device config import living-room config.json --dry-run`,
+  shelly device config import living-room config.json --dry-run
+
+  # Import from a script (no confirmation prompt)
+  shelly device config import living-room config.json --yes`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
@@ -60,6 +69,7 @@ its password.`,
 	}
 
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would be changed without applying")
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	return cmd
 }
@@ -85,6 +95,18 @@ func run(ctx context.Context, opts *Options) error {
 
 	svc := opts.Factory.ShellyService()
 	ios := opts.Factory.IOStreams()
+
+	if !opts.DryRun {
+		confirmed, err := opts.Factory.ConfirmAction(
+			fmt.Sprintf("Import %s into %s? This changes the device's configuration", opts.FilePath, opts.Device), opts.Yes)
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			ios.Info("Cancelled")
+			return nil
+		}
+	}
 
 	var changes, warnings []string
 	msg := "Importing configuration..."

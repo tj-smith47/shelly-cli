@@ -2,6 +2,7 @@ package update
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -604,7 +605,7 @@ func TestRun_NonDev_Rollback(t *testing.T) {
 }
 
 //nolint:paralleltest // Cannot run in parallel - modifies global version.Version and GitHubAPIBaseURL
-func TestRun_NonDev_UpdateWithConfirmation_Declined(t *testing.T) {
+func TestRun_NonDev_UpdateRefusedWithoutYes(t *testing.T) {
 	// Set a non-dev version
 	oldVersion := version.Version
 	version.Version = "v1.0.0"
@@ -616,17 +617,36 @@ func TestRun_NonDev_UpdateWithConfirmation_Declined(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
-	// No --yes flag means confirmation is required
-	// In non-TTY test mode, confirmation returns false by default
+	// Without --yes and without a terminal the gate refuses instead of
+	// silently declining, so a script that forgot --yes exits non-zero.
 	cmd.SetArgs([]string{})
 
 	err := cmd.Execute()
-	// PerformUpdate returns "update cancelled by user" error when declined
-	if err == nil {
-		t.Fatal("Expected 'update cancelled by user' error")
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("Execute() error = %v, want ErrConfirmationRequired", err)
 	}
+}
 
-	if !strings.Contains(err.Error(), "update cancelled by user") {
-		t.Errorf("Expected 'update cancelled by user' error, got: %v", err)
+//nolint:paralleltest // Cannot run in parallel - modifies global version.Version and GitHubAPIBaseURL
+func TestRun_NonDev_RollbackRefusedWithoutYes(t *testing.T) {
+	oldVersion := version.Version
+	version.Version = "v2.0.0"
+	defer func() { version.Version = oldVersion }()
+
+	releases := []github.Release{
+		mockRelease("v2.0.0", false),
+		mockRelease("v1.5.0", false),
+	}
+	setupMockGitHubServer(t, &releases[0], releases)
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"--rollback"})
+
+	// No --yes and no terminal: the gate refuses before any download, so the
+	// "no binary" failure the --yes test hits is never reached.
+	err := cmd.Execute()
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("Execute() error = %v, want ErrConfirmationRequired", err)
 	}
 }

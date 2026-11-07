@@ -3,6 +3,7 @@ package importcmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -339,7 +340,7 @@ func TestRun_OverwriteMode(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	// merge=false means overwrite existing
-	opts := &Options{Factory: tf.Factory, Filename: aliasFile, Merge: false}
+	opts := &Options{Factory: tf.Factory, Filename: aliasFile, Merge: false, Yes: true}
 	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -738,5 +739,44 @@ func TestNewCommand_HasRunE(t *testing.T) {
 
 	if cmd.RunE == nil {
 		t.Error("RunE is nil")
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via t.Setenv and ResetDefaultManagerForTesting.
+func TestRun_ConfirmGate(t *testing.T) {
+	tmpDir := setupTestConfigEnv(t)
+	if err := config.AddAlias("st", "existing command", false); err != nil {
+		t.Fatalf("failed to add existing alias: %v", err)
+	}
+	aliasFile := tmpDir + "/gate.yaml"
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte("aliases:\n  st: \"status kitchen\"\n  fresh: \"device list\"\n"), 0o600); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+	tf := factory.NewTestFactory(t)
+
+	err := run(&Options{Factory: tf.Factory, Filename: aliasFile})
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("overwrite without terminal or --yes: error = %v, want ErrConfirmationRequired", err)
+	}
+	if a, _ := config.GetAlias("st"); a.Command != "existing command" {
+		t.Fatalf("alias overwritten without confirmation: %+v", a)
+	}
+	if _, ok := config.GetAlias("fresh"); ok {
+		t.Fatal("new alias imported although the import was refused")
+	}
+
+	// --merge adds without overwriting, so it never prompts.
+	if err := run(&Options{Factory: tf.Factory, Filename: aliasFile, Merge: true}); err != nil {
+		t.Fatalf("--merge: error = %v", err)
+	}
+	if a, _ := config.GetAlias("st"); a.Command != "existing command" {
+		t.Fatalf("--merge overwrote an alias: %+v", a)
+	}
+
+	if err := run(&Options{Factory: tf.Factory, Filename: aliasFile, Yes: true}); err != nil {
+		t.Fatalf("--yes: error = %v", err)
+	}
+	if a, _ := config.GetAlias("st"); a.Command != "status kitchen" {
+		t.Fatalf("alias not overwritten with --yes: %+v", a)
 	}
 }

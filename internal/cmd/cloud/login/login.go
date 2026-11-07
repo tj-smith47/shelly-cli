@@ -172,7 +172,10 @@ func run(ctx context.Context, opts *Options) error {
 				return fmt.Errorf("authentication failed: %w", err)
 			}
 
-			cfg := config.Get()
+			cfg, err := opts.Factory.Config()
+			if err != nil {
+				return err
+			}
 			cfg.Cloud.Enabled = true
 			cfg.Cloud.AuthKey = authKey
 			cfg.Cloud.ServerURL = serverURL
@@ -233,7 +236,10 @@ func run(ctx context.Context, opts *Options) error {
 				return fmt.Errorf("authentication failed: %w", err)
 			}
 
-			cfg := config.Get()
+			cfg, err := opts.Factory.Config()
+			if err != nil {
+				return err
+			}
 			cfg.Cloud.Enabled = true
 			cfg.Cloud.Email = email
 			cfg.Cloud.AccessToken = result.Token
@@ -348,7 +354,10 @@ func run(ctx context.Context, opts *Options) error {
 			return fmt.Errorf("failed to exchange code: %w", err)
 		}
 
-		cfg := config.Get()
+		cfg, err := opts.Factory.Config()
+		if err != nil {
+			return err
+		}
 		cfg.Cloud.Enabled = true
 		cfg.Cloud.AccessToken = token.AccessToken
 		cfg.Cloud.ServerURL = token.UserAPIURL

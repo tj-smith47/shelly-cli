@@ -4,6 +4,7 @@ package sync
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -24,6 +25,7 @@ type Options struct {
 	DryRun  bool
 	Pull    bool
 	Push    bool
+	Yes     bool
 }
 
 // NewCommand creates the sync command.
@@ -47,7 +49,11 @@ pulled from, so a station keeps its saved address. A station on the network
 the device is already on is written without a password, and the device keeps
 its own. A station on another network is written with the password stored on
 this host for it; with no stored password it is left out with a warning, and
-the network can be set with 'shelly wifi set'.`,
+the network can be set with 'shelly wifi set'.
+
+--push overwrites device configuration, so it asks for confirmation first;
+pass --yes to skip the prompt (required when there is no terminal, such as in
+a script). --dry-run never prompts.`,
 		Example: `  # Pull all device configs to local storage
   shelly sync --pull
 
@@ -55,7 +61,10 @@ the network can be set with 'shelly wifi set'.`,
   shelly sync --push --device kitchen-light
 
   # Preview sync without making changes
-  shelly sync --pull --dry-run`,
+  shelly sync --pull --dry-run
+
+  # Push from a script (no confirmation prompt)
+  shelly sync --push --yes`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), opts)
 		},
@@ -64,9 +73,47 @@ the network can be set with 'shelly wifi set'.`,
 	cmd.Flags().BoolVar(&opts.Push, "push", false, "Push local configs to devices")
 	cmd.Flags().BoolVar(&opts.Pull, "pull", false, "Pull device configs to local storage")
 	flags.AddDryRunFlag(cmd, &opts.DryRun)
+	flags.AddYesFlag(cmd, &opts.Yes)
 	cmd.Flags().StringSliceVar(&opts.Devices, "device", nil, "Specific devices to sync (default: all)")
 
 	return cmd
+}
+
+// pull downloads the selected (default: every configured) device's config
+// into syncDir.
+func (o *Options) pull(ctx context.Context, svc *shelly.Service, syncDir string, progress func(shelly.SyncDeviceResult)) error {
+	ios := o.Factory.IOStreams()
+	cfg, err := o.Factory.Config()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	devices := o.Devices
+	if len(devices) == 0 {
+		for name := range cfg.Devices {
+			devices = append(devices, name)
+		}
+	}
+
+	if len(devices) == 0 {
+		ios.Warning("No devices configured. Add devices with 'shelly config device add'")
+		return nil
+	}
+
+	term.DisplaySyncHeader(ios, "Pulling", len(devices), o.DryRun)
+	success, failed := svc.PullDeviceConfigs(ctx, devices, syncDir, o.DryRun, progress)
+	term.DisplaySyncSummary(ios, success, failed, o.DryRun, syncDir)
+	return nil
+}
+
+// pushConfirmMessage names the sync directory and the devices --push would
+// overwrite.
+func (o *Options) pushConfirmMessage(syncDir string) string {
+	scope := "every device with a saved config"
+	if len(o.Devices) > 0 {
+		scope = strings.Join(o.Devices, ", ")
+	}
+	return fmt.Sprintf("Push saved configs from %s to %s? This overwrites device configuration", syncDir, scope)
 }
 
 func run(ctx context.Context, opts *Options) error {
@@ -92,30 +139,20 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if opts.Pull {
-		cfg, err := opts.Factory.Config()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-
-		devices := opts.Devices
-		if len(devices) == 0 {
-			for name := range cfg.Devices {
-				devices = append(devices, name)
-			}
-		}
-
-		if len(devices) == 0 {
-			ios.Warning("No devices configured. Add devices with 'shelly config device add'")
-			return nil
-		}
-
-		term.DisplaySyncHeader(ios, "Pulling", len(devices), opts.DryRun)
-		success, failed := svc.PullDeviceConfigs(ctx, devices, syncDir, opts.DryRun, progress)
-		term.DisplaySyncSummary(ios, success, failed, opts.DryRun, syncDir)
-		return nil
+		return opts.pull(ctx, svc, syncDir, progress)
 	}
 
-	// Push operation
+	if !opts.DryRun {
+		confirmed, err := opts.Factory.ConfirmAction(opts.pushConfirmMessage(syncDir), opts.Yes)
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			ios.Info("Cancelled")
+			return nil
+		}
+	}
+
 	term.DisplaySyncHeader(ios, "Pushing", 0, opts.DryRun)
 	success, failed, skipped, err := svc.PushDeviceConfigs(ctx, syncDir, opts.Devices, opts.DryRun, progress)
 	if err != nil {

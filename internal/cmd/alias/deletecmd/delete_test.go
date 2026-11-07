@@ -2,6 +2,7 @@ package deletecmd
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -153,15 +154,12 @@ func TestRun_ShortYesFlag(t *testing.T) {
 //
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_WithoutYesConfirmsFirst(t *testing.T) {
-	mgr, out, err := newAliasDeleteTest(t, "lights")
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
+	mgr, _, err := newAliasDeleteTest(t, "lights")
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Errorf("Execute error = %v, want cmdutil.ErrConfirmationRequired", err)
 	}
 	if !mgr.IsAlias("lights") {
 		t.Error("alias must not be deleted without confirmation")
-	}
-	if !strings.Contains(out.String(), "cancelled") {
-		t.Errorf("expected 'cancelled' in output, got: %s", out.String())
 	}
 }
 

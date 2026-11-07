@@ -3,6 +3,7 @@ package install
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -385,7 +386,7 @@ func TestExecute_LoadCertDataError_NonexistentCAFile(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-device", "--ca", "/nonexistent/path/to/ca.pem"})
+	cmd.SetArgs([]string{"test-device", "--ca", "/nonexistent/path/to/ca.pem", "--yes"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -441,7 +442,7 @@ func TestExecute_Gen1DeviceError(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"gen1-device", "--ca", caFile})
+	cmd.SetArgs([]string{"gen1-device", "--ca", caFile, "--yes"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -497,7 +498,7 @@ func TestExecute_Gen2DeviceWithCA(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"gen2-device", "--ca", caFile})
+	cmd.SetArgs([]string{"gen2-device", "--ca", caFile, "--yes"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -559,7 +560,7 @@ func TestExecute_Gen2DeviceWithClientCert(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"gen2-device", "--client-cert", certFile, "--client-key", keyFile})
+	cmd.SetArgs([]string{"gen2-device", "--client-cert", certFile, "--client-key", keyFile, "--yes"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -625,7 +626,7 @@ func TestExecute_Gen2DeviceWithBothCerts(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"gen2-device", "--ca", caFile, "--client-cert", certFile, "--client-key", keyFile})
+	cmd.SetArgs([]string{"gen2-device", "--ca", caFile, "--client-cert", certFile, "--client-key", keyFile, "--yes"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -688,7 +689,7 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"nonexistent-device", "--ca", caFile})
+	cmd.SetArgs([]string{"nonexistent-device", "--ca", caFile, "--yes"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -713,7 +714,7 @@ func TestExecute_LoadCertDataError_NonexistentClientKey(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-device", "--client-cert", certFile, "--client-key", "/nonexistent/key.pem"})
+	cmd.SetArgs([]string{"test-device", "--client-cert", certFile, "--client-key", "/nonexistent/key.pem", "--yes"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -725,4 +726,74 @@ func TestExecute_LoadCertDataError_NonexistentClientKey(t *testing.T) {
 	if !strings.Contains(err.Error(), "read client key") {
 		t.Errorf("error should mention 'read client key', got: %v", err)
 	}
+}
+
+//nolint:paralleltest // Swaps the global config filesystem and config manager.
+func TestExecute_ConfirmGate(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	caFile := testCertDir + "/gate-ca.pem"
+	if err := afero.WriteFile(fs, caFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
+		t.Fatalf("failed to create CA file: %v", err)
+	}
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gate-gen2",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gate-gen2": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	t.Run("no terminal without --yes refuses", func(t *testing.T) {
+		tf := factory.NewTestFactory(t)
+		demo.InjectIntoFactory(tf.Factory)
+		cmd := NewCommand(tf.Factory)
+		cmd.SetContext(context.Background())
+		cmd.SetArgs([]string{"gate-gen2", "--ca", caFile})
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+
+		if err := cmd.Execute(); !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+			t.Fatalf("Execute() error = %v, want ErrConfirmationRequired", err)
+		}
+		if strings.Contains(tf.OutString(), "Installed") {
+			t.Fatalf("certificate installed without confirmation: %q", tf.OutString())
+		}
+	})
+
+	t.Run("--yes installs", func(t *testing.T) {
+		tf := factory.NewTestFactory(t)
+		demo.InjectIntoFactory(tf.Factory)
+		cmd := NewCommand(tf.Factory)
+		cmd.SetContext(context.Background())
+		cmd.SetArgs([]string{"gate-gen2", "--ca", caFile, "--yes"})
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(tf.OutString(), "Installed CA certificate") {
+			t.Fatalf("expected success message, got %q", tf.OutString())
+		}
+	})
 }

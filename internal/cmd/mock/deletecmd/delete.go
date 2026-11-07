@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
@@ -17,6 +18,7 @@ import (
 type Options struct {
 	Factory *cmdutil.Factory
 	Name    string
+	Yes     bool
 }
 
 // NewCommand creates the mock delete command.
@@ -29,13 +31,19 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Delete a mock device",
 		Long:    `Delete a mock device configuration.`,
 		Example: `  # Delete mock device
-  shelly mock delete kitchen`,
+  shelly mock delete kitchen
+
+  # Skip the confirmation prompt (scripts)
+  shelly mock delete kitchen --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Name = args[0]
 			return run(cmd.Context(), opts)
 		},
 	}
+
+	flags.AddYesFlag(cmd, &opts.Yes)
+
 	return cmd
 }
 
@@ -51,6 +59,15 @@ func run(_ context.Context, opts *Options) error {
 	filename := filepath.Join(mockDir, opts.Name+".json")
 	if _, err := fs.Stat(filename); err != nil {
 		return fmt.Errorf("mock device not found: %s", opts.Name)
+	}
+
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Delete mock device %q?", opts.Name), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	if err := fs.Remove(filename); err != nil {

@@ -2,9 +2,12 @@
 package remove
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
@@ -13,6 +16,7 @@ import (
 type Options struct {
 	Factory *cmdutil.Factory
 	Name    string
+	Yes     bool
 }
 
 // NewCommand creates the extension remove command.
@@ -28,7 +32,10 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 Only extensions installed in the user plugins directory can be removed.
 Extensions found in PATH cannot be removed with this command.`,
 		Example: `  # Remove an extension
-  shelly extension remove myext`,
+  shelly extension remove myext
+
+  # Skip the confirmation prompt (scripts)
+  shelly extension remove myext --yes`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.ExtensionNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -36,6 +43,8 @@ Extensions found in PATH cannot be removed with this command.`,
 			return run(opts)
 		},
 	}
+
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	return cmd
 }
@@ -46,6 +55,20 @@ func run(opts *Options) error {
 	registry, err := plugins.NewRegistry()
 	if err != nil {
 		return err
+	}
+
+	if !registry.IsInstalled(opts.Name) {
+		// Remove explains why: unknown name, or a plugin found on PATH outside the plugins directory.
+		return registry.Remove(opts.Name)
+	}
+
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Remove extension %q?", opts.Name), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	if err := registry.Remove(opts.Name); err != nil {

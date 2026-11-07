@@ -2,6 +2,7 @@ package reset
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -121,14 +122,8 @@ func TestRun_Cancelled(t *testing.T) {
 	cmd.SetErr(errOut)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Warning goes to stderr
-	errOutput := errOut.String()
-	if !strings.Contains(errOutput, "cancelled") {
-		t.Errorf("expected 'cancelled' in stderr, got: %s", errOutput)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Errorf("Execute() error = %v, want cmdutil.ErrConfirmationRequired", err)
 	}
 }
 

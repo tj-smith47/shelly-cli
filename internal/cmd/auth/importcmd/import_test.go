@@ -3,6 +3,7 @@ package importcmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -501,11 +502,22 @@ func TestRun_ImportWithTestFactory(t *testing.T) {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
+	// Without a terminal and without --yes the import refuses before writing.
 	cmd := NewCommand(tf.Factory)
 	cmd.SetArgs([]string{credFile})
 	cmd.SetOut(tf.TestIO.Out)
 	cmd.SetErr(tf.TestIO.ErrOut)
+	if err = cmd.Execute(); !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("error without --yes = %v, want ErrConfirmationRequired", err)
+	}
+	if strings.Contains(tf.OutString(), "Imported") {
+		t.Fatalf("credentials were imported without confirmation: %s", tf.OutString())
+	}
 
+	cmd = NewCommand(tf.Factory)
+	cmd.SetArgs([]string{credFile, "--yes"})
+	cmd.SetOut(tf.TestIO.Out)
+	cmd.SetErr(tf.TestIO.ErrOut)
 	err = cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

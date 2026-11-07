@@ -6,8 +6,9 @@ Import aliases from a YAML file
 
 Import command aliases from a YAML file.
 
-By default, existing aliases with the same name are overwritten.
-Use --merge to skip existing aliases instead of overwriting them.
+By default, existing aliases with the same name are overwritten after a
+confirmation prompt; pass --yes to skip the prompt in scripts. Use --merge to
+skip existing aliases instead of overwriting them.
 
 The file format is:
   aliases:
@@ -27,6 +28,9 @@ shelly alias import <file> [flags]
 
   # Import without overwriting existing aliases
   shelly alias import aliases.yaml --merge
+
+  # Overwrite existing aliases without the prompt (scripts)
+  shelly alias import aliases.yaml --yes
 ```
 
 ### Options
@@ -34,6 +38,7 @@ shelly alias import <file> [flags]
 ```
   -h, --help    help for import
   -m, --merge   Merge with existing aliases (skip conflicts)
+  -y, --yes     Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

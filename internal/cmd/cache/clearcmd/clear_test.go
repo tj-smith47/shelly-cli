@@ -323,7 +323,7 @@ func TestRun_ClearDevice(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	tf.SetFileCache(fc)
 
-	opts := &Options{Factory: tf.Factory, Device: "kitchen"}
+	opts := &Options{Factory: tf.Factory, Device: "kitchen", Yes: true}
 	if err := run(context.Background(), opts); err != nil {
 		t.Errorf("run returned error: %v", err)
 	}
@@ -369,7 +369,7 @@ func TestRun_ClearDeviceType(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	tf.SetFileCache(fc)
 
-	opts := &Options{Factory: tf.Factory, Device: "kitchen", Type: "deviceinfo"}
+	opts := &Options{Factory: tf.Factory, Device: "kitchen", Type: "deviceinfo", Yes: true}
 	if err := run(context.Background(), opts); err != nil {
 		t.Errorf("run returned error: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestRun_ExpiredCleanup(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	tf.SetFileCache(fc)
 
-	opts := &Options{Factory: tf.Factory, Expired: true}
+	opts := &Options{Factory: tf.Factory, Expired: true, Yes: true}
 	err = run(context.Background(), opts)
 
 	if err != nil {
@@ -503,10 +503,12 @@ func TestRun_ViaCommand(t *testing.T) {
 	}
 }
 
-// TestRun_ConfirmationDeclined tests when user declines confirmation.
+// TestRun_NoTerminalWithoutYes_Refuses drives every clearing form without a
+// terminal and without --yes: each one returns ErrConfirmationRequired and the
+// cache is untouched.
 //
 //nolint:paralleltest // Uses SetupTestFs which calls t.Setenv
-func TestRun_ConfirmationDeclined(t *testing.T) {
+func TestRun_NoTerminalWithoutYes_Refuses(t *testing.T) {
 	memFs := factory.SetupTestFs(t)
 
 	fc, err := cache.NewWithFs("/cache", memFs)
@@ -519,33 +521,69 @@ func TestRun_ConfirmationDeclined(t *testing.T) {
 		t.Fatalf("Failed to set cache: %v", err)
 	}
 
-	// Use test IO with "n" input for confirmation
-	testIO := factory.NewTestIOStreams()
-	testIO.In.WriteString("n\n")
-
 	tf := factory.NewTestFactory(t)
-	tf.SetIOStreams(testIO.IOStreams)
 	tf.SetFileCache(fc)
 
-	opts := &Options{Factory: tf.Factory, All: true, Yes: false}
-	err = run(context.Background(), opts)
+	for name, opts := range map[string]*Options{
+		"all":         {Factory: tf.Factory, All: true},
+		"device":      {Factory: tf.Factory, Device: "device1"},
+		"device type": {Factory: tf.Factory, Device: "device1", Type: "deviceinfo"},
+		"expired":     {Factory: tf.Factory, Expired: true},
+	} {
+		err := run(context.Background(), opts)
+		if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+			t.Errorf("%s: run() error = %v, want ErrConfirmationRequired", name, err)
+		}
+		entry, getErr := fc.Get("device1", "deviceinfo")
+		if getErr != nil || entry == nil {
+			t.Errorf("%s: cache entry removed without confirmation (entry=%v err=%v)", name, entry, getErr)
+		}
+	}
+	if out := tf.OutString(); strings.Contains(out, "Cleared") || strings.Contains(out, "Removed") {
+		t.Errorf("output reports a clear that must not have happened: %q", out)
+	}
+}
 
+// TestRun_Yes_ClearsEveryForm proves --yes performs each clearing form.
+//
+//nolint:paralleltest // Uses SetupTestFs which calls t.Setenv
+func TestRun_Yes_ClearsEveryForm(t *testing.T) {
+	memFs := factory.SetupTestFs(t)
+
+	fc, err := cache.NewWithFs("/cache", memFs)
 	if err != nil {
-		t.Errorf("run should not error when declined: %v", err)
+		t.Fatalf("Failed to create file cache: %v", err)
 	}
+	for _, dev := range []string{"a", "b", "c", "d"} {
+		if err := fc.Set(dev, "deviceinfo", map[string]string{"id": dev}, cache.TTLDeviceInfo); err != nil {
+			t.Fatalf("Failed to set cache: %v", err)
+		}
+	}
+	tf := factory.NewTestFactory(t)
+	tf.SetFileCache(fc)
 
-	combined := testIO.OutString() + testIO.ErrString()
-	if !strings.Contains(combined, "Cancelled") {
-		t.Errorf("Expected 'Cancelled' message, got: %q", combined)
-	}
-
-	// Cache should NOT be cleared
-	entry, getErr := fc.Get("device1", "deviceinfo")
-	if getErr != nil {
-		t.Errorf("Get error: %v", getErr)
-	}
-	if entry == nil {
-		t.Error("Cache should NOT be cleared after declining")
+	for _, tc := range []struct {
+		opts *Options
+		gone string
+	}{
+		{&Options{Factory: tf.Factory, Device: "a", Type: "deviceinfo", Yes: true}, "a"},
+		{&Options{Factory: tf.Factory, Device: "b", Yes: true}, "b"},
+		{&Options{Factory: tf.Factory, Expired: true, Yes: true}, ""},
+		{&Options{Factory: tf.Factory, All: true, Yes: true}, "c"},
+	} {
+		if err := run(context.Background(), tc.opts); err != nil {
+			t.Fatalf("run(%+v) error = %v", tc.opts, err)
+		}
+		if tc.gone == "" {
+			continue
+		}
+		entry, getErr := fc.Get(tc.gone, "deviceinfo")
+		if getErr != nil {
+			t.Fatalf("Get(%s) error = %v", tc.gone, getErr)
+		}
+		if entry != nil {
+			t.Errorf("%s still cached after run(%+v)", tc.gone, tc.opts)
+		}
 	}
 }
 
@@ -606,7 +644,7 @@ func TestRun_ExpiredWithEntries(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	tf.SetFileCache(fc)
 
-	opts := &Options{Factory: tf.Factory, Expired: true}
+	opts := &Options{Factory: tf.Factory, Expired: true, Yes: true}
 	err = run(context.Background(), opts)
 
 	if err != nil {
@@ -647,7 +685,7 @@ func TestRun_ExpiredMultipleEntries(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	tf.SetFileCache(fc)
 
-	opts := &Options{Factory: tf.Factory, Expired: true}
+	opts := &Options{Factory: tf.Factory, Expired: true, Yes: true}
 	err = run(context.Background(), opts)
 
 	if err != nil {
@@ -662,10 +700,8 @@ func TestRun_ExpiredMultipleEntries(t *testing.T) {
 	}
 }
 
-// Note: TestRun_ConfirmationAccepted cannot be tested because test IOStreams
-// are non-TTY, so CanPrompt() returns false and Confirm() always returns
-// the default value (false). Interactive confirmation requires a real TTY.
-// The --yes flag path is tested in other tests (TestRun, TestRun_ViaCommand).
+// Interactive acceptance needs a real TTY; the --yes path and the no-terminal
+// refusal are covered above.
 
 // =============================================================================
 // Error path tests using failing filesystem
@@ -725,7 +761,7 @@ func TestRun_CleanupError(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	tf.SetFileCache(fcFail)
 
-	opts := &Options{Factory: tf.Factory, Expired: true}
+	opts := &Options{Factory: tf.Factory, Expired: true, Yes: true}
 	err = run(context.Background(), opts)
 
 	if err == nil {
@@ -759,7 +795,7 @@ func TestRun_InvalidateError(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	tf.SetFileCache(fcFail)
 
-	opts := &Options{Factory: tf.Factory, Device: "kitchen", Type: "deviceinfo"}
+	opts := &Options{Factory: tf.Factory, Device: "kitchen", Type: "deviceinfo", Yes: true}
 	err = run(context.Background(), opts)
 
 	if err == nil {
@@ -793,7 +829,7 @@ func TestRun_InvalidateDeviceError(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	tf.SetFileCache(fcFail)
 
-	opts := &Options{Factory: tf.Factory, Device: "kitchen"}
+	opts := &Options{Factory: tf.Factory, Device: "kitchen", Yes: true}
 	err = run(context.Background(), opts)
 
 	if err == nil {

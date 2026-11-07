@@ -2,6 +2,7 @@ package deletecmd
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -281,14 +282,11 @@ func TestCommand_DeleteCancelled(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
+	// The test streams are not a terminal, so the gate refuses instead of
+	// reading the "n": a script without --yes must never silently exit 0.
 	err = cmd.Execute()
-	if err != nil {
-		t.Errorf("Execute() error = %v", err)
-	}
-
-	output := out.String() + errOut.String()
-	if !strings.Contains(output, "cancelled") {
-		t.Errorf("expected 'cancelled' in output, got: %s", output)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Errorf("Execute() error = %v, want ErrConfirmationRequired", err)
 	}
 }
 

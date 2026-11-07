@@ -62,7 +62,10 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	// Get registered devices
-	cfg := config.Get()
+	cfg, err := opts.Factory.Config()
+	if err != nil {
+		return err
+	}
 	if len(cfg.Devices) == 0 {
 		ios.Info("No registered devices found")
 		ios.Info("Use 'shelly device add' to register devices first")

@@ -256,6 +256,13 @@ func (s *Service) planPrimary(
 	if ov != nil {
 		resolved = *ov
 	}
+	if kept, keep, err := s.keptTargetAddress(ctx, cur, bkp, &given, ov); err != nil {
+		return nil, plan, err
+	} else if keep {
+		resolved.StaticIP, resolved.Gateway, resolved.Netmask, resolved.DNS = kept.IP, kept.Gateway, kept.Netmask, kept.DNS
+		plan.Address = describeStatic(kept.IP, kept.Gateway, kept.Netmask, "kept from the device (the backup is of another device)")
+		ov = &resolved
+	}
 	switch {
 	case joined.SSID == "":
 		if namesNetwork(ov) {
@@ -293,6 +300,41 @@ func (s *Service) planPrimary(
 	plan.Key = StationKeyHost
 	resolved.Password = pass
 	return &resolved, plan, nil
+}
+
+// keptTargetAddress decides whether the restore keeps the target's own static
+// address instead of writing the backup's: when the backup records a static
+// address, is of another device (by MAC), and neither --static-ip nor
+// CopyBackupAddress says otherwise. The backup's address belongs to a device
+// that may still be on the network, so copying it would collide. A target on
+// DHCP cannot keep its address without an explicit --static-ip and is refused.
+func (s *Service) keptTargetAddress(
+	ctx context.Context, cur *currentStations, bkp *backup.DeviceBackup, given *reprovision.Network, ov *backup.NetworkOverride,
+) (shellybackup.StaticNetwork, bool, error) {
+	sta := parseBackupStation(bkp.Station())
+	if given.StaticIP != "" || (ov != nil && ov.CopyBackupAddress) || sta.mode() != ipv4Static || sta.disabled() {
+		return shellybackup.StaticNetwork{}, false, nil
+	}
+	backupMAC := bkp.Device().MAC
+	if backupMAC == "" {
+		return shellybackup.StaticNetwork{}, false, nil
+	}
+	info, err := s.DeviceInfo(ctx, cur.device)
+	if err != nil {
+		return shellybackup.StaticNetwork{}, false, fmt.Errorf("read the target's MAC: %w", err)
+	}
+	if !backup.OtherDevice(backupMAC, info.MAC) {
+		return shellybackup.StaticNetwork{}, false, nil
+	}
+	if _, _, err := cur.read(ctx); err != nil {
+		return shellybackup.StaticNetwork{}, false, err
+	}
+	if cur.static.IP == "" {
+		return shellybackup.StaticNetwork{}, false, fmt.Errorf("%w: the backup is of another device (%s) and records static address %s, "+
+			"which that device may still use, and %s is on DHCP; pass --static-ip to choose the target's address",
+			types.ErrInvalidParam, backupMAC, sta.IP, cur.device)
+	}
+	return cur.static, true, nil
 }
 
 // errNoNetworkNamed refuses network flags when neither they nor the backup
@@ -385,6 +427,7 @@ type currentStations struct {
 	device     string
 	done       bool
 	sta, sta1  string
+	static     shellybackup.StaticNetwork
 	readFailed error
 }
 
@@ -392,7 +435,7 @@ func (c *currentStations) read(ctx context.Context) (sta, sta1 string, err error
 	if !c.done {
 		c.done = true
 		st, readErr := c.svc.deviceStations(ctx, c.device)
-		c.sta, c.sta1 = st.primary.SSID, st.secondary.SSID
+		c.sta, c.sta1, c.static = st.primary.SSID, st.secondary.SSID, st.primary.Static
 		if readErr != nil {
 			c.readFailed = fmt.Errorf("read the device's WiFi station: %w", readErr)
 		}

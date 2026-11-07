@@ -149,6 +149,11 @@ type NetworkOverride struct {
 	DNS string
 	// Open joins the network with no passphrase; Password must be empty.
 	Open bool
+	// CopyBackupAddress writes the backup's static address even when the
+	// backup is of another device (a migration replaces that device). Without
+	// it such a restore keeps the target's own static address, since the
+	// backup's belongs to a device that may still be on the network.
+	CopyBackupAddress bool
 }
 
 // Network returns the override as the SDK's reprovision.Network; a nil

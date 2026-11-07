@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -20,6 +21,7 @@ type Options struct {
 	ComponentID   int
 	ComponentType string
 	CounterTypes  []string
+	Yes           bool
 }
 
 // NewCommand creates the energy reset command.
@@ -48,7 +50,10 @@ EM1 energy monitors and Gen1 meters have no counter reset.`,
   shelly energy reset kitchen 1 --type switch
 
   # Reset with device alias
-  shelly energy reset basement-em`,
+  shelly energy reset basement-em
+
+  # Skip the confirmation prompt (scripts)
+  shelly energy reset basement-em --yes`,
 		Aliases:           []string{"clear"},
 		Args:              cobra.RangeArgs(1, 2),
 		ValidArgsFunction: completion.DeviceThenNoComplete(),
@@ -64,6 +69,7 @@ EM1 energy monitors and Gen1 meters have no counter reset.`,
 
 	cmdutil.AddPowerTypeFlag(cmd, &opts.ComponentType)
 	cmd.Flags().StringSliceVar(&opts.CounterTypes, "types", nil, "Counter types to reset (leave empty for all)")
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	return cmd
 }
@@ -71,6 +77,15 @@ EM1 energy monitors and Gen1 meters have no counter reset.`,
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
+
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Reset the energy counters on %s? The accumulated totals cannot be recovered", opts.Device), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
+	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Resetting energy counters...", func(ctx context.Context) error {
 		r, err := svc.ResetPowerCounters(ctx, opts.Device, opts.ComponentType, opts.ComponentID, opts.CounterTypes)

@@ -117,7 +117,7 @@ func runDeviceDelete(ctx context.Context, f *cmdutil.Factory, opts DeviceDeleteO
 		return err
 	}
 	if !confirmed {
-		ios.Warning("Delete cancelled")
+		ios.Info("Cancelled")
 		return nil
 	}
 

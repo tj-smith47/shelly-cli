@@ -98,7 +98,7 @@ func restoreTestCtx(t *testing.T) context.Context {
 func TestRun_Restore_Success(t *testing.T) {
 	out, errOut, f := setupRestore(t)
 	stub := &stubRestoreService{}
-	opts := &Options{Factory: f, Device: "dev", FilePath: testBackupPath, svc: stub}
+	opts := &Options{Factory: f, Device: "dev", FilePath: testBackupPath, Yes: true, svc: stub}
 
 	if err := run(restoreTestCtx(t), opts); err != nil {
 		t.Fatalf("run: %v", err)
@@ -118,7 +118,7 @@ func TestRun_Restore_Fails(t *testing.T) {
 			return nil, errStubRestore
 		},
 	}
-	opts := &Options{Factory: f, Device: "dev", FilePath: testBackupPath, svc: stub}
+	opts := &Options{Factory: f, Device: "dev", FilePath: testBackupPath, Yes: true, svc: stub}
 
 	err := run(restoreTestCtx(t), opts)
 	if err == nil || !strings.Contains(err.Error(), "failed to restore backup") {
@@ -139,7 +139,7 @@ func TestRun_Restore_PartialFailure(t *testing.T) {
 			return &clibackup.RestoreResult{Success: false, Errors: []string{"wifi section rejected"}}, nil
 		},
 	}
-	opts := &Options{Factory: f, Device: "dev", FilePath: testBackupPath, svc: stub}
+	opts := &Options{Factory: f, Device: "dev", FilePath: testBackupPath, Yes: true, svc: stub}
 
 	err := run(restoreTestCtx(t), opts)
 	if err == nil {
@@ -165,7 +165,7 @@ func TestRun_RestoreViaAP_Success(t *testing.T) {
 			return &clibackup.RestoreResult{Success: true}, "10.23.47.227", nil
 		},
 	}
-	opts := &Options{Factory: f, Device: "fr", FilePath: testBackupPath, ToAP: "ShellyBulbDuo-AABBCC", svc: stub}
+	opts := &Options{Factory: f, Device: "fr", FilePath: testBackupPath, Yes: true, ToAP: "ShellyBulbDuo-AABBCC", svc: stub}
 
 	if err := run(restoreTestCtx(t), opts); err != nil {
 		t.Fatalf("run: %v", err)
@@ -186,7 +186,7 @@ func TestRun_RestoreViaAP_Fails(t *testing.T) {
 			return nil, "", errStubRestore
 		},
 	}
-	opts := &Options{Factory: f, Device: "fr", FilePath: testBackupPath, ToAP: "ShellyBulbDuo-AABBCC", svc: stub}
+	opts := &Options{Factory: f, Device: "fr", FilePath: testBackupPath, Yes: true, ToAP: "ShellyBulbDuo-AABBCC", svc: stub}
 
 	err := run(restoreTestCtx(t), opts)
 	if err == nil || !strings.Contains(err.Error(), "failed to restore via AP") {
@@ -223,7 +223,7 @@ func TestRun_RestoreViaAP_StaticIPWithoutGateway(t *testing.T) {
 			return &clibackup.RestoreResult{Success: true}, "10.23.47.227", nil
 		},
 	}
-	opts := &Options{Factory: f, Device: "fr", FilePath: testBackupPath, ToAP: "ShellyBulbDuo-AABBCC", StaticIP: "10.23.47.227", svc: stub}
+	opts := &Options{Factory: f, Device: "fr", FilePath: testBackupPath, Yes: true, ToAP: "ShellyBulbDuo-AABBCC", StaticIP: "10.23.47.227", svc: stub}
 
 	if err := run(restoreTestCtx(t), opts); err != nil {
 		t.Fatalf("run: %v", err)
@@ -247,7 +247,7 @@ func TestRun_Restore_StaticIPWithoutGateway(t *testing.T) {
 			return &clibackup.RestoreResult{Success: true}, nil
 		},
 	}
-	opts := &Options{Factory: f, Device: "fr", FilePath: testBackupPath, StaticIP: "10.23.47.227", svc: stub}
+	opts := &Options{Factory: f, Device: "fr", FilePath: testBackupPath, Yes: true, StaticIP: "10.23.47.227", svc: stub}
 
 	if err := run(restoreTestCtx(t), opts); err != nil {
 		t.Fatalf("run: %v", err)
@@ -270,7 +270,7 @@ func TestRun_OpenReachesRestore(t *testing.T) {
 			return &clibackup.RestoreResult{Success: true}, nil
 		},
 	}
-	opts := &Options{Factory: f, Device: "fr", FilePath: testBackupPath, SSID: "Guest", Open: true, svc: stub}
+	opts := &Options{Factory: f, Device: "fr", FilePath: testBackupPath, Yes: true, SSID: "Guest", Open: true, svc: stub}
 
 	if err := run(restoreTestCtx(t), opts); err != nil {
 		t.Fatalf("run: %v", err)
@@ -313,7 +313,7 @@ func TestRun_StationPlan(t *testing.T) {
 				return &clibackup.RestoreResult{Success: true}, nil
 			},
 		}
-		err := run(restoreTestCtx(t), &Options{Factory: f, Device: "dev", FilePath: testBackupPath, svc: stub})
+		err := run(restoreTestCtx(t), &Options{Factory: f, Device: "dev", FilePath: testBackupPath, Yes: true, svc: stub})
 		if err == nil || !strings.Contains(err.Error(), `no WiFi passphrase for "home"`) {
 			t.Fatalf("err = %v, want the passphrase error", err)
 		}
@@ -333,7 +333,7 @@ func TestRun_StationPlan(t *testing.T) {
 				return &clibackup.RestoreResult{Success: true}, nil
 			},
 		}
-		if err := run(restoreTestCtx(t), &Options{Factory: f, Device: "dev", FilePath: testBackupPath, svc: stub}); err != nil {
+		if err := run(restoreTestCtx(t), &Options{Factory: f, Device: "dev", FilePath: testBackupPath, Yes: true, svc: stub}); err != nil {
 			t.Fatalf("run: %v", err)
 		}
 		if got == nil || got.Password != "stored" {
@@ -380,7 +380,7 @@ func TestRun_RestoreName(t *testing.T) {
 				svc := shelly.New(testutil.Gen2At(dev.Addr),
 					shelly.WithRateLimiter(ratelimit.New(ratelimit.WithGen2MinInterval(0))))
 				opts := &Options{Factory: f, Device: "gb", FilePath: testBackupPath, Name: tt.flag,
-					SkipNetwork: true, DryRun: dryRun, svc: svc}
+					SkipNetwork: true, DryRun: dryRun, Yes: true, svc: svc}
 				if err := run(restoreTestCtx(t), opts); err != nil {
 					t.Fatalf("dry run %v: run: %v", dryRun, err)
 				}
@@ -560,7 +560,7 @@ func TestRun_ToAPRefusals(t *testing.T) {
 				svc := shelly.New(testutil.Gen2At(dev.Addr), shelly.WithWiFiScanner(scanner))
 				opts := tt.opts
 				opts.Factory, opts.Device, opts.FilePath, opts.svc = f, "gb", testBackupPath, svc
-				opts.ToAP, opts.DryRun = "ShellyPlus1-112233445566", dryRun
+				opts.ToAP, opts.DryRun, opts.Yes = "ShellyPlus1-112233445566", dryRun, true
 
 				err := run(restoreTestCtx(t), &opts)
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
@@ -576,6 +576,54 @@ func TestRun_ToAPRefusals(t *testing.T) {
 			}
 			if len(errs) == 2 && errs[0] != errs[1] {
 				t.Errorf("dry run refused with %q, real run with %q", errs[0], errs[1])
+			}
+		})
+	}
+}
+
+// TestRun_RefusesWithoutYes proves the confirmation gate: without --yes and
+// without a terminal, run returns ErrConfirmationRequired before any device
+// write, on both the LAN and the --to-ap path. --dry-run never reaches the gate.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestRun_RefusesWithoutYes(t *testing.T) {
+	cases := []struct {
+		name string
+		toAP string
+	}{
+		{name: "lan"},
+		{name: "to-ap", toAP: "ShellyBulbDuo-AABBCC"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, f := setupRestore(t)
+			writes := 0
+			stub := &stubRestoreService{
+				restore: func(context.Context, string, *clibackup.DeviceBackup, clibackup.RestoreOptions) (*clibackup.RestoreResult, error) {
+					writes++
+					return &clibackup.RestoreResult{Success: true}, nil
+				},
+				restoreToAP: func(context.Context, string, string, string, *clibackup.DeviceBackup, clibackup.RestoreOptions) (*clibackup.RestoreResult, string, error) {
+					writes++
+					return &clibackup.RestoreResult{Success: true}, "10.0.0.50", nil
+				},
+			}
+			opts := &Options{Factory: f, Device: "dev", FilePath: testBackupPath, ToAP: tc.toAP, svc: stub}
+
+			err := run(restoreTestCtx(t), opts)
+			if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+				t.Fatalf("run error = %v, want ErrConfirmationRequired", err)
+			}
+			if writes != 0 {
+				t.Fatalf("restore wrote to the device %d time(s) without confirmation", writes)
+			}
+
+			opts.Yes = true
+			if err := run(restoreTestCtx(t), opts); err != nil {
+				t.Fatalf("run with --yes: %v", err)
+			}
+			if writes != 1 {
+				t.Fatalf("restore writes with --yes = %d, want 1", writes)
 			}
 		})
 	}

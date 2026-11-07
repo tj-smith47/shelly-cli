@@ -3,6 +3,7 @@ package updates
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -1388,5 +1389,47 @@ func TestExecute_MultipleConditions(t *testing.T) {
 	err = cmd.Execute()
 	if err != nil {
 		t.Logf("Execute() error = %v (expected for mock)", err)
+	}
+}
+
+// TestExecute_RefusesWithoutYes proves the confirmation gate: with devices
+// selected (--all) but no --yes and no terminal, Execute returns
+// ErrConfirmationRequired and starts no update.
+func TestExecute_RefusesWithoutYes(t *testing.T) {
+	t.Parallel()
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{{
+				Name: "test-device", Address: "192.168.1.100", MAC: "AA:BB:CC:DD:EE:FF",
+				Type: "SNSW-001P16EU", Model: "Shelly Plus 1PM", Generation: 2,
+			}},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"--all"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("Execute() error = %v, want ErrConfirmationRequired\nout: %s\nerr: %s", err, tf.OutString(), tf.ErrString())
+	}
+	if strings.Contains(tf.OutString(), "Updating") {
+		t.Fatalf("update started without confirmation: %s", tf.OutString())
 	}
 }

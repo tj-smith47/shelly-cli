@@ -3,6 +3,7 @@ package wizard
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -472,7 +473,7 @@ func TestCheckAndConfirmConfig_NoExistingConfig(t *testing.T) {
 	// We test the logic when config doesn't exist or force is set
 
 	optsWithForce := &Options{Force: true}
-	shouldContinue, err := CheckAndConfirmConfig(ios, optsWithForce)
+	shouldContinue, err := CheckAndConfirmConfig(cmdutil.NewFactory().SetIOStreams(ios), optsWithForce)
 	if err != nil {
 		t.Errorf("CheckAndConfirmConfig with force = error %v, want nil", err)
 	}
@@ -483,7 +484,7 @@ func TestCheckAndConfirmConfig_NoExistingConfig(t *testing.T) {
 	// Non-interactive with existing config (would need --force)
 	// We can't easily test the confirm dialog, but we can test non-interactive path
 	optsNonInteractive := &Options{Theme: "dracula"} // makes it non-interactive
-	_, err = CheckAndConfirmConfig(ios, optsNonInteractive)
+	_, err = CheckAndConfirmConfig(cmdutil.NewFactory().SetIOStreams(ios), optsNonInteractive)
 	if err != nil {
 		// No error expected, just may return false if config exists
 		t.Logf("non-interactive check: %v", err)
@@ -1492,7 +1493,7 @@ func TestCheckAndConfirmConfig_Force(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ios, _, _ := testIOStreams()
-			shouldCont, err := CheckAndConfirmConfig(ios, tt.opts)
+			shouldCont, err := CheckAndConfirmConfig(cmdutil.NewFactory().SetIOStreams(ios), tt.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CheckAndConfirmConfig() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -2180,14 +2181,14 @@ func TestCheckAndConfirmConfig_NonInteractiveWithExistingConfig(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 
-	// Non-interactive without force - if config exists, should return false
+	// --defaults without --force keeps an existing config and says so.
 	opts := &Options{
-		Theme: "dracula", // Makes it non-interactive
-		Force: false,
+		Defaults: true,
+		Force:    false,
 	}
 
 	// This test's behavior depends on whether a config file exists
-	shouldContinue, err := CheckAndConfirmConfig(ios, opts)
+	shouldContinue, err := CheckAndConfirmConfig(cmdutil.NewFactory().SetIOStreams(ios), opts)
 	if err != nil {
 		t.Errorf("CheckAndConfirmConfig() error = %v, want nil", err)
 	}
@@ -2341,7 +2342,7 @@ func TestCheckAndConfirmConfig_InteractiveNoConfig(t *testing.T) {
 	opts := &Options{} // Interactive mode
 
 	// No config exists, should continue
-	shouldContinue, err := CheckAndConfirmConfig(ios, opts)
+	shouldContinue, err := CheckAndConfirmConfig(cmdutil.NewFactory().SetIOStreams(ios), opts)
 	if err != nil {
 		t.Errorf("CheckAndConfirmConfig() error = %v, want nil", err)
 	}
@@ -3148,23 +3149,23 @@ func TestCheckAndConfirmConfig_MorePaths(t *testing.T) {
 
 	ios, out, _ := testIOStreams()
 
-	// Non-interactive with existing config and no force - should return false
-	opts := &Options{Theme: "dracula", Force: false}
-	shouldContinue, err := CheckAndConfirmConfig(ios, opts)
+	// --defaults with an existing config and no --force keeps the file and says so.
+	opts := &Options{Defaults: true, Force: false}
+	shouldContinue, err := CheckAndConfirmConfig(cmdutil.NewFactory().SetIOStreams(ios), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if shouldContinue {
 		t.Error("expected shouldContinue=false with existing config and no force")
 	}
-	if !strings.Contains(out.String(), "Configuration already exists") {
-		t.Logf("output: %s", out.String())
+	if !strings.Contains(out.String(), "Use --force to overwrite") {
+		t.Errorf("output %q should point at --force", out.String())
 	}
 
 	// With force flag - should return true
 	out.Reset()
-	opts = &Options{Theme: "dracula", Force: true}
-	shouldContinue, err = CheckAndConfirmConfig(ios, opts)
+	opts = &Options{Defaults: true, Force: true}
+	shouldContinue, err = CheckAndConfirmConfig(cmdutil.NewFactory().SetIOStreams(ios), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3247,4 +3248,37 @@ func TestRunDiscoveryStep_DiscoverFlag(t *testing.T) {
 		t.Logf("discovery error (expected in test): %v", err)
 	}
 	_ = devices
+}
+
+// TestCheckAndConfirmConfig_InteractiveExistingConfig_NonTTY proves the
+// overwrite gate: an existing config, no --force, no --defaults and no
+// terminal returns ErrConfirmationRequired; --force overwrites.
+func TestCheckAndConfirmConfig_InteractiveExistingConfig_NonTTY(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", "/test/home")
+
+	if err := afero.WriteFile(fs, "/test/home/.config/shelly/config.yaml", []byte("output: table\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	ios, _, _ := testIOStreams()
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	shouldContinue, err := CheckAndConfirmConfig(f, &Options{})
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("CheckAndConfirmConfig() error = %v, want ErrConfirmationRequired", err)
+	}
+	if shouldContinue {
+		t.Fatal("CheckAndConfirmConfig() = true without confirmation")
+	}
+
+	shouldContinue, err = CheckAndConfirmConfig(f, &Options{Force: true})
+	if err != nil {
+		t.Fatalf("CheckAndConfirmConfig(--force) error = %v", err)
+	}
+	if !shouldContinue {
+		t.Fatal("CheckAndConfirmConfig(--force) = false, want true")
+	}
 }

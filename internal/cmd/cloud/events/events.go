@@ -14,7 +14,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/netguard"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -91,7 +90,10 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	// Check if logged in
-	cfg := config.Get()
+	cfg, err := opts.Factory.Config()
+	if err != nil {
+		return err
+	}
 	if cfg.Cloud.AccessToken == "" {
 		ios.Error("Not logged in to Shelly Cloud")
 		ios.Info("Use 'shelly cloud login' to authenticate")

@@ -3,6 +3,7 @@ package logout
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -343,6 +344,7 @@ func TestExecute_NotLoggedIn(t *testing.T) {
 	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -367,10 +369,11 @@ func TestExecute_LoggedInWithEmail(t *testing.T) {
 	config.SetDefaultManager(mgr)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--yes"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -409,10 +412,11 @@ func TestExecute_LoggedInWithoutEmail(t *testing.T) {
 	config.SetDefaultManager(mgr)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--yes"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -439,10 +443,11 @@ func TestExecute_ClearsAllCloudFields(t *testing.T) {
 	config.SetDefaultManager(mgr)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--yes"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -475,6 +480,7 @@ func TestExecute_WithHelp(t *testing.T) {
 	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -494,6 +500,7 @@ func TestRun_NotLoggedIn(t *testing.T) {
 	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
 	opts := &Options{Factory: tf.Factory}
 	err := run(opts)
@@ -514,8 +521,9 @@ func TestRun_LoggedInWithEmail(t *testing.T) {
 	config.SetDefaultManager(mgr)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
-	opts := &Options{Factory: tf.Factory}
+	opts := &Options{Factory: tf.Factory, Yes: true}
 	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -534,8 +542,9 @@ func TestRun_LoggedInWithoutEmail(t *testing.T) {
 	config.SetDefaultManager(mgr)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
-	opts := &Options{Factory: tf.Factory}
+	opts := &Options{Factory: tf.Factory, Yes: true}
 	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -555,10 +564,11 @@ func TestExecute_MultipleLogouts(t *testing.T) {
 	config.SetDefaultManager(mgr)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--yes"})
 
 	// First execute - should logout successfully
 	err := cmd.Execute()
@@ -577,7 +587,7 @@ func TestExecute_MultipleLogouts(t *testing.T) {
 	// Second execute - should show not logged in
 	cmd2 := NewCommand(tf.Factory)
 	cmd2.SetContext(context.Background())
-	cmd2.SetArgs([]string{})
+	cmd2.SetArgs([]string{"--yes"})
 
 	err = cmd2.Execute()
 	if err != nil {
@@ -597,11 +607,12 @@ func TestExecute_WithContext(t *testing.T) {
 	config.SetDefaultManager(mgr)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
 	cmd := NewCommand(tf.Factory)
 	ctx := context.Background()
 	cmd.SetContext(ctx)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--yes"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -616,10 +627,11 @@ func TestExecute_OutputFormat(t *testing.T) {
 	config.SetDefaultManager(mgr)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--yes"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -655,8 +667,9 @@ func TestRun_PreservesOtherConfig(t *testing.T) {
 	config.SetDefaultManager(mgr)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
-	opts := &Options{Factory: tf.Factory}
+	opts := &Options{Factory: tf.Factory, Yes: true}
 	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -683,10 +696,11 @@ func TestExecute_PartialCloudConfig(t *testing.T) {
 	config.SetDefaultManager(mgr)
 
 	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--yes"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -711,7 +725,7 @@ func TestRun_WithIOStreams(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	opts := &Options{Factory: f}
+	opts := &Options{Factory: f, Yes: true}
 	err := run(opts)
 
 	// Should not error (says not logged in with isolated config)
@@ -737,7 +751,7 @@ func TestRun_ProducesOutput(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	opts := &Options{Factory: f}
+	opts := &Options{Factory: f, Yes: true}
 	err := run(opts)
 	if err != nil {
 		t.Logf("run error: %v", err)
@@ -771,7 +785,7 @@ func TestNewCommand_Execute(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--yes"})
 
 	// Execute the command - should not error (may or may not be logged in)
 	err := cmd.Execute()
@@ -1031,5 +1045,30 @@ func TestNewCommand_ExampleStartsWithIndent(t *testing.T) {
 		if trimmed != "" && !strings.HasPrefix(trimmed, "#") && !strings.HasPrefix(trimmed, "shelly") {
 			t.Logf("Example line: %s", line)
 		}
+	}
+}
+
+//nolint:paralleltest // Installs the global config manager.
+func TestRun_ConfirmGate(t *testing.T) {
+	factory.SetupTestFs(t)
+	mgr := setupTestManagerWithCloud(t, "user@example.com", "token", "refresh", "https://shelly.cloud", true)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(mgr)
+
+	err := run(&Options{Factory: tf.Factory})
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("no terminal, no --yes: error = %v, want ErrConfirmationRequired", err)
+	}
+	if config.Get().Cloud.AccessToken != "token" {
+		t.Fatal("token cleared without confirmation")
+	}
+
+	if err := run(&Options{Factory: tf.Factory, Yes: true}); err != nil {
+		t.Fatalf("--yes: error = %v", err)
+	}
+	if config.Get().Cloud.AccessToken != "" {
+		t.Fatal("token still stored after --yes")
 	}
 }

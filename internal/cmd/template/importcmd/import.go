@@ -30,7 +30,6 @@ Use --force to overwrite an existing template with the same name.`,
   shelly template import template.yaml --force`,
 		SupportsNameArg: true,
 		NameFlagEnabled: false,
-		ForceFlagName:   "force",
 		ValidArgsFunc:   completion.FileThenNoComplete(),
 		Importer:        config.ImportTemplateFromFile,
 	})

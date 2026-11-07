@@ -8,13 +8,16 @@ import "github.com/spf13/cobra"
 // annotation to receive the argument as typed.
 const AnnotationDashIsOutput = "shelly.dash-is-output"
 
+// annotationSet is the value of a boolean command annotation that is on.
+const annotationSet = "true"
+
 // DashIsOutputAnnotation returns the Annotations map for a command that reads a
 // bare "-" argument as "write to stdout".
 func DashIsOutputAnnotation() map[string]string {
-	return map[string]string{AnnotationDashIsOutput: "true"}
+	return map[string]string{AnnotationDashIsOutput: annotationSet}
 }
 
 // DashIsOutput reports whether cmd reads a bare "-" argument as "write to stdout".
 func DashIsOutput(cmd *cobra.Command) bool {
-	return cmd != nil && cmd.Annotations[AnnotationDashIsOutput] == "true"
+	return cmd != nil && cmd.Annotations[AnnotationDashIsOutput] == annotationSet
 }

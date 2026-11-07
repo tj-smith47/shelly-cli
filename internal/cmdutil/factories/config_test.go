@@ -193,21 +193,16 @@ func TestNewConfigDeleteCommand_Execute_Cancelled(t *testing.T) {
 		},
 	})
 
-	// Without --yes, in non-TTY mode, confirmation returns false (default)
+	// Without --yes and without a terminal the gate refuses, so nothing is deleted.
 	cmd.SetArgs([]string{"movie-night"})
 	err := cmd.Execute()
 
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("Execute error = %v, want ErrConfirmationRequired", err)
 	}
 
 	if deleteWasCalled {
-		t.Error("DeleteFunc should not be called when confirmation is denied")
-	}
-
-	// Check cancellation message
-	if !strings.Contains(out.String(), "cancelled") {
-		t.Errorf("output should contain cancellation message, got: %s", out.String())
+		t.Error("DeleteFunc should not be called when confirmation is refused")
 	}
 }
 

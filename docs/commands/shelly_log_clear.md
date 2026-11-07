@@ -15,12 +15,16 @@ shelly log clear [flags]
 ```
   # Clear log file
   shelly log clear
+
+  # Skip the confirmation prompt (scripts)
+  shelly log clear --yes
 ```
 
 ### Options
 
 ```
   -h, --help   help for clear
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

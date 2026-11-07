@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-go/gen1"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -18,6 +19,7 @@ type Options struct {
 	Device  string
 	Event   string
 	Index   int
+	Yes     bool
 	Factory *cmdutil.Factory
 }
 
@@ -50,7 +52,10 @@ Gen2+ devices use webhooks instead. See 'shelly webhook delete'.`,
   shelly action clear switch longpush_url
 
   # Clear action at a specific index
-  shelly action clear relay out_on_url --index 1`,
+  shelly action clear relay out_on_url --index 1
+
+  # Skip the confirmation prompt (scripts)
+  shelly action clear living-room out_on_url --yes`,
 		Args:              cobra.ExactArgs(2),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -61,6 +66,7 @@ Gen2+ devices use webhooks instead. See 'shelly webhook delete'.`,
 	}
 
 	cmd.Flags().IntVar(&opts.Index, "index", 0, "Action index (for multi-channel devices)")
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	return cmd
 }
@@ -76,8 +82,17 @@ func run(ctx context.Context, opts *Options) error {
 	// Parse the event type
 	event := gen1.ActionEvent(opts.Event)
 
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Clear the %s action URL on %s?", opts.Event, opts.Device), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
+	}
+
 	// Clear the action
-	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+	err = svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
 		if !dev.IsGen1() {
 			ios.Warning("Device %s is not a Gen1 device", opts.Device)
 			ios.Info("Gen2+ devices use webhooks. Try: shelly webhook delete %s", opts.Device)

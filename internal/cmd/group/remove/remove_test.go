@@ -2,6 +2,7 @@ package remove
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -268,7 +269,7 @@ func TestRun_RemoveSingleDevice(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	opts := &Options{Factory: f, GroupName: "living-room", Devices: []string{"light-1"}}
+	opts := &Options{Factory: f, GroupName: "living-room", Devices: []string{"light-1"}, Yes: true}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -305,7 +306,7 @@ func TestRun_RemoveMultipleDevices(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	opts := &Options{Factory: f, GroupName: "office", Devices: []string{"lamp-1", "lamp-2"}}
+	opts := &Options{Factory: f, GroupName: "office", Devices: []string{"lamp-1", "lamp-2"}, Yes: true}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -337,7 +338,7 @@ func TestRun_RemoveDeviceNotInGroup(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	opts := &Options{Factory: f, GroupName: "bedroom", Devices: []string{"lamp-2"}}
+	opts := &Options{Factory: f, GroupName: "bedroom", Devices: []string{"lamp-2"}, Yes: true}
 	err := run(opts)
 	if err == nil {
 		t.Fatal("expected error when no devices were removed")
@@ -368,7 +369,7 @@ func TestRun_PartialRemoveWithWarnings(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	// Remove one existing device and one that doesn't exist
-	opts := &Options{Factory: f, GroupName: "kitchen", Devices: []string{"light-1", "nonexistent"}}
+	opts := &Options{Factory: f, GroupName: "kitchen", Devices: []string{"light-1", "nonexistent"}, Yes: true}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -406,7 +407,7 @@ func TestRun_RemoveAllDevices(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	opts := &Options{Factory: f, GroupName: "garage", Devices: []string{"light-1", "light-2"}}
+	opts := &Options{Factory: f, GroupName: "garage", Devices: []string{"light-1", "light-2"}, Yes: true}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -438,7 +439,7 @@ func TestRun_EmptyDeviceList(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	opts := &Options{Factory: f, GroupName: "test-group", Devices: []string{}}
+	opts := &Options{Factory: f, GroupName: "test-group", Devices: []string{}, Yes: true}
 	err := run(opts)
 	if err == nil {
 		t.Fatal("expected error with empty device list")
@@ -520,7 +521,7 @@ func TestNewCommand_ExecuteSuccess(t *testing.T) {
 	cmd := NewCommand(f)
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
-	cmd.SetArgs([]string{"my-group", "device1"})
+	cmd.SetArgs([]string{"my-group", "device1", "--yes"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -533,5 +534,33 @@ func TestNewCommand_ExecuteSuccess(t *testing.T) {
 	}
 	if len(group.Devices) != 1 {
 		t.Errorf("group devices = %d, want 1", len(group.Devices))
+	}
+}
+
+func TestRun_ConfirmGate(t *testing.T) {
+	t.Parallel()
+
+	mgr := setupTestManager(t)
+	if err := mgr.CreateGroup("gate"); err != nil {
+		t.Fatalf("CreateGroup() error: %v", err)
+	}
+	if err := mgr.AddDeviceToGroup("gate", "light-1"); err != nil {
+		t.Fatalf("AddDeviceToGroup() error: %v", err)
+	}
+	f := cmdutil.NewFactory().SetIOStreams(iostreams.Test(nil, &bytes.Buffer{}, &bytes.Buffer{})).SetConfigManager(mgr)
+
+	err := run(&Options{Factory: f, GroupName: "gate", Devices: []string{"light-1"}})
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("no terminal, no --yes: error = %v, want ErrConfirmationRequired", err)
+	}
+	if group, _ := mgr.GetGroup("gate"); len(group.Devices) != 1 {
+		t.Fatalf("device removed without confirmation: %v", group.Devices)
+	}
+
+	if err := run(&Options{Factory: f, GroupName: "gate", Devices: []string{"light-1"}, Yes: true}); err != nil {
+		t.Fatalf("--yes: error = %v", err)
+	}
+	if group, _ := mgr.GetGroup("gate"); len(group.Devices) != 0 {
+		t.Fatalf("device still in group after --yes: %v", group.Devices)
 	}
 }

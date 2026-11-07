@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-auth-import - Import device credentials
@@ -25,6 +25,10 @@ credentials are not checked; use auth test to check them.
 .PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for import
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -95,6 +99,9 @@ credentials are not checked; use auth test to check them.
 
   # Preview without applying
   shelly auth import credentials.json --dry-run
+
+  # From a script (no prompt)
+  shelly auth import credentials.json --yes
 .EE
 
 

@@ -3,6 +3,7 @@ package clearcmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -376,4 +377,75 @@ func TestRun_Gen1WithIndex(t *testing.T) {
 	if err != nil {
 		t.Logf("run() error = %v (may be expected)", err)
 	}
+}
+
+// TestExecute_ConfirmGate proves the gate: no terminal and no --yes returns
+// ErrConfirmationRequired and performs nothing; --yes runs the action.
+
+func TestExecute_ConfirmGate(t *testing.T) {
+	t.Parallel()
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gate-gen1",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gate-gen1": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	t.Cleanup(demo.Cleanup)
+
+	t.Run("no terminal without --yes refuses", func(t *testing.T) {
+		t.Parallel()
+		tf := factory.NewTestFactory(t)
+		demo.InjectIntoFactory(tf.Factory)
+		cmd := NewCommand(tf.Factory)
+		cmd.SetContext(context.Background())
+		cmd.SetArgs([]string{"gate-gen1", "out_on_url"})
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+
+		if err := cmd.Execute(); !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+			t.Fatalf("Execute() error = %v, want ErrConfirmationRequired", err)
+		}
+		if strings.Contains(tf.OutString(), "cleared on") {
+			t.Fatalf("action ran without confirmation: %q", tf.OutString())
+		}
+	})
+
+	t.Run("--yes performs the action", func(t *testing.T) {
+		t.Parallel()
+		tf := factory.NewTestFactory(t)
+		demo.InjectIntoFactory(tf.Factory)
+		cmd := NewCommand(tf.Factory)
+		cmd.SetContext(context.Background())
+		cmd.SetArgs([]string{"gate-gen1", "out_on_url", "--yes"})
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+
+		err := cmd.Execute()
+		if errors.Is(err, cmdutil.ErrConfirmationRequired) {
+			t.Fatalf("--yes still asked for confirmation: %v", err)
+		}
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(tf.OutString(), "cleared on") {
+			t.Fatalf("expected success message, got %q", tf.OutString())
+		}
+	})
 }

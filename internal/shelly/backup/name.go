@@ -65,6 +65,15 @@ func DescribeName(explicit, alias, backupName, backupMAC, targetMAC string) stri
 	}
 }
 
+// OtherDevice reports whether backupMAC and targetMAC are both known and name
+// different devices. An unknown MAC on either side is not "another device".
+func OtherDevice(backupMAC, targetMAC string) bool {
+	if len(macHex(backupMAC)) != 12 || len(macHex(targetMAC)) < 6 {
+		return false
+	}
+	return !sameDevice(backupMAC, targetMAC)
+}
+
 // sameDevice reports whether a backup's MAC names the target: equal MACs, or
 // a 6-hex target that matches the backup MAC's last three bytes.
 func sameDevice(backupMAC, targetMAC string) bool {

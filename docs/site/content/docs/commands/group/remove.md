@@ -32,12 +32,16 @@ shelly group remove <group> <device>... [flags]
 
   # Short form
   shelly grp rm office 192.168.1.100
+
+  # Skip the confirmation prompt (scripts)
+  shelly group remove living-room light-1 --yes
 ```
 
 ### Options
 
 ```
   -h, --help   help for remove
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

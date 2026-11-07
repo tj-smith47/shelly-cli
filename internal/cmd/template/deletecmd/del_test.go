@@ -2,6 +2,7 @@ package deletecmd
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -356,20 +357,16 @@ func TestExecute_DeleteCancelled(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
+	// The test streams are not a terminal, so the gate refuses instead of
+	// reading the "n": a script without --yes must never silently exit 0.
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("Execute() error: %v", err)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Fatalf("Execute() error = %v, want ErrConfirmationRequired", err)
 	}
 
 	// Verify template was NOT deleted
 	if _, exists := mgr.GetDeviceTemplate("keep-me"); !exists {
 		t.Error("template should NOT have been deleted when cancelled")
-	}
-
-	// Check output contains cancellation message
-	output := out.String()
-	if !strings.Contains(output, "cancelled") {
-		t.Errorf("expected output to contain 'cancelled', got: %s", output)
 	}
 }
 

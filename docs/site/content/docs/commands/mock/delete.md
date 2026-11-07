@@ -20,12 +20,16 @@ shelly mock delete <name> [flags]
 ```
   # Delete mock device
   shelly mock delete kitchen
+
+  # Skip the confirmation prompt (scripts)
+  shelly mock delete kitchen --yes
 ```
 
 ### Options
 
 ```
   -h, --help   help for delete
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

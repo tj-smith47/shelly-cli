@@ -19,6 +19,7 @@ type Options struct {
 	Factory *cmdutil.Factory
 	Input   string
 	DryRun  bool
+	Yes     bool
 }
 
 // NewCommand creates the auth import command.
@@ -38,7 +39,10 @@ credentials are not checked; use auth test to check them.`,
   shelly auth import credentials.json
 
   # Preview without applying
-  shelly auth import credentials.json --dry-run`,
+  shelly auth import credentials.json --dry-run
+
+  # From a script (no prompt)
+  shelly auth import credentials.json --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Input = args[0]
@@ -47,6 +51,7 @@ credentials are not checked; use auth test to check them.`,
 	}
 
 	flags.AddDryRunFlag(cmd, &opts.DryRun)
+	flags.AddYesFlag(cmd, &opts.Yes)
 
 	return cmd
 }
@@ -82,6 +87,16 @@ func run(_ context.Context, opts *Options) error {
 		for device, cred := range export.Credentials {
 			ios.Printf("  %s: %s/***\n", device, cred.Username)
 		}
+		return nil
+	}
+
+	confirmed, err := opts.Factory.ConfirmAction(
+		fmt.Sprintf("Replace the stored credentials of %d device(s) from %s?", len(export.Credentials), opts.Input), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
 		return nil
 	}
 

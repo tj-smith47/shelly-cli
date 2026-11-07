@@ -1,5 +1,5 @@
 .nh
-.TH "SHELLY" "1" "Oct 2026" "Shelly CLI" "User Commands"
+.TH "SHELLY" "1" "Nov 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
 shelly-alias-import - Import aliases from a YAML file
@@ -13,8 +13,9 @@ shelly-alias-import - Import aliases from a YAML file
 Import command aliases from a YAML file.
 
 .PP
-By default, existing aliases with the same name are overwritten.
-Use --merge to skip existing aliases instead of overwriting them.
+By default, existing aliases with the same name are overwritten after a
+confirmation prompt; pass --yes to skip the prompt in scripts. Use --merge to
+skip existing aliases instead of overwriting them.
 
 .PP
 The file format is:
@@ -31,6 +32,10 @@ The file format is:
 .PP
 \fB-m\fP, \fB--merge\fP[=false]
 	Merge with existing aliases (skip conflicts)
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -101,6 +106,9 @@ The file format is:
 
   # Import without overwriting existing aliases
   shelly alias import aliases.yaml --merge
+
+  # Overwrite existing aliases without the prompt (scripts)
+  shelly alias import aliases.yaml --yes
 .EE
 
 

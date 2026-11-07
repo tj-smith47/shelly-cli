@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -57,6 +57,7 @@ type Options struct {
 	AllowFirmwareDowngrade bool
 	FirmwareURL            string
 	TraceFile              string
+	Yes                    bool
 
 	// svc, when non-nil, overrides the service resolved from the Factory. It is the
 	// test injection seam; production leaves it nil and uses Factory.ShellyService().
@@ -84,12 +85,19 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 By default, everything from the backup is restored including network
 and authentication settings. Use --skip-* flags to exclude specific
-sections.`,
+sections.
+
+The restore overwrites the device's current configuration, so it asks for
+confirmation first; pass --yes to skip the prompt (required when there is no
+terminal, such as in a script). --dry-run never prompts.`,
 		Example: `  # Full restore from backup
   shelly backup restore living-room backup.json
 
   # Dry run - show what would change
   shelly backup restore living-room backup.json --dry-run
+
+  # Restore from a script (no confirmation prompt)
+  shelly backup restore living-room backup.json --yes
 
   # Restore without network config (keep current WiFi)
   shelly backup restore living-room backup.json --skip-network
@@ -141,6 +149,7 @@ sections.`,
 	}
 
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would be restored without applying")
+	flags.AddYesFlag(cmd, &opts.Yes)
 	cmd.Flags().BoolVar(&opts.SkipAuth, "skip-auth", false, "Skip authentication configuration")
 	cmd.Flags().BoolVar(&opts.SkipNetwork, "skip-network", false, "Skip network configuration (WiFi, Ethernet)")
 	cmd.Flags().BoolVar(&opts.SkipScripts, "skip-scripts", false, "Skip script restoration")
@@ -151,7 +160,7 @@ sections.`,
 	cmdutil.AddSecretFlagsP(cmd, &opts.Decrypt, &opts.DecryptStdin, "decrypt", "d",
 		"Password to decrypt backup", "Read the password to decrypt the backup from stdin")
 	cmdutil.AddStaticIPFlags(cmd, &opts.StaticIP, &opts.Gateway, &opts.Netmask, &opts.DNS,
-		"Override the backup's WiFi with this static IPv4 address (--gateway, --netmask and --dns default to the backup's)",
+		"Static IPv4 address for the device (default: the backup's own; a backup of another device keeps the target's current static address, and refuses a DHCP target without this flag; --gateway, --netmask and --dns default to the backup's)",
 		"the backup's")
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Set the device name (default: a backup of this same device keeps the name it recorded; a backup of another device takes the target's alias)")
 	cmd.Flags().StringVar(&opts.ToAP, "to-ap", "", "Restore onto a device at its factory WiFi AP with this SSID (hops host WiFi; the network override moves it onto the LAN)")
@@ -243,41 +252,54 @@ func (o *Options) validateFlags() error {
 	return nil
 }
 
-func run(ctx context.Context, opts *Options) error {
-	// --to-ap performs a WiFi hop, a full restore at the AP, and a LAN-rejoin
-	// poll, which together far exceed a normal restore's budget.
-	timeout := shelly.DefaultTimeout * 5
-	if opts.ToAP != "" {
-		timeout = shelly.DefaultTimeout * 30
+// loadBackup reads the stdin-supplied secrets, resolves the backup path and
+// parses the file, decrypting an encrypted envelope when --decrypt or
+// --decrypt-stdin supplies the password.
+func (o *Options) loadBackup() (*backup.DeviceBackup, error) {
+	ios := o.Factory.IOStreams()
+	if err := cmdutil.ReadWiFiPasswordStdin(ios, &o.Password, o.PasswordStdin); err != nil {
+		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	ios := opts.Factory.IOStreams()
-	if err := cmdutil.ReadWiFiPasswordStdin(ios, &opts.Password, opts.PasswordStdin); err != nil {
-		return err
-	}
-	if err := cmdutil.ResolveSecret(ios, &opts.Decrypt, opts.DecryptStdin, "decrypt", "Backup password"); err != nil {
-		return err
+	if err := cmdutil.ResolveSecret(ios, &o.Decrypt, o.DecryptStdin, "decrypt", "Backup password"); err != nil {
+		return nil, err
 	}
 
 	// Resolve file path (check backups dir if not found as-is)
-	opts.FilePath = backup.ResolveFilePath(opts.FilePath)
+	o.FilePath = backup.ResolveFilePath(o.FilePath)
 
-	// Read backup file
-	data, err := afero.ReadFile(config.Fs(), opts.FilePath)
+	data, err := afero.ReadFile(config.Fs(), o.FilePath)
 	if err != nil {
-		return fmt.Errorf("failed to read backup file: %w", err)
+		return nil, fmt.Errorf("failed to read backup file: %w", err)
 	}
 
-	// Load the backup, transparently decrypting an encrypted envelope when
-	// --decrypt or --decrypt-stdin supplies the password.
-	bkp, err := backup.Load(data, opts.Decrypt)
+	bkp, err := backup.Load(data, o.Decrypt)
 	if err != nil {
 		if errors.Is(err, backup.ErrEncryptedNeedsPassword) {
-			return errors.New("backup is encrypted: give its password with --decrypt <value>, or read it from stdin with --decrypt-stdin")
+			return nil, errors.New("backup is encrypted: give its password with --decrypt <value>, or read it from stdin with --decrypt-stdin")
 		}
-		return fmt.Errorf("invalid backup file: %w", err)
+		return nil, fmt.Errorf("invalid backup file: %w", err)
+	}
+	return bkp, nil
+}
+
+// confirmMessage names the target (and its factory AP under --to-ap) and the
+// backup file in the confirmation prompt.
+func (o *Options) confirmMessage() string {
+	target := o.Device
+	if o.ToAP != "" {
+		target = fmt.Sprintf("%s at AP %s", o.Device, o.ToAP)
+	}
+	return fmt.Sprintf("Restore %s from %s? This overwrites the device's current configuration", target, o.FilePath)
+}
+
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := context.WithTimeout(ctx, backup.RestoreTimeout(opts.ToAP != ""))
+	defer cancel()
+
+	ios := opts.Factory.IOStreams()
+	bkp, err := opts.loadBackup()
+	if err != nil {
+		return err
 	}
 
 	if err := opts.validateFlags(); err != nil {
@@ -310,11 +332,20 @@ func run(ctx context.Context, opts *Options) error {
 
 	// The dry run refuses network flags that name no network, or a network
 	// this host has no passphrase for, before any hop; the real run refuses
-	// them the same way, before the trace file or the hop.
+	// them the same way, before the prompt, the trace file or the hop.
 	if opts.ToAP != "" {
 		if _, err := svc.PlanAPStation(ctx, bkp, restoreOpts.NetworkOverride); err != nil {
 			return err
 		}
+	}
+
+	confirmed, err := opts.Factory.ConfirmAction(opts.confirmMessage(), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	// --trace-file streams a per-step Gen1 restore diagnostic to a file: which

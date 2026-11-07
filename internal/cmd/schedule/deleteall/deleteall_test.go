@@ -3,6 +3,7 @@ package deleteall
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -276,14 +277,8 @@ func TestExecute_Cancelled(t *testing.T) {
 	cmd.SetErr(&buf)
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Errorf("Execute() error = %v (expected nil for cancelled)", err)
-	}
-
-	// Warning messages go to ErrOut
-	output := tf.ErrString()
-	if !strings.Contains(output, "cancelled") {
-		t.Errorf("Expected output to contain 'cancelled', got: %s", output)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Errorf("Execute() error = %v, want cmdutil.ErrConfirmationRequired", err)
 	}
 }
 

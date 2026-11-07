@@ -1763,12 +1763,15 @@ func TestPerformUpdate_Cancelled(t *testing.T) {
 		return false, nil
 	}
 
+	out := &bytes.Buffer{}
+	ios = iostreams.Test(&bytes.Buffer{}, out, &bytes.Buffer{})
 	err := client.PerformUpdate(context.Background(), ios, release, testVersionV1, "release notes", confirmFunc, false)
-	if err == nil {
-		t.Error("PerformUpdate() should return error when cancelled")
+	// A decline on a terminal is not an error: the command prints Cancelled and exits 0.
+	if err != nil {
+		t.Errorf("PerformUpdate() unexpected error = %v", err)
 	}
-	if !containsString(err.Error(), "cancelled") {
-		t.Errorf("error should mention cancellation, got: %v", err)
+	if !containsString(out.String(), "Cancelled") {
+		t.Errorf("output should say Cancelled, got: %q", out.String())
 	}
 }
 
@@ -1792,8 +1795,10 @@ func TestPerformUpdate_ConfirmError(t *testing.T) {
 	if err == nil {
 		t.Error("PerformUpdate() should return error when confirmation fails")
 	}
-	if !containsString(err.Error(), "confirmation") {
-		t.Errorf("error should mention confirmation failure, got: %v", err)
+	// The gate's own error passes through unwrapped so errors.Is on
+	// cmdutil.ErrConfirmationRequired and its message both survive.
+	if !containsString(err.Error(), "input error") {
+		t.Errorf("error should be the confirmation error itself, got: %v", err)
 	}
 }
 
@@ -1986,8 +1991,8 @@ func TestPerformRollback_ConfirmError(t *testing.T) {
 	if err == nil {
 		t.Error("PerformRollback() should return error when confirmation fails")
 	}
-	if !containsString(err.Error(), "confirmation") {
-		t.Errorf("error should mention confirmation failure, got: %v", err)
+	if !containsString(err.Error(), "input error") {
+		t.Errorf("error should be the confirmation error itself, got: %v", err)
 	}
 }
 

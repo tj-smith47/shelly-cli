@@ -34,7 +34,7 @@ shelly template import <file> [name] [flags]
 ### Options
 
 ```
-  -f, --force   Overwrite existing template
+  -f, --force   Replace an existing template with the same name
   -h, --help    help for import
 ```
 

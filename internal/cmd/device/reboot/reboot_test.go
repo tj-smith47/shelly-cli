@@ -3,6 +3,7 @@ package reboot
 import (
 	"bytes"
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -251,7 +252,7 @@ func TestRun_Cancelled(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	// Provide "n" response for confirmation
+	// Test streams are not a terminal, so the gate refuses before reading stdin.
 	tf.TestIO.In.WriteString("n\n")
 
 	opts := &Options{
@@ -261,14 +262,8 @@ func TestRun_Cancelled(t *testing.T) {
 	opts.Yes = false
 
 	err := run(context.Background(), opts)
-	if err != nil {
-		t.Errorf("run() error = %v, want nil (cancelled)", err)
-	}
-
-	// Should print cancelled message
-	output := tf.OutString()
-	if output == "" {
-		t.Error("Expected output when cancelled")
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Errorf("run() error = %v, want cmdutil.ErrConfirmationRequired", err)
 	}
 }
 

@@ -67,6 +67,26 @@ type DeviceResolver interface {
 	Resolve(identifier string) (model.Device, error)
 }
 
+// CredentialStore is implemented by a resolver that keeps device credentials
+// in its own config manager, so a password rotation is stored where the
+// device was resolved from.
+type CredentialStore interface {
+	GetDevice(name string) (model.Device, bool)
+	SetDeviceAuth(name, username, password string) error
+}
+
+// globalCredentialStore reads and writes the default config manager, for a
+// resolver that does not carry its own.
+type globalCredentialStore struct{}
+
+func (globalCredentialStore) GetDevice(name string) (model.Device, bool) {
+	return config.GetDevice(name)
+}
+
+func (globalCredentialStore) SetDeviceAuth(name, username, password string) error {
+	return config.SetDeviceAuth(name, username, password)
+}
+
 // GenerationAwareResolver extends DeviceResolver with generation detection.
 type GenerationAwareResolver interface {
 	DeviceResolver
@@ -919,8 +939,12 @@ func (s *Service) SetAuth(ctx context.Context, identifier, user, password string
 		return "", false, err
 	}
 	dev.Auth = &model.Auth{Username: user, Password: password}
-	if _, registered := config.GetDevice(identifier); registered {
-		if err := config.SetDeviceAuth(identifier, user, password); err != nil {
+	store, ok := s.resolver.(CredentialStore)
+	if !ok {
+		store = globalCredentialStore{}
+	}
+	if _, registered := store.GetDevice(identifier); registered {
+		if err := store.SetDeviceAuth(identifier, user, password); err != nil {
 			return user, false, fmt.Errorf("the device now requires the new password, but storing it failed: %w", err)
 		}
 		stored = true

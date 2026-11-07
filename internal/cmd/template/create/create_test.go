@@ -218,7 +218,7 @@ func TestOptions(t *testing.T) {
 		IncludeWiFi: true,
 		Factory:     f,
 	}
-	opts.Yes = true
+	opts.Force = true
 
 	if opts.Name != "test-template" {
 		t.Errorf("Name = %q, want %q", opts.Name, "test-template")
@@ -232,8 +232,8 @@ func TestOptions(t *testing.T) {
 	if !opts.IncludeWiFi {
 		t.Error("IncludeWiFi should be true")
 	}
-	if !opts.Yes {
-		t.Error("Yes should be true")
+	if !opts.Force {
+		t.Error("Force should be true")
 	}
 	if opts.Factory == nil {
 		t.Error("Factory should not be nil")

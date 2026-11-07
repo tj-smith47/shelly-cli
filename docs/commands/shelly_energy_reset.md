@@ -32,6 +32,9 @@ shelly energy reset <device> [id] [flags]
 
   # Reset with device alias
   shelly energy reset basement-em
+
+  # Skip the confirmation prompt (scripts)
+  shelly energy reset basement-em --yes
 ```
 
 ### Options
@@ -40,6 +43,7 @@ shelly energy reset <device> [id] [flags]
   -h, --help            help for reset
       --type string     Component type: auto, or one of em, em1, pm, pm1, switch, cover, light, rgb, rgbw, cct, meter (Gen1), emeter (Gen1) (default "auto")
       --types strings   Counter types to reset (leave empty for all)
+  -y, --yes             Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

@@ -32,9 +32,8 @@ shelly virtual delete <device> <key> [flags]
 ### Options
 
 ```
-      --confirm   Double-confirm destructive operation
-  -h, --help      help for delete
-  -y, --yes       Skip confirmation prompt
+  -h, --help   help for delete
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

@@ -499,7 +499,7 @@ func TestRun_OpenReachesRestore(t *testing.T) {
 	if err := run(migrateTestCtx(t), opts); err != nil {
 		t.Fatalf("run: %v", err)
 	}
-	if got == nil || *got != (clibackup.NetworkOverride{SSID: "Guest", Open: true}) {
+	if got == nil || *got != (clibackup.NetworkOverride{SSID: "Guest", Open: true, CopyBackupAddress: true}) {
 		t.Errorf("override = %+v, want an open Guest network", got)
 	}
 }

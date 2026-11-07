@@ -66,11 +66,21 @@ func AddAliases(parent *cobra.Command, groupID string) {
 	}
 }
 
+// aliasAnnotation marks a command generated from a config alias.
+const aliasAnnotation = "shelly.alias"
+
+// IsAlias reports whether c was generated from a config alias and forwards
+// its arguments to another command.
+func IsAlias(c *cobra.Command) bool {
+	return c.Annotations[aliasAnnotation] == annotationSet
+}
+
 // newAliasCommand creates a cobra command that represents an alias.
 func newAliasCommand(aliasName, aliasValue string) *cobra.Command {
 	return &cobra.Command{
-		Use:   aliasName,
-		Short: fmt.Sprintf("Alias for %q", truncateText(aliasTextMaxLength, aliasValue)),
+		Use:         aliasName,
+		Short:       fmt.Sprintf("Alias for %q", truncateText(aliasTextMaxLength, aliasValue)),
+		Annotations: map[string]string{aliasAnnotation: annotationSet},
 		RunE: func(c *cobra.Command, args []string) error {
 			expandedArgs, err := expandAliasArgs(aliasValue, args)
 			if err != nil {
@@ -84,22 +94,22 @@ func newAliasCommand(aliasName, aliasValue string) *cobra.Command {
 	}
 }
 
-// expandAliasArgs processes args to rewrite them according to an alias expansion.
+// expandAliasArgs rewrites args according to an alias expansion: "$N" takes
+// the Nth argument, "$@" stands for every argument no "$N" consumed, and with
+// neither marker the arguments follow the expansion. Arguments are
+// appended after the expansion is split, so one holding spaces stays one
+// argument.
 func expandAliasArgs(expansion string, args []string) ([]string, error) {
 	extraArgs := []string{}
 	for i, a := range args {
-		if !strings.Contains(expansion, "$") {
-			extraArgs = append(extraArgs, a)
-		} else {
-			expansion = strings.ReplaceAll(expansion, fmt.Sprintf("$%d", i+1), a)
+		placeholder := fmt.Sprintf("$%d", i+1)
+		if strings.Contains(expansion, placeholder) {
+			expansion = strings.ReplaceAll(expansion, placeholder, a)
+			continue
 		}
+		extraArgs = append(extraArgs, a)
 	}
-
-	// Handle $@ for all remaining args
-	if strings.Contains(expansion, "$@") {
-		expansion = strings.ReplaceAll(expansion, "$@", strings.Join(extraArgs, " "))
-		extraArgs = nil
-	}
+	expansion = strings.ReplaceAll(expansion, "$@", "")
 
 	lingeringRE := regexp.MustCompile(`\$\d`)
 	if lingeringRE.MatchString(expansion) {

@@ -3,6 +3,7 @@ package disable
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -242,8 +243,7 @@ func TestExecute_Cancelled(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// In test mode (non-TTY), Confirm returns the default value (false),
-	// so without --yes flag, the confirmation will be declined
+	// Test streams are not a terminal, so without --yes the gate refuses.
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -252,13 +252,8 @@ func TestExecute_Cancelled(t *testing.T) {
 	cmd.SetErr(&buf)
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Errorf("Execute() error = %v, expected nil (cancellation is not an error)", err)
-	}
-
-	output := buf.String() + tf.OutString() + tf.ErrString()
-	if !strings.Contains(output, "Cancelled") {
-		t.Errorf("Expected output to contain 'Cancelled', got: %s", output)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Errorf("Execute() error = %v, want cmdutil.ErrConfirmationRequired", err)
 	}
 }
 
@@ -377,8 +372,7 @@ func TestRun_WithContext(t *testing.T) {
 
 //nolint:paralleltest // Non-parallel test due to shared test state
 func TestRun_ConfirmationDeclined(t *testing.T) {
-	// In test mode (non-TTY), Confirm returns the default value (false)
-	// so with Yes=false, the run function will return nil (cancelled, not an error)
+	// Test streams are not a terminal, so with Yes=false the gate refuses.
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
@@ -388,13 +382,7 @@ func TestRun_ConfirmationDeclined(t *testing.T) {
 	opts.Yes = false // Will be declined in non-TTY mode
 
 	err := run(context.Background(), opts)
-	if err != nil {
-		t.Errorf("run() error = %v, expected nil (cancellation is not an error)", err)
-	}
-
-	// Verify the warning message was printed
-	output := tf.OutString() + tf.ErrString()
-	if !strings.Contains(output, "Cancelled") {
-		t.Errorf("Expected output to contain 'Cancelled', got: %s", output)
+	if !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+		t.Errorf("run() error = %v, want cmdutil.ErrConfirmationRequired", err)
 	}
 }

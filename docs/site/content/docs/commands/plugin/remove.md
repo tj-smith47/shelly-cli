@@ -23,12 +23,16 @@ shelly plugin remove <name> [flags]
 ```
   # Remove an extension
   shelly extension remove myext
+
+  # Skip the confirmation prompt (scripts)
+  shelly extension remove myext --yes
 ```
 
 ### Options
 
 ```
   -h, --help   help for remove
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

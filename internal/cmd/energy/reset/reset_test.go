@@ -3,6 +3,7 @@ package reset
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -194,7 +195,7 @@ func TestRun_Success(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-em", "0"})
+	cmd.SetArgs([]string{"test-em", "0", "--yes"})
 
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
@@ -248,7 +249,7 @@ func TestRun_WithCounterTypes(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-em-types", "0", "--types", "active,reactive"})
+	cmd.SetArgs([]string{"test-em-types", "0", "--types", "active,reactive", "--yes"})
 
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
@@ -266,6 +267,7 @@ func TestRun_Error(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Yes:          true,
 		Factory:      tf.Factory,
 		Device:       "nonexistent-device",
 		ComponentID:  0,
@@ -315,7 +317,7 @@ func TestRun_WithComponentID(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{"test-device", "5"})
+	cmd.SetArgs([]string{"test-device", "5", "--yes"})
 
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
@@ -386,7 +388,7 @@ func TestRun_DefaultComponentID(t *testing.T) {
 	// Only device name, no component ID (should default to 0)
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"test-em-default"})
+	cmd.SetArgs([]string{"test-em-default", "--yes"})
 
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
@@ -438,7 +440,7 @@ func TestRun_EveryCarrier(t *testing.T) {
 			demo.InjectIntoFactory(tf.Factory)
 			cmd := NewCommand(tf.Factory)
 			cmd.SetContext(context.Background())
-			cmd.SetArgs(append([]string{"dev"}, tt.args...))
+			cmd.SetArgs(append([]string{"dev"}, append(tt.args, "--yes")...))
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
 			err = cmd.Execute()
@@ -456,4 +458,73 @@ func TestRun_EveryCarrier(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestExecute_ConfirmGate proves the gate: no terminal and no --yes returns
+// ErrConfirmationRequired and performs nothing; --yes runs the action.
+//
+//nolint:paralleltest // InjectIntoFactory installs the global config manager.
+func TestExecute_ConfirmGate(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gate-em",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gate-em": {"em:0": map[string]any{"id": 0, "total_act_power": 1000.0}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	t.Run("no terminal without --yes refuses", func(t *testing.T) {
+		tf := factory.NewTestFactory(t)
+		demo.InjectIntoFactory(tf.Factory)
+		cmd := NewCommand(tf.Factory)
+		cmd.SetContext(context.Background())
+		cmd.SetArgs([]string{"gate-em", "0"})
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+
+		if err := cmd.Execute(); !errors.Is(err, cmdutil.ErrConfirmationRequired) {
+			t.Fatalf("Execute() error = %v, want ErrConfirmationRequired", err)
+		}
+		if strings.Contains(tf.OutString(), "Energy counters reset") {
+			t.Fatalf("action ran without confirmation: %q", tf.OutString())
+		}
+	})
+
+	t.Run("--yes performs the action", func(t *testing.T) {
+		tf := factory.NewTestFactory(t)
+		demo.InjectIntoFactory(tf.Factory)
+		cmd := NewCommand(tf.Factory)
+		cmd.SetContext(context.Background())
+		cmd.SetArgs([]string{"gate-em", "0", "--yes"})
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+
+		err := cmd.Execute()
+		if errors.Is(err, cmdutil.ErrConfirmationRequired) {
+			t.Fatalf("--yes still asked for confirmation: %v", err)
+		}
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(tf.OutString(), "Energy counters reset") {
+			t.Fatalf("expected %q in output, got %q", "Energy counters reset", tf.OutString())
+		}
+	})
 }

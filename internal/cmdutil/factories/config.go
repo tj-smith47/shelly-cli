@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -75,7 +76,7 @@ func NewConfigDeleteCommand(f *cmdutil.Factory, opts ConfigDeleteOpts) *cobra.Co
 		cmd.ValidArgsFunction = opts.ValidArgsFunc
 	}
 
-	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesFlag(cmd, &yesFlag)
 
 	return cmd
 }
@@ -96,10 +97,10 @@ func runConfigDelete(f *cmdutil.Factory, opts ConfigDeleteOpts, name string, ski
 
 	confirmed, err := f.ConfirmAction(msg, skipConfirm)
 	if err != nil {
-		return fmt.Errorf("confirmation failed: %w", err)
+		return err
 	}
 	if !confirmed {
-		ios.Info("Deletion cancelled")
+		ios.Info("Cancelled")
 		return nil
 	}
 
