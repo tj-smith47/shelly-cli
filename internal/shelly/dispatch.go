@@ -9,6 +9,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
+// Component names as commands and plugins spell them.
+const (
+	componentSwitch = "switch"
+	componentLight  = "light"
+	componentCover  = "cover"
+)
+
 // PluginQuickResult holds the result of a plugin quick operation.
 // This is the plugin-equivalent of QuickResult.
 type PluginQuickResult struct {
@@ -148,10 +155,9 @@ func (s *Service) SupportsPluginCommand(device model.Device, command string) err
 	}
 
 	// Map command to hook
-	const componentCover = "cover"
 	var hookAvailable bool
 	switch command {
-	case "on", "off", "toggle", "switch", "light", componentCover:
+	case string(RelayOn), string(RelayOff), string(RelayToggle), componentSwitch, componentLight, componentCover:
 		hookAvailable = plugin.Manifest.Hooks.Control != ""
 	case "status":
 		hookAvailable = plugin.Manifest.Hooks.Status != ""

@@ -29,7 +29,7 @@ func (s SwitchInfo) ListHeaders() []string {
 
 // ListRow returns the formatted row values for the table.
 func (s SwitchInfo) ListRow() []string {
-	name := output.FormatComponentName(s.Name, "switch", s.ID)
+	name := output.FormatComponentName(s.Name, componentSwitch, s.ID)
 	state := output.RenderOnOff(s.Output, output.CaseUpper, theme.FalseError)
 	power := output.FormatPowerTableValue(s.Power)
 	return []string{fmt.Sprintf("%d", s.ID), name, state, power}

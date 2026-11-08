@@ -50,7 +50,7 @@ func (s *Service) QuickOn(ctx context.Context, identifier string, componentID *i
 
 	// Dispatch to plugin for non-Shelly devices
 	if device.IsPluginManaged() {
-		pluginResult, err := s.dispatchToPlugin(ctx, device, ActionOn, "switch", componentID)
+		pluginResult, err := s.dispatchToPlugin(ctx, device, ActionOn, componentSwitch, componentID)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +87,7 @@ func (s *Service) QuickOff(ctx context.Context, identifier string, componentID *
 
 	// Dispatch to plugin for non-Shelly devices
 	if device.IsPluginManaged() {
-		pluginResult, err := s.dispatchToPlugin(ctx, device, ActionOff, "switch", componentID)
+		pluginResult, err := s.dispatchToPlugin(ctx, device, ActionOff, componentSwitch, componentID)
 		if err != nil {
 			return nil, err
 		}
@@ -124,7 +124,7 @@ func (s *Service) QuickToggle(ctx context.Context, identifier string, componentI
 
 	// Dispatch to plugin for non-Shelly devices
 	if device.IsPluginManaged() {
-		pluginResult, err := s.dispatchToPlugin(ctx, device, ActionToggle, "switch", componentID)
+		pluginResult, err := s.dispatchToPlugin(ctx, device, ActionToggle, componentSwitch, componentID)
 		if err != nil {
 			return nil, err
 		}

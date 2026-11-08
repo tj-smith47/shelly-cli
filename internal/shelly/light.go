@@ -32,7 +32,7 @@ func (l LightInfo) ListHeaders() []string {
 
 // ListRow returns the formatted row values for the table.
 func (l LightInfo) ListRow() []string {
-	name := output.FormatComponentName(l.Name, "light", l.ID)
+	name := output.FormatComponentName(l.Name, componentLight, l.ID)
 	state := output.RenderOnOff(l.Output, output.CaseUpper, theme.FalseError)
 
 	brightness := "-"

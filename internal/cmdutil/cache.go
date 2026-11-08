@@ -183,11 +183,14 @@ func IsOfflineMode() bool {
 	return viper.GetBool("offline")
 }
 
+// resourceSchedule is the singular resource name mutation commands pass.
+const resourceSchedule = "schedule"
+
 // CacheTypeForResource returns the cache type constant for a resource name.
 // This is useful for mutation commands that need to invalidate cache.
 func CacheTypeForResource(resource string) string {
 	switch resource {
-	case "schedule", "schedules":
+	case resourceSchedule, "schedules":
 		return cache.TypeSchedules
 	case "webhook", "webhooks":
 		return cache.TypeWebhooks
