@@ -19,7 +19,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/netguard"
-	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
@@ -720,95 +719,66 @@ func TestOnboardViaAP_RegistersWithDeviceGeneration(t *testing.T) {
 	}
 }
 
-// TestOnboardViaAP_AppliesOptions checks that the name, timezone and cloud
-// choice reach the device over the LAN after the AP write, on both generations,
-// and that a device with no route from this host gets a note naming them.
-//
-//nolint:paralleltest // withIsolatedConfig swaps the process-global config
-func TestOnboardViaAP_AppliesOptions(t *testing.T) {
-	opts := &OnboardOptions{DeviceName: "guest bath", Timezone: "America/Los_Angeles", NoCloud: true}
-	for _, gen := range []int{1, 2} {
-		t.Run(fmt.Sprintf("gen%d", gen), func(t *testing.T) {
-			withIsolatedConfig(t)
-			d := newAPDevServer(t, gen)
-			svc := New(d.resolver(gen), WithRateLimiter(ratelimit.New(ratelimit.WithGen1MinInterval(0))))
-			svc.ap = &apFlows{onboard: func(context.Context, *reprovision.OnboardOptions) (*reprovision.OnboardResult, error) {
-				return &reprovision.OnboardResult{Address: d.addr(), Generation: gen, Reachable: true}, nil
-			}}
-			dev := &OnboardDevice{Name: "duo", SSID: testAPSSID, Generation: gen}
+// TestOnboardViaAP_IdentityOptions checks that the name, timezone and cloud
+// choice go to the SDK, which writes them, and that the SDK's warnings reach
+// the result note once each.
+func TestOnboardViaAP_IdentityOptions(t *testing.T) {
+	t.Parallel()
 
-			res := svc.OnboardViaAP(context.Background(), dev, &OnboardWiFiConfig{SSID: "iot", Password: "p"}, opts)
-
-			if res.Error != nil || res.Note != "" || !res.Registered {
-				t.Fatalf("result = %+v, want registered with no note", res)
-			}
-			var got []string
-			for _, w := range d.written() {
-				switch gen {
-				case 1:
-					got = append(got, w.method+"?"+w.query.Encode())
-				default:
-					b, err := json.Marshal(w.params)
-					if err != nil {
-						t.Fatal(err)
-					}
-					got = append(got, w.method+" "+string(b))
-				}
-			}
-			want := map[int][]string{
-				1: {
-					"/settings?name=guest+bath",
-					"/settings?timezone=America%2FLos_Angeles",
-					"/settings/cloud?enabled=false",
-				},
-				2: {
-					`Sys.SetConfig {"config":{"device":{"name":"guest bath"}}}`,
-					`Sys.SetConfig {"config":{"location":{"tz":"America/Los_Angeles"}}}`,
-					`Cloud.SetConfig {"config":{"enable":false}}`,
-				},
-			}[gen]
-			if !reflect.DeepEqual(got, want) {
-				t.Errorf("device writes =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
-			}
-		})
-	}
-
-	t.Run("no route to the device", func(t *testing.T) {
-		withIsolatedConfig(t)
-		d := newAPDevServer(t, 2)
-		svc := New(d.resolver(2))
-		svc.ap = &apFlows{onboard: func(context.Context, *reprovision.OnboardOptions) (*reprovision.OnboardResult, error) {
-			return &reprovision.OnboardResult{Address: d.addr(), Generation: 2, Reachable: false, SeenVia: "mdns"}, nil
+	t.Run("mapped to the SDK", func(t *testing.T) {
+		t.Parallel()
+		var got *reprovision.OnboardOptions
+		svc := New(NewConfigResolver())
+		svc.ap = &apFlows{onboard: func(_ context.Context, o *reprovision.OnboardOptions) (*reprovision.OnboardResult, error) {
+			got = o
+			return &reprovision.OnboardResult{}, nil
 		}}
+		opts := &OnboardOptions{DeviceName: "garage", Timezone: "America/Los_Angeles", NoCloud: true}
 
-		res := svc.OnboardViaAP(context.Background(), &OnboardDevice{Name: "plug", SSID: "ShellyPlusPlugS-AABBCC"},
+		res := svc.OnboardViaAP(context.Background(), &OnboardDevice{Name: "duo", SSID: testAPSSID},
 			&OnboardWiFiConfig{SSID: "iot", Password: "p"}, opts)
 
-		want := "name, timezone, cloud not applied: the device announced itself but this host has no route to it"
-		if res.Error != nil || !res.Registered || res.Note != want {
-			t.Errorf("result = %+v, want registered with note %q", res, want)
+		if res.Error != nil || res.Note != "" {
+			t.Fatalf("result = %+v, want clean", res)
 		}
-		if n := len(d.written()); n != 0 {
-			t.Errorf("%d writes reached a device this host cannot route to", n)
+		if got.Name != "garage" || got.Timezone != "America/Los_Angeles" || !got.DisableCloud {
+			t.Errorf("SDK options name/timezone/cloud = %q/%q/%v", got.Name, got.Timezone, got.DisableCloud)
 		}
 	})
 
-	t.Run("nothing asked writes nothing", func(t *testing.T) {
-		withIsolatedConfig(t)
-		d := newAPDevServer(t, 1)
-		svc := New(d.resolver(1))
-		svc.ap = &apFlows{onboard: func(context.Context, *reprovision.OnboardOptions) (*reprovision.OnboardResult, error) {
-			return &reprovision.OnboardResult{Address: d.addr(), Generation: 1, Reachable: true}, nil
+	t.Run("nothing asked", func(t *testing.T) {
+		t.Parallel()
+		var got *reprovision.OnboardOptions
+		svc := New(NewConfigResolver())
+		svc.ap = &apFlows{onboard: func(_ context.Context, o *reprovision.OnboardOptions) (*reprovision.OnboardResult, error) {
+			got = o
+			return &reprovision.OnboardResult{}, nil
 		}}
 		for _, o := range []*OnboardOptions{nil, {}} {
-			res := svc.OnboardViaAP(context.Background(), &OnboardDevice{Name: "duo", SSID: testAPSSID},
+			svc.OnboardViaAP(context.Background(), &OnboardDevice{Name: "duo", SSID: testAPSSID},
 				&OnboardWiFiConfig{SSID: "iot", Password: "p"}, o)
-			if res.Error != nil || res.Note != "" {
-				t.Errorf("opts=%+v: result = %+v, want clean", o, res)
+			if got.Name != "" || got.Timezone != "" || got.DisableCloud {
+				t.Errorf("opts=%+v: SDK got name/timezone/cloud %q/%q/%v", o, got.Name, got.Timezone, got.DisableCloud)
 			}
 		}
-		if n := len(d.written()); n != 0 {
-			t.Errorf("%d writes with nothing asked for", n)
+	})
+
+	t.Run("warnings reach the note once", func(t *testing.T) {
+		t.Parallel()
+		svc := New(NewConfigResolver())
+		svc.ap = &apFlows{onboard: func(context.Context, *reprovision.OnboardOptions) (*reprovision.OnboardResult, error) {
+			return &reprovision.OnboardResult{
+				Note:     "joined",
+				Warnings: []string{"name not applied: boom", "cloud not applied: nope"},
+			}, nil
+		}}
+
+		res := svc.OnboardViaAP(context.Background(), &OnboardDevice{Name: "duo", SSID: testAPSSID},
+			&OnboardWiFiConfig{SSID: "iot", Password: "p"}, &OnboardOptions{DeviceName: "x", NoCloud: true})
+
+		want := "joined; name not applied: boom; cloud not applied: nope"
+		if res.Error != nil || res.Note != want {
+			t.Errorf("note = %q, want %q", res.Note, want)
 		}
 	})
 }

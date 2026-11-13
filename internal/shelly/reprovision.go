@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/tj-smith47/shelly-go/discovery"
-	"github.com/tj-smith47/shelly-go/gen2/components"
 	"github.com/tj-smith47/shelly-go/reprovision"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -377,6 +376,10 @@ func (s *Service) OnboardViaAP(
 	opts *OnboardOptions,
 ) *OnboardResult {
 	result := &OnboardResult{Device: device, Method: string(OnboardSourceWiFiAP)}
+	var o OnboardOptions
+	if opts != nil {
+		o = *opts
+	}
 
 	res, err := s.flows().onboard(ctx, &reprovision.OnboardOptions{
 		Scanner: s.scanner(),
@@ -392,8 +395,11 @@ func (s *Service) OnboardViaAP(
 			DNS:      wifi.DNS,
 			Open:     wifi.Open,
 		},
-		Generation: device.Generation,
-		DisableAP:  opts != nil && opts.DisableAP,
+		Generation:   device.Generation,
+		DisableAP:    o.DisableAP,
+		Name:         o.DeviceName,
+		Timezone:     o.Timezone,
+		DisableCloud: o.NoCloud,
 	})
 	if err != nil {
 		if errors.Is(err, reprovision.ErrNoPassphrase) {
@@ -404,7 +410,7 @@ func (s *Service) OnboardViaAP(
 	}
 
 	result.NewAddress = res.Address
-	result.Note = res.Note
+	result.Note = joinNotes(res.Note, strings.Join(res.Warnings, "; "))
 	result.APDisabled = res.APDisabled
 	if res.Address == "" {
 		return result
@@ -419,97 +425,7 @@ func (s *Service) OnboardViaAP(
 	} else {
 		result.Registered = true
 	}
-	// The AP write carries only the station settings, so the name, timezone and
-	// cloud choice reach the device over the LAN once it is there.
-	if !res.Reachable {
-		result.Note = joinNotes(result.Note, opts.describeUnapplied("the device announced itself but this host has no route to it"))
-		return result
-	}
-	result.Note = joinNotes(result.Note, s.applyOnboardOptions(ctx, res.Address, opts))
 	return result
-}
-
-// describeUnapplied names the device settings in o that an onboard did not
-// apply, with the reason, or returns "" when o asks for none.
-func (o *OnboardOptions) describeUnapplied(reason string) string {
-	if o == nil {
-		return ""
-	}
-	var asked []string
-	if o.DeviceName != "" {
-		asked = append(asked, "name")
-	}
-	if o.Timezone != "" {
-		asked = append(asked, "timezone")
-	}
-	if o.NoCloud {
-		asked = append(asked, "cloud")
-	}
-	if len(asked) == 0 {
-		return ""
-	}
-	return fmt.Sprintf("%s not applied: %s", strings.Join(asked, ", "), reason)
-}
-
-// applyOnboardOptions writes the name, timezone and cloud choice in opts to the
-// device at identifier and returns a note naming whatever the device refused,
-// or "" when everything asked for was applied.
-func (s *Service) applyOnboardOptions(ctx context.Context, identifier string, opts *OnboardOptions) string {
-	if opts == nil || (opts.DeviceName == "" && opts.Timezone == "" && !opts.NoCloud) {
-		return ""
-	}
-	var refused []string
-	err := s.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
-		apply := func(what string, fn func() error) {
-			if ferr := fn(); ferr != nil {
-				refused = append(refused, fmt.Sprintf("%s: %v", what, ferr))
-			}
-		}
-		if dev.IsGen1() {
-			g1 := dev.Gen1().Device()
-			if opts.DeviceName != "" {
-				apply("name", func() error { return g1.SetName(ctx, opts.DeviceName) })
-			}
-			if opts.Timezone != "" {
-				apply("timezone", func() error { return g1.SetTimezone(ctx, opts.Timezone) })
-			}
-			if opts.NoCloud {
-				apply("cloud", func() error { return g1.SetCloud(ctx, false) })
-			}
-			return nil
-		}
-		rpcClient := dev.Gen2().RPCClient()
-		if opts.DeviceName != "" {
-			name := opts.DeviceName
-			apply("name", func() error {
-				return components.NewSys(rpcClient).SetConfig(ctx, &components.SysConfig{
-					Device: &components.SysDeviceConfig{Name: &name},
-				})
-			})
-		}
-		if opts.Timezone != "" {
-			tz := opts.Timezone
-			apply("timezone", func() error {
-				return components.NewSys(rpcClient).SetConfig(ctx, &components.SysConfig{
-					Location: &components.SysLocationConfig{TZ: &tz},
-				})
-			})
-		}
-		if opts.NoCloud {
-			enable := false
-			apply("cloud", func() error {
-				return components.NewCloud(rpcClient).SetConfig(ctx, &components.CloudConfig{Enable: &enable})
-			})
-		}
-		return nil
-	})
-	if err != nil {
-		return opts.describeUnapplied(err.Error())
-	}
-	if len(refused) == 0 {
-		return ""
-	}
-	return "not applied: " + strings.Join(refused, "; ")
 }
 
 // joinNotes joins two result notes, skipping empty ones.
