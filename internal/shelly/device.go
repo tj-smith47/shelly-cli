@@ -4,6 +4,7 @@ package shelly
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -70,6 +71,13 @@ func (s *Service) withGenAwareRestart(
 		err = s.WithConnection(ctx, identifier, gen2Fn)
 	}
 	if err == nil {
+		return nil
+	}
+	// A success status followed by silence means the device accepted the action
+	// and restarted before it finished replying. That read stalls until the
+	// caller's deadline, so this check has to come before the deadline one.
+	if errors.Is(err, types.ErrReplyCutOff) {
+		debug.TraceEvent("%s: device accepted the request and restarted mid-reply (expected): %v", op, err)
 		return nil
 	}
 	// If the caller's own context was cancelled or timed out, the operation was

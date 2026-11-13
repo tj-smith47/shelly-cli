@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 	"github.com/tj-smith47/shelly-go/types"
@@ -211,6 +212,25 @@ func TestDeviceFactoryReset_Gen2Success(t *testing.T) {
 
 	if err := svc.DeviceFactoryReset(context.Background(), "dev"); err != nil {
 		t.Fatalf("DeviceFactoryReset gen2 (reachable, accepts reset): %v", err)
+	}
+}
+
+// TestDeviceFactoryReset_ReplyCutOffIsSuccess covers a device that accepts the reset
+// (success status) and wipes before it finishes replying: the read stalls until the
+// caller's deadline, and the reset must still be reported as done.
+func TestDeviceFactoryReset_ReplyCutOffIsSuccess(t *testing.T) {
+	t.Parallel()
+	d := newAPDevServer(t, 1)
+	d.gen1.resetStall = true
+	svc := apdevService(d, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	if err := svc.DeviceFactoryReset(ctx, "dev"); err != nil {
+		t.Fatalf("DeviceFactoryReset: a reply cut off by the reset should read as success, got %v", err)
+	}
+	if atomic.LoadInt32(&d.gen1.resetHits) == 0 {
+		t.Error("the device's /settings?reset=true endpoint was never hit")
 	}
 }
 

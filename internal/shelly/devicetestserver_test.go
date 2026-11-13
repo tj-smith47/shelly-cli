@@ -128,9 +128,30 @@ type apdevGen1 struct {
 	// the production call sees a real (non-connectivity) failure.
 	rebootErr bool
 	resetErr  bool
+	// resetStall, when true, makes the reset endpoint send its headers and then
+	// never finish the body, as a device does when it wipes mid-reply.
+	resetStall bool
 
 	rebootHits int32
 	resetHits  int32
+}
+
+// serveGen1Reset answers the Gen1 factory-reset request.
+func (d *apdevServer) serveGen1Reset(w http.ResponseWriter, r *http.Request) {
+	atomic.AddInt32(&d.gen1.resetHits, 1)
+	switch {
+	case d.gen1.resetErr:
+		http.Error(w, "reset refused", http.StatusInternalServerError)
+	case d.gen1.resetStall:
+		w.Header().Set("Content-Length", "64")
+		w.WriteHeader(http.StatusOK)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		<-r.Context().Done()
+	default:
+		writeJSON(w, map[string]any{"ok": true})
+	}
 }
 
 // apdevGen2 holds the mutable per-route behaviour of a fake Gen2 device.
@@ -191,12 +212,7 @@ func (d *apdevServer) registerGen1(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("/settings", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("reset") == "true" {
-			atomic.AddInt32(&d.gen1.resetHits, 1)
-			if d.gen1.resetErr {
-				http.Error(w, "reset refused", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, map[string]any{"ok": true})
+			d.serveGen1Reset(w, r)
 			return
 		}
 		if r.URL.Query().Has("name") || r.URL.Query().Has("timezone") {

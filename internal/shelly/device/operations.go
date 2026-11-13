@@ -8,20 +8,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
 
-// Reboot reboots the device.
-func (s *Service) Reboot(ctx context.Context, identifier string, delayMS int) error {
-	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		return conn.Reboot(ctx, delayMS)
-	})
-}
-
-// FactoryReset performs a factory reset on the device.
-func (s *Service) FactoryReset(ctx context.Context, identifier string) error {
-	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		return conn.FactoryReset(ctx)
-	})
-}
-
 // GetFullStatus returns the complete device status from Shelly.GetStatus (Gen2+).
 // The returned map contains component names (e.g., "switch:0", "wifi", "sys") as keys
 // and their status as json.RawMessage for flexible parsing.
