@@ -33,6 +33,9 @@ type apdevServer struct {
 	srv  *httptest.Server
 	gen1 *apdevGen1
 	gen2 *apdevGen2
+	// gone makes every request hang unanswered, as a device that has left the
+	// network does.
+	gone atomic.Bool
 	// staSSID is the configured WiFi station SSID both generations report.
 	staSSID string
 	// sta1SSID, when set, is the configured secondary station SSID.
@@ -131,6 +134,11 @@ type apdevGen1 struct {
 	// resetStall, when true, makes the reset endpoint send its headers and then
 	// never finish the body, as a device does when it wipes mid-reply.
 	resetStall bool
+	// resetSilent, when true, makes the reset endpoint take the request and
+	// never answer, as a Bulb Duo does. Unless resetIgnored is also set the
+	// device then stops answering every request, as one that wiped itself does.
+	resetSilent  bool
+	resetIgnored bool
 
 	rebootHits int32
 	resetHits  int32
@@ -142,6 +150,9 @@ func (d *apdevServer) serveGen1Reset(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case d.gen1.resetErr:
 		http.Error(w, "reset refused", http.StatusInternalServerError)
+	case d.gen1.resetSilent:
+		d.gone.Store(!d.gen1.resetIgnored)
+		<-r.Context().Done()
 	case d.gen1.resetStall:
 		w.Header().Set("Content-Length", "64")
 		w.WriteHeader(http.StatusOK)
@@ -182,6 +193,10 @@ func newAPDevServer(t *testing.T, generation int) *apdevServer {
 		}
 		d.hits[r.URL.Path]++
 		d.mu.Unlock()
+		if d.gone.Load() {
+			<-r.Context().Done()
+			return
+		}
 		mux.ServeHTTP(w, r)
 	}))
 	t.Cleanup(d.srv.Close)

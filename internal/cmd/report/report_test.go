@@ -238,10 +238,11 @@ func TestExecute_NoDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_UnknownReportType(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -287,10 +288,11 @@ func TestExecute_UnknownReportType(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_DevicesReport(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -342,10 +344,11 @@ func TestExecute_DevicesReport(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_EnergyReport(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -396,10 +399,11 @@ func TestExecute_EnergyReport(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_AuditReport(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -450,10 +454,11 @@ func TestExecute_AuditReport(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_TextFormat(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -498,10 +503,11 @@ func TestExecute_TextFormat(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithMultipleDevices(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -553,10 +559,11 @@ func TestExecute_WithMultipleDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_DevicesReport(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -598,10 +605,11 @@ func TestRun_DevicesReport(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_EnergyReport(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -643,10 +651,11 @@ func TestRun_EnergyReport(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_AuditReport(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -688,10 +697,11 @@ func TestRun_AuditReport(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_TextFormat(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -733,10 +743,11 @@ func TestRun_TextFormat(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_UnknownReportType(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -780,10 +791,12 @@ func TestRun_UnknownReportType(t *testing.T) {
 
 // TestRun_StdoutCarriesOnlyTheReport runs every report type in every format
 // and requires stdout to hold just the document, with the device's row.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_StdoutCarriesOnlyTheReport(t *testing.T) {
 	// Reports write what devices tell them to the process-wide registry,
 	// so runs against different mocks must not overlap.
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",

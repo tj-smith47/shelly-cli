@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 // Report fixture devices: a Gen2 plug that meters power, a Gen1 bulb that
@@ -87,8 +88,9 @@ func registered(t *testing.T, demo *mock.Demo) map[string]model.Device {
 	return demo.ConfigMgr.Get().Devices
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestGenerateDevicesReport_Gen1Gen2AndOffline(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 	svc, demo := reportService(t)
 
 	report := svc.GenerateDevicesReport(reportContext(t), registered(t, demo))
@@ -127,8 +129,9 @@ func TestGenerateDevicesReport_Gen1Gen2AndOffline(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestGenerateEnergyReport_CountsGen1Meters(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 	svc, demo := reportService(t)
 
 	report := svc.GenerateEnergyReport(reportContext(t), registered(t, demo))
@@ -155,8 +158,9 @@ func TestGenerateEnergyReport_CountsGen1Meters(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestGenerateAuditReport_SharesAuditDevices(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 	svc, demo := reportService(t)
 
 	report := svc.GenerateAuditReport(reportContext(t), registered(t, demo))
@@ -216,8 +220,10 @@ func TestGenerateAuditReport_SharesAuditDevices(t *testing.T) {
 // gate that holds each device's first request until all devices have sent
 // one. Asked one at a time, the first device waits for the others until the
 // gate gives up and answers 503, so a device reads as offline.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestGenerateReports_QueryDevicesConcurrently(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	factory.SetupTestFs(t)
 	svc, demo := reportService(t)
 	devices := []string{reportPlug, reportBulb}
 	inner := demo.DeviceServer.Config.Handler

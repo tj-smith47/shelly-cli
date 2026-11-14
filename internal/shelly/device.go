@@ -80,6 +80,14 @@ func (s *Service) withGenAwareRestart(
 		debug.TraceEvent("%s: device accepted the request and restarted mid-reply (expected): %v", op, err)
 		return nil
 	}
+	// A Gen1 bulb asked to factory reset takes the request and wipes itself
+	// without answering, so the call runs into the caller's deadline. Whether
+	// the device has left the network is what tells that apart from a device
+	// that ignored the request. A cancelled caller gave up, so it gets the error.
+	if errors.Is(err, types.ErrNoReply) && !errors.Is(ctx.Err(), context.Canceled) && s.stoppedAnswering(ctx, identifier) {
+		debug.TraceEvent("%s: device took the request without replying and has stopped answering (expected): %v", op, err)
+		return nil
+	}
 	// If the caller's own context was cancelled or timed out, the operation was
 	// aborted — surface that, never silently swallow it as a "successful" restart.
 	// (IsConnectivityFailure treats context cancellation as a connectivity error, so
@@ -95,6 +103,20 @@ func (s *Service) withGenAwareRestart(
 	}
 	debug.TraceEvent("%s: device dropped the connection as it restarted (expected): %v", op, err)
 	return nil
+}
+
+// restartGoneProbe is how long a device that took a restart request without
+// replying is given to answer one more request before it counts as gone.
+const restartGoneProbe = 3 * time.Second
+
+// stoppedAnswering reports whether the device no longer answers on the
+// network. The probe runs on its own deadline because the caller's has
+// usually run out by the time it is needed.
+func (s *Service) stoppedAnswering(ctx context.Context, identifier string) bool {
+	probeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), restartGoneProbe)
+	defer cancel()
+	_, err := s.DevicePing(probeCtx, identifier)
+	return err != nil && ratelimit.IsConnectivityFailure(err)
 }
 
 // DeviceFactoryReset performs a factory reset on the device, restarting it into AP

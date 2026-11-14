@@ -234,6 +234,42 @@ func TestDeviceFactoryReset_ReplyCutOffIsSuccess(t *testing.T) {
 	}
 }
 
+// TestDeviceFactoryReset_NoReplyThenGoneIsSuccess covers what a Bulb Duo does: it
+// takes the reset request, never answers and leaves the network. The call runs
+// into the caller's deadline and the reset must still be reported as done.
+func TestDeviceFactoryReset_NoReplyThenGoneIsSuccess(t *testing.T) {
+	t.Parallel()
+	d := newAPDevServer(t, 1)
+	d.gen1.resetSilent = true
+	svc := apdevService(d, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	if err := svc.DeviceFactoryReset(ctx, "dev"); err != nil {
+		t.Fatalf("DeviceFactoryReset: a device that took the reset and left the network was reset, got %v", err)
+	}
+	if atomic.LoadInt32(&d.gen1.resetHits) == 0 {
+		t.Error("the device's /settings?reset=true endpoint was never hit")
+	}
+}
+
+// TestDeviceFactoryReset_NoReplyStillAnsweringErrors covers a device that never
+// answers the reset request and is still on the network afterwards: nothing shows
+// it was reset, so the timeout is reported.
+func TestDeviceFactoryReset_NoReplyStillAnsweringErrors(t *testing.T) {
+	t.Parallel()
+	d := newAPDevServer(t, 1)
+	d.gen1.resetSilent = true
+	d.gen1.resetIgnored = true
+	svc := apdevService(d, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	if err := svc.DeviceFactoryReset(ctx, "dev"); err == nil {
+		t.Fatal("DeviceFactoryReset: a device that is still answering was not reset, want an error")
+	}
+}
+
 // TestWithGenAwareRestart_CancelledContextErrors covers the precedence guard: when the
 // caller's own context is cancelled, the operation was aborted and the error must be
 // surfaced — never swallowed as a successful restart — even though a cancellation
