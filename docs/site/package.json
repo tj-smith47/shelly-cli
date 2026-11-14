@@ -10,7 +10,7 @@
     "clean": "rm -rf public resources .hugo_build.lock"
   },
   "dependencies": {
-    "@fullhuman/postcss-purgecss": "^8.0.0",
+    "@fullhuman/postcss-purgecss": "^9.0.0",
     "@thulite/doks-core": "^1.9.4",
     "@thulite/images": "^3.3.4",
     "@thulite/inline-svg": "^1.2.2",
